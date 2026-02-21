@@ -98,6 +98,7 @@ async function installSkill(
   const targetDir = path.join(skillsDir, skillDirName(skillType));
   const altDir = path.join(skillsDir, altSkillDirName(skillType));
   const targetFile = path.join(targetDir, 'SKILL.md');
+  const content = readSkillContent(skillType);
 
   if (fs.existsSync(altDir)) {
     if (opts.removeConflict) {
@@ -132,7 +133,6 @@ async function installSkill(
     }
   }
 
-  const content = readSkillContent(skillType);
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(targetFile, content, 'utf8');
 

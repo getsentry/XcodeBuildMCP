@@ -350,6 +350,27 @@ describe('init command', () => {
       await expect(app.parseAsync()).rejects.toThrow('Skill source not found');
     });
 
+    it('does not delete conflicting skill when source file is missing', async () => {
+      rmSync(join(fakeResourceRoot, 'skills', 'xcodebuildmcp-cli', 'SKILL.md'));
+
+      const dest = join(tempDir, 'skills');
+      const conflictDir = join(dest, 'xcodebuildmcp');
+      mkdirSync(conflictDir, { recursive: true });
+      writeFileSync(join(conflictDir, 'SKILL.md'), 'existing mcp skill', 'utf8');
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--dest', dest, '--skill', 'cli', '--remove-conflict'])
+        .scriptName('')
+        .fail(false);
+      mod.registerInitCommand(app);
+
+      await expect(app.parseAsync()).rejects.toThrow('Skill source not found');
+      expect(existsSync(conflictDir)).toBe(true);
+      expect(readFileSync(join(conflictDir, 'SKILL.md'), 'utf8')).toBe('existing mcp skill');
+    });
+
     it('errors when no clients detected and no --dest or --print', async () => {
       const emptyHome = join(tempDir, 'empty-home');
       mkdirSync(emptyHome, { recursive: true });

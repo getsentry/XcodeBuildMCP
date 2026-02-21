@@ -45,7 +45,8 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 
 ## 3. Testing Checklist
 
-* **Ban on Vitest mocking** (`vi.mock`, `vi.fn`, `vi.spyOn`, `.mock*`) ⇒ critical. Use `createMockExecutor` / `createMockFileSystemExecutor`.
+* **External-boundary rule**: Use `createMockExecutor` / `createMockFileSystemExecutor` for command execution and filesystem side effects.
+* **Internal mocking is allowed**: `vi.mock`, `vi.fn`, `vi.spyOn`, and `.mock*` are acceptable for internal modules/collaborators.
 * Each tool must have tests covering happy-path **and** at least one failure path.
 * Avoid the `any` type unless justified with an inline comment.
 
@@ -72,8 +73,8 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 
 ### How Bugbot Can Verify Rules
 
-1. **Mocking violations**: search `*.test.ts` for `vi.` → critical.
-2. **DI compliance**: search for direct `child_process` / `fs` imports outside executors.
+1. **External-boundary violations**: confirm tests use injected executors/filesystem for external side effects.
+2. **DI compliance**: search for direct `child_process` / `fs` imports outside approved patterns.
 3. **Docs accuracy**: compare `docs/TOOLS.md` against `src/mcp/tools/**`.
 4. **Style**: ensure ESLint and Prettier pass (`npm run lint`, `npm run format:check`).
 
