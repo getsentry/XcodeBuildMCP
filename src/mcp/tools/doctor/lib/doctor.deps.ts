@@ -3,10 +3,14 @@ import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { loadManifest } from '../../../../core/manifest/load-manifest.ts';
 import type { RuntimeToolInfo } from '../../../../utils/tool-registry.ts';
 import { getRuntimeRegistration } from '../../../../utils/tool-registry.ts';
-import { areAxeToolsAvailable, resolveAxeBinary } from '../../../../utils/axe/index.ts';
+import {
+  areAxeToolsAvailable,
+  isAxeAtLeastVersion,
+  resolveAxeBinary,
+} from '../../../../utils/axe/index.ts';
 import {
   isXcodemakeEnabled,
-  isXcodemakeAvailable,
+  isXcodemakeBinaryAvailable,
   doesMakefileExist,
 } from '../../../../utils/xcodemake/index.ts';
 
@@ -46,15 +50,14 @@ export interface EnvironmentInfoProvider {
   };
 }
 
-export interface PluginInfoProvider {
-  getPluginSystemInfo(): Promise<
+export interface ManifestInfoProvider {
+  getManifestToolInfo(): Promise<
     | {
-        totalPlugins: number;
-        pluginDirectories: number;
-        pluginsByDirectory: Record<string, string[]>;
-        systemMode: string;
+        totalTools: number;
+        workflowCount: number;
+        toolsByWorkflow: Record<string, number>;
       }
-    | { error: string; systemMode: string }
+    | { error: string }
   >;
 }
 
@@ -64,8 +67,9 @@ export interface RuntimeInfoProvider {
 
 export interface FeatureDetector {
   areAxeToolsAvailable(): boolean;
+  isAxeAtLeastVersion(version: string, executor: CommandExecutor): Promise<boolean>;
   isXcodemakeEnabled(): boolean;
-  isXcodemakeAvailable(): Promise<boolean>;
+  isXcodemakeBinaryAvailable(): boolean;
   doesMakefileExist(path: string): boolean;
 }
 
@@ -74,7 +78,7 @@ export interface DoctorDependencies {
   binaryChecker: BinaryChecker;
   xcode: XcodeInfoProvider;
   env: EnvironmentInfoProvider;
-  plugins: PluginInfoProvider;
+  manifest: ManifestInfoProvider;
   runtime: RuntimeInfoProvider;
   features: FeatureDetector;
 }
@@ -104,6 +108,15 @@ export function createDoctorDependencies(executor: CommandExecutor): DoctorDepen
           version: version ?? 'Available (version info not available)',
         };
       }
+
+      if (binary === 'xcodemake') {
+        const available = isXcodemakeBinaryAvailable();
+        return {
+          available,
+          version: available ? 'Available (version info not available)' : undefined,
+        };
+      }
+
       try {
         const which = await executor(['which', binary], 'Check Binary Availability');
         if (!which.success) {
@@ -170,6 +183,10 @@ export function createDoctorDependencies(executor: CommandExecutor): DoctorDepen
         'TMPDIR',
         'NODE_ENV',
         'SENTRY_DISABLED',
+        'AXE_PATH',
+        'XBMCP_LAUNCH_JSON_WAIT_MS',
+        'XCODEBUILDMCP_DEBUGGER_BACKEND',
+        'XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE',
       ];
 
       const envVars: Record<string, string | undefined> = {};
@@ -214,31 +231,28 @@ export function createDoctorDependencies(executor: CommandExecutor): DoctorDepen
     },
   };
 
-  const plugins: PluginInfoProvider = {
-    async getPluginSystemInfo() {
+  const manifest: ManifestInfoProvider = {
+    async getManifestToolInfo() {
       try {
-        const manifest = loadManifest();
-        const pluginsByDirectory: Record<string, string[]> = {};
-        let totalPlugins = 0;
+        const loadedManifest = loadManifest();
+        const toolsByWorkflow: Record<string, number> = {};
+        const uniqueTools = new Set<string>();
 
-        for (const [workflowId, workflow] of manifest.workflows.entries()) {
-          const toolNames = workflow.tools
-            .map((toolId) => manifest.tools.get(toolId)?.names.mcp)
-            .filter((name): name is string => name !== undefined);
-          totalPlugins += toolNames.length;
-          pluginsByDirectory[workflowId] = toolNames;
+        for (const [workflowId, workflow] of loadedManifest.workflows.entries()) {
+          toolsByWorkflow[workflowId] = workflow.tools.length;
+          for (const toolId of workflow.tools) {
+            uniqueTools.add(toolId);
+          }
         }
 
         return {
-          totalPlugins,
-          pluginDirectories: manifest.workflows.size,
-          pluginsByDirectory,
-          systemMode: 'manifest-based',
+          totalTools: uniqueTools.size,
+          workflowCount: loadedManifest.workflows.size,
+          toolsByWorkflow,
         };
       } catch (error) {
         return {
           error: `Failed to load manifest: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          systemMode: 'error',
         };
       }
     },
@@ -252,12 +266,13 @@ export function createDoctorDependencies(executor: CommandExecutor): DoctorDepen
 
   const features: FeatureDetector = {
     areAxeToolsAvailable,
+    isAxeAtLeastVersion,
     isXcodemakeEnabled,
-    isXcodemakeAvailable,
+    isXcodemakeBinaryAvailable,
     doesMakefileExist,
   };
 
-  return { commandExecutor, binaryChecker, xcode, env, plugins, runtime, features };
+  return { commandExecutor, binaryChecker, xcode, env, manifest, runtime, features };
 }
 
 export type { CommandExecutor };

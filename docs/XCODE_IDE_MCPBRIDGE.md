@@ -22,7 +22,7 @@ When `xcode-ide` is enabled and `mcpbridge` is available, XcodeBuildMCP exposes 
 - `xcode_ide_list_tools`: Lists remote tools from Xcode's MCP server (name, description, schemas).
 - `xcode_ide_call_tool`: Calls a remote Xcode tool by name with a JSON argument payload.
 
-These tools are stable and manifest-managed. They are shown only when `mcpbridge` is available.
+These tools are stable and manifest-managed. They are shown when the `xcode-ide` workflow is enabled in MCP runtime; calls will fail until `mcpbridge` is available.
 
 CLI behavior is unchanged and continues to use dynamic `xcode_tools_*` proxy naming.
 

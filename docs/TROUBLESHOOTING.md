@@ -7,7 +7,7 @@
 - Check simulator/device availability and permissions.
 
 ## Doctor tool
-The doctor tool checks system configuration and reports on all dependencies required by XcodeBuildMCP.
+The doctor tool checks system configuration and reports dependency/capability status for key XcodeBuildMCP workflows and runtime features.
 
 ```bash
 npx --package xcodebuildmcp@latest xcodebuildmcp-doctor
@@ -16,7 +16,7 @@ npx --package xcodebuildmcp@latest xcodebuildmcp-doctor
 It reports on:
 - System and Node.js environment
 - Xcode installation and configuration
-- Required dependencies (xcodebuild, AXe, etc.)
+- Dependency and capability status (xcodebuild, AXe, debugger/backend requirements, etc.)
 - Environment variables affecting XcodeBuildMCP
 - Feature availability status
 

@@ -69,20 +69,20 @@ function createDeps(overrides?: Partial<DoctorDependencies>): DoctorDependencies
         };
       },
     },
-    plugins: {
-      async getPluginSystemInfo() {
+    manifest: {
+      async getManifestToolInfo() {
         return {
-          totalPlugins: 1,
-          pluginDirectories: 1,
-          pluginsByDirectory: { doctor: ['doctor'] },
-          systemMode: 'plugin-based',
+          totalTools: 1,
+          workflowCount: 1,
+          toolsByWorkflow: { doctor: 1 },
         };
       },
     },
     features: {
       areAxeToolsAvailable: () => true,
+      isAxeAtLeastVersion: async () => true,
       isXcodemakeEnabled: () => true,
-      isXcodemakeAvailable: async () => true,
+      isXcodemakeBinaryAvailable: () => true,
       doesMakefileExist: () => true,
     },
     runtime: {
@@ -110,9 +110,9 @@ function createDeps(overrides?: Partial<DoctorDependencies>): DoctorDependencies
       ...base.env,
       ...(overrides?.env ?? {}),
     },
-    plugins: {
-      ...base.plugins,
-      ...(overrides?.plugins ?? {}),
+    manifest: {
+      ...base.manifest,
+      ...(overrides?.manifest ?? {}),
     },
     features: {
       ...base.features,
@@ -123,25 +123,23 @@ function createDeps(overrides?: Partial<DoctorDependencies>): DoctorDependencies
 
 describe('doctor tool', () => {
   describe('Schema Validation', () => {
-    it('should have correct schema with enabled boolean field', () => {
+    it('should support optional nonRedacted flag', () => {
       const schemaObj = z.object(schema);
 
-      // Valid inputs
-      expect(schemaObj.safeParse({ enabled: true }).success).toBe(true);
-      expect(schemaObj.safeParse({ enabled: false }).success).toBe(true);
-      expect(schemaObj.safeParse({}).success).toBe(true); // enabled is optional
+      // Valid input
+      expect(schemaObj.safeParse({}).success).toBe(true);
+      expect(schemaObj.safeParse({ nonRedacted: true }).success).toBe(true);
+      expect(schemaObj.safeParse({ nonRedacted: false }).success).toBe(true);
 
-      // Invalid inputs
-      expect(schemaObj.safeParse({ enabled: 'true' }).success).toBe(false);
-      expect(schemaObj.safeParse({ enabled: 1 }).success).toBe(false);
-      expect(schemaObj.safeParse({ enabled: null }).success).toBe(false);
+      // Invalid type
+      expect(schemaObj.safeParse({ nonRedacted: 'yes' }).success).toBe(false);
     });
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should handle successful doctor execution', async () => {
       const deps = createDeps();
-      const result = await runDoctor({ enabled: true }, deps);
+      const result = await runDoctor({}, deps);
 
       expect(result.content).toEqual([
         {
@@ -150,18 +148,20 @@ describe('doctor tool', () => {
         },
       ]);
       expect(typeof result.content[0].text).toBe('string');
+      expect(result.content[0].text).toContain('### Manifest Tool Inventory');
+      expect(result.content[0].text).not.toContain('Total Plugins');
     });
 
-    it('should handle plugin loading failure', async () => {
+    it('should handle manifest loading failure', async () => {
       const deps = createDeps({
-        plugins: {
-          async getPluginSystemInfo() {
-            return { error: 'Plugin loading failed', systemMode: 'error' };
+        manifest: {
+          async getManifestToolInfo() {
+            return { error: 'Manifest loading failed' };
           },
         },
       });
 
-      const result = await runDoctor({ enabled: true }, deps);
+      const result = await runDoctor({}, deps);
 
       expect(result.content).toEqual([
         {
@@ -180,7 +180,7 @@ describe('doctor tool', () => {
           },
         },
       });
-      const result = await runDoctor({ enabled: true }, deps);
+      const result = await runDoctor({}, deps);
 
       expect(result.content).toEqual([
         {
@@ -195,8 +195,9 @@ describe('doctor tool', () => {
       const deps = createDeps({
         features: {
           areAxeToolsAvailable: () => true,
+          isAxeAtLeastVersion: async () => true,
           isXcodemakeEnabled: () => true,
-          isXcodemakeAvailable: async () => false,
+          isXcodemakeBinaryAvailable: () => false,
           doesMakefileExist: () => true,
         },
         binaryChecker: {
@@ -206,7 +207,7 @@ describe('doctor tool', () => {
           },
         },
       });
-      const result = await runDoctor({ enabled: true }, deps);
+      const result = await runDoctor({}, deps);
 
       expect(result.content).toEqual([
         {
@@ -217,12 +218,105 @@ describe('doctor tool', () => {
       expect(typeof result.content[0].text).toBe('string');
     });
 
+    it('should redact path and sensitive values in output', async () => {
+      const deps = createDeps({
+        env: {
+          getEnvironmentVariables() {
+            return {
+              PATH: '/Users/testuser/Developer/MySecretProject/bin:/usr/bin',
+              HOME: '/Users/testuser',
+              USER: 'testuser',
+              TMPDIR: '/Users/testuser/tmp',
+              XCODEBUILDMCP_API_KEY: 'super-secret-key',
+            };
+          },
+          getSystemInfo: () => ({
+            platform: 'darwin',
+            release: '25.0.0',
+            arch: 'arm64',
+            cpus: '10 x Apple M3',
+            memory: '32 GB',
+            hostname: 'testhost',
+            username: 'testuser',
+            homedir: '/Users/testuser',
+            tmpdir: '/Users/testuser/tmp',
+          }),
+          getNodeInfo: () => ({
+            version: 'v22.0.0',
+            execPath: '/usr/local/bin/node',
+            pid: '123',
+            ppid: '1',
+            platform: 'darwin',
+            arch: 'arm64',
+            cwd: '/Users/testuser/Developer/MySecretProject',
+            argv: 'node /Users/testuser/Developer/MySecretProject/build/doctor-cli.js --token=abc123',
+          }),
+        },
+      });
+
+      const result = await runDoctor({}, deps);
+      const text = result.content[0].text;
+      if (typeof text !== 'string') throw new Error('Unexpected doctor output type');
+
+      expect(text).toContain('<redacted>');
+      expect(text).not.toContain('testuser');
+      expect(text).not.toContain('MySecretProject');
+      expect(text).not.toContain('super-secret-key');
+      expect(text).toContain('/Users/<redacted>');
+      expect(text).toContain('Output Mode: Redacted (default)');
+    });
+
+    it('should allow non-redacted output when explicitly requested', async () => {
+      const deps = createDeps({
+        env: {
+          getEnvironmentVariables() {
+            return {
+              PATH: '/Users/testuser/Developer/MySecretProject/bin:/usr/bin',
+              HOME: '/Users/testuser',
+              USER: 'testuser',
+              TMPDIR: '/Users/testuser/tmp',
+            };
+          },
+          getSystemInfo: () => ({
+            platform: 'darwin',
+            release: '25.0.0',
+            arch: 'arm64',
+            cpus: '10 x Apple M3',
+            memory: '32 GB',
+            hostname: 'testhost',
+            username: 'testuser',
+            homedir: '/Users/testuser',
+            tmpdir: '/Users/testuser/tmp',
+          }),
+          getNodeInfo: () => ({
+            version: 'v22.0.0',
+            execPath: '/usr/local/bin/node',
+            pid: '123',
+            ppid: '1',
+            platform: 'darwin',
+            arch: 'arm64',
+            cwd: '/Users/testuser/Developer/MySecretProject',
+            argv: 'node /Users/testuser/Developer/MySecretProject/build/doctor-cli.js',
+          }),
+        },
+      });
+
+      const result = await runDoctor({ nonRedacted: true }, deps);
+      const text = result.content[0].text;
+      if (typeof text !== 'string') throw new Error('Unexpected doctor output type');
+
+      expect(text).toContain('Output Mode: ⚠️ Non-redacted (opt-in)');
+      expect(text).toContain('testuser');
+      expect(text).toContain('MySecretProject');
+    });
+
     it('should handle axe tools not available', async () => {
       const deps = createDeps({
         features: {
           areAxeToolsAvailable: () => false,
+          isAxeAtLeastVersion: async () => false,
           isXcodemakeEnabled: () => false,
-          isXcodemakeAvailable: async () => false,
+          isXcodemakeBinaryAvailable: () => false,
           doesMakefileExist: () => false,
         },
         binaryChecker: {
@@ -272,7 +366,7 @@ describe('doctor tool', () => {
         },
       });
 
-      const result = await runDoctor({ enabled: true }, deps);
+      const result = await runDoctor({}, deps);
 
       expect(result.content).toEqual([
         {

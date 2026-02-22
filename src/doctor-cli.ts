@@ -10,6 +10,11 @@
 import { version } from './version.ts';
 import { doctorLogic } from './mcp/tools/doctor/doctor.ts';
 import { getDefaultCommandExecutor } from './utils/execution/index.ts';
+import { bootstrapRuntime } from './runtime/bootstrap-runtime.ts';
+
+function shouldUseNonRedactedOutput(argv: string[]): boolean {
+  return argv.includes('--non-redacted');
+}
 
 async function runDoctor(): Promise<void> {
   try {
@@ -17,9 +22,18 @@ async function runDoctor(): Promise<void> {
     console.error(`Running XcodeBuildMCP Doctor (v${version})...`);
     console.error('Collecting system information and checking dependencies...\n');
 
+    await bootstrapRuntime({ runtime: 'cli' });
+
+    const nonRedacted = shouldUseNonRedactedOutput(process.argv.slice(2));
+    if (nonRedacted) {
+      console.error(
+        'Warning: --non-redacted is enabled; doctor output may include sensitive data.',
+      );
+    }
+
     // Run the doctor tool logic directly with CLI flag enabled
     const executor = getDefaultCommandExecutor();
-    const result = await doctorLogic({}, executor, true); // showAsciiLogo = true for CLI
+    const result = await doctorLogic({ nonRedacted }, executor, true); // showAsciiLogo = true for CLI
 
     // Output the doctor information
     if (result.content && result.content.length > 0) {
