@@ -16,3 +16,4 @@ tools:
   - get_app_bundle_id
   - start_device_log_cap
   - stop_device_log_cap
+  - device_screenshot

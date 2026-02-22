@@ -1,0 +1,9 @@
+id: device_screenshot
+module: mcp/tools/device/device_screenshot
+names:
+  mcp: device_screenshot
+  cli: device-screenshot
+description: Capture screenshot from a connected physical device.
+annotations:
+  title: Device Screenshot
+  readOnlyHint: true
