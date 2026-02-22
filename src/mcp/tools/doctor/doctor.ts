@@ -46,7 +46,10 @@ function redactPathLikeValue(value: string, projectNames: string[], piiTerms: st
     const escaped = escapeRegExp(projectName);
     output = output.replace(new RegExp(`/${escaped}(?=/|$)`, 'g'), '/<redacted>');
     output = output.replace(
-      new RegExp(`${escaped}(?=[.](xcodeproj|xcworkspace|xcuserstate|swiftpm|xcconfig)\b)`, 'g'),
+      new RegExp(
+        `${escaped}(?=[.](xcodeproj|xcworkspace|xcuserstate|swiftpm|xcconfig)(?=$|[^A-Za-z0-9_]))`,
+        'g',
+      ),
       '<redacted>',
     );
   }
