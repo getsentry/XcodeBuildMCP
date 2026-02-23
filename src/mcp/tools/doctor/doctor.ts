@@ -241,6 +241,7 @@ export async function runDoctor(
       },
     },
     manifestTools: manifestToolInfo,
+    xcodeToolsBridge,
   } as const;
 
   const currentCwdName = process.cwd().split('/').filter(Boolean).at(-1) ?? '';
@@ -423,18 +424,18 @@ export async function runDoctor(
       : []),
 
     `\n### Xcode IDE Bridge (mcpbridge)`,
-    ...(xcodeToolsBridge.available
+    ...(doctorInfo.xcodeToolsBridge.available
       ? [
-          `- Workflow enabled: ${xcodeToolsBridge.workflowEnabled ? '✅ Yes' : '❌ No'}`,
-          `- mcpbridge path: ${xcodeToolsBridge.bridgePath ?? '(not found)'}`,
-          `- Xcode running: ${xcodeToolsBridge.xcodeRunning ?? '(unknown)'}`,
-          `- Connected: ${xcodeToolsBridge.connected ? '✅ Yes' : '❌ No'}`,
-          `- Bridge PID: ${xcodeToolsBridge.bridgePid ?? '(none)'}`,
-          `- Proxied tools: ${xcodeToolsBridge.proxiedToolCount}`,
-          `- Last error: ${xcodeToolsBridge.lastError ?? '(none)'}`,
+          `- Workflow enabled: ${doctorInfo.xcodeToolsBridge.workflowEnabled ? '✅ Yes' : '❌ No'}`,
+          `- mcpbridge path: ${doctorInfo.xcodeToolsBridge.bridgePath ?? '(not found)'}`,
+          `- Xcode running: ${doctorInfo.xcodeToolsBridge.xcodeRunning ?? '(unknown)'}`,
+          `- Connected: ${doctorInfo.xcodeToolsBridge.connected ? '✅ Yes' : '❌ No'}`,
+          `- Bridge PID: ${doctorInfo.xcodeToolsBridge.bridgePid ?? '(none)'}`,
+          `- Proxied tools: ${doctorInfo.xcodeToolsBridge.proxiedToolCount}`,
+          `- Last error: ${doctorInfo.xcodeToolsBridge.lastError ?? '(none)'}`,
           `- Note: Bridge debug tools (status/sync/disconnect) are only registered when debug: true`,
         ]
-      : [`- Unavailable: ${xcodeToolsBridge.reason}`]),
+      : [`- Unavailable: ${doctorInfo.xcodeToolsBridge.reason}`]),
 
     `\n## Tool Availability Summary`,
     `- Build Tools: ${!('error' in doctorInfo.xcode) ? '\u2705 Available' : '\u274c Not available'}`,
