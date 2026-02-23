@@ -44,7 +44,7 @@ function redactPathLikeValue(value: string, projectNames: string[], piiTerms: st
   let output = value.replace(USER_HOME_PATH_PATTERN, '/Users/<redacted>');
   for (const projectName of projectNames) {
     const escaped = escapeRegExp(projectName);
-    output = output.replace(new RegExp(`/${escaped}(?=/|$)`, 'g'), '/<redacted>');
+    output = output.replace(new RegExp(`/${escaped}(?=[:/]|$)`, 'g'), '/<redacted>');
     output = output.replace(
       new RegExp(
         `${escaped}(?=[.](xcodeproj|xcworkspace|xcuserstate|swiftpm|xcconfig)(?=$|[^A-Za-z0-9_]))`,
