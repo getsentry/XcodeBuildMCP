@@ -281,6 +281,17 @@ The examples below use npx (Option B). If you installed via Homebrew, replace th
   <br />
 </details>
 
+<details>
+  <summary>AdaL CLI</summary>
+  <br />
+
+  Run the following command inside the AdaL CLI prompt:
+  ```console
+  /mcp add XcodeBuildMCP --command npx --args "-y,xcodebuildmcp@latest,mcp"
+  ```
+  <br />
+</details>
+
 <br />
 
 For other installation options see [Getting Started](docs/GETTING_STARTED.md).

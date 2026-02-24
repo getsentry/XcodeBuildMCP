@@ -135,6 +135,12 @@ claude mcp add XcodeBuildMCP -e XCODEBUILDMCP_SENTRY_DISABLED=false -- npx -y xc
 
 Note: XcodeBuildMCP requests xcodebuild to skip macro validation to avoid Swift Macro build errors.
 
+### AdaL CLI
+Run the following command inside the AdaL CLI prompt:
+```console
+/mcp add XcodeBuildMCP --command npx --args "-y,xcodebuildmcp@latest,mcp"
+```
+
 ## Next steps
 - Configuration options: [CONFIGURATION.md](CONFIGURATION.md)
 - Session defaults and opt-out: [SESSION_DEFAULTS.md](SESSION_DEFAULTS.md)
