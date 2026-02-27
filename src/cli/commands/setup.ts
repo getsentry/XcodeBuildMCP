@@ -13,7 +13,12 @@ import {
   persistProjectConfigPatch,
   type ProjectConfig,
 } from '../../utils/project-config.ts';
-import { createPrompter, type Prompter, type SelectOption } from '../interactive/prompts.ts';
+import {
+  createPrompter,
+  isInteractiveTTY,
+  type Prompter,
+  type SelectOption,
+} from '../interactive/prompts.ts';
 import type { FileSystemExecutor } from '../../utils/FileSystemExecutor.ts';
 import type { CommandExecutor } from '../../utils/CommandExecutor.ts';
 import { createDoctorDependencies } from '../../mcp/tools/doctor/lib/doctor.deps.ts';
@@ -52,10 +57,6 @@ function showPromptHelp(helpText: string, quietOutput: boolean): void {
   clack.log.message(helpText);
 }
 
-function isInteractiveTTY(): boolean {
-  return process.stdin.isTTY === true && process.stdout.isTTY === true;
-}
-
 async function withSpinner<T>(opts: {
   isTTY: boolean;
   quietOutput: boolean;
@@ -69,9 +70,14 @@ async function withSpinner<T>(opts: {
 
   const s = clack.spinner();
   s.start(opts.startMessage);
-  const result = await opts.task();
-  s.stop(opts.stopMessage);
-  return result;
+  try {
+    const result = await opts.task();
+    s.stop(opts.stopMessage);
+    return result;
+  } catch (error) {
+    s.stop(opts.startMessage);
+    throw error;
+  }
 }
 
 function valuesEqual(left: unknown, right: unknown): boolean {

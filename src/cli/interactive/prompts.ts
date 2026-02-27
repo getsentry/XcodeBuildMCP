@@ -136,8 +136,12 @@ function createTtyPrompter(): Prompter {
   };
 }
 
+export function isInteractiveTTY(): boolean {
+  return process.stdin.isTTY === true && process.stdout.isTTY === true;
+}
+
 export function createPrompter(): Prompter {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+  if (!isInteractiveTTY()) {
     return createNonInteractivePrompter();
   }
 

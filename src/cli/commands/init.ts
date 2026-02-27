@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as clack from '@clack/prompts';
 import { getResourceRoot } from '../../core/resource-root.ts';
-import { createPrompter, type Prompter } from '../interactive/prompts.ts';
+import { createPrompter, isInteractiveTTY, type Prompter } from '../interactive/prompts.ts';
 
 type SkillType = 'mcp' | 'cli';
 
@@ -86,10 +86,6 @@ function expandHomePrefix(inputPath: string): string {
 
 function resolveDestinationPath(inputPath: string): string {
   return path.resolve(expandHomePrefix(inputPath));
-}
-
-function isInteractiveTTY(): boolean {
-  return process.stdin.isTTY === true && process.stdout.isTTY === true;
 }
 
 async function promptConfirm(question: string): Promise<boolean> {
