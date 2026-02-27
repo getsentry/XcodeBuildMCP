@@ -6,7 +6,7 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 
 // Import the named exports and logic function
-import { schema, handler, list_simsLogic } from '../list_sims.ts';
+import { schema, handler, list_simsLogic, listSimulators } from '../list_sims.ts';
 
 describe('list_sims tool', () => {
   let callHistory: Array<{
@@ -40,6 +40,45 @@ describe('list_sims tool', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
+    it('returns structured simulator records for setup flows', async () => {
+      const mockExecutor = async (command: string[]) => {
+        if (command.includes('--json')) {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({
+              devices: {
+                'iOS 17.0': [
+                  {
+                    name: 'iPhone 15',
+                    udid: 'test-uuid-123',
+                    isAvailable: true,
+                    state: 'Shutdown',
+                  },
+                ],
+              },
+            }),
+            error: undefined,
+          });
+        }
+
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (test-uuid-123) (Shutdown)`,
+          error: undefined,
+        });
+      };
+
+      const simulators = await listSimulators(mockExecutor);
+      expect(simulators).toEqual([
+        {
+          runtime: 'iOS 17.0',
+          name: 'iPhone 15',
+          udid: 'test-uuid-123',
+          state: 'Shutdown',
+        },
+      ]);
+    });
+
     it('should handle successful simulator listing', async () => {
       const mockJsonOutput = JSON.stringify({
         devices: {

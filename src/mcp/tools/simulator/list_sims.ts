@@ -21,6 +21,13 @@ interface SimulatorDevice {
   runtime?: string;
 }
 
+export interface ListedSimulator {
+  runtime: string;
+  name: string;
+  udid: string;
+  state: string;
+}
+
 interface SimulatorData {
   devices: Record<string, SimulatorDevice[]>;
 }
@@ -99,87 +106,93 @@ function isSimulatorData(value: unknown): value is SimulatorData {
   return true;
 }
 
+export async function listSimulators(executor: CommandExecutor): Promise<ListedSimulator[]> {
+  const jsonCommand = ['xcrun', 'simctl', 'list', 'devices', '--json'];
+  const jsonResult = await executor(jsonCommand, 'List Simulators (JSON)', false);
+
+  if (!jsonResult.success) {
+    throw new Error(`Failed to list simulators: ${jsonResult.error}`);
+  }
+
+  let jsonDevices: Record<string, SimulatorDevice[]> = {};
+  try {
+    const parsedData: unknown = JSON.parse(jsonResult.output);
+    if (isSimulatorData(parsedData)) {
+      jsonDevices = parsedData.devices;
+    }
+  } catch {
+    log('warn', 'Failed to parse JSON output, falling back to text parsing');
+  }
+
+  const textCommand = ['xcrun', 'simctl', 'list', 'devices'];
+  const textResult = await executor(textCommand, 'List Simulators (Text)', false);
+  const textDevices = textResult.success ? parseTextOutput(textResult.output) : [];
+
+  const allDevices: Record<string, SimulatorDevice[]> = { ...jsonDevices };
+  const jsonUUIDs = new Set<string>();
+
+  for (const runtime in jsonDevices) {
+    for (const device of jsonDevices[runtime]) {
+      if (device.isAvailable) {
+        jsonUUIDs.add(device.udid);
+      }
+    }
+  }
+
+  for (const textDevice of textDevices) {
+    if (!jsonUUIDs.has(textDevice.udid)) {
+      const runtime = textDevice.runtime ?? 'Unknown Runtime';
+      if (!allDevices[runtime]) {
+        allDevices[runtime] = [];
+      }
+      allDevices[runtime].push(textDevice);
+      log(
+        'info',
+        `Added missing device from text parsing: ${textDevice.name} (${textDevice.udid})`,
+      );
+    }
+  }
+
+  const listed: ListedSimulator[] = [];
+  for (const runtime in allDevices) {
+    const devices = allDevices[runtime].filter((d) => d.isAvailable);
+    for (const device of devices) {
+      listed.push({
+        runtime,
+        name: device.name,
+        udid: device.udid,
+        state: device.state,
+      });
+    }
+  }
+
+  return listed;
+}
+
 export async function list_simsLogic(
-  params: ListSimsParams,
+  _params: ListSimsParams,
   executor: CommandExecutor,
 ): Promise<ToolResponse> {
   log('info', 'Starting xcrun simctl list devices request');
 
   try {
-    // Try JSON first for structured data
-    const jsonCommand = ['xcrun', 'simctl', 'list', 'devices', '--json'];
-    const jsonResult = await executor(jsonCommand, 'List Simulators (JSON)', false);
+    const simulators = await listSimulators(executor);
 
-    if (!jsonResult.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to list simulators: ${jsonResult.error}`,
-          },
-        ],
-      };
-    }
-
-    // Parse JSON output
-    let jsonDevices: Record<string, SimulatorDevice[]> = {};
-    try {
-      const parsedData: unknown = JSON.parse(jsonResult.output);
-      if (isSimulatorData(parsedData)) {
-        jsonDevices = parsedData.devices;
-      }
-    } catch {
-      log('warn', 'Failed to parse JSON output, falling back to text parsing');
-    }
-
-    // Fallback to text parsing for Apple simctl bugs (duplicate runtime IDs in iOS 26.0 beta)
-    const textCommand = ['xcrun', 'simctl', 'list', 'devices'];
-    const textResult = await executor(textCommand, 'List Simulators (Text)', false);
-
-    const textDevices = textResult.success ? parseTextOutput(textResult.output) : [];
-
-    // Merge JSON and text devices, preferring JSON but adding any missing from text
-    const allDevices: Record<string, SimulatorDevice[]> = { ...jsonDevices };
-    const jsonUUIDs = new Set<string>();
-
-    // Collect all UUIDs from JSON
-    for (const runtime in jsonDevices) {
-      for (const device of jsonDevices[runtime]) {
-        if (device.isAvailable) {
-          jsonUUIDs.add(device.udid);
-        }
-      }
-    }
-
-    // Add devices from text that aren't in JSON (handles Apple's duplicate runtime ID bug)
-    for (const textDevice of textDevices) {
-      if (!jsonUUIDs.has(textDevice.udid)) {
-        const runtime = textDevice.runtime ?? 'Unknown Runtime';
-        if (!allDevices[runtime]) {
-          allDevices[runtime] = [];
-        }
-        allDevices[runtime].push(textDevice);
-        log(
-          'info',
-          `Added missing device from text parsing: ${textDevice.name} (${textDevice.udid})`,
-        );
-      }
-    }
-
-    // Format output
     let responseText = 'Available iOS Simulators:\n\n';
+    const grouped = new Map<string, ListedSimulator[]>();
+    for (const simulator of simulators) {
+      const runtimeGroup = grouped.get(simulator.runtime) ?? [];
+      runtimeGroup.push(simulator);
+      grouped.set(simulator.runtime, runtimeGroup);
+    }
 
-    for (const runtime in allDevices) {
-      const devices = allDevices[runtime].filter((d) => d.isAvailable);
-
+    for (const [runtime, devices] of grouped.entries()) {
       if (devices.length === 0) continue;
 
       responseText += `${runtime}:\n`;
-
       for (const device of devices) {
         responseText += `- ${device.name} (${device.udid})${device.state === 'Booted' ? ' [Booted]' : ''}\n`;
       }
-
       responseText += '\n';
     }
 
@@ -206,6 +219,17 @@ export async function list_simsLogic(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.startsWith('Failed to list simulators:')) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: errorMessage,
+          },
+        ],
+      };
+    }
+
     log('error', `Error listing simulators: ${errorMessage}`);
     return {
       content: [

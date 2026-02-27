@@ -45,6 +45,20 @@ export type PersistActiveSessionDefaultsProfileOptions = {
   profile?: string | null;
 };
 
+export type PersistProjectConfigPatchOptions = {
+  fs: FileSystemExecutor;
+  cwd: string;
+  patch: {
+    enabledWorkflows?: string[];
+    debug?: boolean;
+    sentryDisabled?: boolean;
+    experimentalWorkflowDiscovery?: boolean;
+    disableSessionDefaults?: boolean;
+    sessionDefaults?: Partial<SessionDefaults>;
+  };
+  deleteSessionDefaultKeys?: (keyof SessionDefaults)[];
+};
+
 type PersistenceTargetOptions = {
   fs: FileSystemExecutor;
   configPath: string;
@@ -336,6 +350,54 @@ export async function persistActiveSessionDefaultsProfileToProjectConfig(
     delete nextConfig.activeSessionDefaultsProfile;
   } else {
     nextConfig.activeSessionDefaultsProfile = activeProfile;
+  }
+
+  await options.fs.writeFile(configPath, stringifyYaml(nextConfig), 'utf8');
+
+  return { path: configPath };
+}
+
+export async function persistProjectConfigPatch(
+  options: PersistProjectConfigPatchOptions,
+): Promise<{ path: string }> {
+  const configDir = getConfigDir(options.cwd);
+  const configPath = getConfigPath(options.cwd);
+
+  await options.fs.mkdir(configDir, { recursive: true });
+  const baseConfig = await readBaseConfigForPersistence({ fs: options.fs, configPath });
+
+  const nextConfig: ProjectConfig = {
+    ...baseConfig,
+    schemaVersion: 1,
+  };
+
+  if (options.patch.enabledWorkflows !== undefined) {
+    nextConfig.enabledWorkflows = normalizeEnabledWorkflows(options.patch.enabledWorkflows);
+  }
+
+  const topLevelPatch = removeUndefined({
+    debug: options.patch.debug,
+    sentryDisabled: options.patch.sentryDisabled,
+    experimentalWorkflowDiscovery: options.patch.experimentalWorkflowDiscovery,
+    disableSessionDefaults: options.patch.disableSessionDefaults,
+  });
+
+  for (const [key, value] of Object.entries(topLevelPatch)) {
+    nextConfig[key] = value;
+  }
+
+  if (options.patch.sessionDefaults) {
+    const patch = removeUndefined(options.patch.sessionDefaults as Record<string, unknown>);
+    const nextSessionDefaults: Partial<SessionDefaults> = {
+      ...(nextConfig.sessionDefaults ?? {}),
+      ...patch,
+    };
+
+    for (const key of options.deleteSessionDefaultKeys ?? []) {
+      delete nextSessionDefaults[key];
+    }
+
+    nextConfig.sessionDefaults = nextSessionDefaults;
   }
 
   await options.fs.writeFile(configPath, stringifyYaml(nextConfig), 'utf8');

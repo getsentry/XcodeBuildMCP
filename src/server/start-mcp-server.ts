@@ -23,6 +23,7 @@ import { shutdownXcodeToolsBridge } from '../integrations/xcode-tools-bridge/ind
 import { createStartupProfiler, getStartupProfileNowMs } from './startup-profiler.ts';
 import { getConfig } from '../utils/config-store.ts';
 import { getRegisteredWorkflows } from '../utils/tool-registry.ts';
+import { hydrateSentryDisabledEnvFromProjectConfig } from '../utils/sentry-config.ts';
 
 /**
  * Start the MCP server.
@@ -36,6 +37,8 @@ export async function startMcpServer(): Promise<void> {
     // MCP mode defaults to info level logging
     // Clients can override via logging/setLevel MCP request
     setLogLevel('info');
+
+    await hydrateSentryDisabledEnvFromProjectConfig();
 
     let stageStartMs = getStartupProfileNowMs();
     initSentry({ mode: 'mcp' });

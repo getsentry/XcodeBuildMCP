@@ -38,6 +38,39 @@ export type ListSchemesParams = z.infer<typeof listSchemesSchema>;
 
 const createTextBlock = (text: string) => ({ type: 'text', text }) as const;
 
+export function parseSchemesFromXcodebuildListOutput(output: string): string[] {
+  const schemesMatch = output.match(/Schemes:([\s\S]*?)(?=\n\n|$)/);
+  if (!schemesMatch) {
+    throw new Error('No schemes found in the output');
+  }
+
+  return schemesMatch[1]
+    .trim()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+export async function listSchemes(
+  params: ListSchemesParams,
+  executor: CommandExecutor,
+): Promise<string[]> {
+  const command = ['xcodebuild', '-list'];
+
+  if (typeof params.projectPath === 'string') {
+    command.push('-project', params.projectPath);
+  } else {
+    command.push('-workspace', params.workspacePath!);
+  }
+
+  const result = await executor(command, 'List Schemes', false);
+  if (!result.success) {
+    throw new Error(`Failed to list schemes: ${result.error}`);
+  }
+
+  return parseSchemesFromXcodebuildListOutput(result.output);
+}
+
 /**
  * Business logic for listing schemes in a project or workspace.
  * Exported for direct testing and reuse.
@@ -49,37 +82,11 @@ export async function listSchemesLogic(
   log('info', 'Listing schemes');
 
   try {
-    // For listing schemes, we can't use executeXcodeBuild directly since it's not a standard action
-    // We need to create a custom command with -list flag
-    const command = ['xcodebuild', '-list'];
-
     const hasProjectPath = typeof params.projectPath === 'string';
     const projectOrWorkspace = hasProjectPath ? 'project' : 'workspace';
     const path = hasProjectPath ? params.projectPath : params.workspacePath;
+    const schemes = await listSchemes(params, executor);
 
-    if (hasProjectPath) {
-      command.push('-project', params.projectPath!);
-    } else {
-      command.push('-workspace', params.workspacePath!);
-    }
-
-    const result = await executor(command, 'List Schemes', false);
-
-    if (!result.success) {
-      return createTextResponse(`Failed to list schemes: ${result.error}`, true);
-    }
-
-    // Extract schemes from the output
-    const schemesMatch = result.output.match(/Schemes:([\s\S]*?)(?=\n\n|$)/);
-
-    if (!schemesMatch) {
-      return createTextResponse('No schemes found in the output', true);
-    }
-
-    const schemeLines = schemesMatch[1].trim().split('\n');
-    const schemes = schemeLines.map((line) => line.trim()).filter((line) => line);
-
-    // Prepare next-step params with the first scheme if available
     let nextStepParams: Record<string, Record<string, string | number | boolean>> | undefined;
     let hintText = '';
 
@@ -118,6 +125,13 @@ export async function listSchemesLogic(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    if (
+      errorMessage.startsWith('Failed to list schemes:') ||
+      errorMessage === 'No schemes found in the output'
+    ) {
+      return createTextResponse(errorMessage, true);
+    }
+
     log('error', `Error listing schemes: ${errorMessage}`);
     return createTextResponse(`Error listing schemes: ${errorMessage}`, true);
   }

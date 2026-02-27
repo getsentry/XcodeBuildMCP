@@ -69,6 +69,12 @@ For deterministic session defaults and runtime configuration, add a config file 
 <workspace-root>/.xcodebuildmcp/config.yaml
 ```
 
+Use the setup wizard to create or update this file interactively:
+
+```bash
+xcodebuildmcp setup
+```
+
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema and examples.
 
 ## Client-specific configuration

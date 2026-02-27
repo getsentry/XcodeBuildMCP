@@ -14,6 +14,7 @@ import { normalizeSessionDefaultsProfileName } from './session-defaults-profile.
 export type RuntimeConfigOverrides = Partial<{
   enabledWorkflows: string[];
   debug: boolean;
+  sentryDisabled: boolean;
   experimentalWorkflowDiscovery: boolean;
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
@@ -36,6 +37,7 @@ export type RuntimeConfigOverrides = Partial<{
 export type ResolvedRuntimeConfig = {
   enabledWorkflows: string[];
   debug: boolean;
+  sentryDisabled: boolean;
   experimentalWorkflowDiscovery: boolean;
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
@@ -67,6 +69,7 @@ type ConfigStoreState = {
 const DEFAULT_CONFIG: ResolvedRuntimeConfig = {
   enabledWorkflows: [],
   debug: false,
+  sentryDisabled: false,
   experimentalWorkflowDiscovery: false,
   disableSessionDefaults: false,
   disableXcodeAutoSync: false,
@@ -167,6 +170,7 @@ function readEnvConfig(env: NodeJS.ProcessEnv): RuntimeConfigOverrides {
   );
 
   setIfDefined(config, 'debug', parseBoolean(env.XCODEBUILDMCP_DEBUG));
+  setIfDefined(config, 'sentryDisabled', parseBoolean(env.XCODEBUILDMCP_SENTRY_DISABLED));
 
   setIfDefined(
     config,
@@ -383,6 +387,13 @@ function resolveConfig(opts: {
       fileConfig: opts.fileConfig,
       envConfig,
       fallback: DEFAULT_CONFIG.debug,
+    }),
+    sentryDisabled: resolveFromLayers({
+      key: 'sentryDisabled',
+      overrides: opts.overrides,
+      fileConfig: opts.fileConfig,
+      envConfig,
+      fallback: DEFAULT_CONFIG.sentryDisabled,
     }),
     experimentalWorkflowDiscovery: resolveFromLayers({
       key: 'experimentalWorkflowDiscovery',

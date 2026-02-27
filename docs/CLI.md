@@ -25,6 +25,9 @@ xcodebuildmcp --help
 
 # View tool help
 xcodebuildmcp <workflow> <tool> --help
+
+# Run interactive setup for .xcodebuildmcp/config.yaml
+xcodebuildmcp setup
 ```
 
 ## Tool Options
@@ -115,6 +118,8 @@ enabledWorkflows:
 ```
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full schema.
+
+To create/update config interactively, run `xcodebuildmcp setup`.
 
 ## Environment Variables
 

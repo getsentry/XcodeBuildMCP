@@ -10,7 +10,7 @@ import {
   createMockCommandResponse,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler, listSchemesLogic } from '../list_schemes.ts';
+import { schema, handler, listSchemes, listSchemesLogic } from '../list_schemes.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 
 describe('list_schemes plugin', () => {
@@ -189,6 +189,22 @@ describe('list_schemes plugin', () => {
         content: [{ type: 'text', text: 'Error listing schemes: String error' }],
         isError: true,
       });
+    });
+
+    it('returns parsed schemes for setup flows', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: `Information about project "MyProject":
+    Schemes:
+        MyProject
+        MyProjectTests`,
+      });
+
+      const schemes = await listSchemes(
+        { projectPath: '/path/to/MyProject.xcodeproj' },
+        mockExecutor,
+      );
+      expect(schemes).toEqual(['MyProject', 'MyProjectTests']);
     });
 
     it('should verify command generation with mock executor', async () => {

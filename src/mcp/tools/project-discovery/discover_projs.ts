@@ -25,6 +25,29 @@ interface DirentLike {
   isSymbolicLink(): boolean;
 }
 
+function getErrorDetails(
+  error: unknown,
+  fallbackMessage: string,
+): { code?: string; message: string } {
+  if (error instanceof Error) {
+    const errorWithCode = error as Error & { code?: unknown };
+    return {
+      code: typeof errorWithCode.code === 'string' ? errorWithCode.code : undefined,
+      message: error.message,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { code?: unknown; message?: unknown };
+    return {
+      code: typeof candidate.code === 'string' ? candidate.code : undefined,
+      message: typeof candidate.message === 'string' ? candidate.message : fallbackMessage,
+    };
+  }
+
+  return { message: String(error) };
+}
+
 /**
  * Recursively scans directories to find Xcode projects and workspaces.
  */
@@ -103,24 +126,7 @@ async function _findProjectsRecursive(
       }
     }
   } catch (error) {
-    let code;
-    let message = 'Unknown error';
-
-    if (error instanceof Error) {
-      message = error.message;
-      if ('code' in error) {
-        code = error.code;
-      }
-    } else if (typeof error === 'object' && error !== null) {
-      if ('message' in error && typeof error.message === 'string') {
-        message = error.message;
-      }
-      if ('code' in error && typeof error.code === 'string') {
-        code = error.code;
-      }
-    } else {
-      message = String(error);
-    }
+    const { code, message } = getErrorDetails(error, 'Unknown error');
 
     if (code === 'EPERM' || code === 'EACCES') {
       log('debug', `Permission denied scanning directory: ${currentDirAbs}`);
@@ -140,8 +146,83 @@ const discoverProjsSchema = z.object({
   maxDepth: z.number().int().nonnegative().optional(),
 });
 
+export interface DiscoverProjectsParams {
+  workspaceRoot: string;
+  scanPath?: string;
+  maxDepth?: number;
+}
+
+export interface DiscoverProjectsResult {
+  projects: string[];
+  workspaces: string[];
+}
+
 // Use z.infer for type safety
 type DiscoverProjsParams = z.infer<typeof discoverProjsSchema>;
+
+async function discoverProjectsOrError(
+  params: DiscoverProjectsParams,
+  fileSystemExecutor: FileSystemExecutor,
+): Promise<DiscoverProjectsResult | { error: string }> {
+  const scanPath = params.scanPath ?? '.';
+  const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const workspaceRoot = params.workspaceRoot;
+
+  const requestedScanPath = path.resolve(workspaceRoot, scanPath);
+  let absoluteScanPath = requestedScanPath;
+  const normalizedWorkspaceRoot = path.normalize(workspaceRoot);
+  if (!path.normalize(absoluteScanPath).startsWith(normalizedWorkspaceRoot)) {
+    log(
+      'warn',
+      `Requested scan path '${scanPath}' resolved outside workspace root '${workspaceRoot}'. Defaulting scan to workspace root.`,
+    );
+    absoluteScanPath = normalizedWorkspaceRoot;
+  }
+
+  log(
+    'info',
+    `Starting project discovery request: path=${absoluteScanPath}, maxDepth=${maxDepth}, workspace=${workspaceRoot}`,
+  );
+
+  try {
+    const stats = await fileSystemExecutor.stat(absoluteScanPath);
+    if (!stats.isDirectory()) {
+      const errorMsg = `Scan path is not a directory: ${absoluteScanPath}`;
+      log('error', errorMsg);
+      return { error: errorMsg };
+    }
+  } catch (error) {
+    const { code, message } = getErrorDetails(error, 'Unknown error accessing scan path');
+    const errorMsg = `Failed to access scan path: ${absoluteScanPath}. Error: ${message}`;
+    log('error', `${errorMsg} - Code: ${code ?? 'N/A'}`);
+    return { error: errorMsg };
+  }
+
+  const results: DiscoverProjectsResult = { projects: [], workspaces: [] };
+  await _findProjectsRecursive(
+    absoluteScanPath,
+    workspaceRoot,
+    0,
+    maxDepth,
+    results,
+    fileSystemExecutor,
+  );
+
+  results.projects.sort();
+  results.workspaces.sort();
+  return results;
+}
+
+export async function discoverProjects(
+  params: DiscoverProjectsParams,
+  fileSystemExecutor: FileSystemExecutor,
+): Promise<DiscoverProjectsResult> {
+  const result = await discoverProjectsOrError(params, fileSystemExecutor);
+  if ('error' in result) {
+    throw new Error(result.error);
+  }
+  return result;
+}
 
 /**
  * Business logic for discovering projects.
@@ -151,83 +232,13 @@ export async function discover_projsLogic(
   params: DiscoverProjsParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<ToolResponse> {
-  // Apply defaults
-  const scanPath = params.scanPath ?? '.';
-  const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
-  const workspaceRoot = params.workspaceRoot;
-
-  const relativeScanPath = scanPath;
-
-  // Calculate and validate the absolute scan path
-  const requestedScanPath = path.resolve(workspaceRoot, relativeScanPath ?? '.');
-  let absoluteScanPath = requestedScanPath;
-  const normalizedWorkspaceRoot = path.normalize(workspaceRoot);
-  if (!path.normalize(absoluteScanPath).startsWith(normalizedWorkspaceRoot)) {
-    log(
-      'warn',
-      `Requested scan path '${relativeScanPath}' resolved outside workspace root '${workspaceRoot}'. Defaulting scan to workspace root.`,
-    );
-    absoluteScanPath = normalizedWorkspaceRoot;
-  }
-
-  const results = { projects: [], workspaces: [] };
-
-  log(
-    'info',
-    `Starting project discovery request: path=${absoluteScanPath}, maxDepth=${maxDepth}, workspace=${workspaceRoot}`,
-  );
-
-  try {
-    // Ensure the scan path exists and is a directory
-    const stats = await fileSystemExecutor.stat(absoluteScanPath);
-    if (!stats.isDirectory()) {
-      const errorMsg = `Scan path is not a directory: ${absoluteScanPath}`;
-      log('error', errorMsg);
-      // Return ToolResponse error format
-      return {
-        content: [createTextContent(errorMsg)],
-        isError: true,
-      };
-    }
-  } catch (error) {
-    let code;
-    let message = 'Unknown error accessing scan path';
-
-    // Type guards - refined
-    if (error instanceof Error) {
-      message = error.message;
-      // Check for code property specific to Node.js fs errors
-      if ('code' in error) {
-        code = error.code;
-      }
-    } else if (typeof error === 'object' && error !== null) {
-      if ('message' in error && typeof error.message === 'string') {
-        message = error.message;
-      }
-      if ('code' in error && typeof error.code === 'string') {
-        code = error.code;
-      }
-    } else {
-      message = String(error);
-    }
-
-    const errorMsg = `Failed to access scan path: ${absoluteScanPath}. Error: ${message}`;
-    log('error', `${errorMsg} - Code: ${code ?? 'N/A'}`);
+  const results = await discoverProjectsOrError(params, fileSystemExecutor);
+  if ('error' in results) {
     return {
-      content: [createTextContent(errorMsg)],
+      content: [createTextContent(results.error)],
       isError: true,
     };
   }
-
-  // Start the recursive scan from the validated absolute path
-  await _findProjectsRecursive(
-    absoluteScanPath,
-    workspaceRoot,
-    0,
-    maxDepth,
-    results,
-    fileSystemExecutor,
-  );
 
   log(
     'info',
@@ -239,10 +250,6 @@ export async function discover_projsLogic(
       `Discovery finished. Found ${results.projects.length} projects and ${results.workspaces.length} workspaces.`,
     ),
   ];
-
-  // Sort results for consistent output
-  results.projects.sort();
-  results.workspaces.sort();
 
   if (results.projects.length > 0) {
     responseContent.push(

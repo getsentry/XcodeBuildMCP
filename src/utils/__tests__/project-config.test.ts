@@ -5,6 +5,7 @@ import { createMockFileSystemExecutor } from '../../test-utils/mock-executors.ts
 import {
   loadProjectConfig,
   persistActiveSessionDefaultsProfileToProjectConfig,
+  persistProjectConfigPatch,
   persistSessionDefaultsToProjectConfig,
 } from '../project-config.ts';
 
@@ -299,6 +300,78 @@ describe('project-config', () => {
           patch: { scheme: 'NewIOS' },
         }),
       ).rejects.toThrow('Profile name cannot be empty.');
+    });
+  });
+
+  describe('persistProjectConfigPatch', () => {
+    it('writes top-level setup fields and session defaults', async () => {
+      const { fs, writes } = createFsFixture({ exists: false });
+
+      await persistProjectConfigPatch({
+        fs,
+        cwd,
+        patch: {
+          enabledWorkflows: ['simulator', 'ui-automation'],
+          debug: true,
+          sentryDisabled: true,
+          sessionDefaults: {
+            workspacePath: './MyApp.xcworkspace',
+            scheme: 'MyApp',
+            simulatorId: 'SIM-1',
+          },
+        },
+        deleteSessionDefaultKeys: ['projectPath'],
+      });
+
+      expect(writes.length).toBe(1);
+      const parsed = parseYaml(writes[0].content) as {
+        enabledWorkflows?: string[];
+        debug?: boolean;
+        sentryDisabled?: boolean;
+        sessionDefaults?: Record<string, unknown>;
+      };
+
+      expect(parsed.enabledWorkflows).toEqual(['simulator', 'ui-automation']);
+      expect(parsed.debug).toBe(true);
+      expect(parsed.sentryDisabled).toBe(true);
+      expect(parsed.sessionDefaults?.workspacePath).toBe('./MyApp.xcworkspace');
+      expect(parsed.sessionDefaults?.projectPath).toBeUndefined();
+    });
+
+    it('preserves unknown sections while patching setup fields', async () => {
+      const yaml = [
+        'schemaVersion: 1',
+        'server:',
+        '  enabledWorkflows:',
+        '    - simulator',
+        'sessionDefaults:',
+        '  projectPath: "./App.xcodeproj"',
+        '',
+      ].join('\n');
+      const { fs, writes } = createFsFixture({ exists: true, readFile: yaml });
+
+      await persistProjectConfigPatch({
+        fs,
+        cwd,
+        patch: {
+          debug: false,
+          enabledWorkflows: ['simulator'],
+          sessionDefaults: {
+            workspacePath: './App.xcworkspace',
+          },
+        },
+        deleteSessionDefaultKeys: ['projectPath'],
+      });
+
+      expect(writes.length).toBe(1);
+      const parsed = parseYaml(writes[0].content) as {
+        server?: { enabledWorkflows?: string[] };
+        sessionDefaults?: Record<string, unknown>;
+      };
+
+      expect(parsed.server?.enabledWorkflows).toEqual(['simulator']);
+      expect(parsed.sessionDefaults?.workspacePath).toBe('./App.xcworkspace');
+      expect(parsed.sessionDefaults?.projectPath).toBeUndefined();
     });
   });
 

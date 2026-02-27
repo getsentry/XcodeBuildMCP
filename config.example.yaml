@@ -3,6 +3,8 @@ enabledWorkflows: ['simulator', 'ui-automation', 'debugging']
 experimentalWorkflowDiscovery: false
 disableSessionDefaults: false
 incrementalBuildsEnabled: false
+debug: false
+sentryDisabled: false
 sessionDefaults:
   projectPath: './MyApp.xcodeproj' # xor workspacePath
   workspacePath: './MyApp.xcworkspace' # xor projectPath

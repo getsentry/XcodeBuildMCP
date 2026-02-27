@@ -131,16 +131,36 @@ describe('init command', () => {
       stdoutSpy.mockRestore();
     });
 
-    it('skips Claude for MCP skill in auto-detect mode', async () => {
-      const fakeHome = join(tempDir, 'home-auto-skip-claude');
-      mkdirSync(join(fakeHome, '.claude'), { recursive: true });
-      mkdirSync(join(fakeHome, '.cursor'), { recursive: true });
+    it('expands ~ in --dest to home directory', async () => {
+      const fakeHome = join(tempDir, 'home');
+      mkdirSync(fakeHome, { recursive: true });
       mockedHomedir.mockReturnValue(fakeHome);
 
       const yargs = (await import('yargs')).default;
       const mod = await loadInitModule();
 
-      const app = yargs(['init', '--skill', 'mcp']).scriptName('');
+      const app = yargs(['init', '--dest', '~/skills', '--skill', 'cli']).scriptName('');
+      mod.registerInitCommand(app);
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      const installed = join(fakeHome, 'skills', 'xcodebuildmcp-cli', 'SKILL.md');
+      expect(existsSync(installed)).toBe(true);
+
+      stdoutSpy.mockRestore();
+    });
+
+    it('skips Claude for MCP skill in auto-detect mode', async () => {
+      const fakeHome = join(tempDir, 'home-auto-skip-claude');
+      mkdirSync(join(fakeHome, '.claude'), { recursive: true });
+      mkdirSync(join(fakeHome, '.agents'), { recursive: true });
+      mockedHomedir.mockReturnValue(fakeHome);
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--skill', 'mcp', '--client', 'auto']).scriptName('');
       mod.registerInitCommand(app);
 
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -149,7 +169,7 @@ describe('init command', () => {
       expect(existsSync(join(fakeHome, '.claude', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
         false,
       );
-      expect(existsSync(join(fakeHome, '.cursor', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
+      expect(existsSync(join(fakeHome, '.agents', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
         true,
       );
 
@@ -247,7 +267,7 @@ describe('init command', () => {
       const app = yargs(['init', '--dest', dest, '--skill', 'cli']).scriptName('').fail(false);
       mod.registerInitCommand(app);
 
-      await expect(app.parseAsync()).rejects.toThrow('Conflicting skill');
+      await expect(app.parseAsync()).rejects.toThrow('conflicting mcp skill found');
 
       Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
     });
@@ -393,8 +413,7 @@ describe('init command', () => {
       await app.parseAsync();
 
       expect(existsSync(join(emptyHome, '.claude', 'skills'))).toBe(false);
-      expect(existsSync(join(emptyHome, '.cursor', 'skills'))).toBe(false);
-      expect(existsSync(join(emptyHome, '.codex', 'skills', 'public'))).toBe(false);
+      expect(existsSync(join(emptyHome, '.agents', 'skills'))).toBe(false);
 
       stdoutSpy.mockRestore();
     });
@@ -572,7 +591,33 @@ describe('init command', () => {
       expect(readFileSync(join(conflictDir, 'SKILL.md'), 'utf8')).toBe('existing mcp skill');
     });
 
-    it('errors when no clients detected and no --dest or --print', async () => {
+    it('errors in non-interactive mode without --client or --dest', async () => {
+      const originalStdinIsTTY = process.stdin.isTTY;
+      const originalStdoutIsTTY = process.stdout.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+      Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--skill', 'cli']).scriptName('').fail(false);
+      mod.registerInitCommand(app);
+
+      await expect(app.parseAsync()).rejects.toThrow(
+        'Non-interactive mode requires --client or --dest for init',
+      );
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY,
+        configurable: true,
+      });
+    });
+
+    it('errors when no clients detected with --client=auto and no --dest or --print', async () => {
       const emptyHome = join(tempDir, 'empty-home');
       mkdirSync(emptyHome, { recursive: true });
       mockedHomedir.mockReturnValue(emptyHome);
@@ -580,7 +625,7 @@ describe('init command', () => {
       const yargs = (await import('yargs')).default;
       const mod = await loadInitModule();
 
-      const app = yargs(['init', '--skill', 'cli']).scriptName('').fail(false);
+      const app = yargs(['init', '--skill', 'cli', '--client', 'auto']).scriptName('').fail(false);
       mod.registerInitCommand(app);
 
       await expect(app.parseAsync()).rejects.toThrow('No supported AI clients detected');

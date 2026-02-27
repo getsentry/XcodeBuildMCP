@@ -25,6 +25,12 @@ Create a config file at your workspace root:
 <workspace-root>/.xcodebuildmcp/config.yaml
 ```
 
+Or run the interactive setup wizard:
+
+```bash
+xcodebuildmcp setup
+```
+
 Minimal example:
 
 ```yaml
@@ -61,6 +67,7 @@ incrementalBuildsEnabled: false
 
 # Debugging
 debug: false
+sentryDisabled: false
 debuggerBackend: "dap"
 dapRequestTimeoutMs: 30000
 dapLogEvents: false
@@ -262,8 +269,13 @@ Default templates:
 By default, only internal XcodeBuildMCP runtime failures are sent to Sentry. User-domain errors (such as project build/test/config failures) are not sent. To disable telemetry entirely:
 
 ```yaml
-# Environment variable only (no config.yaml option)
-# XCODEBUILDMCP_SENTRY_DISABLED=true
+sentryDisabled: true
+```
+
+You can also disable telemetry via environment variable:
+
+```bash
+XCODEBUILDMCP_SENTRY_DISABLED=true
 ```
 
 See [PRIVACY.md](PRIVACY.md) for more information.
@@ -286,6 +298,7 @@ Notes:
 | `sessionDefaults` | object | `{}` |
 | `incrementalBuildsEnabled` | boolean | `false` |
 | `debug` | boolean | `false` |
+| `sentryDisabled` | boolean | `false` |
 | `debuggerBackend` | string | `"dap"` |
 | `dapRequestTimeoutMs` | number | `30000` |
 | `dapLogEvents` | boolean | `false` |
@@ -310,6 +323,7 @@ Environment variables are supported for backwards compatibility but the config f
 | `disableSessionDefaults` | `XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS` |
 | `incrementalBuildsEnabled` | `INCREMENTAL_BUILDS_ENABLED` |
 | `debug` | `XCODEBUILDMCP_DEBUG` |
+| `sentryDisabled` | `XCODEBUILDMCP_SENTRY_DISABLED` |
 | `debuggerBackend` | `XCODEBUILDMCP_DEBUGGER_BACKEND` |
 | `dapRequestTimeoutMs` | `XCODEBUILDMCP_DAP_REQUEST_TIMEOUT_MS` |
 | `dapLogEvents` | `XCODEBUILDMCP_DAP_LOG_EVENTS` |
@@ -320,7 +334,6 @@ Environment variables are supported for backwards compatibility but the config f
 | `iosTemplateVersion` | `XCODEBUILD_MCP_IOS_TEMPLATE_VERSION` |
 | `macosTemplatePath` | `XCODEBUILDMCP_MACOS_TEMPLATE_PATH` |
 | `macosTemplateVersion` | `XCODEBUILD_MCP_MACOS_TEMPLATE_VERSION` |
-| (no config option) | `XCODEBUILDMCP_SENTRY_DISABLED` |
 
 Config file takes precedence over environment variables when both are set.
 

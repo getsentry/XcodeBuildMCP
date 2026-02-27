@@ -5,6 +5,7 @@ import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
 import { registerDaemonCommands } from './commands/daemon.ts';
 import { registerInitCommand } from './commands/init.ts';
 import { registerMcpCommand } from './commands/mcp.ts';
+import { registerSetupCommand } from './commands/setup.ts';
 import { registerToolsCommand } from './commands/tools.ts';
 import { registerToolCommands } from './register-tool-commands.ts';
 import { version } from '../version.ts';
@@ -72,6 +73,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
   // Register command groups with workspace context
   registerMcpCommand(app);
   registerInitCommand(app, { workspaceRoot: opts.workspaceRoot });
+  registerSetupCommand(app);
   registerToolsCommand(app);
   registerToolCommands(app, opts.catalog, {
     workspaceRoot: opts.workspaceRoot,

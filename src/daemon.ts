@@ -41,6 +41,7 @@ import {
   setSentryRuntimeContext,
 } from './utils/sentry.ts';
 import { isXcodemakeBinaryAvailable, isXcodemakeEnabled } from './utils/xcodemake/index.ts';
+import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
 
 async function checkExistingDaemon(socketPath: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
@@ -154,6 +155,9 @@ async function main(): Promise<void> {
     setLogLevel(resolveLogLevel() ?? 'info');
   }
 
+  await hydrateSentryDisabledEnvFromProjectConfig({
+    cwd: result.runtime.cwd,
+  });
   initSentry({ mode: 'cli-daemon' });
   recordDaemonLifecycleMetric('start');
 

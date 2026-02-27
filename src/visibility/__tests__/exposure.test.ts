@@ -20,6 +20,7 @@ function createDefaultConfig(
 ): ResolvedRuntimeConfig {
   return {
     debug: false,
+    sentryDisabled: false,
     enabledWorkflows: [],
     experimentalWorkflowDiscovery: false,
     disableSessionDefaults: false,

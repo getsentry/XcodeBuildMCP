@@ -2,8 +2,9 @@ import type { Argv } from 'yargs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import * as readline from 'node:readline';
+import * as clack from '@clack/prompts';
 import { getResourceRoot } from '../../core/resource-root.ts';
+import { createPrompter, type Prompter } from '../interactive/prompts.ts';
 
 type SkillType = 'mcp' | 'cli';
 
@@ -15,8 +16,7 @@ interface ClientInfo {
 
 const CLIENT_DEFINITIONS: { id: string; name: string; skillsSubdir: string }[] = [
   { id: 'claude', name: 'Claude Code', skillsSubdir: '.claude/skills' },
-  { id: 'cursor', name: 'Cursor', skillsSubdir: '.cursor/skills' },
-  { id: 'codex', name: 'Codex', skillsSubdir: '.codex/skills/public' },
+  { id: 'agents', name: 'Agents Skills', skillsSubdir: '.agents/skills' },
 ];
 
 const AGENTS_FILE_NAME = 'AGENTS.md';
@@ -72,22 +72,42 @@ function readSkillContent(skillType: SkillType): string {
   return fs.readFileSync(sourcePath, 'utf8');
 }
 
-async function promptYesNo(question: string): Promise<boolean> {
-  if (!process.stdin.isTTY) {
+function expandHomePrefix(inputPath: string): string {
+  if (inputPath === '~') {
+    return os.homedir();
+  }
+
+  if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
+    return path.join(os.homedir(), inputPath.slice(2));
+  }
+
+  return inputPath;
+}
+
+function resolveDestinationPath(inputPath: string): string {
+  return path.resolve(expandHomePrefix(inputPath));
+}
+
+function isInteractiveTTY(): boolean {
+  return process.stdin.isTTY === true && process.stdout.isTTY === true;
+}
+
+async function promptConfirm(question: string): Promise<boolean> {
+  if (!isInteractiveTTY()) {
     return false;
   }
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stderr,
+  const result = await clack.confirm({
+    message: question,
+    initialValue: false,
   });
 
-  return new Promise((resolve) => {
-    rl.question(`${question} [y/N]: `, (answer) => {
-      rl.close();
-      resolve(answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes');
-    });
-  });
+  if (clack.isCancel(result)) {
+    clack.cancel('Operation cancelled.');
+    return false;
+  }
+
+  return result;
 }
 
 interface InstallResult {
@@ -124,15 +144,15 @@ async function installSkill(
       fs.rmSync(altDir, { recursive: true, force: true });
     } else {
       const altType = skillType === 'mcp' ? 'cli' : 'mcp';
-      if (!process.stdin.isTTY) {
+      if (!isInteractiveTTY()) {
         throw new Error(
-          `Conflicting skill "${altSkillDirName(skillType)}" found in ${skillsDir}. ` +
+          `Installing ${skillDisplayName(skillType)} but conflicting ${altType} skill found in ${skillsDir}. ` +
             `Use --remove-conflict to auto-remove it, or uninstall the ${altType} skill first.`,
         );
       }
 
-      const confirmed = await promptYesNo(
-        `Conflicting skill "${altSkillDirName(skillType)}" found in ${skillsDir}.\n  Remove it?`,
+      const confirmed = await promptConfirm(
+        `Installing ${skillDisplayName(skillType)} but a conflicting ${altType} skill exists in ${skillsDir}. Remove it?`,
       );
       if (!confirmed) {
         throw new Error('Installation cancelled due to conflicting skill.');
@@ -142,11 +162,11 @@ async function installSkill(
   }
 
   if (fs.existsSync(targetFile) && !opts.force) {
-    if (!process.stdin.isTTY) {
+    if (!isInteractiveTTY()) {
       throw new Error(`Skill already installed at ${targetFile}. Use --force to overwrite.`);
     }
 
-    const confirmed = await promptYesNo(`Skill already installed at ${targetFile}.\n  Overwrite?`);
+    const confirmed = await promptConfirm(`Skill already installed at ${targetFile}. Overwrite?`);
     if (!confirmed) {
       throw new Error('Installation cancelled.');
     }
@@ -184,7 +204,7 @@ function resolveTargets(
   operation: 'install' | 'uninstall',
 ): ClientInfo[] {
   if (destFlag) {
-    const resolvedDest = path.resolve(destFlag);
+    const resolvedDest = resolveDestinationPath(destFlag);
     if (resolvedDest === path.parse(resolvedDest).root) {
       throw new Error(
         'Refusing to use filesystem root as skills destination. Use a dedicated directory.',
@@ -196,7 +216,7 @@ function resolveTargets(
   if (clientFlag && clientFlag !== 'auto') {
     const def = CLIENT_DEFINITIONS.find((d) => d.id === clientFlag);
     if (!def) {
-      throw new Error(`Unknown client: ${clientFlag}. Valid clients: claude, cursor, codex`);
+      throw new Error(`Unknown client: ${clientFlag}. Valid clients: claude, agents`);
     }
     const home = os.homedir();
     return [{ name: def.name, id: def.id, skillsDir: path.join(home, def.skillsSubdir) }];
@@ -259,7 +279,7 @@ async function ensureAgentsGuidance(
       );
     }
 
-    const confirmed = await promptYesNo(`Update ${AGENTS_FILE_NAME} with the guidance above?`);
+    const confirmed = await promptConfirm(`Update ${AGENTS_FILE_NAME} with the guidance above?`);
     if (!confirmed) {
       writeLine(`Skipped updating ${AGENTS_FILE_NAME}.`);
       return 'skipped';
@@ -275,6 +295,143 @@ async function ensureAgentsGuidance(
   return 'updated';
 }
 
+const CUSTOM_PATH_SENTINEL = '__custom__';
+
+interface InitSelection {
+  skillType: SkillType;
+  targets: ClientInfo[];
+}
+
+async function collectInitSelection(
+  argv: { skill?: string; client?: string; dest?: string },
+  prompter: Prompter,
+): Promise<InitSelection> {
+  const destProvided = argv.dest !== undefined;
+
+  const interactive = isInteractiveTTY();
+
+  let skillType: SkillType;
+  if (argv.skill !== undefined) {
+    skillType = argv.skill as SkillType;
+  } else if (interactive) {
+    skillType = await prompter.selectOne<SkillType>({
+      message: 'Which skill variant to install?',
+      options: [
+        {
+          value: 'cli',
+          label: 'XcodeBuildMCP CLI',
+          description: 'Recommended for most users',
+        },
+        {
+          value: 'mcp',
+          label: 'XcodeBuildMCP MCP Server',
+          description: 'For MCP server usage',
+        },
+      ],
+      initialIndex: 0,
+    });
+  } else {
+    skillType = 'cli';
+  }
+
+  if (destProvided) {
+    const resolvedDest = resolveDestinationPath(argv.dest!);
+    if (resolvedDest === path.parse(resolvedDest).root) {
+      throw new Error(
+        'Refusing to use filesystem root as skills destination. Use a dedicated directory.',
+      );
+    }
+    return {
+      skillType,
+      targets: [{ name: 'Custom', id: 'custom', skillsDir: resolvedDest }],
+    };
+  }
+
+  if (argv.client !== undefined) {
+    const targets = resolveTargets(argv.client, undefined, 'install');
+    return { skillType, targets };
+  }
+
+  if (!interactive) {
+    throw new Error(
+      'Non-interactive mode requires --client or --dest for init. Use --print to output the skill content without installing.',
+    );
+  }
+
+  const home = os.homedir();
+  const detected = detectClients();
+  const detectedIds = new Set(detected.map((c) => c.id));
+
+  const options: { value: string; label: string; description?: string }[] = [];
+  for (const def of CLIENT_DEFINITIONS) {
+    const isDetected = detectedIds.has(def.id);
+    const dir = path.join(home, def.skillsSubdir);
+    options.push({
+      value: def.id,
+      label: `${def.name}${isDetected ? ' (detected)' : ''}`,
+      description: dir,
+    });
+  }
+  options.push({
+    value: CUSTOM_PATH_SENTINEL,
+    label: 'Custom path...',
+    description: 'Enter a custom directory path',
+  });
+
+  const selected = await prompter.selectMany<string>({
+    message: 'Where should the skill be installed?',
+    options,
+    initialSelectedKeys: detectedIds,
+    getKey: (value) => value,
+    minSelected: 1,
+  });
+
+  const targets: ClientInfo[] = [];
+  for (const id of selected) {
+    if (id === CUSTOM_PATH_SENTINEL) {
+      const customPath = await promptCustomPath();
+      targets.push({ name: 'Custom', id: 'custom', skillsDir: customPath });
+    } else {
+      const def = CLIENT_DEFINITIONS.find((d) => d.id === id);
+      if (!def) {
+        throw new Error(`Unknown client target: ${id}`);
+      }
+      targets.push({
+        name: def.name,
+        id: def.id,
+        skillsDir: path.join(home, def.skillsSubdir),
+      });
+    }
+  }
+
+  return { skillType, targets };
+}
+
+async function promptCustomPath(): Promise<string> {
+  if (!isInteractiveTTY()) {
+    throw new Error('Cannot prompt for custom path in non-interactive mode. Use --dest instead.');
+  }
+
+  const result = await clack.text({
+    message: 'Enter the destination directory path:',
+    validate: (value: string | undefined) => {
+      if (!value?.trim()) return 'Path cannot be empty.';
+      const resolved = resolveDestinationPath(value);
+      if (resolved === path.parse(resolved).root) {
+        return 'Refusing to use filesystem root. Use a dedicated directory.';
+      }
+      return undefined;
+    },
+  });
+
+  if (clack.isCancel(result)) {
+    clack.cancel('Operation cancelled.');
+    throw new Error('Operation cancelled.');
+  }
+
+  return resolveDestinationPath(result as string);
+}
+
 export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }): void {
   app.command(
     'init',
@@ -283,15 +440,13 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
       return yargs
         .option('client', {
           type: 'string',
-          describe: 'Target client: claude, cursor, codex (default: auto-detect)',
-          choices: ['auto', 'claude', 'cursor', 'codex'] as const,
-          default: 'auto',
+          describe: 'Target client: claude, agents (default: auto-detect)',
+          choices: ['auto', 'claude', 'agents'] as const,
         })
         .option('skill', {
           type: 'string',
-          describe: 'Skill variant: mcp or cli',
+          describe: 'Skill variant: mcp or cli (default: cli)',
           choices: ['mcp', 'cli'] as const,
-          default: 'cli',
         })
         .option('dest', {
           type: 'string',
@@ -319,43 +474,74 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         });
     },
     async (argv) => {
-      const skillType = argv.skill as SkillType;
-      const clientFlag = argv.client as string | undefined;
-      const destFlag = argv.dest as string | undefined;
-
       if (argv.print) {
-        const content = readSkillContent(skillType);
+        const content = readSkillContent((argv.skill as SkillType | undefined) ?? 'cli');
         process.stdout.write(content);
         return;
       }
 
+      const isTTY = isInteractiveTTY();
+      const clientFlag = argv.client as string | undefined;
+      const destFlag = argv.dest as string | undefined;
+
       if (argv.uninstall) {
-        const targets = resolveTargets(clientFlag, destFlag, 'uninstall');
+        if (isTTY) {
+          clack.intro('XcodeBuildMCP Init');
+          clack.log.info('Removing XcodeBuildMCP agent skills from detected AI clients.');
+        }
+
+        const targets = resolveTargets(clientFlag ?? 'auto', destFlag, 'uninstall');
         let anyRemoved = false;
 
         for (const target of targets) {
           const result = uninstallSkill(target.skillsDir, target.name);
           if (result) {
             if (!anyRemoved) {
-              writeLine('Uninstalled skill directories');
+              clack.log.step('Uninstalled skill directories');
             }
-            writeLine(`  Client: ${result.client}`);
-            for (const removed of result.removed) {
-              writeLine(`  Removed (${removed.variant}): ${removed.path}`);
-            }
+            const removedLines = result.removed
+              .map((r) => `  Removed (${r.variant}): ${r.path}`)
+              .join('\n');
+            clack.log.message(`  Client: ${result.client}\n${removedLines}`);
             anyRemoved = true;
           }
         }
 
         if (!anyRemoved) {
-          writeLine('No installed skill directories found to remove.');
+          clack.log.info('No installed skill directories found to remove.');
+        }
+
+        if (isTTY) {
+          clack.outro(anyRemoved ? 'Done.' : undefined);
         }
         return;
       }
 
-      const targets = resolveTargets(clientFlag, destFlag, 'install');
+      if (isTTY) {
+        clack.intro('XcodeBuildMCP Init');
+        clack.log.info(
+          'Install the XcodeBuildMCP agent skill to your AI coding clients.\n' +
+            'The skill teaches your AI assistant how to use XcodeBuildMCP\n' +
+            'effectively for building, testing, and debugging your apps.',
+        );
+      }
 
-      const policy = enforceInstallPolicy(targets, skillType, clientFlag, destFlag);
+      const prompter = createPrompter();
+      const selection = await collectInitSelection(
+        {
+          skill: argv.skill as string | undefined,
+          client: argv.client as string | undefined,
+          dest: argv.dest as string | undefined,
+        },
+        prompter,
+      );
+
+      const policy = enforceInstallPolicy(
+        selection.targets,
+        selection.skillType,
+        clientFlag,
+        destFlag,
+      );
       for (const skipped of policy.skippedClients) {
         writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
       }
@@ -368,17 +554,20 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
 
       const results: InstallResult[] = [];
       for (const target of policy.allowedTargets) {
-        const result = await installSkill(target.skillsDir, target.name, skillType, {
+        const result = await installSkill(target.skillsDir, target.name, selection.skillType, {
           force: argv.force as boolean,
           removeConflict: argv['remove-conflict'] as boolean,
         });
         results.push(result);
       }
 
-      writeLine(`Installed ${skillDisplayName(skillType)} skill`);
+      clack.log.success(`Installed ${skillDisplayName(selection.skillType)} skill`);
       for (const result of results) {
-        writeLine(`  Client: ${result.client}`);
-        writeLine(`  Location: ${result.location}`);
+        clack.log.message(`  Client: ${result.client}\n  Location: ${result.location}`);
+      }
+
+      if (isTTY) {
+        clack.outro('Done.');
       }
 
       if (ctx?.workspaceRoot) {

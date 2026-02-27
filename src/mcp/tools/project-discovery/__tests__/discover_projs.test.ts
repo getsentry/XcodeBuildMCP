@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import { schema, handler, discover_projsLogic } from '../discover_projs.ts';
+import { schema, handler, discover_projsLogic, discoverProjects } from '../discover_projs.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 
 describe('discover_projs plugin', () => {
@@ -58,6 +58,21 @@ describe('discover_projs plugin', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
+    it('returns structured discovery results for setup flows', async () => {
+      mockFileSystemExecutor.stat = async () => ({ isDirectory: () => true, mtimeMs: 0 });
+      mockFileSystemExecutor.readdir = async () => [
+        { name: 'App.xcodeproj', isDirectory: () => true, isSymbolicLink: () => false },
+        { name: 'App.xcworkspace', isDirectory: () => true, isSymbolicLink: () => false },
+      ];
+
+      const result = await discoverProjects(
+        { workspaceRoot: '/workspace' },
+        mockFileSystemExecutor,
+      );
+      expect(result.projects).toEqual(['/workspace/App.xcodeproj']);
+      expect(result.workspaces).toEqual(['/workspace/App.xcworkspace']);
+    });
+
     it('should handle workspaceRoot parameter correctly when provided', async () => {
       mockFileSystemExecutor.stat = async () => ({ isDirectory: () => true, mtimeMs: 0 });
       mockFileSystemExecutor.readdir = async () => [];

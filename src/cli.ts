@@ -7,6 +7,7 @@ import { startMcpServer } from './server/start-mcp-server.ts';
 import { listCliWorkflowIdsFromManifest } from './runtime/tool-catalog.ts';
 import { flushAndCloseSentry, initSentry, recordBootstrapDurationMetric } from './utils/sentry.ts';
 import { setLogLevel, type LogLevel } from './utils/logger.ts';
+import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
 
 function findTopLevelCommand(argv: string[]): string | undefined {
   const flagsWithValue = new Set(['--socket', '--log-level', '--style']);
@@ -31,12 +32,11 @@ function findTopLevelCommand(argv: string[]): string | undefined {
   return undefined;
 }
 
-async function runInitCommand(): Promise<void> {
+async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yargs').default>> {
   const yargs = (await import('yargs')).default;
   const { hideBin } = await import('yargs/helpers');
-  const { registerInitCommand } = await import('./cli/commands/init.ts');
 
-  const app = yargs(hideBin(process.argv))
+  return yargs(hideBin(process.argv))
     .scriptName('')
     .strict()
     .help()
@@ -63,7 +63,19 @@ async function runInitCommand(): Promise<void> {
         setLogLevel(level);
       }
     });
+}
+
+async function runInitCommand(): Promise<void> {
+  const { registerInitCommand } = await import('./cli/commands/init.ts');
+  const app = await buildLightweightYargsApp();
   registerInitCommand(app, { workspaceRoot: process.cwd() });
+  await app.parseAsync();
+}
+
+async function runSetupCommand(): Promise<void> {
+  const { registerSetupCommand } = await import('./cli/commands/setup.ts');
+  const app = await buildLightweightYargsApp();
+  registerSetupCommand(app);
   await app.parseAsync();
 }
 
@@ -78,6 +90,12 @@ async function main(): Promise<void> {
     await runInitCommand();
     return;
   }
+  if (earlyCommand === 'setup') {
+    await runSetupCommand();
+    return;
+  }
+
+  await hydrateSentryDisabledEnvFromProjectConfig();
   initSentry({ mode: 'cli' });
 
   // CLI mode uses disableSessionDefaults to show all tool parameters as flags
