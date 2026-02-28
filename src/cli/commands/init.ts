@@ -19,6 +19,12 @@ const CLIENT_DEFINITIONS: { id: string; name: string; skillsSubdir: string }[] =
   { id: 'codex', name: 'Codex', skillsSubdir: '.codex/skills/public' },
 ];
 
+const AGENTS_FILE_NAME = 'AGENTS.md';
+const AGENTS_LEGACY_GUIDANCE_LINE =
+  '- If using XcodeBuildMCP, first find and read the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.';
+const AGENTS_GUIDANCE_LINE =
+  '- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.';
+
 function writeLine(text: string): void {
   process.stdout.write(`${text}\n`);
 }
@@ -87,6 +93,11 @@ async function promptYesNo(question: string): Promise<boolean> {
 interface InstallResult {
   client: string;
   location: string;
+}
+
+interface InstallPolicyResult {
+  allowedTargets: ClientInfo[];
+  skippedClients: Array<{ client: string; reason: string }>;
 }
 
 async function installSkill(
@@ -197,7 +208,66 @@ function resolveTargets(
   return detected;
 }
 
-export function registerInitCommand(app: Argv): void {
+function renderAgentsAppendDiff(fileName: string): string {
+  return `--- ${fileName}\n+++ ${fileName}\n@@\n+${AGENTS_GUIDANCE_LINE}`;
+}
+
+async function ensureAgentsGuidance(
+  projectRoot: string,
+  force: boolean,
+): Promise<'created' | 'updated' | 'no_change' | 'skipped'> {
+  const agentsPath = path.join(projectRoot, AGENTS_FILE_NAME);
+  if (!fs.existsSync(agentsPath)) {
+    const newContent = `# ${AGENTS_FILE_NAME}\n\n${AGENTS_GUIDANCE_LINE}\n`;
+    fs.writeFileSync(agentsPath, newContent, 'utf8');
+    writeLine(`Created ${AGENTS_FILE_NAME} with XcodeBuildMCP guidance at ${agentsPath}`);
+    return 'created';
+  }
+
+  const currentContent = fs.readFileSync(agentsPath, 'utf8');
+  if (currentContent.includes(AGENTS_GUIDANCE_LINE)) {
+    writeLine(`${AGENTS_FILE_NAME} already includes XcodeBuildMCP guidance.`);
+    return 'no_change';
+  }
+
+  if (currentContent.includes(AGENTS_LEGACY_GUIDANCE_LINE)) {
+    const updatedFromLegacy = currentContent.replace(
+      AGENTS_LEGACY_GUIDANCE_LINE,
+      AGENTS_GUIDANCE_LINE,
+    );
+    fs.writeFileSync(agentsPath, updatedFromLegacy, 'utf8');
+    writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+    return 'updated';
+  }
+
+  const diff = renderAgentsAppendDiff(AGENTS_FILE_NAME);
+  writeLine(`Proposed update for ${agentsPath}:`);
+  writeLine(diff);
+
+  if (!force) {
+    if (!process.stdin.isTTY) {
+      throw new Error(
+        `${AGENTS_FILE_NAME} exists and requires confirmation to update. Re-run with --force to apply the change in non-interactive mode.`,
+      );
+    }
+
+    const confirmed = await promptYesNo(`Update ${AGENTS_FILE_NAME} with the guidance above?`);
+    if (!confirmed) {
+      writeLine(`Skipped updating ${AGENTS_FILE_NAME}.`);
+      return 'skipped';
+    }
+  }
+
+  const updatedContent = currentContent.endsWith('\n')
+    ? `${currentContent}${AGENTS_GUIDANCE_LINE}\n`
+    : `${currentContent}\n${AGENTS_GUIDANCE_LINE}\n`;
+
+  fs.writeFileSync(agentsPath, updatedContent, 'utf8');
+  writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+  return 'updated';
+}
+
+export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }): void {
   app.command(
     'init',
     'Install XcodeBuildMCP agent skill',
@@ -242,6 +312,8 @@ export function registerInitCommand(app: Argv): void {
     },
     async (argv) => {
       const skillType = argv.skill as SkillType;
+      const clientFlag = argv.client as string | undefined;
+      const destFlag = argv.dest as string | undefined;
 
       if (argv.print) {
         const content = readSkillContent(skillType);
@@ -250,11 +322,7 @@ export function registerInitCommand(app: Argv): void {
       }
 
       if (argv.uninstall) {
-        const targets = resolveTargets(
-          argv.client as string | undefined,
-          argv.dest as string | undefined,
-          'uninstall',
-        );
+        const targets = resolveTargets(clientFlag, destFlag, 'uninstall');
         let anyRemoved = false;
 
         for (const target of targets) {
@@ -277,14 +345,15 @@ export function registerInitCommand(app: Argv): void {
         return;
       }
 
-      const targets = resolveTargets(
-        argv.client as string | undefined,
-        argv.dest as string | undefined,
-        'install',
-      );
+      const targets = resolveTargets(clientFlag, destFlag, 'install');
+
+      const policy = enforceInstallPolicy(targets, skillType, clientFlag, destFlag);
+      if (policy.allowedTargets.length === 0) {
+        throw new Error('No eligible install targets after applying skill policy.');
+      }
 
       const results: InstallResult[] = [];
-      for (const target of targets) {
+      for (const target of policy.allowedTargets) {
         const result = await installSkill(target.skillsDir, target.name, skillType, {
           force: argv.force as boolean,
           removeConflict: argv['remove-conflict'] as boolean,
@@ -292,11 +361,55 @@ export function registerInitCommand(app: Argv): void {
         results.push(result);
       }
 
+      for (const skipped of policy.skippedClients) {
+        writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
+      }
+
       writeLine(`Installed ${skillDisplayName(skillType)} skill`);
       for (const result of results) {
         writeLine(`  Client: ${result.client}`);
         writeLine(`  Location: ${result.location}`);
       }
+
+      if (ctx?.workspaceRoot) {
+        const projectRoot = path.resolve(ctx.workspaceRoot);
+        await ensureAgentsGuidance(projectRoot, argv.force as boolean);
+      }
     },
   );
+}
+
+function enforceInstallPolicy(
+  targets: ClientInfo[],
+  skillType: SkillType,
+  clientFlag: string | undefined,
+  destFlag: string | undefined,
+): InstallPolicyResult {
+  if (skillType !== 'mcp') {
+    return { allowedTargets: targets, skippedClients: [] };
+  }
+
+  if (destFlag) {
+    return { allowedTargets: targets, skippedClients: [] };
+  }
+
+  const allowedTargets: ClientInfo[] = [];
+  const skippedClients: Array<{ client: string; reason: string }> = [];
+
+  for (const target of targets) {
+    if (target.id === 'claude') {
+      skippedClients.push({
+        client: target.name,
+        reason: 'MCP skill is unnecessary because Claude Code already uses server instructions.',
+      });
+      continue;
+    }
+    allowedTargets.push(target);
+  }
+
+  if (clientFlag === 'claude') {
+    return { allowedTargets: targets, skippedClients: [] };
+  }
+
+  return { allowedTargets, skippedClients };
 }

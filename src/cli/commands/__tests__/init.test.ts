@@ -20,6 +20,10 @@ import { homedir } from 'node:os';
 
 const mockedGetResourceRoot = vi.mocked(getResourceRoot);
 const mockedHomedir = vi.mocked(homedir);
+const agentsGuidanceLine =
+  '- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.';
+const legacyAgentsGuidanceLine =
+  '- If using XcodeBuildMCP, first find and read the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.';
 
 function loadInitModule() {
   return import('../init.ts');
@@ -123,6 +127,58 @@ describe('init command', () => {
 
       expect(existsSync(join(dest, 'xcodebuildmcp-cli', 'SKILL.md'))).toBe(true);
       expect(existsSync(join(dest, 'xcodebuildmcp', 'SKILL.md'))).toBe(false);
+
+      stdoutSpy.mockRestore();
+    });
+
+    it('skips Claude for MCP skill in auto-detect mode', async () => {
+      const fakeHome = join(tempDir, 'home-auto-skip-claude');
+      mkdirSync(join(fakeHome, '.claude'), { recursive: true });
+      mkdirSync(join(fakeHome, '.cursor'), { recursive: true });
+      mockedHomedir.mockReturnValue(fakeHome);
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--skill', 'mcp']).scriptName('');
+      mod.registerInitCommand(app);
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      expect(existsSync(join(fakeHome, '.claude', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
+        false,
+      );
+      expect(existsSync(join(fakeHome, '.cursor', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
+        true,
+      );
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).toContain('Skipped Claude Code');
+
+      stdoutSpy.mockRestore();
+    });
+
+    it('allows explicit Claude MCP install with --client claude', async () => {
+      const fakeHome = join(tempDir, 'home-explicit-claude');
+      mkdirSync(join(fakeHome, '.claude'), { recursive: true });
+      mockedHomedir.mockReturnValue(fakeHome);
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--client', 'claude', '--skill', 'mcp']).scriptName('');
+      mod.registerInitCommand(app);
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      expect(existsSync(join(fakeHome, '.claude', 'skills', 'xcodebuildmcp', 'SKILL.md'))).toBe(
+        true,
+      );
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).not.toContain('Skipped Claude Code');
 
       stdoutSpy.mockRestore();
     });
@@ -315,6 +371,127 @@ describe('init command', () => {
       expect(existsSync(join(emptyHome, '.claude', 'skills'))).toBe(false);
       expect(existsSync(join(emptyHome, '.cursor', 'skills'))).toBe(false);
       expect(existsSync(join(emptyHome, '.codex', 'skills', 'public'))).toBe(false);
+
+      stdoutSpy.mockRestore();
+    });
+  });
+
+  describe('AGENTS.md guidance on skill install', () => {
+    it('creates project-level AGENTS.md when missing', async () => {
+      const dest = join(tempDir, 'skills');
+      const projectRoot = join(tempDir, 'project-create');
+      mkdirSync(dest, { recursive: true });
+      mkdirSync(projectRoot, { recursive: true });
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--dest', dest, '--skill', 'cli']).scriptName('');
+      mod.registerInitCommand(app, { workspaceRoot: projectRoot });
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      const agentsPath = join(projectRoot, 'AGENTS.md');
+      expect(existsSync(agentsPath)).toBe(true);
+      expect(readFileSync(agentsPath, 'utf8')).toContain(agentsGuidanceLine);
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).toContain('Created AGENTS.md with XcodeBuildMCP guidance');
+
+      stdoutSpy.mockRestore();
+    });
+
+    it('shows diff and errors in non-interactive mode when AGENTS.md exists and --force is not set', async () => {
+      const dest = join(tempDir, 'skills');
+      const projectRoot = join(tempDir, 'project-non-interactive');
+      mkdirSync(dest, { recursive: true });
+      mkdirSync(projectRoot, { recursive: true });
+      writeFileSync(join(projectRoot, 'AGENTS.md'), '# Existing\n', 'utf8');
+
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--dest', dest, '--skill', 'cli']).scriptName('').fail(false);
+      mod.registerInitCommand(app, { workspaceRoot: projectRoot });
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await expect(app.parseAsync()).rejects.toThrow(
+        'AGENTS.md exists and requires confirmation to update',
+      );
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).toContain('Proposed update for');
+      expect(output).toContain('--- AGENTS.md');
+      expect(output).toContain('+++ AGENTS.md');
+      expect(output).toContain(agentsGuidanceLine);
+
+      stdoutSpy.mockRestore();
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+    });
+
+    it('updates existing AGENTS.md with --force without prompting', async () => {
+      const dest = join(tempDir, 'skills');
+      const projectRoot = join(tempDir, 'project-force');
+      mkdirSync(dest, { recursive: true });
+      mkdirSync(projectRoot, { recursive: true });
+      writeFileSync(join(projectRoot, 'AGENTS.md'), '# Existing\n', 'utf8');
+
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--dest', dest, '--skill', 'cli', '--force']).scriptName('');
+      mod.registerInitCommand(app, { workspaceRoot: projectRoot });
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      const agentsContent = readFileSync(join(projectRoot, 'AGENTS.md'), 'utf8');
+      expect(agentsContent).toContain('# Existing');
+      expect(agentsContent).toContain(agentsGuidanceLine);
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).toContain('Proposed update for');
+      expect(output).toContain('Updated AGENTS.md at');
+
+      stdoutSpy.mockRestore();
+      Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+    });
+
+    it('replaces legacy XcodeBuildMCP guidance line without appending duplicate', async () => {
+      const dest = join(tempDir, 'skills');
+      const projectRoot = join(tempDir, 'project-legacy-guidance');
+      mkdirSync(dest, { recursive: true });
+      mkdirSync(projectRoot, { recursive: true });
+      writeFileSync(
+        join(projectRoot, 'AGENTS.md'),
+        `# Existing\n\n${legacyAgentsGuidanceLine}\n`,
+        'utf8',
+      );
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--dest', dest, '--skill', 'cli']).scriptName('');
+      mod.registerInitCommand(app, { workspaceRoot: projectRoot });
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await app.parseAsync();
+
+      const agentsContent = readFileSync(join(projectRoot, 'AGENTS.md'), 'utf8');
+      expect(agentsContent).toContain(agentsGuidanceLine);
+      expect(agentsContent).not.toContain(legacyAgentsGuidanceLine);
+      expect(
+        agentsContent.match(
+          new RegExp(agentsGuidanceLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        )?.length,
+      ).toBe(1);
 
       stdoutSpy.mockRestore();
     });
