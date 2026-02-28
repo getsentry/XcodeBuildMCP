@@ -507,6 +507,143 @@ describe('test_macos plugin (unified)', () => {
       );
     });
 
+    it('should filter out stderr lines when xcresult data is available', async () => {
+      // Regression test for #231: stderr warnings (e.g. "multiple matching destinations")
+      // should be dropped when xcresult parsing succeeds, since xcresult is authoritative.
+      let callCount = 0;
+      const mockExecutor = async (
+        command: string[],
+        logPrefix?: string,
+        useShell?: boolean,
+        opts?: { env?: Record<string, string> },
+        detached?: boolean,
+      ) => {
+        callCount++;
+        void logPrefix;
+        void useShell;
+        void opts;
+        void detached;
+
+        // First call: xcodebuild test fails with stderr warning
+        if (callCount === 1) {
+          return createMockCommandResponse({
+            success: false,
+            output: '',
+            error:
+              'WARNING: multiple matching destinations, using first match\n' + 'error: Test failed',
+          });
+        }
+
+        // Second call: xcresulttool succeeds
+        if (command.includes('xcresulttool')) {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({
+              title: 'Test Results',
+              result: 'FAILED',
+              totalTestCount: 5,
+              passedTests: 3,
+              failedTests: 2,
+              skippedTests: 0,
+              expectedFailures: 0,
+            }),
+          });
+        }
+
+        return createMockCommandResponse({ success: true, output: '' });
+      };
+
+      const mockFileSystemExecutor = createTestFileSystemExecutor({
+        mkdtemp: async () => '/tmp/xcodebuild-test-stderr',
+      });
+
+      const result = await testMacosLogic(
+        {
+          workspacePath: '/path/to/MyProject.xcworkspace',
+          scheme: 'MyScheme',
+        },
+        mockExecutor,
+        mockFileSystemExecutor,
+      );
+
+      // stderr lines should be filtered out
+      const allText = result.content.map((c) => c.text).join('\n');
+      expect(allText).not.toContain('[stderr]');
+
+      // xcresult summary should be present and first
+      expect(result.content[0].text).toContain('Test Results Summary:');
+
+      // Build status line should still be present
+      expect(allText).toContain('Test Run test failed for scheme MyScheme');
+    });
+
+    it('should preserve stderr when xcresult reports zero tests (build failure)', async () => {
+      // When the build fails, xcresult exists but has totalTestCount: 0.
+      // In that case stderr contains the actual compilation errors and must be preserved.
+      let callCount = 0;
+      const mockExecutor = async (
+        command: string[],
+        logPrefix?: string,
+        useShell?: boolean,
+        opts?: { env?: Record<string, string> },
+        detached?: boolean,
+      ) => {
+        callCount++;
+        void logPrefix;
+        void useShell;
+        void opts;
+        void detached;
+
+        // First call: xcodebuild test fails with compilation error on stderr
+        if (callCount === 1) {
+          return createMockCommandResponse({
+            success: false,
+            output: '',
+            error: 'error: missing argument for parameter in call',
+          });
+        }
+
+        // Second call: xcresulttool succeeds but reports 0 tests
+        if (command.includes('xcresulttool')) {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({
+              title: 'Test Results',
+              result: 'unknown',
+              totalTestCount: 0,
+              passedTests: 0,
+              failedTests: 0,
+              skippedTests: 0,
+              expectedFailures: 0,
+            }),
+          });
+        }
+
+        return createMockCommandResponse({ success: true, output: '' });
+      };
+
+      const mockFileSystemExecutor = createTestFileSystemExecutor({
+        mkdtemp: async () => '/tmp/xcodebuild-test-buildfail',
+      });
+
+      const result = await testMacosLogic(
+        {
+          workspacePath: '/path/to/MyProject.xcworkspace',
+          scheme: 'MyScheme',
+        },
+        mockExecutor,
+        mockFileSystemExecutor,
+      );
+
+      // stderr with compilation error must be preserved (not filtered)
+      const allText = result.content.map((c) => c.text).join('\n');
+      expect(allText).toContain('[stderr]');
+      expect(allText).toContain('missing argument');
+
+      // xcresult summary should NOT be present (it's meaningless with 0 tests)
+      expect(allText).not.toContain('Test Results Summary:');
+    });
+
     it('should return exact exception handling response', async () => {
       // Mock executor (won't be called due to mkdtemp failure)
       const mockExecutor = createMockExecutor({

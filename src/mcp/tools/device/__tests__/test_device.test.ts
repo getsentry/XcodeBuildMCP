@@ -168,9 +168,9 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
-      expect(result.content[0].text).toContain('✅');
-      expect(result.content[1].text).toContain('Test Results Summary:');
-      expect(result.content[1].text).toContain('MyScheme Tests');
+      expect(result.content[0].text).toContain('Test Results Summary:');
+      expect(result.content[0].text).toContain('MyScheme Tests');
+      expect(result.content[1].text).toContain('✅');
     });
 
     it('should handle test failure scenarios', async () => {
@@ -214,8 +214,8 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
-      expect(result.content[1].text).toContain('Test Failures:');
-      expect(result.content[1].text).toContain('testExample');
+      expect(result.content[0].text).toContain('Test Failures:');
+      expect(result.content[0].text).toContain('testExample');
     });
 
     it('should handle xcresult parsing failures gracefully', async () => {
@@ -264,6 +264,70 @@ describe('test_device plugin', () => {
       expect(result.content[0].text).toContain('✅');
     });
 
+    it('should preserve stderr when xcresult reports zero tests (build failure)', async () => {
+      // When the build fails, xcresult exists but has totalTestCount: 0.
+      // stderr contains the actual compilation errors and must be preserved.
+      let callCount = 0;
+      const mockExecutor = async (
+        _args: string[],
+        _description?: string,
+        _useShell?: boolean,
+        _opts?: { cwd?: string },
+        _detached?: boolean,
+      ) => {
+        callCount++;
+
+        // First call: xcodebuild test fails with compilation error
+        if (callCount === 1) {
+          return createMockCommandResponse({
+            success: false,
+            output: '',
+            error: 'error: missing argument for parameter in call',
+          });
+        }
+
+        // Second call: xcresulttool succeeds but reports 0 tests
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            title: 'Test Results',
+            result: 'unknown',
+            totalTestCount: 0,
+            passedTests: 0,
+            failedTests: 0,
+            skippedTests: 0,
+            expectedFailures: 0,
+          }),
+        });
+      };
+
+      const result = await testDeviceLogic(
+        {
+          projectPath: '/path/to/project.xcodeproj',
+          scheme: 'MyScheme',
+          deviceId: 'test-device-123',
+          configuration: 'Debug',
+          preferXcodebuild: false,
+          platform: 'iOS',
+        },
+        mockExecutor,
+        createMockFileSystemExecutor({
+          mkdtemp: async () => '/tmp/xcodebuild-test-buildfail',
+          tmpdir: () => '/tmp',
+          stat: async () => ({ isDirectory: () => false, mtimeMs: 0 }),
+          rm: async () => {},
+        }),
+      );
+
+      // stderr with compilation error must be preserved
+      const allText = result.content.map((c) => c.text).join('\n');
+      expect(allText).toContain('[stderr]');
+      expect(allText).toContain('missing argument');
+
+      // xcresult summary should NOT be present
+      expect(allText).not.toContain('Test Results Summary:');
+    });
+
     it('should support different platforms', async () => {
       // Mock xcresulttool output
       const mockExecutor = createMockExecutor({
@@ -298,7 +362,7 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
-      expect(result.content[1].text).toContain('WatchApp Tests');
+      expect(result.content[0].text).toContain('WatchApp Tests');
     });
 
     it('should handle optional parameters', async () => {
@@ -337,7 +401,7 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
-      expect(result.content[0].text).toContain('✅');
+      expect(result.content[1].text).toContain('✅');
     });
 
     it('should handle workspace testing successfully', async () => {
@@ -374,9 +438,9 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
-      expect(result.content[0].text).toContain('✅');
-      expect(result.content[1].text).toContain('Test Results Summary:');
-      expect(result.content[1].text).toContain('WorkspaceScheme Tests');
+      expect(result.content[0].text).toContain('Test Results Summary:');
+      expect(result.content[0].text).toContain('WorkspaceScheme Tests');
+      expect(result.content[1].text).toContain('✅');
     });
   });
 });

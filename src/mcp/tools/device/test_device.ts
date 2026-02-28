@@ -76,13 +76,18 @@ const publicSchemaObject = baseSchemaObject.omit({
  * (JavaScript implementation - no actual interface, this is just documentation)
  */
 
+interface XcresultSummary {
+  formatted: string;
+  totalTestCount: number;
+}
+
 /**
  * Parse xcresult bundle using xcrun xcresulttool
  */
 async function parseXcresultBundle(
   resultBundlePath: string,
   executor: CommandExecutor = getDefaultCommandExecutor(),
-): Promise<string> {
+): Promise<XcresultSummary> {
   try {
     // Use injected executor for testing
     const result = await executor(
@@ -98,7 +103,11 @@ async function parseXcresultBundle(
 
     // Parse JSON response and format as human-readable
     const summaryData = JSON.parse(result.output) as Record<string, unknown>;
-    return formatTestSummary(summaryData);
+    return {
+      formatted: formatTestSummary(summaryData),
+      totalTestCount:
+        typeof summaryData.totalTestCount === 'number' ? summaryData.totalTestCount : 0,
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('error', `Error parsing xcresult bundle: ${errorMessage}`);
@@ -252,20 +261,31 @@ export async function testDeviceLogic(
         throw new Error(`xcresult bundle not found at ${resultBundlePath}`);
       }
 
-      const testSummary = await parseXcresultBundle(resultBundlePath, executor);
+      const xcresult = await parseXcresultBundle(resultBundlePath, executor);
       log('info', 'Successfully parsed xcresult bundle');
 
       // Clean up temporary directory
       await cleanup();
 
-      // Return combined result - preserve isError from testResult (test failures should be marked as errors)
+      // If no tests ran (e.g. build failed), the xcresult is empty/meaningless.
+      // Fall back to the original response which contains the actual build errors.
+      if (xcresult.totalTestCount === 0) {
+        log('info', 'xcresult reports 0 tests — falling back to raw build output');
+        return testResult;
+      }
+
+      // When xcresult has real test data, it's the authoritative source.
+      // Drop stderr lines — they're redundant noise (e.g. "multiple matching destinations").
+      const filteredContent = (testResult.content || []).filter(
+        (item) => item.type !== 'text' || !item.text.includes('[stderr]'),
+      );
       return {
         content: [
-          ...(testResult.content || []),
           {
             type: 'text',
-            text: '\nTest Results Summary:\n' + testSummary,
+            text: '\nTest Results Summary:\n' + xcresult.formatted,
           },
+          ...filteredContent,
         ],
         isError: testResult.isError,
       };

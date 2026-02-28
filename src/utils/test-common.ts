@@ -56,10 +56,15 @@ interface TestSummary {
   }>;
 }
 
+interface XcresultSummary {
+  formatted: string;
+  totalTestCount: number;
+}
+
 /**
  * Parse xcresult bundle using xcrun xcresulttool
  */
-export async function parseXcresultBundle(resultBundlePath: string): Promise<string> {
+export async function parseXcresultBundle(resultBundlePath: string): Promise<XcresultSummary> {
   try {
     const execAsync = promisify(exec);
     const { stdout } = await execAsync(
@@ -68,7 +73,10 @@ export async function parseXcresultBundle(resultBundlePath: string): Promise<str
 
     // Parse JSON response and format as human-readable
     const summary = JSON.parse(stdout) as TestSummary;
-    return formatTestSummary(summary);
+    return {
+      formatted: formatTestSummary(summary),
+      totalTestCount: summary.totalTestCount ?? 0,
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('error', `Error parsing xcresult bundle: ${errorMessage}`);
@@ -216,20 +224,31 @@ export async function handleTestLogic(
         throw new Error(`xcresult bundle not found at ${resultBundlePath}`);
       }
 
-      const testSummary = await parseXcresultBundle(resultBundlePath);
+      const xcresult = await parseXcresultBundle(resultBundlePath);
       log('info', 'Successfully parsed xcresult bundle');
 
       // Clean up temporary directory
       await rm(tempDir, { recursive: true, force: true });
 
-      // Return combined result - preserve isError from testResult (test failures should be marked as errors)
+      // If no tests ran (e.g. build failed), the xcresult is empty/meaningless.
+      // Fall back to the original response which contains the actual build errors.
+      if (xcresult.totalTestCount === 0) {
+        log('info', 'xcresult reports 0 tests — falling back to raw build output');
+        return consolidateContentForClaudeCode(testResult);
+      }
+
+      // When xcresult has real test data, it's the authoritative source.
+      // Drop stderr lines — they're redundant noise (e.g. "multiple matching destinations").
+      const filteredContent = (testResult.content || []).filter(
+        (item) => item.type !== 'text' || !item.text.includes('[stderr]'),
+      );
       const combinedResponse: ToolResponse = {
         content: [
-          ...(testResult.content || []),
           {
             type: 'text',
-            text: '\nTest Results Summary:\n' + testSummary,
+            text: '\nTest Results Summary:\n' + xcresult.formatted,
           },
+          ...filteredContent,
         ],
         isError: testResult.isError,
       };
