@@ -4,6 +4,8 @@ enabledWorkflows:
   - simulator
   - ui-automation
   - xcode-ide
+debug: false
+sentryDisabled: false
 sessionDefaults:
   workspacePath: CalculatorApp.xcworkspace
   scheme: CalculatorApp
@@ -17,5 +19,3 @@ sessionDefaults:
   derivedDataPath: ./iOS_Calculator/.derivedData
   preferXcodebuild: true
   bundleId: io.sentry.calculatorapp
-debug: false
-sentryDisabled: false
