@@ -6,4 +6,3 @@ names:
 description: Set session defaults for the active profile, or for a specified profile and make it active.
 annotations:
   title: Set Session Defaults
-  destructiveHint: true

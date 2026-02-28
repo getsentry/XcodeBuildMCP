@@ -6,4 +6,3 @@ names:
 description: Stop macOS app.
 annotations:
   title: Stop macOS App
-  destructiveHint: true

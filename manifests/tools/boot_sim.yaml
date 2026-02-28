@@ -6,7 +6,6 @@ names:
 description: Boot iOS simulator.
 annotations:
   title: Boot Simulator
-  destructiveHint: true
 nextSteps:
   - label: Open the Simulator app (makes it visible)
     toolId: open_sim

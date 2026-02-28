@@ -6,4 +6,3 @@ names:
 description: Stop sim app.
 annotations:
   title: Stop App Simulator
-  destructiveHint: true

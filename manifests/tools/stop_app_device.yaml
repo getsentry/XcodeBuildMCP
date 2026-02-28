@@ -6,4 +6,3 @@ names:
 description: Stop device app.
 annotations:
   title: Stop App Device
-  destructiveHint: true

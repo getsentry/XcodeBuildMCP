@@ -6,4 +6,3 @@ names:
 description: Set sim appearance.
 annotations:
   title: Set Simulator Appearance
-  destructiveHint: true

@@ -8,7 +8,6 @@ routing:
   stateful: true
 annotations:
   title: Record Simulator Video
-  destructiveHint: true
 nextSteps:
   - label: Stop and save the recording
     toolId: record_sim_video

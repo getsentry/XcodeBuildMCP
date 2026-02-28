@@ -6,4 +6,3 @@ names:
 description: Long press at coords.
 annotations:
   title: Long Press
-  destructiveHint: true

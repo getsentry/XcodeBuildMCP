@@ -6,4 +6,3 @@ names:
 description: Tap UI element by accessibility id/label (recommended) or coordinates as fallback.
 annotations:
   title: Tap
-  destructiveHint: true

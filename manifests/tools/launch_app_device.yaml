@@ -6,7 +6,6 @@ names:
 description: Launch app on device.
 annotations:
   title: Launch App Device
-  destructiveHint: true
 nextSteps:
   - label: Stop the app
     toolId: stop_app_device

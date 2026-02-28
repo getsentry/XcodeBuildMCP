@@ -6,7 +6,6 @@ names:
 description: Open Simulator app.
 annotations:
   title: Open Simulator
-  destructiveHint: true
 nextSteps:
   - label: Boot a simulator if needed
     toolId: boot_sim

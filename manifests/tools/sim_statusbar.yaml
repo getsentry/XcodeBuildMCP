@@ -6,4 +6,3 @@ names:
 description: Set sim status bar network.
 annotations:
   title: Simulator Statusbar
-  destructiveHint: true
