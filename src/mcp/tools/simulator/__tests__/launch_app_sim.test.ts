@@ -28,7 +28,7 @@ describe('launch_app_sim tool', () => {
 
       const withSimDefaults = schemaObj.safeParse({
         simulatorId: 'sim-default',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
       });
       expect(withSimDefaults.success).toBe(false);
     });
@@ -57,7 +57,7 @@ describe('launch_app_sim tool', () => {
     it('should reject when both simulatorId and simulatorName provided explicitly', async () => {
       const result = await handler({
         simulatorId: 'SIM-UUID',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
         bundleId: 'io.sentry.testapp',
       });
 
@@ -179,7 +179,7 @@ describe('launch_app_sim tool', () => {
       const result = await launch_app_simLogic(
         {
           simulatorId: 'resolved-uuid',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
           bundleId: 'io.sentry.testapp',
         },
         sequencedExecutor,
@@ -189,7 +189,7 @@ describe('launch_app_sim tool', () => {
         content: [
           {
             type: 'text',
-            text: 'App launched successfully in simulator "iPhone 16" (resolved-uuid).',
+            text: 'App launched successfully in simulator "iPhone 17" (resolved-uuid).',
           },
         ],
         nextStepParams: {

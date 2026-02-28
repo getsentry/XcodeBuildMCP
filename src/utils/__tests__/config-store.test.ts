@@ -128,7 +128,7 @@ describe('config-store', () => {
       fs: createFs(yaml),
       overrides: {
         sessionDefaultsProfiles: {
-          ios: { simulatorName: 'iPhone 16' },
+          ios: { simulatorName: 'iPhone 17' },
           watch: { scheme: 'WatchScheme' },
         },
       },
@@ -137,7 +137,7 @@ describe('config-store', () => {
     const config = getConfig();
     expect(config.activeSessionDefaultsProfile).toBe('ios');
     expect(config.sessionDefaultsProfiles?.ios?.scheme).toBe('FromFile');
-    expect(config.sessionDefaultsProfiles?.ios?.simulatorName).toBe('iPhone 16');
+    expect(config.sessionDefaultsProfiles?.ios?.simulatorName).toBe('iPhone 17');
     expect(config.sessionDefaultsProfiles?.watch?.scheme).toBe('WatchScheme');
   });
 

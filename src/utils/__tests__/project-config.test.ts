@@ -65,7 +65,7 @@ describe('project-config', () => {
         'sessionDefaults:',
         '  projectPath: "./App.xcodeproj"',
         '  workspacePath: "./App.xcworkspace"',
-        '  simulatorName: "iPhone 16"',
+        '  simulatorName: "iPhone 17"',
         '  simulatorId: "SIM-1"',
         '  derivedDataPath: "./.derivedData"',
         '',
@@ -83,7 +83,7 @@ describe('project-config', () => {
       expect(defaults.workspacePath).toBe(path.join(cwd, 'App.xcworkspace'));
       expect(defaults.projectPath).toBeUndefined();
       expect(defaults.simulatorId).toBe('SIM-1');
-      expect(defaults.simulatorName).toBe('iPhone 16');
+      expect(defaults.simulatorName).toBe('iPhone 17');
       expect(defaults.derivedDataPath).toBe(path.join(cwd, '.derivedData'));
       expect(result.notices.length).toBeGreaterThan(0);
     });
@@ -136,7 +136,7 @@ describe('project-config', () => {
         '  ios:',
         '    projectPath: "./App.xcodeproj"',
         '    workspacePath: "./App.xcworkspace"',
-        '    simulatorName: "iPhone 16"',
+        '    simulatorName: "iPhone 17"',
         '  watch:',
         '    workspacePath: "./Watch.xcworkspace"',
         '',

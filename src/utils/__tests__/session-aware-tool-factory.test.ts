@@ -245,7 +245,7 @@ describe('createSessionAwareTool', () => {
       scheme: 'App',
       projectPath: '/a.xcodeproj',
       simulatorId: 'SIM-123',
-      simulatorName: 'iPhone 16',
+      simulatorName: 'iPhone 17',
     });
 
     // Call with no args - both come from session defaults

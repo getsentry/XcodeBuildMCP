@@ -14,7 +14,7 @@ beforeAll(async () => {
           devices: {
             'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
               {
-                name: 'iPhone 16 Pro',
+                name: 'iPhone 17 Pro',
                 udid: 'AAAAAAAA-1111-2222-3333-444444444444',
                 state: 'Shutdown',
                 isAvailable: true,

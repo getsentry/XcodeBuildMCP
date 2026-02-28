@@ -118,7 +118,7 @@ describe('show_build_settings plugin', () => {
           build_sim: {
             projectPath: '/path/to/MyProject.xcodeproj',
             scheme: 'MyScheme',
-            simulatorName: 'iPhone 16',
+            simulatorName: 'iPhone 17',
           },
           list_schemes: { projectPath: '/path/to/MyProject.xcodeproj' },
         },
@@ -311,7 +311,7 @@ describe('show_build_settings plugin', () => {
           build_sim: {
             projectPath: '/path/to/MyProject.xcodeproj',
             scheme: 'MyScheme',
-            simulatorName: 'iPhone 16',
+            simulatorName: 'iPhone 17',
           },
           list_schemes: { projectPath: '/path/to/MyProject.xcodeproj' },
         },

@@ -93,7 +93,7 @@ describe('get_sim_app_path tool', () => {
       const result = await handler({
         platform: XcodePlatform.iOSSimulator,
         simulatorId: 'SIM-UUID',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
       });
 
       expect(result.isError).toBe(true);
@@ -136,7 +136,7 @@ describe('get_sim_app_path tool', () => {
           workspacePath: '/path/to/workspace.xcworkspace',
           scheme: 'MyScheme',
           platform: XcodePlatform.iOSSimulator,
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
           useLatestOS: true,
         },
         trackingExecutor,
@@ -155,7 +155,7 @@ describe('get_sim_app_path tool', () => {
         '-configuration',
         'Debug',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16,OS=latest',
+        'platform=iOS Simulator,name=iPhone 17,OS=latest',
       ]);
 
       expect(result.isError).toBe(false);

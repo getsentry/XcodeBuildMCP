@@ -14,10 +14,10 @@ describe('SessionStore', () => {
 
   it('should merge defaults on set', () => {
     sessionStore.setDefaults({ scheme: 'App' });
-    sessionStore.setDefaults({ simulatorName: 'iPhone 16' });
+    sessionStore.setDefaults({ simulatorName: 'iPhone 17' });
     const all = sessionStore.getAll();
     expect(all.scheme).toBe('App');
-    expect(all.simulatorName).toBe('iPhone 16');
+    expect(all.simulatorName).toBe('iPhone 17');
   });
 
   it('should clear specific keys', () => {
@@ -47,12 +47,12 @@ describe('SessionStore', () => {
   it('isolates defaults by active profile', () => {
     sessionStore.setDefaults({ scheme: 'GlobalApp' });
     sessionStore.setActiveProfile('ios');
-    sessionStore.setDefaults({ scheme: 'iOSApp', simulatorName: 'iPhone 16' });
+    sessionStore.setDefaults({ scheme: 'iOSApp', simulatorName: 'iPhone 17' });
     sessionStore.setActiveProfile('watch');
     sessionStore.setDefaults({ scheme: 'WatchApp' });
 
     sessionStore.setActiveProfile('ios');
-    expect(sessionStore.getAll()).toMatchObject({ scheme: 'iOSApp', simulatorName: 'iPhone 16' });
+    expect(sessionStore.getAll()).toMatchObject({ scheme: 'iOSApp', simulatorName: 'iPhone 17' });
 
     sessionStore.setActiveProfile('watch');
     expect(sessionStore.getAll()).toMatchObject({ scheme: 'WatchApp' });

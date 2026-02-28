@@ -49,7 +49,7 @@ const baseGetSimulatorAppPathSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Name of the simulator (e.g., 'iPhone 16'). Provide EITHER this OR simulatorId, not both",
+      "Name of the simulator (e.g., 'iPhone 17'). Provide EITHER this OR simulatorId, not both",
     ),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
   useLatestOS: z

@@ -32,7 +32,7 @@ const baseSchemaObject = z.object({
     .string()
     .optional()
     .describe(
-      "Name of the simulator (e.g., 'iPhone 16'). Provide EITHER this OR simulatorId, not both",
+      "Name of the simulator (e.g., 'iPhone 17'). Provide EITHER this OR simulatorId, not both",
     ),
   bundleId: z.string().describe('Bundle identifier of the app to launch'),
   args: z.array(z.string()).optional().describe('Optional arguments to pass to the app'),

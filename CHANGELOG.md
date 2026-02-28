@@ -73,7 +73,7 @@ enabledWorkflows:
 sessionDefaults:
   scheme: MyApp
   projectPath: ./MyApp.xcodeproj
-  simulatorName: iPhone 16
+  simulatorName: iPhone 17
 ```
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full reference.

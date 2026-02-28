@@ -45,7 +45,7 @@ Copy/paste this sequence when starting a new session:
 {"name":"session_set_defaults","arguments":{
   "workspacePath":"/repo/MyApp.xcworkspace",
   "scheme":"MyApp-iOS",
-  "simulatorName":"iPhone 16 Pro",
+  "simulatorName":"iPhone 17 Pro",
   "persist":true
 }}
 {"name":"session_show_defaults","arguments":{}}

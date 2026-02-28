@@ -379,12 +379,12 @@ export async function scaffold_ios_projectLogic(
         build_sim: {
           workspacePath,
           scheme: generatedProjectName,
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         build_run_sim: {
           workspacePath,
           scheme: generatedProjectName,
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
       },
     };

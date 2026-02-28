@@ -91,7 +91,7 @@ export async function showBuildSettingsLogic(
       const pathKey = hasProjectPath ? 'projectPath' : 'workspacePath';
       nextStepParams = {
         build_macos: { [pathKey]: path, scheme: params.scheme },
-        build_sim: { [pathKey]: path, scheme: params.scheme, simulatorName: 'iPhone 16' },
+        build_sim: { [pathKey]: path, scheme: params.scheme, simulatorName: 'iPhone 17' },
         list_schemes: { [pathKey]: path },
       };
     }
