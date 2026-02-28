@@ -44,7 +44,12 @@ Capabilities:
 
 Only simulator workflow tools are enabled by default. If capabilities like device, macOS, debugging, or UI automation are not available, the user must configure XcodeBuildMCP to enable them. See https://github.com/getsentry/XcodeBuildMCP/blob/main/docs/CONFIGURATION.md for workflow configuration.
 
-Always start by calling session_show_defaults to see current configuration, then use discovery tools to find projects and set appropriate defaults.`,
+Simulator run flow:
+- Before your first build, run, or test call in a session, you MUST call session_show_defaults to verify the active project/workspace, scheme, and simulator. Do not assume defaults are configured. Only skip this if you have already called session_show_defaults earlier in the current session.
+- If session_show_defaults confirms project/workspace + scheme + simulator are set, call build_run_sim immediately (often with empty arguments).
+- Use discover_projs only when session_show_defaults shows project/workspace is missing or wrong.
+- Never call discover_projs speculatively or in parallel with session_show_defaults.
+- Do not call boot_sim or open_sim as prerequisites for build_run_sim; build_run_sim boots and opens Simulator as needed.`,
       capabilities: {
         tools: {
           listChanged: true,

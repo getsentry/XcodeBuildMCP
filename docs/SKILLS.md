@@ -26,6 +26,8 @@ xcodebuildmcp init --remove-conflict    # Auto-remove conflicting variant
 xcodebuildmcp init --uninstall          # Remove installed skill
 ```
 
+When installing `--skill mcp` in auto-detect mode, Claude Code targets are skipped because Claude already receives MCP guidance through server instructions. If you explicitly set `--client claude`, MCP skill installation is still allowed.
+
 ## Unsupported Clients
 
 For clients without a skills directory, print the skill content and pipe it to a file or paste it into your client's instructions area:

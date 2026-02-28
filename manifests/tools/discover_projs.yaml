@@ -3,7 +3,14 @@ module: mcp/tools/project-discovery/discover_projs
 names:
   mcp: discover_projs
   cli: discover-projects
-description: Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files.
+description: Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.
 annotations:
   title: Discover Projects
   readOnlyHint: true
+nextSteps:
+  - label: Save discovered project/workspace as session defaults
+    toolId: session_set_defaults
+    priority: 1
+  - label: Build and run once defaults are set
+    toolId: build_run_sim
+    priority: 2

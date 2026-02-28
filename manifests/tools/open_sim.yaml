@@ -3,12 +3,12 @@ module: mcp/tools/simulator/open_sim
 names:
   mcp: open_sim
   cli: open
-description: Open Simulator app.
+description: Open Simulator.app for visibility/manual workflows. Not required before simulator build-and-run (build_run_sim).
 annotations:
   title: Open Simulator
   destructiveHint: true
 nextSteps:
-  - label: Boot a simulator if needed
+  - label: Boot a simulator for manual workflows
     toolId: boot_sim
     params:
       simulatorId: UUID_FROM_LIST_SIMS
