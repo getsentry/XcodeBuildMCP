@@ -110,7 +110,7 @@ export async function applyWorkflowSelectionFromManifest(
           toolModule = await importToolModule(toolManifest.module);
           moduleCache.set(toolId, toolModule);
         } catch (err) {
-          log('warning', `Failed to import tool module ${toolManifest.module}: ${err}`);
+          log('warn', `Failed to import tool module ${toolManifest.module}: ${err}`);
           continue;
         }
       }

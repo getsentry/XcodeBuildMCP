@@ -118,7 +118,7 @@ export async function detectPlatformFromScheme(
     return { platform, sdkroot, supportedPlatforms };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log('warning', `[Platform Detection] ${errorMessage}`);
+    log('warn', `[Platform Detection] ${errorMessage}`);
     return {
       platform: null,
       sdkroot: null,

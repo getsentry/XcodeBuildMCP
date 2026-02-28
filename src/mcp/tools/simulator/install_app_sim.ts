@@ -80,7 +80,7 @@ export async function install_app_simLogic(
         bundleId = bundleIdResult.output.trim();
       }
     } catch (error) {
-      log('warning', `Could not extract bundle ID from app: ${error}`);
+      log('warn', `Could not extract bundle ID from app: ${error}`);
     }
 
     return {

@@ -35,7 +35,7 @@ export async function stop_device_log_capLogic(
 
   const session = activeDeviceLogSessions.get(logSessionId);
   if (!session) {
-    log('warning', `Device log session not found: ${logSessionId}`);
+    log('warn', `Device log session not found: ${logSessionId}`);
     return {
       content: [
         {

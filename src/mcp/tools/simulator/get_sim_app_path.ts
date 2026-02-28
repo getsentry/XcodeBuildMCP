@@ -99,7 +99,7 @@ export async function get_sim_app_pathLogic(
   // Log warning if useLatestOS is provided with simulatorId
   if (simulatorId && params.useLatestOS !== undefined) {
     log(
-      'warning',
+      'warn',
       `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
     );
   }

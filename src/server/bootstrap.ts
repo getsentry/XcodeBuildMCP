@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { registerResources } from '../core/resources.ts';
 import type { FileSystemExecutor } from '../utils/FileSystemExecutor.ts';
-import { log, setLogLevel, type LogLevel } from '../utils/logger.ts';
+import { log, normalizeLogLevel, setLogLevel } from '../utils/logger.ts';
 import type { RuntimeConfigOverrides } from '../utils/config-store.ts';
 import { getRegisteredWorkflows, registerWorkflowsFromManifest } from '../utils/tool-registry.ts';
 import { bootstrapRuntime } from '../runtime/bootstrap-runtime.ts';
@@ -35,7 +35,10 @@ export async function bootstrapServer(
 
   server.server.setRequestHandler(SetLevelRequestSchema, async (request) => {
     const { level } = request.params;
-    setLogLevel(level as LogLevel);
+    const normalized = normalizeLogLevel(level);
+    if (normalized) {
+      setLogLevel(normalized);
+    }
     log('info', `Client requested log level: ${level}`);
     return {};
   });

@@ -16,7 +16,7 @@ describe('logger sentry capture policy', () => {
 
   it('maps internal levels to Sentry log levels', () => {
     expect(__mapLogLevelToSentryForTests('emergency')).toBe('fatal');
-    expect(__mapLogLevelToSentryForTests('warning')).toBe('warn');
+    expect(__mapLogLevelToSentryForTests('warn')).toBe('warn');
     expect(__mapLogLevelToSentryForTests('notice')).toBe('info');
     expect(__mapLogLevelToSentryForTests('error')).toBe('error');
   });

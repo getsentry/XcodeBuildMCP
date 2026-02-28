@@ -113,7 +113,7 @@ export async function findXcodeStateFile(
   // Get current username
   const userResult = await executor(['whoami'], 'Get username', false);
   if (!userResult.success) {
-    log('warning', `[xcode-state] Failed to get username: ${userResult.error}`);
+    log('warn', `[xcode-state] Failed to get username: ${userResult.error}`);
     return undefined;
   }
   const username = userResult.output.trim();
@@ -253,7 +253,7 @@ export async function lookupSimulatorName(
   );
 
   if (!result.success) {
-    log('warning', `[xcode-state] Failed to list simulators: ${result.error}`);
+    log('warn', `[xcode-state] Failed to list simulators: ${result.error}`);
     return undefined;
   }
 
@@ -270,7 +270,7 @@ export async function lookupSimulatorName(
       }
     }
   } catch (e) {
-    log('warning', `[xcode-state] Failed to parse simulator list: ${e}`);
+    log('warn', `[xcode-state] Failed to parse simulator list: ${e}`);
   }
 
   return undefined;
@@ -325,7 +325,7 @@ export async function readXcodeIdeState(ctx: XcodeStateReaderContext): Promise<X
     return result;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    log('warning', `[xcode-state] Failed to read Xcode IDE state: ${message}`);
+    log('warn', `[xcode-state] Failed to read Xcode IDE state: ${message}`);
     return { error: message };
   }
 }

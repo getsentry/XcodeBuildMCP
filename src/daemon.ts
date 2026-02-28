@@ -19,7 +19,7 @@ import {
   removeDaemonRegistryEntry,
   cleanupWorkspaceDaemonFiles,
 } from './daemon/daemon-registry.ts';
-import { log, setLogFile, setLogLevel, type LogLevel } from './utils/logger.ts';
+import { log, normalizeLogLevel, setLogFile, setLogLevel } from './utils/logger.ts';
 import { version } from './version.ts';
 import {
   DAEMON_IDLE_TIMEOUT_ENV_KEY,
@@ -102,29 +102,12 @@ function ensureLogDir(logPath: string): void {
   }
 }
 
-function resolveLogLevel(): LogLevel | null {
-  const raw = process.env.XCODEBUILDMCP_DAEMON_LOG_LEVEL?.trim().toLowerCase();
+function resolveLogLevel(): ReturnType<typeof normalizeLogLevel> {
+  const raw = process.env.XCODEBUILDMCP_DAEMON_LOG_LEVEL;
   if (!raw) {
     return null;
   }
-
-  const knownLevels: LogLevel[] = [
-    'none',
-    'emergency',
-    'alert',
-    'critical',
-    'error',
-    'warning',
-    'notice',
-    'info',
-    'debug',
-  ];
-
-  if (knownLevels.includes(raw as LogLevel)) {
-    return raw as LogLevel;
-  }
-
-  return null;
+  return normalizeLogLevel(raw);
 }
 
 async function main(): Promise<void> {
@@ -315,7 +298,7 @@ async function main(): Promise<void> {
 
     // Force exit if server doesn't close in time
     setTimeout(() => {
-      log('warning', '[Daemon] Forced shutdown after timeout');
+      log('warn', '[Daemon] Forced shutdown after timeout');
       cleanupWorkspaceDaemonFiles(workspaceKey);
       void flushAndCloseSentry(1000).finally(() => {
         process.exit(1);
@@ -408,7 +391,7 @@ async function main(): Promise<void> {
     setImmediate(() => {
       void enrichSentryMetadata().catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
-        log('warning', `[Daemon] Failed to enrich Sentry metadata: ${message}`);
+        log('warn', `[Daemon] Failed to enrich Sentry metadata: ${message}`);
       });
     });
   });

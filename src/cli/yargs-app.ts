@@ -44,7 +44,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
     .option('log-level', {
       type: 'string',
       describe: 'Set log verbosity level',
-      choices: ['none', 'error', 'warning', 'info', 'debug'] as const,
+      choices: ['none', 'error', 'warn', 'info', 'debug'] as const,
       default: 'none',
     })
     .option('style', {

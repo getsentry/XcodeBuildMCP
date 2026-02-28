@@ -108,10 +108,10 @@ export async function getDeviceNameForSimulatorId(
         }
       }
     }
-    log('warning', `${LOG_PREFIX}: Could not find device name for ${simulatorId}`);
+    log('warn', `${LOG_PREFIX}: Could not find device name for ${simulatorId}`);
     return null;
   } catch (error) {
-    log('warning', `${LOG_PREFIX}: Failed to get device name: ${error}`);
+    log('warn', `${LOG_PREFIX}: Failed to get device name: ${error}`);
     return null;
   }
 }
@@ -129,7 +129,7 @@ export async function detectLandscapeMode(
     // If no device name available, skip orientation detection to avoid incorrect rotation
     // This is safer than guessing, as we don't know if it's iPhone or iPad
     if (!deviceName) {
-      log('warning', `${LOG_PREFIX}: No device name available, skipping orientation detection`);
+      log('warn', `${LOG_PREFIX}: No device name available, skipping orientation detection`);
       return false;
     }
     const swiftCode = getWindowDetectionSwiftCode(deviceName);
@@ -149,10 +149,10 @@ export async function detectLandscapeMode(
         return isLandscape;
       }
     }
-    log('warning', `${LOG_PREFIX}: Could not detect window orientation, assuming portrait`);
+    log('warn', `${LOG_PREFIX}: Could not detect window orientation, assuming portrait`);
     return false;
   } catch (error) {
-    log('warning', `${LOG_PREFIX}: Orientation detection failed: ${error}`);
+    log('warn', `${LOG_PREFIX}: Orientation detection failed: ${error}`);
     return false;
   }
 }
@@ -170,7 +170,7 @@ export async function rotateImage(
     const result = await executor(rotateArgs, `${LOG_PREFIX}: rotate image`, false);
     return result.success;
   } catch (error) {
-    log('warning', `${LOG_PREFIX}: Image rotation failed: ${error}`);
+    log('warn', `${LOG_PREFIX}: Image rotation failed: ${error}`);
     return false;
   }
 }
@@ -239,7 +239,7 @@ export async function screenshotLogic(
         log('info', `${LOG_PREFIX}/screenshot: Landscape mode detected, rotating +90°`);
         const rotated = await rotateImage(screenshotPath, 90, executor);
         if (!rotated) {
-          log('warning', `${LOG_PREFIX}/screenshot: Rotation failed, continuing with original`);
+          log('warn', `${LOG_PREFIX}/screenshot: Rotation failed, continuing with original`);
         }
       }
 
@@ -262,7 +262,7 @@ export async function screenshotLogic(
       const optimizeResult = await executor(optimizeArgs, `${LOG_PREFIX}: optimize image`, false);
 
       if (!optimizeResult.success) {
-        log('warning', `${LOG_PREFIX}/screenshot: Image optimization failed, using original PNG`);
+        log('warn', `${LOG_PREFIX}/screenshot: Image optimization failed, using original PNG`);
         if (returnFormat === 'base64') {
           // Fallback to original PNG if optimization fails
           const base64Image = await fileSystemExecutor.readFile(screenshotPath, 'base64');
@@ -271,7 +271,7 @@ export async function screenshotLogic(
           try {
             await fileSystemExecutor.rm(screenshotPath);
           } catch (err) {
-            log('warning', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
+            log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
           }
 
           return {
@@ -298,7 +298,7 @@ export async function screenshotLogic(
           await fileSystemExecutor.rm(screenshotPath);
           await fileSystemExecutor.rm(optimizedPath);
         } catch (err) {
-          log('warning', `${LOG_PREFIX}/screenshot: Failed to delete temporary files: ${err}`);
+          log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temporary files: ${err}`);
         }
 
         // Return the optimized image (JPEG format, smaller size)
@@ -312,7 +312,7 @@ export async function screenshotLogic(
       try {
         await fileSystemExecutor.rm(screenshotPath);
       } catch (err) {
-        log('warning', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
+        log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
       }
 
       return createTextResponse(`Screenshot captured: ${optimizedPath} (image/jpeg)`);

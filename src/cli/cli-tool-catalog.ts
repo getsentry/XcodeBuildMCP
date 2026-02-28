@@ -15,7 +15,6 @@ interface BuildCliToolCatalogOptions {
   socketPath: string;
   workspaceRoot: string;
   cliExposedWorkflowIds: string[];
-  logLevel?: string;
   discoveryMode?: 'none' | 'quick';
 }
 
@@ -48,16 +47,6 @@ function jsonSchemaToToolSchemaShape(inputSchema: unknown): ToolSchemaShape {
   }
 
   return shape;
-}
-
-function buildDaemonEnvOverrides(opts: BuildCliToolCatalogOptions): Record<string, string> {
-  const env: Record<string, string> = {};
-
-  if (opts.logLevel) {
-    env.XCODEBUILDMCP_DAEMON_LOG_LEVEL = opts.logLevel;
-  }
-
-  return env;
 }
 
 async function invokeRemoteToolOneShot(
@@ -123,11 +112,10 @@ async function loadDaemonBackedXcodeProxyTools(
         startDaemonBackground({
           socketPath: opts.socketPath,
           workspaceRoot: opts.workspaceRoot,
-          env: buildDaemonEnvOverrides(opts),
         });
       } catch (startError) {
         const message = startError instanceof Error ? startError.message : String(startError);
-        log('warning', `[xcode-ide] Failed to start daemon in background: ${message}`);
+        log('warn', `[xcode-ide] Failed to start daemon in background: ${message}`);
       }
       return [];
     }
@@ -149,7 +137,7 @@ async function loadDaemonBackedXcodeProxyTools(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (quickMode) {
-      log('warning', `[xcode-ide] CLI daemon-backed bridge discovery failed: ${message}`);
+      log('warn', `[xcode-ide] CLI daemon-backed bridge discovery failed: ${message}`);
     } else {
       log('debug', `[xcode-ide] CLI cached bridge discovery skipped: ${message}`);
     }

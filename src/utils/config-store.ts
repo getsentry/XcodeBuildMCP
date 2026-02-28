@@ -139,7 +139,7 @@ function parseDebuggerBackend(value: string | undefined): DebuggerBackendKind | 
   const normalized = value.trim().toLowerCase();
   if (normalized === 'lldb' || normalized === 'lldb-cli') return 'lldb-cli';
   if (normalized === 'dap') return 'dap';
-  log('warning', `Unsupported debugger backend '${value}', falling back to defaults.`);
+  log('warn', `Unsupported debugger backend '${value}', falling back to defaults.`);
   return undefined;
 }
 
@@ -528,12 +528,12 @@ export async function initConfigStore(opts: {
     } else if ('error' in result) {
       const errorMessage =
         result.error instanceof Error ? result.error.message : String(result.error);
-      log('warning', `Failed to read or parse project config at ${result.path}. ${errorMessage}`);
-      log('warning', '[infra/config-store] project config read/parse failed', { sentry: true });
+      log('warn', `Failed to read or parse project config at ${result.path}. ${errorMessage}`);
+      log('warn', '[infra/config-store] project config read/parse failed', { sentry: true });
     }
   } catch (error) {
-    log('warning', `Failed to load project config from ${opts.cwd}. ${error}`);
-    log('warning', `[infra/config-store] project config load threw (${getErrorKind(error)})`, {
+    log('warn', `Failed to load project config from ${opts.cwd}. ${error}`);
+    log('warn', `[infra/config-store] project config load threw (${getErrorKind(error)})`, {
       sentry: true,
     });
   }

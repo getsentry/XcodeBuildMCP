@@ -180,7 +180,7 @@ async function inferPlatformFromSimctl(
   );
 
   if (!result.success) {
-    log('warning', `[Platform Inference] simctl failed: ${result.error ?? 'Unknown error'}`);
+    log('warn', `[Platform Inference] simctl failed: ${result.error ?? 'Unknown error'}`);
     return null;
   }
 
@@ -188,12 +188,12 @@ async function inferPlatformFromSimctl(
   try {
     parsed = JSON.parse(result.output);
   } catch {
-    log('warning', `[Platform Inference] Failed to parse simctl JSON output`);
+    log('warn', `[Platform Inference] Failed to parse simctl JSON output`);
     return null;
   }
 
   if (!parsed || typeof parsed !== 'object' || !('devices' in parsed)) {
-    log('warning', `[Platform Inference] simctl JSON missing devices`);
+    log('warn', `[Platform Inference] simctl JSON missing devices`);
     return null;
   }
 

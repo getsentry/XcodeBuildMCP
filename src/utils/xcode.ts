@@ -56,7 +56,7 @@ export function constructDestinationString(
     // Throw error as specific simulator is needed unless it's a generic build action
     // Allow fallback for generic simulator builds if needed, but generally require specifics for build/run
     log(
-      'warning',
+      'warn',
       `Constructing generic destination for ${platform} without name or ID. This might not be specific enough.`,
     );
     // Example: return `platform=${platform},name=Any ${platform} Device`; // Or similar generic target

@@ -48,7 +48,7 @@ export function registerDaemonCommands(app: Argv, opts: DaemonCommandsOptions): 
             'alert',
             'critical',
             'error',
-            'warning',
+            'warn',
             'notice',
             'info',
             'debug',

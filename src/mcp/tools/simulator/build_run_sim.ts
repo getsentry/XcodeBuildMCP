@@ -91,7 +91,7 @@ async function _handleSimulatorBuildLogic(
   // Log warning if useLatestOS is provided with simulatorId
   if (params.simulatorId && params.useLatestOS !== undefined) {
     log(
-      'warning',
+      'warn',
       `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
     );
   }
@@ -270,7 +270,7 @@ export async function build_run_simLogic(
     }
 
     if (uuidResult.warning) {
-      log('warning', uuidResult.warning);
+      log('warn', uuidResult.warning);
     }
 
     const simulatorId = uuidResult.uuid;
@@ -364,7 +364,7 @@ export async function build_run_simLogic(
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      log('warning', `Warning: Could not open Simulator app: ${errorMessage}`);
+      log('warn', `Warning: Could not open Simulator app: ${errorMessage}`);
       // Don't fail the whole operation for this
     }
 

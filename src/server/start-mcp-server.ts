@@ -71,7 +71,7 @@ export async function startMcpServer(): Promise<void> {
 
     void bootstrap.runDeferredInitialization().catch((error) => {
       log(
-        'warning',
+        'warn',
         `Deferred bootstrap initialization failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });

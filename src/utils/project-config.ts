@@ -113,7 +113,7 @@ function tryFileUrlToPath(value: string): string | null {
   try {
     return fileURLToPath(value);
   } catch (error) {
-    log('warning', `Failed to parse file URL path: ${value}. ${String(error)}`);
+    log('warn', `Failed to parse file URL path: ${value}. ${String(error)}`);
     return null;
   }
 }
@@ -245,7 +245,7 @@ async function readBaseConfigForPersistence(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log(
-      'warning',
+      'warn',
       `Failed to read or parse project config at ${options.configPath}. Overwriting with new config. ${errorMessage}`,
     );
     return { schemaVersion: 1 };

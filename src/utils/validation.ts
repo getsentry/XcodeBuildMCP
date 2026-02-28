@@ -57,7 +57,7 @@ export function validateRequiredParam(
   helpfulMessage = `Required parameter '${paramName}' is missing. Please provide a value for this parameter.`,
 ): ValidationResult {
   if (paramValue === undefined || paramValue === null) {
-    log('warning', `Required parameter '${paramName}' is missing`);
+    log('warn', `Required parameter '${paramName}' is missing`);
     return {
       isValid: false,
       errorResponse: createTextResponse(helpfulMessage, true),
@@ -81,7 +81,7 @@ export function validateAllowedValues<T>(
 ): ValidationResult {
   if (!allowedValues.includes(paramValue)) {
     log(
-      'warning',
+      'warn',
       `Parameter '${paramName}' has invalid value '${paramValue}'. Allowed values: ${allowedValues.join(
         ', ',
       )}`,
@@ -112,7 +112,7 @@ export function validateCondition(
 ): ValidationResult {
   if (!condition) {
     if (logWarning) {
-      log('warning', message);
+      log('warn', message);
     }
     return {
       isValid: false,
@@ -164,7 +164,7 @@ export function validateAtLeastOneParam(
     (param1Value === undefined || param1Value === null) &&
     (param2Value === undefined || param2Value === null)
   ) {
-    log('warning', `At least one of '${param1Name}' or '${param2Name}' must be provided`);
+    log('warn', `At least one of '${param1Name}' or '${param2Name}' must be provided`);
     return {
       isValid: false,
       errorResponse: createTextResponse(
@@ -191,7 +191,7 @@ export function validateEnumParam<T>(
 ): ValidationResult {
   if (!allowedValues.includes(paramValue)) {
     log(
-      'warning',
+      'warn',
       `Parameter '${paramName}' has invalid value '${paramValue}'. Allowed values: ${allowedValues.join(
         ', ',
       )}`,

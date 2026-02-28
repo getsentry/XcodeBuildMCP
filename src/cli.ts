@@ -48,7 +48,7 @@ async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yar
     .option('log-level', {
       type: 'string',
       describe: 'Set log verbosity level',
-      choices: ['none', 'error', 'warning', 'info', 'debug'] as const,
+      choices: ['none', 'error', 'warn', 'info', 'debug'] as const,
       default: 'none',
     })
     .option('style', {
@@ -133,7 +133,6 @@ async function main(): Promise<void> {
     socketPath: defaultSocketPath,
     workspaceRoot,
     cliExposedWorkflowIds,
-    logLevel: result.runtime.config.debug ? 'info' : undefined,
     discoveryMode,
   });
 

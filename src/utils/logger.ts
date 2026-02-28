@@ -36,7 +36,7 @@ const LOG_LEVELS = {
   alert: 1,
   critical: 2,
   error: 3,
-  warning: 4,
+  warn: 4,
   notice: 5,
   info: 6,
   debug: 7,
@@ -112,7 +112,7 @@ function mapLogLevelToSentry(level: string): SentryLogLevel {
     case 'critical':
     case 'error':
       return 'error';
-    case 'warning':
+    case 'warn':
       return 'warn';
     case 'debug':
       return 'debug';
@@ -126,6 +126,20 @@ function mapLogLevelToSentry(level: string): SentryLogLevel {
 
 export function __mapLogLevelToSentryForTests(level: string): SentryLogLevel {
   return mapLogLevelToSentry(level);
+}
+
+/**
+ * Normalize an external log level string to the internal LogLevel type.
+ * Handles the MCP protocol's 'warning' (mapped to internal 'warn') and
+ * validates against known levels. Returns null for unrecognized values.
+ */
+export function normalizeLogLevel(raw: string): LogLevel | null {
+  const lower = raw.trim().toLowerCase();
+  const mapped = lower === 'warning' ? 'warn' : lower;
+  if (mapped in LOG_LEVELS) {
+    return mapped as LogLevel;
+  }
+  return null;
 }
 
 /**

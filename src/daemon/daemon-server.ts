@@ -212,7 +212,7 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
         }
       },
       (err) => {
-        log('warning', `[Daemon] Frame parse error: ${err.message}`);
+        log('warn', `[Daemon] Frame parse error: ${err.message}`);
       },
     );
 
@@ -221,12 +221,12 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
       log('info', '[Daemon] Client disconnected');
     });
     socket.on('error', (err) => {
-      log('warning', `[Daemon] Socket error: ${err.message}`);
+      log('warn', `[Daemon] Socket error: ${err.message}`);
     });
   });
 
   server.on('error', (err) => {
-    log('warning', `[Daemon] Server error: ${err.message}`);
+    log('warn', `[Daemon] Server error: ${err.message}`);
   });
   server.on('close', () => {
     void xcodeIdeService.disconnect();

@@ -244,7 +244,7 @@ export async function stopLogCapture(
 ): Promise<{ logContent: string; error?: string }> {
   const session = activeLogSessions.get(logSessionId);
   if (!session) {
-    log('warning', `Log session not found: ${logSessionId}`);
+    log('warn', `Log session not found: ${logSessionId}`);
     return { logContent: '', error: `Log capture session not found: ${logSessionId}` };
   }
 

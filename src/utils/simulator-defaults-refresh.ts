@@ -110,7 +110,7 @@ async function refreshSimulatorDefaults(
     }
   } catch (error) {
     log(
-      'warning',
+      'warn',
       `[Session] Background simulator defaults refresh failed (${options.reason}): ${String(error)}`,
     );
   }

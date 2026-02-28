@@ -87,7 +87,7 @@ function extractState(filePath: string): { scheme: string | null; simulatorId: s
       simulatorId: result.simulatorId ?? null,
     };
   } catch (e) {
-    log('warning', `[xcode-watcher] Failed to parse xcuserstate: ${e}`);
+    log('warn', `[xcode-watcher] Failed to parse xcuserstate: ${e}`);
     return { scheme: null, simulatorId: null };
   }
 }
@@ -103,7 +103,7 @@ function handleFileChange(): void {
   state.debounceTimer = setTimeout(() => {
     state.debounceTimer = null;
     processFileChange().catch((e) => {
-      log('warning', `[xcode-watcher] Error processing file change: ${e}`);
+      log('warn', `[xcode-watcher] Error processing file change: ${e}`);
     });
   }, DEBOUNCE_MS);
 }
@@ -240,7 +240,7 @@ export async function startXcodeStateWatcher(options: StartWatcherOptions = {}):
 
   state.watcher.on('error', (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    log('warning', `[xcode-watcher] Watcher error: ${message}`);
+    log('warn', `[xcode-watcher] Watcher error: ${message}`);
   });
 
   return true;

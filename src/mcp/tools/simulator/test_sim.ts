@@ -86,7 +86,7 @@ export async function test_simLogic(
   // Log warning if useLatestOS is provided with simulatorId
   if (params.simulatorId && params.useLatestOS !== undefined) {
     log(
-      'warning',
+      'warn',
       `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
     );
   }
