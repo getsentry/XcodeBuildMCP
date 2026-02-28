@@ -124,11 +124,104 @@ describe('setup command', () => {
     };
 
     expect(parsed.enabledWorkflows?.length).toBeGreaterThan(0);
+    expect(parsed.enabledWorkflows).not.toContain('doctor');
     expect(parsed.debug).toBe(false);
     expect(parsed.sentryDisabled).toBe(false);
     expect(parsed.sessionDefaults?.workspacePath).toBe('App.xcworkspace');
     expect(parsed.sessionDefaults?.scheme).toBe('App');
     expect(parsed.sessionDefaults?.simulatorId).toBe('SIM-1');
+  });
+
+  it('shows debug-gated workflows when existing config enables debug', async () => {
+    let storedConfig = 'schemaVersion: 1\ndebug: true\n';
+    let offeredWorkflowIds: string[] = [];
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected read path: ${targetPath}`);
+        }
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected write path: ${targetPath}`);
+        }
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        offeredWorkflowIds = opts.options.map((option) => String(option.value));
+        return opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      debug?: boolean;
+      enabledWorkflows?: string[];
+    };
+
+    expect(parsed.debug).toBe(true);
+    expect(offeredWorkflowIds).toContain('doctor');
   });
 
   it('fails fast when Xcode command line tools are unavailable', async () => {

@@ -118,7 +118,10 @@ function normalizeExistingDefaults(config?: ProjectConfig): {
   };
 }
 
-function getWorkflowOptions(debug: boolean): WorkflowManifestEntry[] {
+function getWorkflowOptions(
+  debug: boolean,
+  existingConfig?: ProjectConfig,
+): WorkflowManifestEntry[] {
   const manifest = loadManifest();
   const config = getConfig();
 
@@ -126,6 +129,7 @@ function getWorkflowOptions(debug: boolean): WorkflowManifestEntry[] {
     runtime: 'mcp' as const,
     config: {
       ...config,
+      ...existingConfig,
       debug,
     },
     runningUnderXcode: false,
@@ -197,11 +201,12 @@ function getChangedFields(
 
 async function selectWorkflowIds(opts: {
   debug: boolean;
+  existingConfig?: ProjectConfig;
   existingEnabledWorkflows: string[];
   prompter: Prompter;
   quietOutput: boolean;
 }): Promise<string[]> {
-  const workflows = getWorkflowOptions(opts.debug);
+  const workflows = getWorkflowOptions(opts.debug, opts.existingConfig);
   if (workflows.length === 0) {
     return [];
   }
@@ -427,6 +432,7 @@ async function collectSetupSelection(
 
   const enabledWorkflows = await selectWorkflowIds({
     debug,
+    existingConfig,
     existingEnabledWorkflows: existingConfig?.enabledWorkflows ?? [],
     prompter: deps.prompter,
     quietOutput: deps.quietOutput,
