@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed `swift_package_build`, `swift_package_test`, and `swift_package_clean` swallowing compiler diagnostics on failure by treating empty stderr as falsy, so stdout diagnostics are included in the error response ([#243](https://github.com/getsentry/XcodeBuildMCP/issues/243)).
+
 ## [2.1.0]
 
 ### Added
