@@ -53,6 +53,10 @@ export function registerDaemonCommands(app: Argv, opts: DaemonCommandsOptions): 
             'info',
             'debug',
           ] as const,
+          coerce: (value: unknown) => {
+            if (typeof value !== 'string') return value;
+            return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
+          },
         })
         .option('tail', {
           type: 'number',
