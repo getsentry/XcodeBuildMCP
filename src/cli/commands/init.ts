@@ -294,7 +294,7 @@ async function ensureAgentsGuidance(
   }
 
   if (!force) {
-    if (!process.stdin.isTTY) {
+    if (!isInteractiveTTY()) {
       throw new Error(
         `${AGENTS_FILE_NAME} exists and requires confirmation to update. Re-run with --force to apply the change in non-interactive mode.`,
       );
@@ -325,6 +325,7 @@ const CUSTOM_PATH_SENTINEL = '__custom__';
 interface InitSelection {
   skillType: SkillType;
   targets: ClientInfo[];
+  selectionMode: 'flags_or_dest' | 'interactive';
 }
 
 async function collectInitSelection(
@@ -369,12 +370,13 @@ async function collectInitSelection(
     return {
       skillType,
       targets: [{ name: 'Custom', id: 'custom', skillsDir: resolvedDest }],
+      selectionMode: 'flags_or_dest',
     };
   }
 
   if (argv.client !== undefined) {
     const targets = resolveTargets(argv.client, undefined, 'install');
-    return { skillType, targets };
+    return { skillType, targets, selectionMode: 'flags_or_dest' };
   }
 
   if (!interactive) {
@@ -429,7 +431,7 @@ async function collectInitSelection(
     }
   }
 
-  return { skillType, targets };
+  return { skillType, targets, selectionMode: 'interactive' };
 }
 
 async function promptCustomPath(): Promise<string> {
@@ -585,6 +587,7 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         selection.skillType,
         clientFlag,
         destFlag,
+        selection.selectionMode,
       );
 
       if (policy.allowedTargets.length === 0) {
@@ -667,6 +670,7 @@ function enforceInstallPolicy(
   skillType: SkillType,
   clientFlag: string | undefined,
   destFlag: string | undefined,
+  selectionMode: InitSelection['selectionMode'],
 ): InstallPolicyResult {
   if (skillType !== 'mcp') {
     return { allowedTargets: targets, skippedClients: [] };
@@ -692,6 +696,10 @@ function enforceInstallPolicy(
       continue;
     }
     allowedTargets.push(target);
+  }
+
+  if (clientFlag === 'claude' || selectionMode === 'interactive') {
+    return { allowedTargets: targets, skippedClients: [] };
   }
 
   return { allowedTargets, skippedClients };

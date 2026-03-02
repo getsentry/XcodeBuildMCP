@@ -162,7 +162,16 @@ function registerToolSubcommand(
 
       // Convert CLI argv to tool params (kebab-case -> camelCase)
       // Filter out internal CLI options before converting
-      const internalKeys = new Set(['json', 'output', 'style', 'socket', 'log-level', '_', '$0']);
+      const internalKeys = new Set([
+        'json',
+        'output',
+        'style',
+        'socket',
+        'log-level',
+        'logLevel',
+        '_',
+        '$0',
+      ]);
       const flagArgs: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(argv as Record<string, unknown>)) {
         if (!internalKeys.has(key)) {
