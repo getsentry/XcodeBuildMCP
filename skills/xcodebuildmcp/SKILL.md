@@ -5,199 +5,37 @@ description: Official skill for XcodeBuildMCP. Use when doing iOS/macOS/watchOS/
 
 # XcodeBuildMCP
 
-Prefer XcodeBuildMCP over raw `xcodebuild`, `xcrun`, or `simctl`.
+Use XcodeBuildMCP tools instead of raw `xcodebuild`, `xcrun`, or `simctl`.
 
-If a capability is missing, assume your tool list may be hiding tools (search/progressive disclosure) or not loading tool schemas yet. Use your tool-search or “load tools” mechanism. If you still can’t find the tools, ask the user to enable them in the MCP client's configuration.
+Capabilities:
+- Session defaults: Configure project, scheme, simulator, and device defaults to avoid repetitive parameters
+- Project discovery: Find Xcode projects/workspaces, list schemes, inspect build settings
+- Simulator workflows: Build, run, test, install, and launch apps on iOS simulators; manage simulator state (boot, erase, location, appearance)
+- Device workflows: Build, test, install, and launch apps on physical devices with code signing
+- macOS workflows: Build, run, and test macOS applications
+- Log capture: Stream and capture logs from simulators and devices
+- LLDB debugging: Attach debugger, set breakpoints, inspect stack traces and variables, execute LLDB commands
+- UI automation: Capture screenshots, inspect view hierarchy with coordinates, perform taps/swipes/gestures, type text, press hardware buttons
+- SwiftPM: Build, run, test, and manage Swift Package Manager projects
+- Project scaffolding: Generate new iOS/macOS project templates
 
-## Default Tool Choice (Simulator)
+Only simulator workflow tools are enabled by default. If capabilities like device, macOS, debugging, or UI automation are not available, the user must configure XcodeBuildMCP to enable them. See https://github.com/getsentry/XcodeBuildMCP/blob/main/docs/CONFIGURATION.md for workflow configuration.
 
-- If intent includes run/launch/open in Simulator, use `build_run_sim` as the default.
-- If intent is compile-only feedback (no launch), use `build_sim`.
-- Do not call `build_sim` and then `build_run_sim` in sequence unless the user explicitly asks for both.
-- If the app is already built and you need launch only without rebuilding, use `install_app_sim` + `launch_app_sim` (or `launch_app_logs_sim`).
+## Step 1: Establish Session Context
 
-## Tools (exact names + official descriptions)
+- Call `session_show_defaults` before the first build/run/test action in a session.
+- Use `discover_projs` only when defaults show missing or incorrect project/workspace context.
+- Do not run discovery speculatively or in parallel with `session_show_defaults`.
+- For simulator run intent, prefer the combined build-and-run tool instead of separate build then run calls.
+- Do not chain build-only then build-and-run unless the user explicitly requests both.
 
-### Session defaults
+## Step 2: Understand Workflow-Scoped Tool Availability
 
-Before you call any other tools, you **must** call `session_show_defaults` to show the current defaults, then fill in any missing defaults. You may need discovery/list tools first to obtain valid values.
+- Not all tools are enabled by default; tool availability depends on enabled workflows.
+- If a tool is expected but missing, check enabled workflows first.
+- Update enabled workflows in `.xcodebuildmcp/config.yaml`, then ask user to reload/restart the session to surface refreshes.
 
-- `session_show_defaults`
-  - Show the current active defaults (including the active profile name).
-- `session_set_defaults`
-  - Set defaults for the current active profile, or set defaults for a specific profile via `profile`.
-- `session_use_defaults_profile`
-  - Switch the active defaults profile.
-- `session_clear_defaults`
-  - Clear defaults (current active profile by default, or a specific profile when provided).
+## Step 3: Report Context Clearly
 
-### Project discovery
-
-- `discover_projs`
-  - Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files.
-- `list_schemes`
-  - List Xcode schemes.
-- `show_build_settings`
-  - Show build settings.
-- `get_app_bundle_id`
-  - Extract bundle id from .app.
-- `get_mac_bundle_id`
-  - Extract bundle id from macOS .app.
-
-### Simulator
-
-- `boot_sim`
-  - Boot iOS simulator.
-- `list_sims`
-  - List iOS simulators.
-- `open_sim`
-  - Open Simulator app.
-- `build_sim`
-  - Build for iOS sim.
-- `build_run_sim`
-  - Build and run iOS sim.
-- `test_sim`
-  - Test on iOS sim.
-- `get_sim_app_path`
-  - Get sim built app path.
-- `install_app_sim`
-  - Install app on sim.
-- `launch_app_sim`
-  - Launch app on simulator.
-- `launch_app_logs_sim`
-  - Launch sim app with logs.
-- `stop_app_sim`
-  - Stop sim app.
-- `record_sim_video`
-  - Record sim video.
-
-### Simulator management
-
-- `erase_sims`
-  - Erase simulator.
-- `set_sim_location`
-  - Set sim location.
-- `reset_sim_location`
-  - Reset sim location.
-- `set_sim_appearance`
-  - Set sim appearance.
-- `sim_statusbar`
-  - Set sim status bar network.
-
-### Device
-
-- `list_devices`
-  - List connected devices.
-- `build_device`
-  - Build for device.
-- `test_device`
-  - Test on device.
-- `get_device_app_path`
-  - Get device built app path.
-- `install_app_device`
-  - Install app on device.
-- `launch_app_device`
-  - Launch app on device.
-- `stop_app_device`
-  - Stop device app.
-
-### macOS
-
-- `build_macos`
-  - Build macOS app.
-- `build_run_macos`
-  - Build and run macOS app.
-- `test_macos`
-  - Test macOS target.
-- `get_mac_app_path`
-  - Get macOS built app path.
-- `launch_mac_app`
-  - Launch macOS app.
-- `stop_mac_app`
-  - Stop macOS app.
-
-### Logging
-
-- `start_device_log_cap`
-  - Start device log capture.
-- `start_sim_log_cap`
-  - Start sim log capture.
-- `stop_device_log_cap`
-  - Stop device log capture.
-- `stop_sim_log_cap`
-  - Stop sim log capture.
-
-### Debugging
-
-- `debug_attach_sim`
-  - Attach LLDB to sim app.
-- `debug_breakpoint_add`
-  - Add breakpoint.
-- `debug_breakpoint_remove`
-  - Remove breakpoint.
-- `debug_continue`
-  - Continue debug session.
-- `debug_detach`
-  - Detach debugger.
-- `debug_lldb_command`
-  - Run LLDB command.
-- `debug_stack`
-  - Get backtrace.
-- `debug_variables`
-  - Get frame variables.
-
-### UI automation
-
-- `button`
-  - Press simulator hardware button.
-- `gesture`
-  - Simulator gesture preset.
-- `key_press`
-  - Press key by keycode.
-- `key_sequence`
-  - Press a sequence of keys by their keycodes.
-- `long_press`
-  - Long press at coords.
-- `screenshot`
-  - Capture screenshot.
-- `snapshot_ui`
-  - Print view hierarchy with element ids/labels and precise coordinates (x, y, width, height) for visible elements.
-- `swipe`
-  - Swipe between points.
-- `tap`
-  - Tap UI element by accessibility id/label (recommended) or coordinates as fallback.
-- `touch`
-  - Touch down/up at coords.
-- `type_text`
-  - Type text.
-
-### SwiftPM
-
-- `swift_package_build`
-  - swift package target build.
-- `swift_package_clean`
-  - swift package clean.
-- `swift_package_list`
-  - List SwiftPM processes.
-- `swift_package_run`
-  - swift package target run.
-- `swift_package_stop`
-  - Stop SwiftPM run.
-- `swift_package_test`
-  - Run swift package target tests.
-
-### Scaffolding / utilities
-
-- `scaffold_ios_project`
-  - Scaffold iOS project.
-- `scaffold_macos_project`
-  - Scaffold macOS project.
-- `clean`
-  - Clean build products.
-
-### Diagnostics
-
-- `doctor`
-  - MCP environment info.
-- `manage_workflows`
-  - Workflows are groups of tools exposed by XcodeBuildMCP. By default, not all workflows (and therefore tools) are enabled; only simulator tools are enabled by default. Some workflows are mandatory and can't be disabled.
+- Return the active defaults context used for execution (project/workspace, scheme, simulator/device).
+- For failures, include the exact failing step and the next actionable command/tool call.

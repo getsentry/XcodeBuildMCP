@@ -3,7 +3,7 @@ module: mcp/tools/simulator/build_run_sim
 names:
   mcp: build_run_sim
   cli: build-and-run
-description: Build and run iOS sim (preferred for run/launch intent).
+description: Build, install, and launch on iOS Simulator; boots simulator and attempts to open Simulator.app as needed. Preferred single-step run tool when defaults are set.
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

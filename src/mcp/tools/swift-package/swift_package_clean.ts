@@ -26,7 +26,7 @@ export async function swift_package_cleanLogic(
   try {
     const result = await executor(['swift', ...swiftArgs], 'Swift Package Clean', false, undefined);
     if (!result.success) {
-      const errorMessage = result.error ?? result.output ?? 'Unknown error';
+      const errorMessage = result.error || result.output || 'Unknown error';
       return createErrorResponse('Swift package clean failed', errorMessage);
     }
 

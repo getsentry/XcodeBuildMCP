@@ -71,7 +71,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
 
   // Register command groups with workspace context
   registerMcpCommand(app);
-  registerInitCommand(app);
+  registerInitCommand(app, { workspaceRoot: opts.workspaceRoot });
   registerToolsCommand(app);
   registerToolCommands(app, opts.catalog, {
     workspaceRoot: opts.workspaceRoot,

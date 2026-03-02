@@ -17,6 +17,8 @@ When reading issues:
 -
 ## Tools
 - GitHub CLI for issues/PRs
+- When working on skill sources in `skills/`, use the `skill-creator` skill workflow.
+- After modifying any skill source, run `npx skill-check <skill-directory>` and address all errors/warnings before handoff.
 -
 ## Style
 - Keep answers short and concise

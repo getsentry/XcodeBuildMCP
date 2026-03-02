@@ -153,7 +153,7 @@ describe('lookupSimulatorName', () => {
     const simctlOutput = JSON.stringify({
       devices: {
         'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
-          { udid: '2FCB5689-88F1-4CDF-9E7F-8E310CD41D72', name: 'iPhone 16' },
+          { udid: '2FCB5689-88F1-4CDF-9E7F-8E310CD41D72', name: 'iPhone 17' },
           { udid: 'OTHER-UUID', name: 'iPhone 15' },
         ],
       },
@@ -168,7 +168,7 @@ describe('lookupSimulatorName', () => {
       '2FCB5689-88F1-4CDF-9E7F-8E310CD41D72',
     );
 
-    expect(result).toBe('iPhone 16');
+    expect(result).toBe('iPhone 17');
   });
 
   it('returns undefined for unknown UUID', async () => {

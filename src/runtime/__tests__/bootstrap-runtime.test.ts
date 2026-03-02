@@ -14,7 +14,7 @@ function createFsWithSessionDefaults() {
     'sessionDefaults:',
     '  scheme: "AppScheme"',
     '  simulatorId: "SIM-UUID"',
-    '  simulatorName: "iPhone 16"',
+    '  simulatorName: "iPhone 17"',
     '',
   ].join('\n');
 
@@ -51,7 +51,7 @@ function createFsWithProfiles() {
     'sessionDefaultsProfiles:',
     '  ios:',
     '    scheme: "IOSScheme"',
-    '    simulatorName: "iPhone 16"',
+    '    simulatorName: "iPhone 17"',
     'activeSessionDefaultsProfile: "ios"',
     '',
   ].join('\n');
@@ -84,7 +84,7 @@ describe('bootstrapRuntime', () => {
     expect(sessionStore.getAll()).toMatchObject({
       scheme: 'AppScheme',
       simulatorId: 'SIM-UUID',
-      simulatorName: 'iPhone 16',
+      simulatorName: 'iPhone 17',
     });
   });
 
@@ -122,6 +122,6 @@ describe('bootstrapRuntime', () => {
 
     expect(sessionStore.getActiveProfile()).toBe('ios');
     expect(sessionStore.getAll().scheme).toBe('IOSScheme');
-    expect(sessionStore.getAll().simulatorName).toBe('iPhone 16');
+    expect(sessionStore.getAll().simulatorName).toBe('iPhone 17');
   });
 });

@@ -8,7 +8,7 @@ sessionDefaults:
   workspacePath: './MyApp.xcworkspace' # xor projectPath
   scheme: 'MyApp'
   configuration: 'Debug'
-  simulatorName: 'iPhone 16' # xor simulatorId
+  simulatorName: 'iPhone 17' # xor simulatorId
   simulatorId: '<UUID>' # xor simulatorName
   deviceId: '<UUID>'
   useLatestOS: true

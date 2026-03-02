@@ -47,7 +47,7 @@ sessionDefaults:
   projectPath: "./MyApp.xcodeproj"
   scheme: "MyApp"
   configuration: "Debug"
-  simulatorName: "iPhone 16"
+  simulatorName: "iPhone 17"
   platform: "iOS"
   useLatestOS: true
   arch: "arm64"
@@ -104,7 +104,7 @@ sessionDefaults:
   projectPath: "./MyApp.xcodeproj"
   scheme: "MyApp"
   configuration: "Debug"
-  simulatorName: "iPhone 16"
+  simulatorName: "iPhone 17"
 ```
 
 ### Setting defaults from an agent
@@ -119,7 +119,7 @@ Agents can call `session_set_defaults` at runtime. By default these are stored i
 | `workspacePath` | string | Path to `.xcworkspace` file. Takes precedence if both are set. |
 | `scheme` | string | Build scheme name. |
 | `configuration` | string | Build configuration (e.g., `Debug`, `Release`). |
-| `simulatorName` | string | Simulator name (e.g., `iPhone 16`). Mutually exclusive with `simulatorId`. |
+| `simulatorName` | string | Simulator name (e.g., `iPhone 17`). Mutually exclusive with `simulatorId`. |
 | `simulatorId` | string | Simulator UUID. Takes precedence if both are set. |
 | `deviceId` | string | Physical device UUID. |
 | `platform` | string | Target platform (e.g., `iOS`, `macOS`, `watchOS`, `tvOS`, `visionOS`). |
