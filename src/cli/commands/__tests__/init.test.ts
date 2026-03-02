@@ -202,7 +202,7 @@ describe('init command', () => {
       const yargs = (await import('yargs')).default;
       const mod = await loadInitModule();
 
-      const app = yargs(['init', '--skill', 'mcp']).scriptName('').fail(false);
+      const app = yargs(['init', '--skill', 'mcp', '--client', 'auto']).scriptName('').fail(false);
       mod.registerInitCommand(app);
 
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);

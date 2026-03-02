@@ -591,6 +591,9 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
       );
 
       if (policy.allowedTargets.length === 0) {
+        for (const skipped of policy.skippedClients) {
+          writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
+        }
         const skippedSummary = formatSkippedClients(policy.skippedClients);
         const reasonSuffix = skippedSummary.length > 0 ? ` Skipped: ${skippedSummary}` : '';
         throw new Error(`No eligible install targets after applying skill policy.${reasonSuffix}`);
