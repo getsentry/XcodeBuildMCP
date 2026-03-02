@@ -8,4 +8,4 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Test Simulator
-  destructiveHint: true
+  destructiveHint: false

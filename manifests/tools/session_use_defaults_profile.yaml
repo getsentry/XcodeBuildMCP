@@ -7,3 +7,4 @@ description: Switch the active session defaults profile.
 annotations:
   title: Use Session Defaults Profile
   readOnlyHint: false
+  destructiveHint: false

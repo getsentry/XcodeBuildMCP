@@ -63,7 +63,7 @@ async function runInitCommand(): Promise<void> {
         setLogLevel(level);
       }
     });
-  registerInitCommand(app);
+  registerInitCommand(app, { workspaceRoot: process.cwd() });
   await app.parseAsync();
 }
 

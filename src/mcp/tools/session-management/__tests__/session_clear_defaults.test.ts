@@ -8,7 +8,7 @@ describe('session-clear-defaults tool', () => {
     sessionStore.setDefaults({
       scheme: 'MyScheme',
       projectPath: '/path/to/proj.xcodeproj',
-      simulatorName: 'iPhone 16',
+      simulatorName: 'iPhone 17',
       deviceId: 'DEVICE-123',
       useLatestOS: true,
       arch: 'arm64',
@@ -44,7 +44,7 @@ describe('session-clear-defaults tool', () => {
       expect(current.deviceId).toBeUndefined();
       expect(current.derivedDataPath).toBeUndefined();
       expect(current.projectPath).toBe('/path/to/proj.xcodeproj');
-      expect(current.simulatorName).toBe('iPhone 16');
+      expect(current.simulatorName).toBe('iPhone 17');
       expect(current.useLatestOS).toBe(true);
       expect(current.arch).toBe('arm64');
     });

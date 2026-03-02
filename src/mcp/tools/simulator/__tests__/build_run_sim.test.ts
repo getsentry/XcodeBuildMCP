@@ -61,7 +61,7 @@ describe('build_run_sim tool', () => {
             output: JSON.stringify({
               devices: {
                 'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
-                  { udid: 'SIM-UUID', name: 'iPhone 16', isAvailable: true },
+                  { udid: 'SIM-UUID', name: 'iPhone 17', isAvailable: true },
                 ],
               },
             }),
@@ -89,7 +89,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -115,7 +115,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -152,7 +152,7 @@ describe('build_run_sim tool', () => {
                 'iOS 16.0': [
                   {
                     udid: 'test-uuid-123',
-                    name: 'iPhone 16',
+                    name: 'iPhone 17',
                     state: 'Booted',
                     isAvailable: true,
                   },
@@ -183,7 +183,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -203,7 +203,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -223,7 +223,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -255,7 +255,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         createTrackingExecutor(callHistory),
       );
@@ -272,7 +272,7 @@ describe('build_run_sim tool', () => {
         'Debug',
         '-skipMacroValidation',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16,OS=latest',
+        'platform=iOS Simulator,name=iPhone 17,OS=latest',
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -292,7 +292,7 @@ describe('build_run_sim tool', () => {
             output: JSON.stringify({
               devices: {
                 'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
-                  { udid: 'test-uuid-123', name: 'iPhone 16', isAvailable: true },
+                  { udid: 'test-uuid-123', name: 'iPhone 17', isAvailable: true },
                 ],
               },
             }),
@@ -310,7 +310,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         trackingExecutor,
       );
@@ -327,7 +327,7 @@ describe('build_run_sim tool', () => {
         'Debug',
         '-skipMacroValidation',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16,OS=latest',
+        'platform=iOS Simulator,name=iPhone 17,OS=latest',
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -347,7 +347,7 @@ describe('build_run_sim tool', () => {
             output: JSON.stringify({
               devices: {
                 'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
-                  { udid: 'test-uuid-123', name: 'iPhone 16', isAvailable: true },
+                  { udid: 'test-uuid-123', name: 'iPhone 17', isAvailable: true },
                 ],
               },
             }),
@@ -371,7 +371,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
           configuration: 'Release',
           useLatestOS: false,
         },
@@ -390,7 +390,7 @@ describe('build_run_sim tool', () => {
         'Release',
         '-skipMacroValidation',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16',
+        'platform=iOS Simulator,name=iPhone 17',
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -404,7 +404,7 @@ describe('build_run_sim tool', () => {
         '-configuration',
         'Release',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16',
+        'platform=iOS Simulator,name=iPhone 17',
       ]);
       expect(callHistory[2].logPrefix).toBe('Get App Path');
     });
@@ -416,7 +416,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/Users/dev/My Project/MyProject.xcworkspace',
           scheme: 'My Scheme',
-          simulatorName: 'iPhone 16 Pro',
+          simulatorName: 'iPhone 17 Pro',
         },
         createTrackingExecutor(callHistory),
       );
@@ -433,7 +433,7 @@ describe('build_run_sim tool', () => {
         'Debug',
         '-skipMacroValidation',
         '-destination',
-        'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest',
+        'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest',
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -474,7 +474,7 @@ describe('build_run_sim tool', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
       const result = await handler({
         scheme: 'MyScheme',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
       });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -486,7 +486,7 @@ describe('build_run_sim tool', () => {
         projectPath: '/path/project.xcodeproj',
         workspacePath: '/path/workspace.xcworkspace',
         scheme: 'MyScheme',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
       });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Parameter validation failed');
@@ -506,7 +506,7 @@ describe('build_run_sim tool', () => {
         {
           projectPath: '/path/project.xcodeproj',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );
@@ -526,7 +526,7 @@ describe('build_run_sim tool', () => {
         {
           workspacePath: '/path/workspace.xcworkspace',
           scheme: 'MyScheme',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         mockExecutor,
       );

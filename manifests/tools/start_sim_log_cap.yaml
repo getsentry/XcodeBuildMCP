@@ -8,7 +8,7 @@ routing:
   stateful: true
 annotations:
   title: Start Simulator Log Capture
-  destructiveHint: true
+  destructiveHint: false
 nextSteps:
   - label: Stop capture and retrieve logs
     toolId: stop_sim_log_cap

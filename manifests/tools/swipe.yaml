@@ -6,4 +6,4 @@ names:
 description: Swipe between points.
 annotations:
   title: Swipe
-  destructiveHint: true
+  destructiveHint: false

@@ -8,7 +8,7 @@ describe('determineSimulatorUuid', () => {
       'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
         {
           udid: 'ABC-123-UUID',
-          name: 'iPhone 16',
+          name: 'iPhone 17',
           isAvailable: true,
         },
         {
@@ -49,7 +49,7 @@ describe('determineSimulatorUuid', () => {
       );
 
       const result = await determineSimulatorUuid(
-        { simulatorUuid: 'DIRECT-UUID', simulatorName: 'iPhone 16' },
+        { simulatorUuid: 'DIRECT-UUID', simulatorName: 'iPhone 17' },
         mockExecutor,
       );
 
@@ -91,7 +91,7 @@ describe('determineSimulatorUuid', () => {
         output: mockSimulatorListOutput,
       });
 
-      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 16' }, mockExecutor);
+      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 17' }, mockExecutor);
 
       expect(result.uuid).toBe('ABC-123-UUID');
       expect(result.warning).toBeUndefined();
@@ -142,7 +142,7 @@ describe('determineSimulatorUuid', () => {
         error: 'simctl command failed',
       });
 
-      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 16' }, mockExecutor);
+      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 17' }, mockExecutor);
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
@@ -155,7 +155,7 @@ describe('determineSimulatorUuid', () => {
         output: 'invalid json {',
       });
 
-      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 16' }, mockExecutor);
+      const result = await determineSimulatorUuid({ simulatorName: 'iPhone 17' }, mockExecutor);
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();

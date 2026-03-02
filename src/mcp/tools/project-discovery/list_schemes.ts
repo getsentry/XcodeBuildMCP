@@ -91,12 +91,12 @@ export async function listSchemesLogic(
         build_run_sim: {
           [`${projectOrWorkspace}Path`]: path!,
           scheme: firstScheme,
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         build_sim: {
           [`${projectOrWorkspace}Path`]: path!,
           scheme: firstScheme,
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
         },
         show_build_settings: { [`${projectOrWorkspace}Path`]: path!, scheme: firstScheme },
       };

@@ -8,4 +8,4 @@ routing:
   stateful: true
 annotations:
   title: Stop Simulator and Return Logs
-  destructiveHint: true
+  destructiveHint: false

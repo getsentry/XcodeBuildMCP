@@ -6,4 +6,4 @@ names:
 description: Press a sequence of keys by their keycodes.
 annotations:
   title: Key Sequence
-  destructiveHint: true
+  destructiveHint: false

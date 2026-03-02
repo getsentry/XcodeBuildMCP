@@ -9,3 +9,4 @@ predicates:
 annotations:
   title: Call Xcode IDE Tool
   readOnlyHint: false
+  destructiveHint: false

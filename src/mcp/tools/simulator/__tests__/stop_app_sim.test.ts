@@ -24,7 +24,7 @@ describe('stop_app_sim tool', () => {
 
       const withSessionDefaults = schemaObj.safeParse({
         simulatorId: 'SIM-UUID',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
       });
       expect(withSessionDefaults.success).toBe(true);
       const parsed = withSessionDefaults.data as Record<string, unknown>;
@@ -56,7 +56,7 @@ describe('stop_app_sim tool', () => {
     it('should reject mutually exclusive simulator parameters', async () => {
       const result = await handler({
         simulatorId: 'SIM-UUID',
-        simulatorName: 'iPhone 16',
+        simulatorName: 'iPhone 17',
         bundleId: 'io.sentry.app',
       });
 
@@ -95,7 +95,7 @@ describe('stop_app_sim tool', () => {
       const result = await stop_app_simLogic(
         {
           simulatorId: 'resolved-uuid',
-          simulatorName: 'iPhone 16',
+          simulatorName: 'iPhone 17',
           bundleId: 'io.sentry.App',
         },
         mockExecutor,
@@ -105,7 +105,7 @@ describe('stop_app_sim tool', () => {
         content: [
           {
             type: 'text',
-            text: 'App io.sentry.App stopped successfully in simulator "iPhone 16" (resolved-uuid)',
+            text: 'App io.sentry.App stopped successfully in simulator "iPhone 17" (resolved-uuid)',
           },
         ],
       });

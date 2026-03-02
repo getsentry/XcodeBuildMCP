@@ -14,7 +14,7 @@ export type SimulatorResolutionResult =
  * Resolves a simulator name to its UUID by querying simctl.
  *
  * @param executor - Command executor for running simctl
- * @param simulatorName - The human-readable simulator name (e.g., "iPhone 16")
+ * @param simulatorName - The human-readable simulator name (e.g., "iPhone 17")
  * @returns Resolution result with simulatorId on success, or error message on failure
  */
 export async function resolveSimulatorNameToId(

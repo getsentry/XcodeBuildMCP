@@ -228,6 +228,32 @@ describe('swift_package_build plugin', () => {
       });
     });
 
+    it('should include stdout diagnostics when stderr is empty on build failure', async () => {
+      const executor = createMockExecutor({
+        success: false,
+        error: '',
+        output:
+          "main.swift:10:25: error: cannot find type 'DOESNOTEXIST' in scope\nlet broken: DOESNOTEXIST = 42",
+      });
+
+      const result = await swift_package_buildLogic(
+        {
+          packagePath: '/test/package',
+        },
+        executor,
+      );
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: 'text',
+            text: "Error: Swift package build failed\nDetails: main.swift:10:25: error: cannot find type 'DOESNOTEXIST' in scope\nlet broken: DOESNOTEXIST = 42",
+          },
+        ],
+        isError: true,
+      });
+    });
+
     it('should handle spawn error', async () => {
       const executor = async () => {
         throw new Error('spawn ENOENT');
