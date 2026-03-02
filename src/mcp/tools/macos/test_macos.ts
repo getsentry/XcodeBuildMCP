@@ -27,7 +27,7 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { filterStderrContent } from '../../../utils/test-result-content.ts';
+import { filterStderrContent, type XcresultSummary } from '../../../utils/test-result-content.ts';
 
 // Unified schema: XOR between projectPath and workspacePath
 const baseSchemaObject = z.object({
@@ -67,11 +67,6 @@ const testMacosSchema = z.preprocess(
 );
 
 export type TestMacosParams = z.infer<typeof testMacosSchema>;
-
-interface XcresultSummary {
-  formatted: string;
-  totalTestCount: number;
-}
 
 /**
  * Type definition for test summary structure from xcresulttool

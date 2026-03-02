@@ -27,7 +27,7 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { filterStderrContent } from '../../../utils/test-result-content.ts';
+import { filterStderrContent, type XcresultSummary } from '../../../utils/test-result-content.ts';
 
 // Unified schema: XOR between projectPath and workspacePath
 const baseSchemaObject = z.object({
@@ -71,16 +71,6 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
   platform: true,
 } as const);
-
-/**
- * Type definition for test summary structure from xcresulttool
- * (JavaScript implementation - no actual interface, this is just documentation)
- */
-
-interface XcresultSummary {
-  formatted: string;
-  totalTestCount: number;
-}
 
 /**
  * Parse xcresult bundle using xcrun xcresulttool

@@ -25,7 +25,7 @@ import { normalizeTestRunnerEnv } from './environment.ts';
 import type { ToolResponse } from '../types/common.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
-import { filterStderrContent } from './test-result-content.ts';
+import { filterStderrContent, type XcresultSummary } from './test-result-content.ts';
 
 /**
  * Type definition for test summary structure from xcresulttool
@@ -55,11 +55,6 @@ interface TestSummary {
     impact?: string;
     text?: string;
   }>;
-}
-
-interface XcresultSummary {
-  formatted: string;
-  totalTestCount: number;
 }
 
 /**
