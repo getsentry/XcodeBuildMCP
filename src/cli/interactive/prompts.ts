@@ -30,6 +30,9 @@ function clampIndex(index: number, optionsLength: number): number {
 function createNonInteractivePrompter(): Prompter {
   return {
     async selectOne<T>(opts: { options: SelectOption<T>[]; initialIndex?: number }): Promise<T> {
+      if (opts.options.length === 0) {
+        throw new Error('No options available for selection.');
+      }
       const index = clampIndex(opts.initialIndex ?? 0, opts.options.length);
       return opts.options[index].value;
     },
