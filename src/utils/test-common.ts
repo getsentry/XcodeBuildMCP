@@ -25,6 +25,7 @@ import { normalizeTestRunnerEnv } from './environment.ts';
 import type { ToolResponse } from '../types/common.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
+import { filterStderrContent } from './test-result-content.ts';
 
 /**
  * Type definition for test summary structure from xcresulttool
@@ -75,7 +76,7 @@ export async function parseXcresultBundle(resultBundlePath: string): Promise<Xcr
     const summary = JSON.parse(stdout) as TestSummary;
     return {
       formatted: formatTestSummary(summary),
-      totalTestCount: summary.totalTestCount ?? 0,
+      totalTestCount: typeof summary.totalTestCount === 'number' ? summary.totalTestCount : 0,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -230,18 +231,15 @@ export async function handleTestLogic(
       // Clean up temporary directory
       await rm(tempDir, { recursive: true, force: true });
 
-      // If no tests ran (e.g. build failed), the xcresult is empty/meaningless.
-      // Fall back to the original response which contains the actual build errors.
+      // If no tests ran (for example build/setup failed), xcresult summary is not useful.
+      // Return raw output so the original diagnostics stay visible.
       if (xcresult.totalTestCount === 0) {
-        log('info', 'xcresult reports 0 tests — falling back to raw build output');
+        log('info', 'xcresult reports 0 tests — returning raw build output');
         return consolidateContentForClaudeCode(testResult);
       }
 
-      // When xcresult has real test data, it's the authoritative source.
-      // Drop stderr lines — they're redundant noise (e.g. "multiple matching destinations").
-      const filteredContent = (testResult.content || []).filter(
-        (item) => item.type !== 'text' || !item.text.includes('[stderr]'),
-      );
+      // xcresult summary should be first. Drop stderr-only noise while preserving non-stderr lines.
+      const filteredContent = filterStderrContent(testResult.content);
       const combinedResponse: ToolResponse = {
         content: [
           {

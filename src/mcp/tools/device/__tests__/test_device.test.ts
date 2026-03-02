@@ -401,6 +401,7 @@ describe('test_device plugin', () => {
       );
 
       expect(result.content).toHaveLength(2);
+      expect(result.content[0].text).toContain('Test Results Summary:');
       expect(result.content[1].text).toContain('✅');
     });
 

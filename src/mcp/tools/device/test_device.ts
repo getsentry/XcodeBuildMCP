@@ -27,6 +27,7 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { filterStderrContent } from '../../../utils/test-result-content.ts';
 
 // Unified schema: XOR between projectPath and workspacePath
 const baseSchemaObject = z.object({
@@ -267,18 +268,15 @@ export async function testDeviceLogic(
       // Clean up temporary directory
       await cleanup();
 
-      // If no tests ran (e.g. build failed), the xcresult is empty/meaningless.
-      // Fall back to the original response which contains the actual build errors.
+      // If no tests ran (for example build/setup failed), xcresult summary is not useful.
+      // Return raw output so the original diagnostics stay visible.
       if (xcresult.totalTestCount === 0) {
-        log('info', 'xcresult reports 0 tests — falling back to raw build output');
+        log('info', 'xcresult reports 0 tests — returning raw build output');
         return testResult;
       }
 
-      // When xcresult has real test data, it's the authoritative source.
-      // Drop stderr lines — they're redundant noise (e.g. "multiple matching destinations").
-      const filteredContent = (testResult.content || []).filter(
-        (item) => item.type !== 'text' || !item.text.includes('[stderr]'),
-      );
+      // xcresult summary should be first. Drop stderr-only noise while preserving non-stderr lines.
+      const filteredContent = filterStderrContent(testResult.content);
       return {
         content: [
           {
