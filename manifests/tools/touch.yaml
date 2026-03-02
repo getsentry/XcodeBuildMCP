@@ -6,3 +6,4 @@ names:
 description: Touch down/up at coords.
 annotations:
   title: Touch
+  destructiveHint: false

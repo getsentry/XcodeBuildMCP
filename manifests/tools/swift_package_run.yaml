@@ -8,3 +8,4 @@ routing:
   stateful: true
 annotations:
   title: Swift Package Run
+  destructiveHint: false

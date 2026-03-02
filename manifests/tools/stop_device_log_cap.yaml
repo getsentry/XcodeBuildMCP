@@ -8,3 +8,4 @@ routing:
   stateful: true
 annotations:
   title: Stop Device and Return Logs
+  destructiveHint: false

@@ -6,3 +6,4 @@ names:
 description: Install app on device.
 annotations:
   title: Install App Device
+  destructiveHint: false

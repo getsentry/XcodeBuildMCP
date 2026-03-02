@@ -6,6 +6,7 @@ names:
 description: Open Simulator.app for visibility/manual workflows. Not required before simulator build-and-run (build_run_sim).
 annotations:
   title: Open Simulator
+  destructiveHint: false
 nextSteps:
   - label: Boot a simulator for manual workflows
     toolId: boot_sim

@@ -6,6 +6,7 @@ names:
 description: Launch app on simulator.
 annotations:
   title: Launch App Simulator
+  destructiveHint: false
 nextSteps:
   - label: Open Simulator app to see it
     toolId: open_sim

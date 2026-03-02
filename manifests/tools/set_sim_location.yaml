@@ -6,3 +6,4 @@ names:
 description: Set sim location.
 annotations:
   title: Set Simulator Location
+  destructiveHint: false

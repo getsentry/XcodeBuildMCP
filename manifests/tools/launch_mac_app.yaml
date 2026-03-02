@@ -6,3 +6,4 @@ names:
 description: Launch macOS app.
 annotations:
   title: Launch macOS App
+  destructiveHint: false

@@ -8,7 +8,7 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Scaffold macOS Project
-  destructiveHint: true
+  destructiveHint: false
 nextSteps:
   - label: "Important: Before working on the project make sure to read the README.md file in the workspace root directory."
   - label: Build for macOS

@@ -6,6 +6,7 @@ names:
 description: Install app on sim.
 annotations:
   title: Install App Simulator
+  destructiveHint: false
 nextSteps:
   - label: Open the Simulator app
     toolId: open_sim

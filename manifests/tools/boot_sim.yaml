@@ -6,6 +6,7 @@ names:
 description: Boot iOS simulator for manual/non-build flows. Not required before simulator build-and-run (build_run_sim).
 annotations:
   title: Boot Simulator
+  destructiveHint: false
 nextSteps:
   - label: Open the Simulator app (makes it visible)
     toolId: open_sim

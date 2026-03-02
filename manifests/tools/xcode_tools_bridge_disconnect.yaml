@@ -9,3 +9,4 @@ predicates:
 annotations:
   title: Disconnect Xcode Tools Bridge
   readOnlyHint: false
+  destructiveHint: false

@@ -8,6 +8,7 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Build Run Simulator
+  destructiveHint: false
 nextSteps:
   - label: Capture structured logs (app continues running)
     toolId: start_sim_log_cap

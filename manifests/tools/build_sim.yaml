@@ -8,3 +8,4 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Build Simulator
+  destructiveHint: false
