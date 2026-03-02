@@ -29,6 +29,11 @@ function loadInitModule() {
   return import('../init.ts');
 }
 
+function parseJsonOutput(stdoutSpy: { mock: { calls: unknown[][] } }): Record<string, unknown> {
+  const output = stdoutSpy.mock.calls.map((call) => String(call[0] ?? '')).join('');
+  return JSON.parse(output.trim()) as Record<string, unknown>;
+}
+
 describe('init command', () => {
   let tempDir: string;
   let fakeResourceRoot: string;
@@ -81,10 +86,11 @@ describe('init command', () => {
       expect(existsSync(installed)).toBe(true);
       expect(readFileSync(installed, 'utf8')).toBe('# CLI Skill Content');
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Installed XcodeBuildMCP CLI skill');
-      expect(output).toContain('Custom');
-      expect(output).toContain(installed);
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.skillType).toBe('cli');
+      expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
+      expect(output.installed).toEqual([{ client: 'Custom', location: installed }]);
 
       stdoutSpy.mockRestore();
     });
@@ -106,8 +112,10 @@ describe('init command', () => {
       expect(existsSync(installed)).toBe(true);
       expect(readFileSync(installed, 'utf8')).toBe('# MCP Skill Content');
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Installed XcodeBuildMCP (MCP server) skill');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.skillType).toBe('mcp');
+      expect(output.message).toBe('Installed XcodeBuildMCP (MCP server) skill');
 
       stdoutSpy.mockRestore();
     });
@@ -173,8 +181,15 @@ describe('init command', () => {
         true,
       );
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Skipped Claude Code');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.skillType).toBe('mcp');
+      expect(output.skipped).toEqual([
+        {
+          client: 'Claude Code',
+          reason: 'MCP skill is unnecessary because Claude Code already uses server instructions.',
+        },
+      ]);
 
       stdoutSpy.mockRestore();
     });
@@ -317,10 +332,16 @@ describe('init command', () => {
       expect(existsSync(cliSkillDir)).toBe(false);
       expect(existsSync(mcpSkillDir)).toBe(false);
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Uninstalled skill directories');
-      expect(output).toContain('Removed (xcodebuildmcp-cli):');
-      expect(output).toContain('Removed (xcodebuildmcp):');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('uninstall');
+      expect(output.message).toBe('Uninstalled skill directories');
+      expect(output.removed).toHaveLength(2);
+      expect(output.removed).toEqual(
+        expect.arrayContaining([
+          { client: 'Custom', variant: 'xcodebuildmcp-cli', path: cliSkillDir },
+          { client: 'Custom', variant: 'xcodebuildmcp', path: mcpSkillDir },
+        ]),
+      );
 
       stdoutSpy.mockRestore();
     });
@@ -338,8 +359,10 @@ describe('init command', () => {
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
       await app.parseAsync();
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('No installed skill directories found');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('uninstall');
+      expect(output.message).toBe('No installed skill directories found to remove.');
+      expect(output.removed).toEqual([]);
 
       stdoutSpy.mockRestore();
     });
@@ -358,8 +381,10 @@ describe('init command', () => {
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
       await app.parseAsync();
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('No installed skill directories found');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('uninstall');
+      expect(output.message).toBe('No installed skill directories found to remove.');
+      expect(output.removed).toEqual([]);
 
       stdoutSpy.mockRestore();
     });
@@ -439,8 +464,9 @@ describe('init command', () => {
       expect(existsSync(agentsPath)).toBe(true);
       expect(readFileSync(agentsPath, 'utf8')).toContain(agentsGuidanceLine);
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Created AGENTS.md with XcodeBuildMCP guidance');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
 
       stdoutSpy.mockRestore();
     });
@@ -466,11 +492,9 @@ describe('init command', () => {
         'AGENTS.md exists and requires confirmation to update',
       );
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Proposed update for');
-      expect(output).toContain('--- AGENTS.md');
-      expect(output).toContain('+++ AGENTS.md');
-      expect(output).toContain(agentsGuidanceLine);
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
 
       stdoutSpy.mockRestore();
       Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
@@ -499,9 +523,9 @@ describe('init command', () => {
       expect(agentsContent).toContain('# Existing');
       expect(agentsContent).toContain(agentsGuidanceLine);
 
-      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-      expect(output).toContain('Proposed update for');
-      expect(output).toContain('Updated AGENTS.md at');
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
 
       stdoutSpy.mockRestore();
       Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });

@@ -124,6 +124,15 @@ function formatSkippedClients(skippedClients: Array<{ client: string; reason: st
   return skippedClients.map((skipped) => `${skipped.client}: ${skipped.reason}`).join('; ');
 }
 
+interface InitReport {
+  action: 'install' | 'uninstall';
+  skillType?: SkillType;
+  installed?: InstallResult[];
+  removed?: Array<{ client: string; variant: string; path: string }>;
+  skipped?: Array<{ client: string; reason: string }>;
+  message: string;
+}
+
 async function installSkill(
   skillsDir: string,
   clientName: string,
@@ -239,18 +248,23 @@ function renderAgentsAppendDiff(fileName: string): string {
 async function ensureAgentsGuidance(
   projectRoot: string,
   force: boolean,
+  emitOutput: boolean,
 ): Promise<'created' | 'updated' | 'no_change' | 'skipped'> {
   const agentsPath = path.join(projectRoot, AGENTS_FILE_NAME);
   if (!fs.existsSync(agentsPath)) {
     const newContent = `# ${AGENTS_FILE_NAME}\n\n${AGENTS_GUIDANCE_LINE}\n`;
     fs.writeFileSync(agentsPath, newContent, 'utf8');
-    writeLine(`Created ${AGENTS_FILE_NAME} with XcodeBuildMCP guidance at ${agentsPath}`);
+    if (emitOutput) {
+      writeLine(`Created ${AGENTS_FILE_NAME} with XcodeBuildMCP guidance at ${agentsPath}`);
+    }
     return 'created';
   }
 
   const currentContent = fs.readFileSync(agentsPath, 'utf8');
   if (currentContent.includes(AGENTS_GUIDANCE_LINE)) {
-    writeLine(`${AGENTS_FILE_NAME} already includes XcodeBuildMCP guidance.`);
+    if (emitOutput) {
+      writeLine(`${AGENTS_FILE_NAME} already includes XcodeBuildMCP guidance.`);
+    }
     return 'no_change';
   }
 
@@ -260,13 +274,17 @@ async function ensureAgentsGuidance(
       AGENTS_GUIDANCE_LINE,
     );
     fs.writeFileSync(agentsPath, updatedFromLegacy, 'utf8');
-    writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+    if (emitOutput) {
+      writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+    }
     return 'updated';
   }
 
   const diff = renderAgentsAppendDiff(AGENTS_FILE_NAME);
-  writeLine(`Proposed update for ${agentsPath}:`);
-  writeLine(diff);
+  if (emitOutput) {
+    writeLine(`Proposed update for ${agentsPath}:`);
+    writeLine(diff);
+  }
 
   if (!force) {
     if (!process.stdin.isTTY) {
@@ -277,7 +295,9 @@ async function ensureAgentsGuidance(
 
     const confirmed = await promptConfirm(`Update ${AGENTS_FILE_NAME} with the guidance above?`);
     if (!confirmed) {
-      writeLine(`Skipped updating ${AGENTS_FILE_NAME}.`);
+      if (emitOutput) {
+        writeLine(`Skipped updating ${AGENTS_FILE_NAME}.`);
+      }
       return 'skipped';
     }
   }
@@ -287,7 +307,9 @@ async function ensureAgentsGuidance(
     : `${currentContent}\n${AGENTS_GUIDANCE_LINE}\n`;
 
   fs.writeFileSync(agentsPath, updatedContent, 'utf8');
-  writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+  if (emitOutput) {
+    writeLine(`Updated ${AGENTS_FILE_NAME} at ${agentsPath}`);
+  }
   return 'updated';
 }
 
@@ -487,29 +509,48 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         }
 
         const targets = resolveTargets(clientFlag ?? 'auto', destFlag, 'uninstall');
-        let anyRemoved = false;
+        const removedEntries: Array<{ client: string; variant: string; path: string }> = [];
 
         for (const target of targets) {
           const result = uninstallSkill(target.skillsDir, target.name);
-          if (result) {
-            if (!anyRemoved) {
-              clack.log.step('Uninstalled skill directories');
-            }
-            const removedLines = result.removed
-              .map((r) => `  Removed (${r.variant}): ${r.path}`)
-              .join('\n');
-            clack.log.message(`  Client: ${result.client}\n${removedLines}`);
-            anyRemoved = true;
+          if (!result) {
+            continue;
+          }
+
+          for (const removed of result.removed) {
+            removedEntries.push({
+              client: result.client,
+              variant: removed.variant,
+              path: removed.path,
+            });
           }
         }
 
-        if (!anyRemoved) {
-          clack.log.info('No installed skill directories found to remove.');
-        }
+        const report: InitReport = {
+          action: 'uninstall',
+          removed: removedEntries,
+          message:
+            removedEntries.length > 0
+              ? 'Uninstalled skill directories'
+              : 'No installed skill directories found to remove.',
+        };
 
         if (isTTY) {
-          clack.outro(anyRemoved ? 'Done.' : undefined);
+          if (removedEntries.length > 0) {
+            clack.log.step(report.message);
+            for (const removed of removedEntries) {
+              clack.log.message(
+                `  Client: ${removed.client}\n  Removed (${removed.variant}): ${removed.path}`,
+              );
+            }
+          } else {
+            clack.log.info(report.message);
+          }
+          clack.outro('Done.');
+        } else {
+          process.stdout.write(`${JSON.stringify(report)}\n`);
         }
+
         return;
       }
 
@@ -538,9 +579,6 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         clientFlag,
         destFlag,
       );
-      for (const skipped of policy.skippedClients) {
-        writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
-      }
 
       if (policy.allowedTargets.length === 0) {
         const skippedSummary = formatSkippedClients(policy.skippedClients);
@@ -557,18 +595,30 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         results.push(result);
       }
 
-      clack.log.success(`Installed ${skillDisplayName(selection.skillType)} skill`);
-      for (const result of results) {
-        clack.log.message(`  Client: ${result.client}\n  Location: ${result.location}`);
-      }
+      const report: InitReport = {
+        action: 'install',
+        skillType: selection.skillType,
+        installed: results,
+        skipped: policy.skippedClients,
+        message: `Installed ${skillDisplayName(selection.skillType)} skill`,
+      };
 
       if (isTTY) {
+        for (const skipped of report.skipped ?? []) {
+          clack.log.info(`Skipped ${skipped.client}: ${skipped.reason}`);
+        }
+        clack.log.success(report.message);
+        for (const result of results) {
+          clack.log.message(`  Client: ${result.client}\n  Location: ${result.location}`);
+        }
         clack.outro('Done.');
+      } else {
+        process.stdout.write(`${JSON.stringify(report)}\n`);
       }
 
       if (ctx?.workspaceRoot) {
         const projectRoot = path.resolve(ctx.workspaceRoot);
-        await ensureAgentsGuidance(projectRoot, argv.force as boolean);
+        await ensureAgentsGuidance(projectRoot, argv.force as boolean, isTTY);
       }
     },
   );
