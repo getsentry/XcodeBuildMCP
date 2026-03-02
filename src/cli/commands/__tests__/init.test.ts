@@ -467,6 +467,10 @@ describe('init command', () => {
       const output = parseJsonOutput(stdoutSpy);
       expect(output.action).toBe('install');
       expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
+      expect(output.agentsGuidance).toEqual({
+        status: 'created',
+        path: agentsPath,
+      });
 
       stdoutSpy.mockRestore();
     });
@@ -495,6 +499,12 @@ describe('init command', () => {
       const output = parseJsonOutput(stdoutSpy);
       expect(output.action).toBe('install');
       expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
+      expect(output.agentsGuidance).toEqual({
+        status: 'error',
+        path: join(projectRoot, 'AGENTS.md'),
+        error:
+          'AGENTS.md exists and requires confirmation to update. Re-run with --force to apply the change in non-interactive mode.',
+      });
 
       stdoutSpy.mockRestore();
       Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
@@ -526,6 +536,10 @@ describe('init command', () => {
       const output = parseJsonOutput(stdoutSpy);
       expect(output.action).toBe('install');
       expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
+      expect(output.agentsGuidance).toEqual({
+        status: 'updated',
+        path: join(projectRoot, 'AGENTS.md'),
+      });
 
       stdoutSpy.mockRestore();
       Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
@@ -559,6 +573,14 @@ describe('init command', () => {
           new RegExp(agentsGuidanceLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
         )?.length,
       ).toBe(1);
+
+      const output = parseJsonOutput(stdoutSpy);
+      expect(output.action).toBe('install');
+      expect(output.message).toBe('Installed XcodeBuildMCP CLI skill');
+      expect(output.agentsGuidance).toEqual({
+        status: 'updated',
+        path: join(projectRoot, 'AGENTS.md'),
+      });
 
       stdoutSpy.mockRestore();
     });

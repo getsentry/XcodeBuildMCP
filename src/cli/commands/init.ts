@@ -124,12 +124,19 @@ function formatSkippedClients(skippedClients: Array<{ client: string; reason: st
   return skippedClients.map((skipped) => `${skipped.client}: ${skipped.reason}`).join('; ');
 }
 
+type AgentsGuidanceStatus = 'created' | 'updated' | 'no_change' | 'skipped' | 'error';
+
 interface InitReport {
   action: 'install' | 'uninstall';
   skillType?: SkillType;
   installed?: InstallResult[];
   removed?: Array<{ client: string; variant: string; path: string }>;
   skipped?: Array<{ client: string; reason: string }>;
+  agentsGuidance?: {
+    status: AgentsGuidanceStatus;
+    path: string;
+    error?: string;
+  };
   message: string;
 }
 
@@ -595,11 +602,38 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         results.push(result);
       }
 
+      let agentsGuidanceStatus: AgentsGuidanceStatus | undefined;
+      let agentsGuidancePath: string | undefined;
+      let agentsGuidanceError: string | undefined;
+      if (!isTTY && ctx?.workspaceRoot) {
+        const projectRoot = path.resolve(ctx.workspaceRoot);
+        agentsGuidancePath = path.join(projectRoot, AGENTS_FILE_NAME);
+        try {
+          agentsGuidanceStatus = await ensureAgentsGuidance(
+            projectRoot,
+            argv.force as boolean,
+            false,
+          );
+        } catch (error) {
+          agentsGuidanceStatus = 'error';
+          agentsGuidanceError = error instanceof Error ? error.message : String(error);
+        }
+      }
+
       const report: InitReport = {
         action: 'install',
         skillType: selection.skillType,
         installed: results,
         skipped: policy.skippedClients,
+        ...(agentsGuidanceStatus && agentsGuidancePath
+          ? {
+              agentsGuidance: {
+                status: agentsGuidanceStatus,
+                path: agentsGuidancePath,
+                ...(agentsGuidanceError ? { error: agentsGuidanceError } : {}),
+              },
+            }
+          : {}),
         message: `Installed ${skillDisplayName(selection.skillType)} skill`,
       };
 
@@ -616,9 +650,13 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         process.stdout.write(`${JSON.stringify(report)}\n`);
       }
 
-      if (ctx?.workspaceRoot) {
+      if (agentsGuidanceStatus === 'error' && agentsGuidanceError) {
+        throw new Error(agentsGuidanceError);
+      }
+
+      if (ctx?.workspaceRoot && isTTY) {
         const projectRoot = path.resolve(ctx.workspaceRoot);
-        await ensureAgentsGuidance(projectRoot, argv.force as boolean, isTTY);
+        await ensureAgentsGuidance(projectRoot, argv.force as boolean, true);
       }
     },
   );
