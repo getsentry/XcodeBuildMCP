@@ -27,7 +27,9 @@ function isSentryDisabledFromEnv(): boolean {
   );
 }
 
-const sentryEnabled = !isSentryDisabledFromEnv();
+function isSentryEnabled(): boolean {
+  return !isSentryDisabledFromEnv();
+}
 
 // Log levels in order of severity (lower number = more severe)
 const LOG_LEVELS = {
@@ -78,7 +80,7 @@ const require = createRequire(
 let cachedSentry: SentryModule | null = null;
 
 function loadSentrySync(): SentryModule | null {
-  if (!sentryEnabled || isTestEnv()) {
+  if (!isSentryEnabled() || isTestEnv()) {
     return null;
   }
   if (cachedSentry) {
@@ -237,7 +239,7 @@ export function log(level: string, message: string, context?: LogContext): void 
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
 
-  const captureToSentry = sentryEnabled && __shouldCaptureToSentryForTests(context);
+  const captureToSentry = isSentryEnabled() && __shouldCaptureToSentryForTests(context);
 
   if (captureToSentry) {
     withSentry((s) => {

@@ -680,7 +680,7 @@ function enforceInstallPolicy(
     return { allowedTargets: targets, skippedClients: [] };
   }
 
-  if (clientFlag === 'claude') {
+  if (clientFlag === 'claude' || selectionMode === 'interactive') {
     return { allowedTargets: targets, skippedClients: [] };
   }
 
@@ -696,10 +696,6 @@ function enforceInstallPolicy(
       continue;
     }
     allowedTargets.push(target);
-  }
-
-  if (clientFlag === 'claude' || selectionMode === 'interactive') {
-    return { allowedTargets: targets, skippedClients: [] };
   }
 
   return { allowedTargets, skippedClients };
