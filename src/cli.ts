@@ -49,6 +49,10 @@ async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yar
       type: 'string',
       describe: 'Set log verbosity level',
       choices: ['none', 'error', 'warn', 'info', 'debug'] as const,
+      coerce: (value: unknown) => {
+        if (typeof value !== 'string') return value;
+        return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
+      },
       default: 'none',
     })
     .option('style', {
