@@ -159,6 +159,30 @@ describe('init command', () => {
       stdoutSpy.mockRestore();
     });
 
+    it('errors with skip reason when only Claude is detected for MCP auto-install', async () => {
+      const fakeHome = join(tempDir, 'home-only-claude');
+      mkdirSync(join(fakeHome, '.claude'), { recursive: true });
+      mockedHomedir.mockReturnValue(fakeHome);
+
+      const yargs = (await import('yargs')).default;
+      const mod = await loadInitModule();
+
+      const app = yargs(['init', '--skill', 'mcp']).scriptName('').fail(false);
+      mod.registerInitCommand(app);
+
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+      await expect(app.parseAsync()).rejects.toThrow(
+        'No eligible install targets after applying skill policy. Skipped: Claude Code: MCP skill is unnecessary because Claude Code already uses server instructions.',
+      );
+
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+      expect(output).toContain(
+        'Skipped Claude Code: MCP skill is unnecessary because Claude Code already uses server instructions.',
+      );
+
+      stdoutSpy.mockRestore();
+    });
+
     it('allows explicit Claude MCP install with --client claude', async () => {
       const fakeHome = join(tempDir, 'home-explicit-claude');
       mkdirSync(join(fakeHome, '.claude'), { recursive: true });

@@ -100,6 +100,14 @@ interface InstallPolicyResult {
   skippedClients: Array<{ client: string; reason: string }>;
 }
 
+function formatSkippedClients(skippedClients: Array<{ client: string; reason: string }>): string {
+  if (skippedClients.length === 0) {
+    return '';
+  }
+
+  return skippedClients.map((skipped) => `${skipped.client}: ${skipped.reason}`).join('; ');
+}
+
 async function installSkill(
   skillsDir: string,
   clientName: string,
@@ -348,8 +356,14 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
       const targets = resolveTargets(clientFlag, destFlag, 'install');
 
       const policy = enforceInstallPolicy(targets, skillType, clientFlag, destFlag);
+      for (const skipped of policy.skippedClients) {
+        writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
+      }
+
       if (policy.allowedTargets.length === 0) {
-        throw new Error('No eligible install targets after applying skill policy.');
+        const skippedSummary = formatSkippedClients(policy.skippedClients);
+        const reasonSuffix = skippedSummary.length > 0 ? ` Skipped: ${skippedSummary}` : '';
+        throw new Error(`No eligible install targets after applying skill policy.${reasonSuffix}`);
       }
 
       const results: InstallResult[] = [];
@@ -359,10 +373,6 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
           removeConflict: argv['remove-conflict'] as boolean,
         });
         results.push(result);
-      }
-
-      for (const skipped of policy.skippedClients) {
-        writeLine(`Skipped ${skipped.client}: ${skipped.reason}`);
       }
 
       writeLine(`Installed ${skillDisplayName(skillType)} skill`);
@@ -393,6 +403,10 @@ function enforceInstallPolicy(
     return { allowedTargets: targets, skippedClients: [] };
   }
 
+  if (clientFlag === 'claude') {
+    return { allowedTargets: targets, skippedClients: [] };
+  }
+
   const allowedTargets: ClientInfo[] = [];
   const skippedClients: Array<{ client: string; reason: string }> = [];
 
@@ -405,10 +419,6 @@ function enforceInstallPolicy(
       continue;
     }
     allowedTargets.push(target);
-  }
-
-  if (clientFlag === 'claude') {
-    return { allowedTargets: targets, skippedClients: [] };
   }
 
   return { allowedTargets, skippedClients };
