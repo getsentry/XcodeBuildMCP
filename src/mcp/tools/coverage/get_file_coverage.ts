@@ -130,10 +130,12 @@ export async function get_file_coverageLogic(
     'targets' in data &&
     Array.isArray((data as { targets: unknown }).targets)
   ) {
-    const targets = (data as { targets: { files?: RawFileEntry[] }[] }).targets;
+    const targets = (data as { targets: unknown[] }).targets;
     for (const t of targets) {
-      if (t.files) {
-        fileEntries.push(...t.files.map(normalizeFileEntry));
+      if (typeof t !== 'object' || t === null) continue;
+      const target = t as { files?: RawFileEntry[] };
+      if (target.files) {
+        fileEntries.push(...target.files.map(normalizeFileEntry));
       }
     }
   }
