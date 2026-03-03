@@ -25,14 +25,22 @@ export interface EnvironmentDetector {
  * Production implementation of environment detection
  */
 export class ProductionEnvironmentDetector implements EnvironmentDetector {
+  private cachedResult: boolean | undefined;
+
   isRunningUnderClaudeCode(): boolean {
+    if (this.cachedResult !== undefined) {
+      return this.cachedResult;
+    }
+
     // Disable Claude Code detection during tests for environment-agnostic testing
     if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+      this.cachedResult = false;
       return false;
     }
 
     // Method 1: Check for Claude Code environment variables
     if (process.env.CLAUDECODE === '1' || process.env.CLAUDE_CODE_ENTRYPOINT === 'cli') {
+      this.cachedResult = true;
       return true;
     }
 
@@ -45,6 +53,7 @@ export class ProductionEnvironmentDetector implements EnvironmentDetector {
           timeout: 1000,
         }).trim();
         if (parentCommand.includes('claude')) {
+          this.cachedResult = true;
           return true;
         }
       }
@@ -53,6 +62,7 @@ export class ProductionEnvironmentDetector implements EnvironmentDetector {
       log('debug', `Failed to detect parent process: ${error}`);
     }
 
+    this.cachedResult = false;
     return false;
   }
 }

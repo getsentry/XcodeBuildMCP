@@ -21,7 +21,7 @@ import { log } from './logger.ts';
 import { XcodePlatform, constructDestinationString } from './xcode.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import type { ToolResponse, SharedBuildParams, PlatformBuildOptions } from '../types/common.ts';
-import { createTextResponse, consolidateContentForClaudeCode } from './validation.ts';
+import { createTextResponse } from './validation.ts';
 import {
   isXcodemakeEnabled,
   isXcodemakeAvailable,
@@ -306,7 +306,7 @@ export async function executeXcodeBuildCommand(
         });
       }
 
-      return consolidateContentForClaudeCode(errorResponse);
+      return errorResponse;
     }
 
     log('info', `✅ ${platformOptions.logPrefix} ${buildAction} succeeded.`);
@@ -369,7 +369,7 @@ Future builds will use the generated Makefile for improved performance.
       });
     }
 
-    return consolidateContentForClaudeCode(successResponse);
+    return successResponse;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -382,11 +382,9 @@ Future builds will use the generated Makefile for improved performance.
       sentry: !isSpawnError,
     });
 
-    return consolidateContentForClaudeCode(
-      createTextResponse(
-        `Error during ${platformOptions.logPrefix} ${buildAction}: ${errorMessage}`,
-        true,
-      ),
+    return createTextResponse(
+      `Error during ${platformOptions.logPrefix} ${buildAction}: ${errorMessage}`,
+      true,
     );
   }
 }

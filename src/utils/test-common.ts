@@ -12,19 +12,16 @@
  * - Temporary directory management for xcresult files
  */
 
-import { promisify } from 'util';
-import { exec } from 'child_process';
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
 import { join } from 'path';
 import { log } from './logger.ts';
 import type { XcodePlatform } from './xcode.ts';
 import { executeXcodeBuildCommand } from './build/index.ts';
-import { createTextResponse, consolidateContentForClaudeCode } from './validation.ts';
+import { createTextResponse } from './validation.ts';
 import { normalizeTestRunnerEnv } from './environment.ts';
 import type { ToolResponse } from '../types/common.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
-import { getDefaultCommandExecutor } from './command.ts';
+import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from './command.ts';
+import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import { filterStderrContent, type XcresultSummary } from './test-result-content.ts';
 
 /**
@@ -60,15 +57,23 @@ interface TestSummary {
 /**
  * Parse xcresult bundle using xcrun xcresulttool
  */
-export async function parseXcresultBundle(resultBundlePath: string): Promise<XcresultSummary> {
+export async function parseXcresultBundle(
+  resultBundlePath: string,
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+): Promise<XcresultSummary> {
   try {
-    const execAsync = promisify(exec);
-    const { stdout } = await execAsync(
-      `xcrun xcresulttool get test-results summary --path "${resultBundlePath}"`,
+    const result = await executor(
+      ['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', resultBundlePath],
+      'Parse xcresult bundle',
+      true,
     );
 
+    if (!result.success) {
+      throw new Error(result.error ?? 'Failed to parse xcresult bundle');
+    }
+
     // Parse JSON response and format as human-readable
-    const summary = JSON.parse(stdout) as TestSummary;
+    const summary = JSON.parse(result.output || '{}') as TestSummary;
     return {
       formatted: formatTestSummary(summary),
       totalTestCount: typeof summary.totalTestCount === 'number' ? summary.totalTestCount : 0,
@@ -165,7 +170,8 @@ export async function handleTestLogic(
     platform: XcodePlatform;
     testRunnerEnv?: Record<string, string>;
   },
-  executor?: CommandExecutor,
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
 ): Promise<ToolResponse> {
   log(
     'info',
@@ -174,7 +180,9 @@ export async function handleTestLogic(
 
   try {
     // Create temporary directory for xcresult bundle
-    const tempDir = await mkdtemp(join(tmpdir(), 'xcodebuild-test-'));
+    const tempDir = await fileSystemExecutor.mkdtemp(
+      join(fileSystemExecutor.tmpdir(), 'xcodebuild-test-'),
+    );
     const resultBundlePath = join(tempDir, 'TestResults.xcresult');
 
     // Add resultBundlePath to extraArgs
@@ -201,7 +209,7 @@ export async function handleTestLogic(
       },
       params.preferXcodebuild,
       'test',
-      executor ?? getDefaultCommandExecutor(),
+      executor,
       execOpts,
     );
 
@@ -212,25 +220,24 @@ export async function handleTestLogic(
 
       // Check if the file exists
       try {
-        const { stat } = await import('fs/promises');
-        await stat(resultBundlePath);
+        await fileSystemExecutor.stat(resultBundlePath);
         log('info', `xcresult bundle exists at: ${resultBundlePath}`);
       } catch {
         log('warn', `xcresult bundle does not exist at: ${resultBundlePath}`);
         throw new Error(`xcresult bundle not found at ${resultBundlePath}`);
       }
 
-      const xcresult = await parseXcresultBundle(resultBundlePath);
+      const xcresult = await parseXcresultBundle(resultBundlePath, executor);
       log('info', 'Successfully parsed xcresult bundle');
 
       // Clean up temporary directory
-      await rm(tempDir, { recursive: true, force: true });
+      await fileSystemExecutor.rm(tempDir, { recursive: true, force: true });
 
       // If no tests ran (for example build/setup failed), xcresult summary is not useful.
       // Return raw output so the original diagnostics stay visible.
       if (xcresult.totalTestCount === 0) {
         log('info', 'xcresult reports 0 tests — returning raw build output');
-        return consolidateContentForClaudeCode(testResult);
+        return testResult;
       }
 
       // xcresult summary should be first. Drop stderr-only noise while preserving non-stderr lines.
@@ -246,26 +253,23 @@ export async function handleTestLogic(
         isError: testResult.isError,
       };
 
-      // Apply Claude Code workaround if enabled
-      return consolidateContentForClaudeCode(combinedResponse);
+      return combinedResponse;
     } catch (parseError) {
       // If parsing fails, return original test result
       log('warn', `Failed to parse xcresult bundle: ${parseError}`);
 
       // Clean up temporary directory even if parsing fails
       try {
-        await rm(tempDir, { recursive: true, force: true });
+        await fileSystemExecutor.rm(tempDir, { recursive: true, force: true });
       } catch (cleanupError) {
         log('warn', `Failed to clean up temporary directory: ${cleanupError}`);
       }
 
-      return consolidateContentForClaudeCode(testResult);
+      return testResult;
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('error', `Error during test run: ${errorMessage}`);
-    return consolidateContentForClaudeCode(
-      createTextResponse(`Error during test run: ${errorMessage}`, true),
-    );
+    return createTextResponse(`Error during test run: ${errorMessage}`, true);
   }
 }

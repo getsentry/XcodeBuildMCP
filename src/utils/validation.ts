@@ -25,6 +25,7 @@ import { log } from './logger.ts';
 import type { ToolResponse, ValidationResult } from '../types/common.ts';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import { getDefaultEnvironmentDetector } from './environment.ts';
+import type { EnvironmentDetector } from './environment.ts';
 
 /**
  * Creates a text response with the given message
@@ -218,9 +219,14 @@ export function validateEnumParam<T>(
  * @param response The original ToolResponse with multiple content blocks
  * @returns A new ToolResponse with consolidated content
  */
-export function consolidateContentForClaudeCode(response: ToolResponse): ToolResponse {
+export function consolidateContentForClaudeCode(
+  response: ToolResponse,
+  detector?: EnvironmentDetector,
+): ToolResponse {
   // Automatically detect if running under Claude Code
-  const shouldConsolidate = getDefaultEnvironmentDetector().isRunningUnderClaudeCode();
+  const shouldConsolidate = (
+    detector ?? getDefaultEnvironmentDetector()
+  ).isRunningUnderClaudeCode();
 
   if (!shouldConsolidate || !response.content || response.content.length <= 1) {
     return response;

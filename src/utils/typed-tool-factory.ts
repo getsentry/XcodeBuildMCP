@@ -13,6 +13,7 @@ import * as z from 'zod';
 import type { ToolResponse } from '../types/common.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import { createErrorResponse } from './responses/index.ts';
+import { consolidateContentForClaudeCode } from './validation.ts';
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
 
@@ -25,7 +26,8 @@ function createValidatedHandler<TParams, TContext>(
     try {
       const validatedParams = schema.parse(args);
 
-      return await logicFunction(validatedParams, getContext());
+      const response = await logicFunction(validatedParams, getContext());
+      return consolidateContentForClaudeCode(response);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const details = `Invalid parameters:\n${formatZodIssues(error)}`;
@@ -242,7 +244,8 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
       }
 
       const validated = internalSchema.parse(merged);
-      return await logicFunction(validated, getContext());
+      const response = await logicFunction(validated, getContext());
+      return consolidateContentForClaudeCode(response);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const details = `Invalid parameters:\n${formatZodIssues(error)}`;

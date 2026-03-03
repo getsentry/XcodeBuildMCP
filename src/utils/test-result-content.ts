@@ -12,42 +12,21 @@ export function filterStderrContent(
     return [];
   }
 
-  const filtered: ToolResponseContent[] = [];
-  content.forEach((item) => {
+  return content.flatMap((item): ToolResponseContent[] => {
     if (item.type !== 'text') {
-      filtered.push(item);
-      return;
+      return [item];
     }
 
-    const lines = item.text.split('\n').filter((line) => !line.includes('[stderr]'));
-
-    // Clean up orphaned separators left by consolidateContentForClaudeCode.
-    // That function joins content blocks with `\n---\n`, so removing [stderr]
-    // lines can leave bare `---` lines stacked together or dangling at edges.
-    const cleaned: string[] = [];
-    for (const line of lines) {
-      if (
-        line.trim() === '---' &&
-        (cleaned.length === 0 || cleaned[cleaned.length - 1].trim() === '---')
-      ) {
-        continue;
-      }
-      cleaned.push(line);
-    }
-
-    // Remove trailing separator
-    while (cleaned.length > 0 && cleaned[cleaned.length - 1].trim() === '---') {
-      cleaned.pop();
-    }
-
-    const filteredText = cleaned.join('\n').trim();
+    const filteredText = item.text
+      .split('\n')
+      .filter((line) => !line.includes('[stderr]'))
+      .join('\n')
+      .trim();
 
     if (filteredText.length === 0) {
-      return;
+      return [];
     }
 
-    filtered.push({ ...item, text: filteredText });
+    return [{ ...item, text: filteredText }];
   });
-
-  return filtered;
 }
