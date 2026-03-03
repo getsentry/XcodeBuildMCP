@@ -8,7 +8,8 @@
 import * as z from 'zod';
 import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
-import type { CommandExecutor } from '../../../utils/execution/index.ts';
+import { validateFileExists } from '../../../utils/validation/index.ts';
+import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
 
@@ -54,8 +55,14 @@ function isValidCoverageTarget(value: unknown): value is CoverageTarget {
 export async function get_coverage_reportLogic(
   params: GetCoverageReportParams,
   executor: CommandExecutor,
+  fileSystem?: FileSystemExecutor,
 ): Promise<ToolResponse> {
   const { xcresultPath, target, showFiles } = params;
+
+  const fileExistsValidation = validateFileExists(xcresultPath, fileSystem);
+  if (!fileExistsValidation.isValid) {
+    return fileExistsValidation.errorResponse!;
+  }
 
   log('info', `Getting coverage report from: ${xcresultPath}`);
 

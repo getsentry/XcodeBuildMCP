@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import { createMockExecutor, createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, get_coverage_reportLogic } from '../get_coverage_report.ts';
 
 const sampleTargets = [
@@ -36,6 +36,8 @@ const sampleTargetsWithFiles = [
   },
 ];
 
+const mockFileSystem = createMockFileSystemExecutor({ existsSync: () => true });
+
 describe('get_coverage_report', () => {
   describe('Export Validation', () => {
     it('should export get_coverage_reportLogic function', () => {
@@ -62,7 +64,7 @@ describe('get_coverage_report', () => {
         onExecute: (command) => { commands.push(command); },
       });
 
-      await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(commands).toHaveLength(1);
       expect(commands[0]).toContain('--only-targets');
@@ -78,7 +80,7 @@ describe('get_coverage_report', () => {
         onExecute: (command) => { commands.push(command); },
       });
 
-      await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor);
+      await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor, mockFileSystem);
 
       expect(commands).toHaveLength(1);
       expect(commands[0]).not.toContain('--only-targets');
@@ -92,7 +94,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBeUndefined();
       expect(result.content).toHaveLength(1);
@@ -114,7 +116,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.nextStepParams).toEqual({
         get_file_coverage: { xcresultPath: '/tmp/test.xcresult' },
@@ -128,7 +130,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(nestedData),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBeUndefined();
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -144,7 +146,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'MyApp', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'MyApp', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBeUndefined();
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -159,7 +161,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'core', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'core', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBeUndefined();
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -172,7 +174,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'NonExistent', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', target: 'NonExistent', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBe(true);
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -187,7 +189,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargetsWithFiles),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBeUndefined();
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -203,7 +205,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargetsWithFiles),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: true }, mockExecutor, mockFileSystem);
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
       // Under MyApp.app: AppDelegate (20%) before ViewModel (60%)
@@ -214,13 +216,25 @@ describe('get_coverage_report', () => {
   });
 
   describe('Failure Paths', () => {
+    it('should return error when xcresult path does not exist', async () => {
+      const missingFs = createMockFileSystemExecutor({ existsSync: () => false });
+      const mockExecutor = createMockExecutor({ success: true, output: '{}' });
+
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/missing.xcresult', showFiles: false }, mockExecutor, missingFs);
+
+      expect(result.isError).toBe(true);
+      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      expect(text).toContain('File not found');
+      expect(text).toContain('/tmp/missing.xcresult');
+    });
+
     it('should return error when xccov command fails', async () => {
       const mockExecutor = createMockExecutor({
         success: false,
         error: 'Failed to load result bundle',
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/bad.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/bad.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBe(true);
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -234,7 +248,7 @@ describe('get_coverage_report', () => {
         output: 'not valid json',
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBe(true);
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -247,7 +261,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify({ unexpected: 'format' }),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBe(true);
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -260,7 +274,7 @@ describe('get_coverage_report', () => {
         output: JSON.stringify([]),
       });
 
-      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor);
+      const result = await get_coverage_reportLogic({ xcresultPath: '/tmp/test.xcresult', showFiles: false }, mockExecutor, mockFileSystem);
 
       expect(result.isError).toBe(true);
       const text = result.content[0].type === 'text' ? result.content[0].text : '';

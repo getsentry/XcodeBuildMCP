@@ -8,6 +8,7 @@ import {
   createMockExecutor,
   createMockCommandResponse,
   createCommandMatchingMockExecutor,
+  createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, get_file_coverageLogic } from '../get_file_coverage.ts';
 
@@ -34,6 +35,8 @@ const sampleArchiveOutput = [
   '    9: 0',
   '   10: 1',
 ].join('\n');
+
+const mockFileSystem = createMockFileSystemExecutor({ existsSync: () => true });
 
 describe('get_file_coverage', () => {
   describe('Export Validation', () => {
@@ -64,6 +67,7 @@ describe('get_file_coverage', () => {
       await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(commands).toHaveLength(1);
@@ -95,6 +99,7 @@ describe('get_file_coverage', () => {
       await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(commands).toHaveLength(2);
@@ -116,6 +121,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBeUndefined();
@@ -135,6 +141,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -151,6 +158,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -170,6 +178,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -186,6 +195,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.nextStepParams).toEqual({
@@ -223,6 +233,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Model.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBeUndefined();
@@ -252,6 +263,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         mockExecutor,
+        mockFileSystem,
       );
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -280,6 +292,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         mockExecutor,
+        mockFileSystem,
       );
 
       const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -305,6 +318,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBeUndefined();
@@ -314,6 +328,22 @@ describe('get_file_coverage', () => {
   });
 
   describe('Failure Paths', () => {
+    it('should return error when xcresult path does not exist', async () => {
+      const missingFs = createMockFileSystemExecutor({ existsSync: () => false });
+      const mockExecutor = createMockExecutor({ success: true, output: '{}' });
+
+      const result = await get_file_coverageLogic(
+        { xcresultPath: '/tmp/missing.xcresult', file: 'Foo.swift', showLines: false },
+        mockExecutor,
+        missingFs,
+      );
+
+      expect(result.isError).toBe(true);
+      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      expect(text).toContain('File not found');
+      expect(text).toContain('/tmp/missing.xcresult');
+    });
+
     it('should return error when functions-for-file command fails', async () => {
       const mockExecutor = createMockExecutor({
         success: false,
@@ -323,6 +353,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/bad.xcresult', file: 'Foo.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBe(true);
@@ -340,6 +371,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Foo.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBe(true);
@@ -356,6 +388,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Missing.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBe(true);
@@ -372,6 +405,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Foo.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBe(true);
@@ -389,6 +423,7 @@ describe('get_file_coverage', () => {
       const result = await get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Empty.swift', showLines: false },
         mockExecutor,
+        mockFileSystem,
       );
 
       expect(result.isError).toBeUndefined();

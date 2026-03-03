@@ -8,7 +8,8 @@
 import * as z from 'zod';
 import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
-import type { CommandExecutor } from '../../../utils/execution/index.ts';
+import { validateFileExists } from '../../../utils/validation/index.ts';
+import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
 
@@ -66,8 +67,14 @@ function normalizeFileEntry(raw: RawFileEntry): FileFunctionCoverage {
 export async function get_file_coverageLogic(
   params: GetFileCoverageParams,
   executor: CommandExecutor,
+  fileSystem?: FileSystemExecutor,
 ): Promise<ToolResponse> {
   const { xcresultPath, file, showLines } = params;
+
+  const fileExistsValidation = validateFileExists(xcresultPath, fileSystem);
+  if (!fileExistsValidation.isValid) {
+    return fileExistsValidation.errorResponse!;
+  }
 
   log('info', `Getting file coverage for "${file}" from: ${xcresultPath}`);
 
