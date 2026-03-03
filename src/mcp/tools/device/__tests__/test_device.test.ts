@@ -1,8 +1,7 @@
 /**
  * Tests for test_device plugin
  * Following CLAUDE.md testing standards with literal validation
- * Using pure dependency injection for deterministic testing
- * NO VITEST MOCKING ALLOWED - Only createMockExecutor and manual stubs
+ * Using dependency injection for deterministic testing
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

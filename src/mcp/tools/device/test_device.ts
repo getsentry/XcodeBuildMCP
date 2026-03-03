@@ -80,7 +80,6 @@ async function parseXcresultBundle(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<XcresultSummary> {
   try {
-    // Use injected executor for testing
     const result = await executor(
       ['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', resultBundlePath],
       'Parse xcresult bundle',

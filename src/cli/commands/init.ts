@@ -626,20 +626,17 @@ export function registerInitCommand(app: Argv, ctx?: { workspaceRoot: string }):
         }
       }
 
+      const agentsGuidance =
+        agentsGuidanceStatus && agentsGuidancePath
+          ? { status: agentsGuidanceStatus, path: agentsGuidancePath, error: agentsGuidanceError }
+          : undefined;
+
       const report: InitReport = {
         action: 'install',
         skillType: selection.skillType,
         installed: results,
         skipped: policy.skippedClients,
-        ...(agentsGuidanceStatus && agentsGuidancePath
-          ? {
-              agentsGuidance: {
-                status: agentsGuidanceStatus,
-                path: agentsGuidancePath,
-                ...(agentsGuidanceError ? { error: agentsGuidanceError } : {}),
-              },
-            }
-          : {}),
+        ...(agentsGuidance ? { agentsGuidance } : {}),
         message: `Installed ${skillDisplayName(selection.skillType)} skill`,
       };
 
@@ -675,15 +672,13 @@ function enforceInstallPolicy(
   destFlag: string | undefined,
   selectionMode: InitSelection['selectionMode'],
 ): InstallPolicyResult {
-  if (skillType !== 'mcp') {
-    return { allowedTargets: targets, skippedClients: [] };
-  }
+  const skipPolicy =
+    skillType !== 'mcp' ||
+    destFlag != null ||
+    clientFlag === 'claude' ||
+    selectionMode === 'interactive';
 
-  if (destFlag) {
-    return { allowedTargets: targets, skippedClients: [] };
-  }
-
-  if (clientFlag === 'claude' || selectionMode === 'interactive') {
+  if (skipPolicy) {
     return { allowedTargets: targets, skippedClients: [] };
   }
 

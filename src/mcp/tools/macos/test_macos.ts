@@ -69,22 +69,6 @@ const testMacosSchema = z.preprocess(
 export type TestMacosParams = z.infer<typeof testMacosSchema>;
 
 /**
- * Type definition for test summary structure from xcresulttool
- * @typedef {Object} TestSummary
- * @property {string} [title]
- * @property {string} [result]
- * @property {number} [totalTestCount]
- * @property {number} [passedTests]
- * @property {number} [failedTests]
- * @property {number} [skippedTests]
- * @property {number} [expectedFailures]
- * @property {string} [environmentDescription]
- * @property {Array<Object>} [devicesAndConfigurations]
- * @property {Array<Object>} [testFailures]
- * @property {Array<Object>} [topInsights]
- */
-
-/**
  * Parse xcresult bundle using xcrun xcresulttool
  */
 async function parseXcresultBundle(
@@ -103,22 +87,10 @@ async function parseXcresultBundle(
     }
 
     // Parse JSON response and format as human-readable
-    let summary: unknown;
-    try {
-      summary = JSON.parse(result.output || '{}');
-    } catch (parseError) {
-      throw new Error(`Failed to parse JSON output: ${parseError}`);
-    }
-
-    if (typeof summary !== 'object' || summary === null) {
-      throw new Error('Invalid JSON output: expected object');
-    }
-
-    const summaryRecord = summary as Record<string, unknown>;
+    const summary = JSON.parse(result.output || '{}') as Record<string, unknown>;
     return {
-      formatted: formatTestSummary(summaryRecord),
-      totalTestCount:
-        typeof summaryRecord.totalTestCount === 'number' ? summaryRecord.totalTestCount : 0,
+      formatted: formatTestSummary(summary),
+      totalTestCount: typeof summary.totalTestCount === 'number' ? summary.totalTestCount : 0,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -155,31 +127,13 @@ function formatTestSummary(summary: Record<string, unknown>): string {
     Array.isArray(summary.devicesAndConfigurations) &&
     summary.devicesAndConfigurations.length > 0
   ) {
-    const firstDeviceConfig: unknown = summary.devicesAndConfigurations[0];
-    if (
-      typeof firstDeviceConfig === 'object' &&
-      firstDeviceConfig !== null &&
-      'device' in firstDeviceConfig
-    ) {
-      const device: unknown = (firstDeviceConfig as Record<string, unknown>).device;
-      if (typeof device === 'object' && device !== null) {
-        const deviceRecord = device as Record<string, unknown>;
-        const deviceName =
-          'deviceName' in deviceRecord && typeof deviceRecord.deviceName === 'string'
-            ? deviceRecord.deviceName
-            : 'Unknown';
-        const platform =
-          'platform' in deviceRecord && typeof deviceRecord.platform === 'string'
-            ? deviceRecord.platform
-            : 'Unknown';
-        const osVersion =
-          'osVersion' in deviceRecord && typeof deviceRecord.osVersion === 'string'
-            ? deviceRecord.osVersion
-            : 'Unknown';
-
-        lines.push(`Device: ${deviceName} (${platform} ${osVersion})`);
-        lines.push('');
-      }
+    const deviceConfig = summary.devicesAndConfigurations[0] as Record<string, unknown>;
+    const device = deviceConfig.device as Record<string, unknown> | undefined;
+    if (device) {
+      lines.push(
+        `Device: ${device.deviceName ?? 'Unknown'} (${device.platform ?? 'Unknown'} ${device.osVersion ?? 'Unknown'})`,
+      );
+      lines.push('');
     }
   }
 
@@ -189,23 +143,13 @@ function formatTestSummary(summary: Record<string, unknown>): string {
     summary.testFailures.length > 0
   ) {
     lines.push('Test Failures:');
-    summary.testFailures.forEach((failure: unknown, index: number) => {
-      if (typeof failure === 'object' && failure !== null) {
-        const failureRecord = failure as Record<string, unknown>;
-        const testName =
-          'testName' in failureRecord && typeof failureRecord.testName === 'string'
-            ? failureRecord.testName
-            : 'Unknown Test';
-        const targetName =
-          'targetName' in failureRecord && typeof failureRecord.targetName === 'string'
-            ? failureRecord.targetName
-            : 'Unknown Target';
-
-        lines.push(`  ${index + 1}. ${testName} (${targetName})`);
-
-        if ('failureText' in failureRecord && typeof failureRecord.failureText === 'string') {
-          lines.push(`     ${failureRecord.failureText}`);
-        }
+    summary.testFailures.forEach((failureItem, index: number) => {
+      const failure = failureItem as Record<string, unknown>;
+      lines.push(
+        `  ${index + 1}. ${failure.testName ?? 'Unknown Test'} (${failure.targetName ?? 'Unknown Target'})`,
+      );
+      if (failure.failureText) {
+        lines.push(`     ${failure.failureText}`);
       }
     });
     lines.push('');
@@ -213,20 +157,11 @@ function formatTestSummary(summary: Record<string, unknown>): string {
 
   if (summary.topInsights && Array.isArray(summary.topInsights) && summary.topInsights.length > 0) {
     lines.push('Insights:');
-    summary.topInsights.forEach((insight: unknown, index: number) => {
-      if (typeof insight === 'object' && insight !== null) {
-        const insightRecord = insight as Record<string, unknown>;
-        const impact =
-          'impact' in insightRecord && typeof insightRecord.impact === 'string'
-            ? insightRecord.impact
-            : 'Unknown';
-        const text =
-          'text' in insightRecord && typeof insightRecord.text === 'string'
-            ? insightRecord.text
-            : 'No description';
-
-        lines.push(`  ${index + 1}. [${impact}] ${text}`);
-      }
+    summary.topInsights.forEach((insightItem, index: number) => {
+      const insight = insightItem as Record<string, unknown>;
+      lines.push(
+        `  ${index + 1}. [${insight.impact ?? 'Unknown'}] ${insight.text ?? 'No description'}`,
+      );
     });
   }
 
