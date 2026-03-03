@@ -6,7 +6,7 @@ import { getSocketPath, getWorkspaceKey, resolveWorkspaceRoot } from './daemon/s
 import { startMcpServer } from './server/start-mcp-server.ts';
 import { listCliWorkflowIdsFromManifest } from './runtime/tool-catalog.ts';
 import { flushAndCloseSentry, initSentry, recordBootstrapDurationMetric } from './utils/sentry.ts';
-import { setLogLevel, type LogLevel } from './utils/logger.ts';
+import { coerceLogLevel, setLogLevel, type LogLevel } from './utils/logger.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
 
 function findTopLevelCommand(argv: string[]): string | undefined {
@@ -49,10 +49,7 @@ async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yar
       type: 'string',
       describe: 'Set log verbosity level',
       choices: ['none', 'error', 'warn', 'info', 'debug'] as const,
-      coerce: (value: unknown) => {
-        if (typeof value !== 'string') return value;
-        return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
-      },
+      coerce: coerceLogLevel,
       default: 'none',
     })
     .option('style', {

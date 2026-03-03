@@ -145,6 +145,15 @@ export function normalizeLogLevel(raw: string): LogLevel | null {
 }
 
 /**
+ * Yargs coerce function for log-level options.
+ * Maps the deprecated 'warning' value to 'warn' for backwards compatibility.
+ */
+export function coerceLogLevel(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
+}
+
+/**
  * Set the minimum log level for client-requested filtering
  * @param level The minimum log level to output
  */

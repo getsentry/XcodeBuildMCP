@@ -10,6 +10,7 @@ import {
   listDaemonRegistryEntries,
   readDaemonRegistryEntry,
 } from '../../daemon/daemon-registry.ts';
+import { coerceLogLevel } from '../../utils/logger.ts';
 
 export interface DaemonCommandsOptions {
   defaultSocketPath: string;
@@ -53,10 +54,7 @@ export function registerDaemonCommands(app: Argv, opts: DaemonCommandsOptions): 
             'info',
             'debug',
           ] as const,
-          coerce: (value: unknown) => {
-            if (typeof value !== 'string') return value;
-            return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
-          },
+          coerce: coerceLogLevel,
         })
         .option('tail', {
           type: 'number',

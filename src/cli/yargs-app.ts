@@ -9,7 +9,7 @@ import { registerSetupCommand } from './commands/setup.ts';
 import { registerToolsCommand } from './commands/tools.ts';
 import { registerToolCommands } from './register-tool-commands.ts';
 import { version } from '../version.ts';
-import { setLogLevel, type LogLevel } from '../utils/logger.ts';
+import { coerceLogLevel, setLogLevel, type LogLevel } from '../utils/logger.ts';
 
 export interface YargsAppOptions {
   catalog: ToolCatalog;
@@ -45,10 +45,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
       type: 'string',
       describe: 'Set log verbosity level',
       choices: ['none', 'error', 'warn', 'info', 'debug'] as const,
-      coerce: (value: unknown) => {
-        if (typeof value !== 'string') return value;
-        return value.trim().toLowerCase() === 'warning' ? 'warn' : value;
-      },
+      coerce: coerceLogLevel,
       default: 'none',
     })
     .option('style', {
