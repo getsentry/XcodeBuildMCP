@@ -10,8 +10,8 @@ import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../../utils/execution/index.ts';
+import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
 
 const getCoverageReportSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -52,14 +52,18 @@ function isValidCoverageTarget(value: unknown): value is CoverageTarget {
   );
 }
 
+type GetCoverageReportContext = {
+  executor: CommandExecutor;
+  fileSystem: FileSystemExecutor;
+};
+
 export async function get_coverage_reportLogic(
   params: GetCoverageReportParams,
-  executor: CommandExecutor,
-  fileSystem?: FileSystemExecutor,
+  context: GetCoverageReportContext,
 ): Promise<ToolResponse> {
   const { xcresultPath, target, showFiles } = params;
 
-  const fileExistsValidation = validateFileExists(xcresultPath, fileSystem);
+  const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
   if (!fileExistsValidation.isValid) {
     return fileExistsValidation.errorResponse!;
   }
@@ -72,7 +76,7 @@ export async function get_coverage_reportLogic(
   }
   cmd.push('--json', xcresultPath);
 
-  const result = await executor(cmd, 'Get Coverage Report', false, undefined);
+  const result = await context.executor(cmd, 'Get Coverage Report', false, undefined);
 
   if (!result.success) {
     return {
@@ -197,8 +201,11 @@ export async function get_coverage_reportLogic(
 
 export const schema = getCoverageReportSchema.shape;
 
-export const handler = createTypedTool(
+export const handler = createTypedToolWithContext(
   getCoverageReportSchema,
   get_coverage_reportLogic,
-  getDefaultCommandExecutor,
+  () => ({
+    executor: getDefaultCommandExecutor(),
+    fileSystem: getDefaultFileSystemExecutor(),
+  }),
 );

@@ -10,8 +10,8 @@ import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../../utils/execution/index.ts';
+import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
 
 const getFileCoverageSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -64,14 +64,18 @@ function normalizeFileEntry(raw: RawFileEntry): FileFunctionCoverage {
   return { filePath, coveredLines, executableLines, lineCoverage, functions };
 }
 
+type GetFileCoverageContext = {
+  executor: CommandExecutor;
+  fileSystem: FileSystemExecutor;
+};
+
 export async function get_file_coverageLogic(
   params: GetFileCoverageParams,
-  executor: CommandExecutor,
-  fileSystem?: FileSystemExecutor,
+  context: GetFileCoverageContext,
 ): Promise<ToolResponse> {
   const { xcresultPath, file, showLines } = params;
 
-  const fileExistsValidation = validateFileExists(xcresultPath, fileSystem);
+  const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
   if (!fileExistsValidation.isValid) {
     return fileExistsValidation.errorResponse!;
   }
@@ -79,7 +83,7 @@ export async function get_file_coverageLogic(
   log('info', `Getting file coverage for "${file}" from: ${xcresultPath}`);
 
   // Get function-level coverage
-  const funcResult = await executor(
+  const funcResult = await context.executor(
     ['xcrun', 'xccov', 'view', '--report', '--functions-for-file', file, '--json', xcresultPath],
     'Get File Function Coverage',
     false,
@@ -182,7 +186,7 @@ export async function get_file_coverageLogic(
   // Optionally get line-by-line coverage from the archive
   if (showLines) {
     const filePath = fileEntries[0].filePath !== 'unknown' ? fileEntries[0].filePath : file;
-    const archiveResult = await executor(
+    const archiveResult = await context.executor(
       ['xcrun', 'xccov', 'view', '--archive', '--file', filePath, xcresultPath],
       'Get File Line Coverage',
       false,
@@ -266,8 +270,11 @@ function parseUncoveredLines(output: string): LineRange[] {
 
 export const schema = getFileCoverageSchema.shape;
 
-export const handler = createTypedTool(
+export const handler = createTypedToolWithContext(
   getFileCoverageSchema,
   get_file_coverageLogic,
-  getDefaultCommandExecutor,
+  () => ({
+    executor: getDefaultCommandExecutor(),
+    fileSystem: getDefaultFileSystemExecutor(),
+  }),
 );
