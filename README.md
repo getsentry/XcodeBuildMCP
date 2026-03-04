@@ -368,3 +368,4 @@ The CLI uses a per-workspace daemon for stateful operations (log capture, debugg
 ## Licence
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Third-party licensing notices (including AXe and Meta's IDB MIT attributions) are in [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
