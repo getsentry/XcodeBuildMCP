@@ -23,7 +23,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 import { install_app_deviceLogic } from './install_app_device.ts';
 import { launch_app_deviceLogic } from './launch_app_device.ts';
-import { resolveAppPathFromBuildSettings } from './build-settings.ts';
+import { mapDevicePlatform, resolveAppPathFromBuildSettings } from './build-settings.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -54,21 +54,6 @@ const buildRunDeviceSchema = z.preprocess(
 
 export type BuildRunDeviceParams = z.infer<typeof buildRunDeviceSchema>;
 
-function mapPlatform(platform?: BuildRunDeviceParams['platform']): XcodePlatform {
-  switch (platform) {
-    case 'watchOS':
-      return XcodePlatform.watchOS;
-    case 'tvOS':
-      return XcodePlatform.tvOS;
-    case 'visionOS':
-      return XcodePlatform.visionOS;
-    case 'iOS':
-    case undefined:
-    default:
-      return XcodePlatform.iOS;
-  }
-}
-
 function extractResponseText(response: ToolResponse): string {
   return String(response.content[0]?.text ?? 'Unknown error');
 }
@@ -94,7 +79,7 @@ export async function build_run_deviceLogic(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
 ): Promise<ToolResponse> {
-  const platform = mapPlatform(params.platform);
+  const platform = mapDevicePlatform(params.platform);
 
   const sharedBuildParams: SharedBuildParams = {
     projectPath: params.projectPath,

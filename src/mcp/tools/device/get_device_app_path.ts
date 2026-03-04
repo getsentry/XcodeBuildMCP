@@ -7,7 +7,6 @@
 
 import * as z from 'zod';
 import type { ToolResponse } from '../../../types/common.ts';
-import { XcodePlatform } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { createTextResponse } from '../../../utils/responses/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -17,7 +16,7 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { resolveAppPathFromBuildSettings } from './build-settings.ts';
+import { mapDevicePlatform, resolveAppPathFromBuildSettings } from './build-settings.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -54,26 +53,11 @@ const publicSchemaObject = baseSchemaObject.omit({
   platform: true,
 } as const);
 
-function mapPlatform(platform?: GetDeviceAppPathParams['platform']): XcodePlatform {
-  switch (platform) {
-    case 'watchOS':
-      return XcodePlatform.watchOS;
-    case 'tvOS':
-      return XcodePlatform.tvOS;
-    case 'visionOS':
-      return XcodePlatform.visionOS;
-    case 'iOS':
-    case undefined:
-    default:
-      return XcodePlatform.iOS;
-  }
-}
-
 export async function get_device_app_pathLogic(
   params: GetDeviceAppPathParams,
   executor: CommandExecutor,
 ): Promise<ToolResponse> {
-  const platform = mapPlatform(params.platform);
+  const platform = mapDevicePlatform(params.platform);
   const configuration = params.configuration ?? 'Debug';
 
   log('info', `Getting app path for scheme ${params.scheme} on platform ${platform}`);

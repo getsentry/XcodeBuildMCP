@@ -14,6 +14,23 @@ function resolvePathFromCwd(pathValue?: string): string | undefined {
   return path.resolve(process.cwd(), pathValue);
 }
 
+export type DevicePlatform = 'iOS' | 'watchOS' | 'tvOS' | 'visionOS';
+
+export function mapDevicePlatform(platform?: DevicePlatform): XcodePlatform {
+  switch (platform) {
+    case 'watchOS':
+      return XcodePlatform.watchOS;
+    case 'tvOS':
+      return XcodePlatform.tvOS;
+    case 'visionOS':
+      return XcodePlatform.visionOS;
+    case 'iOS':
+    case undefined:
+    default:
+      return XcodePlatform.iOS;
+  }
+}
+
 export function getBuildSettingsDestination(platform: XcodePlatform, deviceId?: string): string {
   if (deviceId) {
     return `platform=${platform},id=${deviceId}`;
