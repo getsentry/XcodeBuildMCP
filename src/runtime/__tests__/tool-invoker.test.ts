@@ -375,6 +375,67 @@ describe('DefaultToolInvoker next steps post-processing', () => {
     ]);
   });
 
+  it('preserves daemon-provided next-step params when nextStepParams are already consumed', async () => {
+    daemonClientMock.invokeTool.mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      nextSteps: [
+        {
+          tool: 'stop_sim_log_cap',
+          label: 'Stop capture and retrieve logs',
+          params: { logSessionId: 'session-123' },
+          priority: 1,
+        },
+      ],
+    } satisfies ToolResponse);
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'start_sim_log_cap',
+        cliName: 'start-simulator-log-capture',
+        mcpName: 'start_sim_log_cap',
+        workflow: 'logging',
+        stateful: true,
+        nextStepTemplates: [
+          {
+            label: 'Stop capture and retrieve logs',
+            toolId: 'stop_sim_log_cap',
+            priority: 1,
+          },
+        ],
+        handler: vi.fn().mockResolvedValue(textResponse('start')),
+      }),
+      makeTool({
+        id: 'stop_sim_log_cap',
+        cliName: 'stop-simulator-log-capture',
+        mcpName: 'stop_sim_log_cap',
+        workflow: 'logging',
+        stateful: true,
+        handler: vi.fn().mockResolvedValue(textResponse('stop')),
+      }),
+    ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invoker.invoke(
+      'start-simulator-log-capture',
+      {},
+      {
+        runtime: 'cli',
+        socketPath: '/tmp/xcodebuildmcp.sock',
+      },
+    );
+
+    expect(response.nextSteps).toEqual([
+      {
+        tool: 'stop_sim_log_cap',
+        label: 'Stop capture and retrieve logs',
+        params: { logSessionId: 'session-123' },
+        priority: 1,
+        workflow: 'logging',
+        cliTool: 'stop-simulator-log-capture',
+      },
+    ]);
+  });
+
   it('overrides unresolved template placeholders with dynamic next-step params', async () => {
     const directHandler = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],

@@ -147,13 +147,14 @@ export function postProcessToolResponse(params: {
   response: ToolResponse;
   catalog: ToolCatalog;
   runtime: InvokeOptions['runtime'];
+  applyTemplateNextSteps?: boolean;
 }): ToolResponse {
-  const { tool, response, catalog, runtime } = params;
+  const { tool, response, catalog, runtime, applyTemplateNextSteps = true } = params;
 
   const templateSteps = buildTemplateNextSteps(tool, catalog);
 
   const withTemplates =
-    templateSteps.length > 0
+    applyTemplateNextSteps && templateSteps.length > 0
       ? {
           ...response,
           nextSteps: mergeTemplateAndResponseNextSteps(templateSteps, response.nextStepParams),
@@ -303,6 +304,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       return postProcessToolResponse({
         ...context.postProcessParams,
         response,
+        applyTemplateNextSteps: false,
       });
     } catch (error) {
       log(
