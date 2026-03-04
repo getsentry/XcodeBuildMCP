@@ -37,6 +37,8 @@
     "docs:update": "npx tsx scripts/update-tools-docs.ts",
     "docs:update:dry-run": "npx tsx scripts/update-tools-docs.ts --dry-run --verbose",
     "docs:check": "node scripts/check-docs-cli-commands.js",
+    "license:report": "node scripts/generate-third-party-package-licenses.mjs",
+    "license:check": "npx -y license-checker --production --onlyAllow 'MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Unlicense;FSL-1.1-MIT'",
     "test": "vitest run",
     "test:smoke": "npm run build && vitest run --config vitest.smoke.config.ts",
     "test:watch": "vitest",
