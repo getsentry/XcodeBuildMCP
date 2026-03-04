@@ -25,6 +25,7 @@ XcodeBuildMCP provides 75 canonical tools organized into 14 workflow groups.
 **Purpose**: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro). (16 tools)
 
 - `build` - Build for device.
+- `build-and-run` - Build, install, and launch on physical device. Preferred single-step run tool when defaults are set.
 - `clean` - Clean build products.
 - `discover-projects` - Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.
 - `get-app-bundle-id` - Extract bundle id from .app.

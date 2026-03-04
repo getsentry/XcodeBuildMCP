@@ -4,6 +4,7 @@ enabledWorkflows:
   - simulator
   - ui-automation
   - xcode-ide
+  - device
 debug: false
 sentryDisabled: false
 sessionDefaults:

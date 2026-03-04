@@ -85,7 +85,7 @@ describe('CLI Surface (e2e)', () => {
       { workflow: 'simulator', tool: 'list-sims', expected: '--help' },
       { workflow: 'device', tool: 'build', expected: '--scheme' },
       { workflow: 'swift-package', tool: 'build', expected: '--package-path' },
-      { workflow: 'project-discovery', tool: 'list-schemes', expected: '--project-path' },
+      { workflow: 'project-discovery', tool: 'list-schemes', expected: 'List Xcode schemes.' },
       { workflow: 'ui-automation', tool: 'tap', expected: '--simulator-id' },
       { workflow: 'utilities', tool: 'clean', expected: '--scheme' },
     ];

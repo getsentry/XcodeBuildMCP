@@ -197,7 +197,9 @@ export async function list_simsLogic(
     }
 
     responseText +=
-      "Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).";
+      "Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).\n";
+    responseText +=
+      'Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.';
 
     return {
       content: [

@@ -9,6 +9,7 @@ import * as launchAppDevice from '../launch_app_device.ts';
 import * as stopAppDevice from '../stop_app_device.ts';
 import * as listDevices from '../list_devices.ts';
 import * as installAppDevice from '../install_app_device.ts';
+import * as buildRunDevice from '../build_run_device.ts';
 
 describe('device tool named exports', () => {
   describe('launch_app_device exports', () => {
@@ -39,12 +40,20 @@ describe('device tool named exports', () => {
     });
   });
 
+  describe('build_run_device exports', () => {
+    it('should export schema and handler', () => {
+      expect(buildRunDevice.schema).toBeDefined();
+      expect(typeof buildRunDevice.handler).toBe('function');
+    });
+  });
+
   describe('All exports validation', () => {
     const modules = [
       { mod: launchAppDevice, name: 'launch_app_device' },
       { mod: stopAppDevice, name: 'stop_app_device' },
       { mod: listDevices, name: 'list_devices' },
       { mod: installAppDevice, name: 'install_app_device' },
+      { mod: buildRunDevice, name: 'build_run_device' },
     ];
 
     it('should have callable handlers', () => {

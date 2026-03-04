@@ -12,6 +12,7 @@ import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 
 // Define schema as ZodObject
 const getAppBundleIdSchema = z.object({
@@ -20,17 +21,6 @@ const getAppBundleIdSchema = z.object({
 
 // Use z.infer for type safety
 type GetAppBundleIdParams = z.infer<typeof getAppBundleIdSchema>;
-
-/**
- * Sync wrapper for CommandExecutor to handle synchronous commands
- */
-async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
-  const result = await executor(['/bin/sh', '-c', command], 'Bundle ID Extraction');
-  if (!result.success) {
-    throw new Error(result.error ?? 'Command failed');
-  }
-  return result.output || '';
-}
 
 /**
  * Business logic for extracting bundle ID from app.
@@ -62,21 +52,11 @@ export async function get_app_bundle_idLogic(
     let bundleId;
 
     try {
-      bundleId = await executeSyncCommand(
-        `defaults read "${appPath}/Info" CFBundleIdentifier`,
-        executor,
+      bundleId = await extractBundleIdFromAppPath(appPath, executor);
+    } catch (innerError) {
+      throw new Error(
+        `Could not extract bundle ID from Info.plist: ${innerError instanceof Error ? innerError.message : String(innerError)}`,
       );
-    } catch {
-      try {
-        bundleId = await executeSyncCommand(
-          `/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${appPath}/Info.plist"`,
-          executor,
-        );
-      } catch (innerError) {
-        throw new Error(
-          `Could not extract bundle ID from Info.plist: ${innerError instanceof Error ? innerError.message : String(innerError)}`,
-        );
-      }
     }
 
     log('info', `Extracted app bundle ID: ${bundleId}`);

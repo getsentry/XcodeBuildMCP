@@ -17,6 +17,7 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { resolveAppPathFromBuildSettings } from './build-settings.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -53,80 +54,41 @@ const publicSchemaObject = baseSchemaObject.omit({
   platform: true,
 } as const);
 
+function mapPlatform(platform?: GetDeviceAppPathParams['platform']): XcodePlatform {
+  switch (platform) {
+    case 'watchOS':
+      return XcodePlatform.watchOS;
+    case 'tvOS':
+      return XcodePlatform.tvOS;
+    case 'visionOS':
+      return XcodePlatform.visionOS;
+    case 'iOS':
+    case undefined:
+    default:
+      return XcodePlatform.iOS;
+  }
+}
+
 export async function get_device_app_pathLogic(
   params: GetDeviceAppPathParams,
   executor: CommandExecutor,
 ): Promise<ToolResponse> {
-  const platformMap = {
-    iOS: XcodePlatform.iOS,
-    watchOS: XcodePlatform.watchOS,
-    tvOS: XcodePlatform.tvOS,
-    visionOS: XcodePlatform.visionOS,
-  };
-
-  const platform = platformMap[params.platform ?? 'iOS'];
+  const platform = mapPlatform(params.platform);
   const configuration = params.configuration ?? 'Debug';
 
   log('info', `Getting app path for scheme ${params.scheme} on platform ${platform}`);
 
   try {
-    // Create the command array for xcodebuild with -showBuildSettings option
-    const command = ['xcodebuild', '-showBuildSettings'];
-
-    // Add the project or workspace
-    if (params.projectPath) {
-      command.push('-project', params.projectPath);
-    } else if (params.workspacePath) {
-      command.push('-workspace', params.workspacePath);
-    } else {
-      // This should never happen due to schema validation
-      throw new Error('Either projectPath or workspacePath is required.');
-    }
-
-    // Add the scheme and configuration
-    command.push('-scheme', params.scheme);
-    command.push('-configuration', configuration);
-
-    // Map platform to destination string
-    const destinationMap: Record<string, string> = {
-      [XcodePlatform.iOS]: 'generic/platform=iOS',
-      [XcodePlatform.watchOS]: 'generic/platform=watchOS',
-      [XcodePlatform.tvOS]: 'generic/platform=tvOS',
-      [XcodePlatform.visionOS]: 'generic/platform=visionOS',
-    };
-
-    const destinationString = destinationMap[platform];
-    if (!destinationString) {
-      return createTextResponse(`Unsupported platform: ${platform}`, true);
-    }
-
-    command.push('-destination', destinationString);
-
-    // Execute the command directly
-    const result = await executor(command, 'Get App Path', false);
-
-    if (!result.success) {
-      return createTextResponse(`Failed to get app path: ${result.error}`, true);
-    }
-
-    if (!result.output) {
-      return createTextResponse('Failed to extract build settings output from the result.', true);
-    }
-
-    const buildSettingsOutput = result.output;
-    const builtProductsDirMatch = buildSettingsOutput.match(/^\s*BUILT_PRODUCTS_DIR\s*=\s*(.+)$/m);
-    const fullProductNameMatch = buildSettingsOutput.match(/^\s*FULL_PRODUCT_NAME\s*=\s*(.+)$/m);
-
-    if (!builtProductsDirMatch || !fullProductNameMatch) {
-      return createTextResponse(
-        'Failed to extract app path from build settings. Make sure the app has been built first.',
-        true,
-      );
-    }
-
-    const builtProductsDir = builtProductsDirMatch[1].trim();
-    const fullProductName = fullProductNameMatch[1].trim();
-    const appPath = `${builtProductsDir}/${fullProductName}`;
+    const appPath = await resolveAppPathFromBuildSettings(
+      {
+        projectPath: params.projectPath,
+        workspacePath: params.workspacePath,
+        scheme: params.scheme,
+        configuration,
+        platform,
+      },
+      executor,
+    );
 
     return {
       content: [
@@ -144,6 +106,18 @@ export async function get_device_app_pathLogic(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('error', `Error retrieving app path: ${errorMessage}`);
+
+    if (errorMessage.startsWith('Could not extract app path from build settings.')) {
+      return createTextResponse(
+        'Failed to extract app path from build settings. Make sure the app has been built first.',
+        true,
+      );
+    }
+
+    if (errorMessage.includes('xcodebuild:')) {
+      return createTextResponse(`Failed to get app path: ${errorMessage}`, true);
+    }
+
     return createTextResponse(`Error retrieving app path: ${errorMessage}`, true);
   }
 }

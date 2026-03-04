@@ -649,7 +649,7 @@ export async function start_device_log_capLogic(
     content: [
       {
         type: 'text',
-        text: `✅ Device log capture started successfully\n\nSession ID: ${sessionId}\n\nNote: The app has been launched on the device with console output capture enabled.\n\nInteract with your app on the device, then stop capture to retrieve logs.`,
+        text: `✅ Device log capture started successfully\n\nSession ID: ${sessionId}\n\nNote: The app has been launched on the device with console output capture enabled.\nDo not call launch_app_device during this capture session; relaunching can interrupt captured output.\n\nInteract with your app on the device, then stop capture to retrieve logs.`,
       },
     ],
     nextStepParams: {

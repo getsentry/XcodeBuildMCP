@@ -21,11 +21,37 @@ const listDevicesSchema = z.object({});
 // Use z.infer for type safety
 type ListDevicesParams = z.infer<typeof listDevicesSchema>;
 
+function isAvailableState(state: string): boolean {
+  return state === 'Available' || state === 'Available (WiFi)' || state === 'Connected';
+}
+
+function getPlatformLabel(platformIdentifier?: string): string {
+  const platformId = platformIdentifier?.toLowerCase() ?? '';
+
+  if (platformId.includes('ios') || platformId.includes('iphone')) {
+    return 'iOS';
+  }
+  if (platformId.includes('ipad')) {
+    return 'iPadOS';
+  }
+  if (platformId.includes('watch')) {
+    return 'watchOS';
+  }
+  if (platformId.includes('tv') || platformId.includes('apple tv')) {
+    return 'tvOS';
+  }
+  if (platformId.includes('vision')) {
+    return 'visionOS';
+  }
+
+  return 'Unknown';
+}
+
 /**
  * Business logic for listing connected devices
  */
 export async function list_devicesLogic(
-  params: ListDevicesParams,
+  _params: ListDevicesParams,
   executor: CommandExecutor,
   pathDeps?: { tmpdir?: () => string; join?: (...paths: string[]) => string },
   fsDeps?: {
@@ -216,20 +242,7 @@ export async function list_devicesLogic(
               continue;
             }
 
-            // Determine platform from platformIdentifier
-            let platform = 'Unknown';
-            const platformId = device.deviceProperties?.platformIdentifier?.toLowerCase() ?? '';
-            if (platformId.includes('ios') || platformId.includes('iphone')) {
-              platform = 'iOS';
-            } else if (platformId.includes('ipad')) {
-              platform = 'iPadOS';
-            } else if (platformId.includes('watch')) {
-              platform = 'watchOS';
-            } else if (platformId.includes('tv') || platformId.includes('apple tv')) {
-              platform = 'tvOS';
-            } else if (platformId.includes('vision')) {
-              platform = 'visionOS';
-            }
+            const platform = getPlatformLabel(device.deviceProperties?.platformIdentifier);
 
             // Determine connection state
             const pairingState = device.connectionProperties?.pairingState ?? '';
@@ -328,9 +341,7 @@ export async function list_devicesLogic(
       responseText += 'For simulators, use the list_sims tool instead.\n';
     } else {
       // Group devices by availability status
-      const availableDevices = uniqueDevices.filter(
-        (d) => d.state === 'Available' || d.state === 'Available (WiFi)' || d.state === 'Connected',
-      );
+      const availableDevices = uniqueDevices.filter((d) => isAvailableState(d.state));
       const pairedDevices = uniqueDevices.filter((d) => d.state === 'Paired (not connected)');
       const unpairedDevices = uniqueDevices.filter((d) => d.state === 'Unpaired');
 
@@ -376,9 +387,7 @@ export async function list_devicesLogic(
     }
 
     // Add next steps
-    const availableDevicesExist = uniqueDevices.some(
-      (d) => d.state === 'Available' || d.state === 'Available (WiFi)' || d.state === 'Connected',
-    );
+    const availableDevicesExist = uniqueDevices.some((d) => isAvailableState(d.state));
 
     let nextStepParams: Record<string, Record<string, string | number | boolean>> | undefined;
 
@@ -386,9 +395,12 @@ export async function list_devicesLogic(
       responseText += 'Note: Use the device ID/UDID from above when required by other tools.\n';
       responseText +=
         "Hint: Save a default device with session-set-defaults { deviceId: 'DEVICE_UDID' }.\n";
+      responseText +=
+        'Before running build/run/test/UI automation tools, set the desired device identifier in session defaults.\n';
 
       nextStepParams = {
         build_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
+        build_run_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
         test_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
         get_device_app_path: { scheme: 'SCHEME' },
       };

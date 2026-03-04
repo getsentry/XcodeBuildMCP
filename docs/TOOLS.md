@@ -23,6 +23,7 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 **Purpose**: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro). (16 tools)
 
 - `build_device` - Build for device.
+- `build_run_device` - Build, install, and launch on physical device. Preferred single-step run tool when defaults are set.
 - `clean` - Clean build products.
 - `discover_projs` - Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.
 - `get_app_bundle_id` - Extract bundle id from .app.

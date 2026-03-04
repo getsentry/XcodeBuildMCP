@@ -3,6 +3,7 @@ title: iOS Device Development
 description: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro).
 tools:
   - build_device
+  - build_run_device
   - test_device
   - list_devices
   - install_app_device

@@ -141,6 +141,9 @@ describe('start_device_log_cap plugin', () => {
         mockFileSystemExecutor,
       );
 
+      expect(result.content[0].text).toContain(
+        'Do not call launch_app_device during this capture session',
+      );
       expect(result.content[0].text).toContain('Interact with your app');
       const responseText = String(result.content[0].text);
       const sessionIdMatch = responseText.match(/Session ID: ([a-f0-9-]{36})/);

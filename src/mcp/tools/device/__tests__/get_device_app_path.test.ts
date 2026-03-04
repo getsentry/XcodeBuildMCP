@@ -131,7 +131,7 @@ describe('get_device_app_path plugin', () => {
         ],
         logPrefix: 'Get App Path',
         useShell: false,
-        opts: undefined,
+        opts: { cwd: '/path/to' },
       });
     });
 
@@ -186,7 +186,7 @@ describe('get_device_app_path plugin', () => {
         ],
         logPrefix: 'Get App Path',
         useShell: false,
-        opts: undefined,
+        opts: { cwd: '/path/to' },
       });
     });
 
@@ -240,7 +240,7 @@ describe('get_device_app_path plugin', () => {
         ],
         logPrefix: 'Get App Path',
         useShell: false,
-        opts: undefined,
+        opts: { cwd: '/path/to' },
       });
     });
 
@@ -378,7 +378,7 @@ describe('get_device_app_path plugin', () => {
         ],
         logPrefix: 'Get App Path',
         useShell: false,
-        opts: undefined,
+        opts: { cwd: '/path/to' },
       });
     });
 

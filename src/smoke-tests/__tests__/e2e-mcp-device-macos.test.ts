@@ -1,18 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { promises as fs } from 'node:fs';
 import { createMcpTestHarness, type McpTestHarness } from '../mcp-test-harness.ts';
 import { isErrorResponse, expectContent } from '../test-helpers.ts';
 
 let harness: McpTestHarness;
 
 beforeAll(async () => {
+  await fs.mkdir('/tmp/build/MyApp.app', { recursive: true });
+  await fs.writeFile('/tmp/build/MyApp.app/Info.plist', 'plist');
+
   harness = await createMcpTestHarness({
     commandResponses: {
+      'xcodebuild -showBuildSettings': {
+        success: true,
+        output: 'BUILT_PRODUCTS_DIR = /tmp/build\nFULL_PRODUCT_NAME = MyApp.app\n',
+      },
       xcodebuild: { success: true, output: 'Build Succeeded' },
       devicectl: { success: true, output: '{}' },
       'xctrace list devices': { success: true, output: 'No devices found.' },
       open: { success: true, output: '' },
       kill: { success: true, output: '' },
       pkill: { success: true, output: '' },
+      '/bin/sh': { success: true, output: 'io.sentry.MyApp' },
       'defaults read': { success: true, output: 'io.sentry.MyApp' },
       PlistBuddy: { success: true, output: 'io.sentry.MyApp' },
       xcresulttool: { success: true, output: '{}' },
@@ -45,6 +54,37 @@ describe('MCP Device and macOS Tool Invocation (e2e)', () => {
 
       const commandStrs = harness.capturedCommands.map((c) => c.command.join(' '));
       expect(commandStrs.some((c) => c.includes('xcodebuild') && c.includes('MyApp'))).toBe(true);
+    });
+
+    it('build_run_device captures build, install, and launch commands', async () => {
+      await harness.client.callTool({
+        name: 'session_set_defaults',
+        arguments: {
+          scheme: 'MyApp',
+          projectPath: '/path/to/MyApp.xcodeproj',
+          deviceId: 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE',
+        },
+      });
+
+      harness.resetCapturedCommands();
+      const result = await harness.client.callTool({
+        name: 'build_run_device',
+        arguments: {},
+      });
+
+      expectContent(result);
+
+      const commandStrs = harness.capturedCommands.map((c) => c.command.join(' '));
+      expect(commandStrs.some((c) => c.includes('xcodebuild') && c.includes('build'))).toBe(true);
+      expect(
+        commandStrs.some((c) => c.includes('xcodebuild') && c.includes('-showBuildSettings')),
+      ).toBe(true);
+
+      const hasInstall = commandStrs.some((c) => c.includes('devicectl') && c.includes('install'));
+      const hasLaunch = commandStrs.some((c) => c.includes('devicectl') && c.includes('launch'));
+      if (!hasInstall || !hasLaunch) {
+        throw new Error(`Missing expected device commands. Captured: ${commandStrs.join(' || ')}`);
+      }
     });
 
     it('test_device captures xcodebuild test command', async () => {

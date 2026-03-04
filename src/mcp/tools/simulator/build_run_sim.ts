@@ -497,6 +497,7 @@ export async function build_run_simLogic(
           { simulatorId, bundleId },
           { simulatorId, bundleId, captureConsole: true },
         ],
+        stop_app_sim: { simulatorId, bundleId },
         launch_app_logs_sim: { simulatorId, bundleId },
       },
       isError: false,

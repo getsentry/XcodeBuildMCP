@@ -151,7 +151,8 @@ describe('list_sims tool', () => {
 iOS 17.0:
 - iPhone 15 (test-uuid-123)
 
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).`,
+Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
+Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
           },
         ],
         nextStepParams: {
@@ -211,7 +212,8 @@ Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FR
 iOS 17.0:
 - iPhone 15 (test-uuid-123) [Booted]
 
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).`,
+Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
+Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
           },
         ],
         nextStepParams: {
@@ -277,7 +279,8 @@ iOS 18.6:
 iOS 26.0:
 - iPhone 17 Pro (text-uuid-456)
 
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).`,
+Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
+Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
           },
         ],
         nextStepParams: {
@@ -348,7 +351,8 @@ Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FR
 iOS 17.0:
 - iPhone 15 (test-uuid-456)
 
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).`,
+Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
+Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
           },
         ],
         nextStepParams: {
