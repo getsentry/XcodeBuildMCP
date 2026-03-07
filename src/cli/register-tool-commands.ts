@@ -1,4 +1,5 @@
 import type { Argv } from 'yargs';
+import yargsParser from 'yargs-parser';
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
 import type { OutputStyle } from '../types/common.ts';
 import { DefaultToolInvoker } from '../runtime/tool-invoker.ts';
@@ -34,17 +35,15 @@ function buildXcodeIdeNoCommandsMessage(workflowName: string): string {
 }
 
 function readProfileOverrideFromProcessArgv(): string | undefined {
-  const argv = process.argv.slice(2);
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === '--profile') {
-      return argv[index + 1];
-    }
-    if (token.startsWith('--profile=')) {
-      return token.slice('--profile='.length);
-    }
-  }
-  return undefined;
+  const parsedArgv = yargsParser(process.argv.slice(2), {
+    configuration: {
+      'camel-case-expansion': true,
+    },
+    string: ['profile'],
+  }) as { profile?: string | string[] };
+
+  const profile = parsedArgv.profile;
+  return typeof profile === 'string' ? profile : undefined;
 }
 
 /**

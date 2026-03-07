@@ -3,34 +3,36 @@ import * as z from 'zod';
 import {
   mergeCliSessionDefaults,
   pickSchemaSessionDefaults,
-  resolveActiveCliSessionDefaults,
+  resolveCliSessionDefaults,
 } from '../session-defaults.ts';
 
 describe('CLI session defaults', () => {
   it('uses the active profile without overlaying global defaults', () => {
-    const defaults = resolveActiveCliSessionDefaults({
-      enabledWorkflows: [],
-      customWorkflows: {},
-      debug: false,
-      sentryDisabled: false,
-      experimentalWorkflowDiscovery: false,
-      disableSessionDefaults: true,
-      disableXcodeAutoSync: false,
-      uiDebuggerGuardMode: 'error',
-      incrementalBuildsEnabled: false,
-      dapRequestTimeoutMs: 30_000,
-      dapLogEvents: false,
-      launchJsonWaitMs: 8_000,
-      debuggerBackend: 'dap',
-      sessionDefaults: {
-        workspacePath: 'Global.xcworkspace',
-      },
-      sessionDefaultsProfiles: {
-        ios: {
-          scheme: 'ProfileScheme',
+    const defaults = resolveCliSessionDefaults({
+      runtimeConfig: {
+        enabledWorkflows: [],
+        customWorkflows: {},
+        debug: false,
+        sentryDisabled: false,
+        experimentalWorkflowDiscovery: false,
+        disableSessionDefaults: true,
+        disableXcodeAutoSync: false,
+        uiDebuggerGuardMode: 'error',
+        incrementalBuildsEnabled: false,
+        dapRequestTimeoutMs: 30_000,
+        dapLogEvents: false,
+        launchJsonWaitMs: 8_000,
+        debuggerBackend: 'dap',
+        sessionDefaults: {
+          workspacePath: 'Global.xcworkspace',
         },
+        sessionDefaultsProfiles: {
+          ios: {
+            scheme: 'ProfileScheme',
+          },
+        },
+        activeSessionDefaultsProfile: 'ios',
       },
-      activeSessionDefaultsProfile: 'ios',
     });
 
     expect(defaults).toEqual({ scheme: 'ProfileScheme' });

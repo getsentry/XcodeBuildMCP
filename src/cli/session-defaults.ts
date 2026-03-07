@@ -24,12 +24,6 @@ export function resolveCliSessionDefaults(opts: {
   return { ...(opts.runtimeConfig.sessionDefaults ?? {}) };
 }
 
-export function resolveActiveCliSessionDefaults(
-  runtimeConfig: ResolvedRuntimeConfig,
-): Partial<SessionDefaults> {
-  return resolveCliSessionDefaults({ runtimeConfig });
-}
-
 export function isKnownCliSessionDefaultsProfile(
   runtimeConfig: ResolvedRuntimeConfig,
   profileName: string,
