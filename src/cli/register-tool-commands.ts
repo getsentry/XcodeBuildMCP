@@ -7,9 +7,16 @@ import { convertArgvToToolParams } from '../runtime/naming.ts';
 import { printToolResponse, type OutputFormat } from './output.ts';
 import { groupToolsByWorkflow } from '../runtime/tool-catalog.ts';
 import { getWorkflowMetadataFromManifest } from '../core/manifest/load-manifest.ts';
+import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
+import {
+  getCliSessionDefaultsForTool,
+  isKnownCliSessionDefaultsProfile,
+  mergeCliSessionDefaults,
+} from './session-defaults.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
+  runtimeConfig: ResolvedRuntimeConfig;
   cliExposedWorkflowIds?: string[];
   /** Workflows to register as command groups (even if currently empty) */
   workflowNames?: string[];
@@ -24,6 +31,20 @@ function buildXcodeIdeNoCommandsMessage(workflowName: string): string {
     `If Xcode showed an authorization prompt, make sure you clicked Allow.\n\n` +
     `Then run this command again.`
   );
+}
+
+function readProfileOverrideFromProcessArgv(): string | undefined {
+  const argv = process.argv.slice(2);
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === '--profile') {
+      return argv[index + 1];
+    }
+    if (token.startsWith('--profile=')) {
+      return token.slice('--profile='.length);
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -92,7 +113,15 @@ function registerToolSubcommand(
   opts: RegisterToolCommandsOptions,
   cliExposedWorkflowIds: string[],
 ): void {
-  const yargsOptions = schemaToYargsOptions(tool.cliSchema);
+  const builderProfileOverride = readProfileOverrideFromProcessArgv();
+  const hydratedDefaults = getCliSessionDefaultsForTool({
+    tool,
+    runtimeConfig: opts.runtimeConfig,
+    profileOverride: builderProfileOverride,
+  });
+  const yargsOptions = schemaToYargsOptions(tool.cliSchema, {
+    hydratedDefaults,
+  });
   const unsupportedKeys = getUnsupportedSchemaKeys(tool.cliSchema);
 
   const commandName = tool.cliName;
@@ -110,6 +139,12 @@ function registerToolSubcommand(
         subYargs.option(flagName, config);
         toolArgNames.push(flagName);
       }
+
+      // Add --profile option for per-invocation defaults override
+      subYargs.option('profile', {
+        type: 'string',
+        describe: 'Override the defaults profile for this command only',
+      });
 
       // Add --json option for complex args or full override
       subYargs.option('json', {
@@ -129,6 +164,7 @@ function registerToolSubcommand(
       if (toolArgNames.length > 0) {
         subYargs.group(toolArgNames, 'Tool Arguments:');
       }
+      subYargs.group(['profile'], 'Session Defaults:');
       subYargs.group(['json', 'output'], 'Output Options:');
 
       // Add note about unsupported keys if any
@@ -143,10 +179,20 @@ function registerToolSubcommand(
     async (argv) => {
       // Extract our options
       const jsonArg = argv.json as string | undefined;
+      const profileOverride = argv.profile as string | undefined;
       const outputFormat = (argv.output as OutputFormat) ?? 'text';
       const outputStyle = (argv.style as OutputStyle) ?? 'normal';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
+
+      if (
+        profileOverride &&
+        !isKnownCliSessionDefaultsProfile(opts.runtimeConfig, profileOverride)
+      ) {
+        console.error(`Error: Unknown defaults profile '${profileOverride}'`);
+        process.exitCode = 1;
+        return;
+      }
 
       // Parse JSON args if provided
       let jsonArgs: Record<string, unknown> = {};
@@ -165,6 +211,7 @@ function registerToolSubcommand(
       const internalKeys = new Set([
         'json',
         'output',
+        'profile',
         'style',
         'socket',
         'log-level',
@@ -181,7 +228,15 @@ function registerToolSubcommand(
       const toolParams = convertArgvToToolParams(flagArgs);
 
       // Merge: flag args first, then JSON overrides
-      const args = { ...toolParams, ...jsonArgs };
+      const explicitArgs = { ...toolParams, ...jsonArgs };
+      const args = mergeCliSessionDefaults({
+        defaults: getCliSessionDefaultsForTool({
+          tool,
+          runtimeConfig: opts.runtimeConfig,
+          profileOverride,
+        }),
+        explicitArgs,
+      });
 
       // Invoke the tool
       const response = await invoker.invokeDirect(tool, args, {

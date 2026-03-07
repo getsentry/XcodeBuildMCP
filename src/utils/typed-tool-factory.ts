@@ -16,6 +16,7 @@ import { createErrorResponse } from './responses/index.ts';
 import { consolidateContentForClaudeCode } from './validation.ts';
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
+import { mergeSessionDefaultArgs } from './session-default-args.ts';
 
 function createValidatedHandler<TParams, TContext>(
   schema: z.ZodType<TParams, unknown>,
@@ -164,52 +165,12 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
         }
       }
 
-      // Start with session defaults merged with explicit args (args override session)
       const sessionDefaults = sessionStore.getAll();
-      const merged: Record<string, unknown> = { ...sessionDefaults, ...sanitizedArgs };
-
-      // Deep-merge env: combine session-default env vars with user-provided ones
-      // (user-provided keys take precedence on conflict)
-      if (
-        sessionDefaults.env &&
-        typeof sanitizedArgs.env === 'object' &&
-        sanitizedArgs.env &&
-        !Array.isArray(sanitizedArgs.env)
-      ) {
-        merged.env = { ...sessionDefaults.env, ...(sanitizedArgs.env as Record<string, string>) };
-      }
-
-      // Apply exclusive pair pruning: only when caller provided a concrete (non-null/undefined) value
-      // for any key in the pair. When activated, drop other keys in the pair coming from session defaults.
-      for (const pair of exclusivePairs) {
-        const userProvidedConcrete = pair.some((k) =>
-          Object.prototype.hasOwnProperty.call(sanitizedArgs, k),
-        );
-        if (!userProvidedConcrete) continue;
-
-        for (const k of pair) {
-          if (!Object.prototype.hasOwnProperty.call(sanitizedArgs, k) && k in merged) {
-            delete merged[k];
-          }
-        }
-      }
-
-      // When both values of an exclusive pair come from session defaults (not user args),
-      // prefer the first key in the pair. This ensures simulatorId is preferred over simulatorName.
-      for (const pair of exclusivePairs) {
-        const allFromDefaults = pair.every(
-          (k) => !Object.prototype.hasOwnProperty.call(sanitizedArgs, k),
-        );
-        if (!allFromDefaults) continue;
-
-        const presentKeys = pair.filter((k) => merged[k] != null);
-        if (presentKeys.length > 1) {
-          // Keep first key (preferred), remove others
-          for (let i = 1; i < presentKeys.length; i++) {
-            delete merged[presentKeys[i]];
-          }
-        }
-      }
+      const merged = mergeSessionDefaultArgs({
+        defaults: sessionDefaults,
+        explicitArgs: sanitizedArgs,
+        exclusivePairs,
+      });
 
       // Check requirements first (before expensive simulator resolution)
       for (const req of requirements) {

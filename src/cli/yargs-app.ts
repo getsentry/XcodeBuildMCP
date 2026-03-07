@@ -78,6 +78,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
   registerToolsCommand(app);
   registerToolCommands(app, opts.catalog, {
     workspaceRoot: opts.workspaceRoot,
+    runtimeConfig: opts.runtimeConfig,
     cliExposedWorkflowIds: opts.cliExposedWorkflowIds,
     workflowNames: opts.workflowNames,
   });

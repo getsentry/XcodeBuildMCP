@@ -7,6 +7,14 @@ export interface YargsOptionConfig extends Options {
   type: 'string' | 'number' | 'boolean' | 'array';
 }
 
+export interface ZodToYargsOptionOptions {
+  hasHydratedDefault?: boolean;
+}
+
+export interface SchemaToYargsOptionsOptions {
+  hydratedDefaults?: Record<string, unknown>;
+}
+
 /**
  * Check the Zod type kind using the internal _zod property.
  * This is more reliable than instanceof checks which can fail
@@ -150,10 +158,13 @@ function getLiteralValue(t: z.ZodType): unknown {
  * Convert a Zod type to yargs option configuration.
  * Returns null for types that can't be represented as CLI flags.
  */
-export function zodToYargsOption(t: z.ZodType): YargsOptionConfig | null {
+export function zodToYargsOption(
+  t: z.ZodType,
+  opts: ZodToYargsOptionOptions = {},
+): YargsOptionConfig | null {
   const unwrapped = unwrap(t);
   const description = getDescription(t);
-  const demandOption = !isOptional(t);
+  const demandOption = !isOptional(t) && !opts.hasHydratedDefault;
   const typeName = getZodTypeName(unwrapped);
 
   if (typeName === 'string') {
@@ -213,11 +224,16 @@ export function zodToYargsOption(t: z.ZodType): YargsOptionConfig | null {
  * Convert a tool schema shape to yargs options.
  * Returns a map of flag names (kebab-case) to yargs options.
  */
-export function schemaToYargsOptions(schema: ToolSchemaShape): Map<string, YargsOptionConfig> {
+export function schemaToYargsOptions(
+  schema: ToolSchemaShape,
+  opts: SchemaToYargsOptionsOptions = {},
+): Map<string, YargsOptionConfig> {
   const options = new Map<string, YargsOptionConfig>();
 
   for (const [key, zodType] of Object.entries(schema)) {
-    const opt = zodToYargsOption(zodType);
+    const opt = zodToYargsOption(zodType, {
+      hasHydratedDefault: Object.prototype.hasOwnProperty.call(opts.hydratedDefaults ?? {}, key),
+    });
     if (opt) {
       const flagName = toKebabCase(key);
       options.set(flagName, opt);
