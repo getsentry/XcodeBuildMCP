@@ -103,13 +103,13 @@ else
     cd "$AXE_TEMP_DIR"
 
     # Download and extract the release
-    if [ "$(uname -s)" != "Darwin" ]; then
-        echo "📥 Non-macOS detected; downloading pre-signed legacy archive ($AXE_LEGACY_URL)..."
-        curl -fL -o "axe-release.tar.gz" "$AXE_LEGACY_URL"
-        AXE_ARCHIVE_FLAVOR="legacy-signed"
-    elif curl -fL -o "axe-release.tar.gz" "$AXE_UNIVERSAL_URL"; then
+    if curl -fL -o "axe-release.tar.gz" "$AXE_UNIVERSAL_URL"; then
         AXE_ARCHIVE_FLAVOR="universal"
-        echo "✅ Downloaded AXe universal archive"
+        if [ "$(uname -s)" != "Darwin" ]; then
+            echo "✅ Downloaded AXe universal archive for non-macOS bundling"
+        else
+            echo "✅ Downloaded AXe universal archive"
+        fi
     else
         echo "⚠️  AXe universal archive unavailable, falling back to legacy archive"
         curl -fL -o "axe-release.tar.gz" "$AXE_LEGACY_URL"
