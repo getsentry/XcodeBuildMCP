@@ -153,6 +153,10 @@ async function main(): Promise<void> {
 
 main()
   .then(async () => {
+    if (findTopLevelCommand(process.argv.slice(2)) === 'mcp') {
+      return;
+    }
+
     await flushAndCloseSentry(2000);
   })
   .catch(async (err) => {

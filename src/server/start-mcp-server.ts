@@ -79,14 +79,27 @@ export async function startMcpServer(): Promise<void> {
       enrichSentryContext();
     });
 
+    type ShutdownReason = NodeJS.Signals | 'stdin-end' | 'stdin-close';
+
     let shuttingDown = false;
-    const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+    const shutdown = async (reason: ShutdownReason): Promise<void> => {
       if (shuttingDown) return;
       shuttingDown = true;
 
-      log('info', `Received ${signal}; shutting down MCP server`);
+      if (reason === 'stdin-end') {
+        log('info', 'MCP stdin ended; shutting down MCP server');
+      } else if (reason === 'stdin-close') {
+        log('info', 'MCP stdin closed; shutting down MCP server');
+      } else {
+        log('info', `Received ${reason}; shutting down MCP server`);
+      }
 
       let exitCode = 0;
+
+      if (reason === 'stdin-end' || reason === 'stdin-close') {
+        // Allow span completion/export to settle after the client closes stdin.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
 
       try {
         await shutdownXcodeToolsBridge();
@@ -119,6 +132,14 @@ export async function startMcpServer(): Promise<void> {
 
     process.once('SIGINT', () => {
       void shutdown('SIGINT');
+    });
+
+    process.stdin.once('end', () => {
+      void shutdown('stdin-end');
+    });
+
+    process.stdin.once('close', () => {
+      void shutdown('stdin-close');
     });
 
     log('info', `XcodeBuildMCP server (version ${version}) started successfully`);

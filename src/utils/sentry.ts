@@ -4,10 +4,8 @@
  * This file initializes Sentry when explicitly called to avoid side effects
  * during module import.
  */
-
 import * as Sentry from '@sentry/node';
 import { version } from '../version.ts';
-
 const USER_HOME_PATH_PATTERN = /\/Users\/[^/\s]+/g;
 const XCODE_VERSION_PATTERN = /^Xcode\s+(.+)$/m;
 const XCODE_BUILD_PATTERN = /^Build version\s+(.+)$/m;
@@ -43,11 +41,9 @@ export interface SentryRuntimeContext {
 function redactPathLikeData(value: string): string {
   return value.replace(USER_HOME_PATH_PATTERN, '/Users/<redacted>');
 }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
 function redactUnknown(value: unknown): unknown {
   if (typeof value === 'string') {
     return redactPathLikeData(value);
@@ -153,7 +149,6 @@ let initialized = false;
 let enriched = false;
 let selfTestEmitted = false;
 let pendingRuntimeContext: SentryRuntimeContext | null = null;
-
 function isSentryDisabled(): boolean {
   return (
     process.env.XCODEBUILDMCP_SENTRY_DISABLED === 'true' || process.env.SENTRY_DISABLED === 'true'
@@ -168,7 +163,6 @@ function isSentrySelfTestEnabled(): boolean {
   const raw = process.env[SENTRY_SELF_TEST_ENV_VAR]?.trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes';
 }
-
 function emitSentrySelfTest(mode: SentryRuntimeMode | undefined): void {
   if (!isSentrySelfTestEnabled() || selfTestEmitted) {
     return;
@@ -202,7 +196,6 @@ function boolToTag(value: boolean | undefined): string | undefined {
   }
   return String(value);
 }
-
 function setTagIfDefined(key: string, value: string | undefined): void {
   if (!value) {
     return;
@@ -387,7 +380,6 @@ interface InternalErrorMetric {
 }
 
 type DaemonGaugeMetricName = 'inflight_requests' | 'active_sessions' | 'idle_timeout_ms';
-
 function sanitizeTagValue(value: string): string {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) {
@@ -399,7 +391,6 @@ function sanitizeTagValue(value: string): string {
 function shouldEmitMetrics(): boolean {
   return initialized && !isSentryDisabled() && !isTestEnv();
 }
-
 export function recordToolInvocationMetric(metric: ToolInvocationMetric): void {
   if (!shouldEmitMetrics()) {
     return;
