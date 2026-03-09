@@ -248,6 +248,91 @@ describe('setup command', () => {
     ).rejects.toThrow('Setup prerequisites failed');
   });
 
+  it('outputs MCP config JSON when format is mcp-json', async () => {
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => false,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+
+        return [];
+      },
+      readFile: async () => '',
+      writeFile: async () => {},
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createTestPrompter(),
+      quietOutput: true,
+      outputFormat: 'mcp-json',
+    });
+
+    expect(result.configPath).toBeUndefined();
+    expect(result.mcpConfigJson).toBeDefined();
+
+    const parsed = JSON.parse(result.mcpConfigJson!) as {
+      mcpServers: {
+        XcodeBuildMCP: {
+          command: string;
+          args: string[];
+          env: Record<string, string>;
+        };
+      };
+    };
+
+    const serverConfig = parsed.mcpServers.XcodeBuildMCP;
+    expect(serverConfig.command).toBe('npx');
+    expect(serverConfig.args).toEqual(['-y', 'xcodebuildmcp@latest', 'mcp']);
+    expect(serverConfig.env.XCODEBUILDMCP_ENABLED_WORKFLOWS).toBeDefined();
+    expect(serverConfig.env.XCODEBUILDMCP_WORKSPACE_PATH).toBe(path.join(cwd, 'App.xcworkspace'));
+    expect(serverConfig.env.XCODEBUILDMCP_SCHEME).toBe('App');
+    expect(serverConfig.env.XCODEBUILDMCP_SIMULATOR_ID).toBe('SIM-1');
+    expect(serverConfig.env.XCODEBUILDMCP_SIMULATOR_NAME).toBe('iPhone 15');
+  });
+
   it('fails in non-interactive mode', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });

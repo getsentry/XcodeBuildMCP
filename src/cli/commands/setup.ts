@@ -34,17 +34,21 @@ interface SetupSelection {
   simulatorName: string;
 }
 
+type SetupOutputFormat = 'yaml' | 'mcp-json';
+
 interface SetupDependencies {
   cwd: string;
   fs: FileSystemExecutor;
   executor: CommandExecutor;
   prompter: Prompter;
   quietOutput: boolean;
+  outputFormat: SetupOutputFormat;
 }
 
 export interface SetupRunResult {
-  configPath: string;
+  configPath?: string;
   changedFields: string[];
+  mcpConfigJson?: string;
 }
 
 const WORKFLOW_EXCLUDES = new Set(['session-management', 'workflow-discovery']);
@@ -480,6 +484,44 @@ async function collectSetupSelection(
   };
 }
 
+function selectionToMcpConfigJson(selection: SetupSelection): string {
+  const env: Record<string, string> = {};
+
+  if (selection.enabledWorkflows.length > 0) {
+    env.XCODEBUILDMCP_ENABLED_WORKFLOWS = selection.enabledWorkflows.join(',');
+  }
+
+  if (selection.debug) {
+    env.XCODEBUILDMCP_DEBUG = 'true';
+  }
+
+  if (selection.sentryDisabled) {
+    env.XCODEBUILDMCP_SENTRY_DISABLED = 'true';
+  }
+
+  if (selection.workspacePath) {
+    env.XCODEBUILDMCP_WORKSPACE_PATH = selection.workspacePath;
+  } else if (selection.projectPath) {
+    env.XCODEBUILDMCP_PROJECT_PATH = selection.projectPath;
+  }
+
+  env.XCODEBUILDMCP_SCHEME = selection.scheme;
+  env.XCODEBUILDMCP_SIMULATOR_ID = selection.simulatorId;
+  env.XCODEBUILDMCP_SIMULATOR_NAME = selection.simulatorName;
+
+  const mcpConfig = {
+    mcpServers: {
+      XcodeBuildMCP: {
+        command: 'npx',
+        args: ['-y', 'xcodebuildmcp@latest', 'mcp'],
+        env,
+      },
+    },
+  };
+
+  return JSON.stringify(mcpConfig, null, 2);
+}
+
 export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise<SetupRunResult> {
   const isTTY = isInteractiveTTY();
   if (!isTTY) {
@@ -492,16 +534,28 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
     executor: deps?.executor ?? getDefaultCommandExecutor(),
     prompter: deps?.prompter ?? createPrompter(),
     quietOutput: deps?.quietOutput ?? false,
+    outputFormat: deps?.outputFormat ?? 'yaml',
   };
+
+  const isMcpJson = resolvedDeps.outputFormat === 'mcp-json';
 
   if (!resolvedDeps.quietOutput) {
     clack.intro('XcodeBuildMCP Setup');
-    clack.log.info(
-      'This wizard will configure your project defaults for XcodeBuildMCP.\n' +
-        'You will select a project or workspace, scheme, simulator, and\n' +
-        'which workflows to enable. Settings are saved to\n' +
-        '.xcodebuildmcp/config.yaml in your project directory.',
-    );
+    if (isMcpJson) {
+      clack.log.info(
+        'This wizard will configure your project defaults for XcodeBuildMCP.\n' +
+          'You will select a project or workspace, scheme, simulator, and\n' +
+          'which workflows to enable. A ready-to-paste MCP config JSON\n' +
+          'block will be printed at the end.',
+      );
+    } else {
+      clack.log.info(
+        'This wizard will configure your project defaults for XcodeBuildMCP.\n' +
+          'You will select a project or workspace, scheme, simulator, and\n' +
+          'which workflows to enable. Settings are saved to\n' +
+          '.xcodebuildmcp/config.yaml in your project directory.',
+      );
+    }
   }
 
   await ensureSetupPrerequisites({
@@ -514,6 +568,26 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
   const beforeConfig = beforeResult.found ? beforeResult.config : undefined;
 
   const selection = await collectSetupSelection(beforeConfig, resolvedDeps);
+
+  if (isMcpJson) {
+    const mcpConfigJson = selectionToMcpConfigJson(selection);
+
+    if (!resolvedDeps.quietOutput) {
+      clack.log.info(
+        'Copy the following JSON block into your MCP client config\n' +
+          '(e.g. mcp_config.json for Windsurf, .vscode/mcp.json for VS Code,\n' +
+          'claude_desktop_config.json for Claude Desktop):',
+      );
+      // Print raw JSON to stdout so it can be piped/copied
+      console.log(mcpConfigJson);
+      clack.outro('Setup complete.');
+    }
+
+    return {
+      changedFields: [],
+      mcpConfigJson,
+    };
+  }
 
   const deleteSessionDefaultKeys: Array<'projectPath' | 'workspacePath'> =
     selection.workspacePath != null ? ['projectPath'] : ['workspacePath'];
@@ -570,10 +644,17 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
 export function registerSetupCommand(app: Argv): void {
   app.command(
     'setup',
-    'Interactively create or update .xcodebuildmcp/config.yaml',
-    (yargs) => yargs,
-    async () => {
-      await runSetupWizard();
+    'Interactively configure XcodeBuildMCP project defaults',
+    (yargs) =>
+      yargs.option('format', {
+        type: 'string',
+        choices: ['yaml', 'mcp-json'] as const,
+        default: 'yaml',
+        describe:
+          'Output format: yaml writes .xcodebuildmcp/config.yaml, mcp-json prints a ready-to-paste MCP client config block',
+      }),
+    async (argv) => {
+      await runSetupWizard({ outputFormat: argv.format as SetupOutputFormat });
     },
   );
 }

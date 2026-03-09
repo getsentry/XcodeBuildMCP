@@ -233,6 +233,57 @@ function readEnvConfig(env: NodeJS.ProcessEnv): RuntimeConfigOverrides {
   return config;
 }
 
+function readEnvSessionDefaults(env: NodeJS.ProcessEnv): Partial<SessionDefaults> | undefined {
+  const defaults: Partial<SessionDefaults> = {};
+  let hasAny = false;
+
+  function setString<K extends keyof SessionDefaults>(key: K, value: string | undefined): void {
+    if (value) {
+      (defaults as Record<string, unknown>)[key] = value;
+      hasAny = true;
+    }
+  }
+
+  function setBool<K extends keyof SessionDefaults>(key: K, value: string | undefined): void {
+    const parsed = parseBoolean(value);
+    if (parsed !== undefined) {
+      (defaults as Record<string, unknown>)[key] = parsed;
+      hasAny = true;
+    }
+  }
+
+  setString('workspacePath', env.XCODEBUILDMCP_WORKSPACE_PATH);
+  setString('projectPath', env.XCODEBUILDMCP_PROJECT_PATH);
+  setString('scheme', env.XCODEBUILDMCP_SCHEME);
+  setString('configuration', env.XCODEBUILDMCP_CONFIGURATION);
+  setString('simulatorName', env.XCODEBUILDMCP_SIMULATOR_NAME);
+  setString('simulatorId', env.XCODEBUILDMCP_SIMULATOR_ID);
+  setString('deviceId', env.XCODEBUILDMCP_DEVICE_ID);
+  setString('derivedDataPath', env.XCODEBUILDMCP_DERIVED_DATA_PATH);
+  setString('platform', env.XCODEBUILDMCP_PLATFORM);
+  setString('bundleId', env.XCODEBUILDMCP_BUNDLE_ID);
+  setBool('useLatestOS', env.XCODEBUILDMCP_USE_LATEST_OS);
+  setBool('suppressWarnings', env.XCODEBUILDMCP_SUPPRESS_WARNINGS);
+  setBool('preferXcodebuild', env.XCODEBUILDMCP_PREFER_XCODEBUILD);
+
+  const simulatorPlatform = env.XCODEBUILDMCP_SIMULATOR_PLATFORM;
+  if (simulatorPlatform) {
+    const valid = ['iOS Simulator', 'watchOS Simulator', 'tvOS Simulator', 'visionOS Simulator'];
+    if (valid.includes(simulatorPlatform)) {
+      defaults.simulatorPlatform = simulatorPlatform as SessionDefaults['simulatorPlatform'];
+      hasAny = true;
+    }
+  }
+
+  const arch = env.XCODEBUILDMCP_ARCH;
+  if (arch === 'arm64' || arch === 'x86_64') {
+    defaults.arch = arch;
+    hasAny = true;
+  }
+
+  return hasAny ? defaults : undefined;
+}
+
 function resolveFromLayers<T>(opts: {
   key: keyof RuntimeConfigOverrides;
   overrides?: RuntimeConfigOverrides;
@@ -270,11 +321,13 @@ function resolveFromLayers<T>(opts: {
 function resolveSessionDefaults(opts: {
   overrides?: RuntimeConfigOverrides;
   fileConfig?: ProjectConfig;
+  env?: NodeJS.ProcessEnv;
 }): Partial<SessionDefaults> | undefined {
   const overrideDefaults = opts.overrides?.sessionDefaults;
   const fileDefaults = opts.fileConfig?.sessionDefaults;
-  if (!overrideDefaults && !fileDefaults) return undefined;
-  return { ...(fileDefaults ?? {}), ...(overrideDefaults ?? {}) };
+  const envDefaults = readEnvSessionDefaults(opts.env ?? process.env);
+  if (!overrideDefaults && !fileDefaults && !envDefaults) return undefined;
+  return { ...(envDefaults ?? {}), ...(fileDefaults ?? {}), ...(overrideDefaults ?? {}) };
 }
 
 function resolveSessionDefaultsProfiles(opts: {
@@ -501,6 +554,7 @@ function resolveConfig(opts: {
     sessionDefaults: resolveSessionDefaults({
       overrides: opts.overrides,
       fileConfig: opts.fileConfig,
+      env: opts.env,
     }),
     sessionDefaultsProfiles: resolveSessionDefaultsProfiles({
       overrides: opts.overrides,
