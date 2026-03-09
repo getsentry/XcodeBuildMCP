@@ -5,6 +5,13 @@
 ### Added
 
 - Added `xcodebuildmcp upgrade` command to check for updates and upgrade in place. Supports `--check` (report-only) and `--yes`/`-y` (skip confirmation). Detects install method (Homebrew, npm-global, npx) and queries the appropriate channel source (`brew info`, `npm view`, or GitHub Releases) for the latest version. Non-interactive environments exit 1 when an auto-upgrade is possible but `--yes` was not supplied.
+- Added platform selection step to the `xcodebuildmcp setup` wizard. You now choose which platforms you are developing for (macOS, iOS, tvOS, watchOS, visionOS) before selecting workflows. Based on the selection, the wizard automatically recommends the appropriate workflow set ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
+
+### Changed
+
+- The `setup` wizard no longer prompts for a simulator or device when macOS is the only selected platform — macOS apps run natively and do not require a simulator or physical device ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
+- When a single platform is selected, `xcodebuildmcp setup` now writes `platform` to `sessionDefaults` in `config.yaml` and includes `XCODEBUILDMCP_PLATFORM` in `--format mcp-json` output. For multi-platform projects the platform key is omitted so the agent can choose per-command ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
+- The `setup` wizard remembers previous choices on re-run: existing `config.yaml` values (including the new `platform`) are pre-loaded as defaults for every prompt ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
 
 ## [2.3.2]
 

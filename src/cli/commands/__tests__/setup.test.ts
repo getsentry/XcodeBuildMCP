@@ -108,6 +108,26 @@ function createTestPrompter(): Prompter {
   };
 }
 
+function createPlatformPrompter(platforms: string[]): Prompter {
+  let selectManyCalls = 0;
+  return {
+    selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+      const preferredOption = opts.options.find((option) => option.value != null);
+      return (preferredOption ?? opts.options[0]).value;
+    },
+    selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+      selectManyCalls++;
+      if (selectManyCalls === 1) {
+        return opts.options
+          .filter((option) => platforms.includes(String(option.value)))
+          .map((option) => option.value);
+      }
+      return opts.options.map((option) => option.value);
+    },
+    confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+  };
+}
+
 describe('setup command', () => {
   const originalStdinIsTTY = process.stdin.isTTY;
   const originalStdoutIsTTY = process.stdout.isTTY;
@@ -1053,5 +1073,231 @@ sessionDefaults:
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
 
     await expect(runSetupWizard()).rejects.toThrow('requires an interactive TTY');
+  });
+
+  it('skips simulator and sets platform for macOS-only selection', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async () =>
+      createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['macOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.platform).toBe('macOS');
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
+  it('outputs XCODEBUILDMCP_PLATFORM=macOS and no simulator fields for macOS-only mcp-json', async () => {
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => false,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async () => '',
+      writeFile: async () => {},
+    });
+
+    const executor: CommandExecutor = async () =>
+      createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['macOS']),
+      quietOutput: true,
+      outputFormat: 'mcp-json',
+    });
+
+    expect(result.mcpConfigJson).toBeDefined();
+    const parsed = JSON.parse(result.mcpConfigJson!) as {
+      mcpServers: { XcodeBuildMCP: { env: Record<string, string> } };
+    };
+    const env = parsed.mcpServers.XcodeBuildMCP.env;
+
+    expect(env.XCODEBUILDMCP_PLATFORM).toBe('macOS');
+    expect(env.XCODEBUILDMCP_SIMULATOR_ID).toBeUndefined();
+    expect(env.XCODEBUILDMCP_SIMULATOR_NAME).toBeUndefined();
+  });
+
+  it('outputs XCODEBUILDMCP_PLATFORM=iOS Simulator and simulator fields for iOS-only mcp-json', async () => {
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => false,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async () => '',
+      writeFile: async () => {},
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                { name: 'iPhone 15', udid: 'SIM-1', state: 'Shutdown', isAvailable: true },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['iOS']),
+      quietOutput: true,
+      outputFormat: 'mcp-json',
+    });
+
+    expect(result.mcpConfigJson).toBeDefined();
+    const parsed = JSON.parse(result.mcpConfigJson!) as {
+      mcpServers: { XcodeBuildMCP: { env: Record<string, string> } };
+    };
+    const env = parsed.mcpServers.XcodeBuildMCP.env;
+
+    expect(env.XCODEBUILDMCP_PLATFORM).toBe('iOS Simulator');
+    expect(env.XCODEBUILDMCP_SIMULATOR_ID).toBe('SIM-1');
+    expect(env.XCODEBUILDMCP_SIMULATOR_NAME).toBe('iPhone 15');
+  });
+
+  it('omits XCODEBUILDMCP_PLATFORM for multi-platform mcp-json', async () => {
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => false,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async () => '',
+      writeFile: async () => {},
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                { name: 'iPhone 15', udid: 'SIM-1', state: 'Shutdown', isAvailable: true },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['macOS', 'iOS']),
+      quietOutput: true,
+      outputFormat: 'mcp-json',
+    });
+
+    expect(result.mcpConfigJson).toBeDefined();
+    const parsed = JSON.parse(result.mcpConfigJson!) as {
+      mcpServers: { XcodeBuildMCP: { env: Record<string, string> } };
+    };
+    const env = parsed.mcpServers.XcodeBuildMCP.env;
+
+    expect(env.XCODEBUILDMCP_PLATFORM).toBeUndefined();
+    expect(env.XCODEBUILDMCP_SIMULATOR_ID).toBe('SIM-1');
   });
 });
