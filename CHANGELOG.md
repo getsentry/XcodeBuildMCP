@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added environment variable support for all session defaults (e.g., `XCODEBUILDMCP_WORKSPACE_PATH`, `XCODEBUILDMCP_SCHEME`, `XCODEBUILDMCP_PLATFORM`), enabling full configuration via the MCP client `env` field without requiring a config file ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Added `--format mcp-json` flag to `xcodebuildmcp setup` that outputs a ready-to-paste MCP client config JSON block instead of writing `config.yaml` ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Added copy-pastable MCP config examples for macOS, iOS, multi-platform, tvOS, and watchOS projects to [docs/CONFIGURATION.md](docs/CONFIGURATION.md) ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+
+### Changed
+
+- Environment variables are now documented as the recommended configuration method for MCP client integration, replacing the previous "legacy" designation. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+
 ## [2.2.1]
 
 - Fix AXe bundling issue.

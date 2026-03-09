@@ -262,6 +262,55 @@ describe('config-store', () => {
     expect(getConfig().sessionDefaults?.scheme).toBe('App');
   });
 
+  it('reads session defaults from env vars', async () => {
+    const env = {
+      XCODEBUILDMCP_WORKSPACE_PATH: '/path/to/App.xcworkspace',
+      XCODEBUILDMCP_SCHEME: 'MyApp',
+      XCODEBUILDMCP_PLATFORM: 'macOS',
+      XCODEBUILDMCP_SUPPRESS_WARNINGS: 'true',
+      XCODEBUILDMCP_DERIVED_DATA_PATH: '/tmp/dd',
+      XCODEBUILDMCP_USE_LATEST_OS: 'true',
+      XCODEBUILDMCP_ARCH: 'arm64',
+      XCODEBUILDMCP_SIMULATOR_NAME: 'iPhone 17',
+      XCODEBUILDMCP_BUNDLE_ID: 'com.example.app',
+    };
+
+    await initConfigStore({ cwd, fs: createFs(), env });
+
+    const config = getConfig();
+    expect(config.sessionDefaults?.workspacePath).toBe('/path/to/App.xcworkspace');
+    expect(config.sessionDefaults?.scheme).toBe('MyApp');
+    expect(config.sessionDefaults?.platform).toBe('macOS');
+    expect(config.sessionDefaults?.suppressWarnings).toBe(true);
+    expect(config.sessionDefaults?.derivedDataPath).toBe('/tmp/dd');
+    expect(config.sessionDefaults?.useLatestOS).toBe(true);
+    expect(config.sessionDefaults?.arch).toBe('arm64');
+    expect(config.sessionDefaults?.simulatorName).toBe('iPhone 17');
+    expect(config.sessionDefaults?.bundleId).toBe('com.example.app');
+  });
+
+  it('file config session defaults take precedence over env var session defaults', async () => {
+    const yaml = [
+      'schemaVersion: 1',
+      'sessionDefaults:',
+      '  scheme: "FromFile"',
+      '  workspacePath: "./FromFile.xcworkspace"',
+      '',
+    ].join('\n');
+    const env = {
+      XCODEBUILDMCP_SCHEME: 'FromEnv',
+      XCODEBUILDMCP_WORKSPACE_PATH: '/env/path/App.xcworkspace',
+      XCODEBUILDMCP_PLATFORM: 'iOS',
+    };
+
+    await initConfigStore({ cwd, fs: createFs(yaml), env });
+
+    const config = getConfig();
+    expect(config.sessionDefaults?.scheme).toBe('FromFile');
+    expect(config.sessionDefaults?.workspacePath).toBe('/repo/FromFile.xcworkspace');
+    expect(config.sessionDefaults?.platform).toBe('iOS');
+  });
+
   it('keeps non-session config immutable after init when persisting active profile', async () => {
     let persistedYaml = 'schemaVersion: 1\n';
     const fs = createMockFileSystemExecutor({
