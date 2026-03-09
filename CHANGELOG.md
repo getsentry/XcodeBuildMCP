@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added platform selection step to the `xcodebuildmcp setup` wizard. You now choose which platforms you are developing for (macOS, iOS, tvOS, watchOS, visionOS) before selecting workflows. Based on the selection, the wizard automatically recommends the appropriate workflow set.
+
+### Changed
+
+- The `setup` wizard no longer prompts for a simulator or device when macOS is the only selected platform — macOS apps run natively and do not require a simulator or physical device.
+- When a single platform is selected, `xcodebuildmcp setup` now writes `platform` to `sessionDefaults` in `config.yaml` and includes `XCODEBUILDMCP_PLATFORM` in `--format mcp-json` output. For multi-platform projects the platform key is omitted so the agent can choose per-command.
+- The `setup` wizard remembers previous choices on re-run: existing `config.yaml` values (including the new `platform`) are pre-loaded as defaults for every prompt.
+
 ## [2.3.0]
 
 ### Added
