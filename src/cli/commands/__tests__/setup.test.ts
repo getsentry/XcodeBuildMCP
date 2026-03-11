@@ -679,6 +679,68 @@ sessionDefaults:
     expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
   });
 
+  it('continues setup with no default device when both discovery commands fail', async () => {
+    const { fs, getStoredConfig } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        throw new Error('devicectl unavailable');
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'xctrace') {
+        return createMockCommandResponse({ success: false, output: '', error: 'xctrace failed' });
+      }
+
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const loggingOption = opts.options.find((option) => option.value === ('logging' as T));
+        return loggingOption ? [loggingOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
   it('continues setup with no default simulator when no simulators are available', async () => {
     const { fs, getStoredConfig } = createSetupFs();
 

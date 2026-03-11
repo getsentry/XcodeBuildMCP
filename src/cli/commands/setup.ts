@@ -574,7 +574,7 @@ async function listAvailableDevices(
   );
 
   if (!fallbackResult.success) {
-    throw new Error(`Failed to list devices: ${fallbackResult.error}`);
+    return [];
   }
 
   return parseXctraceDevices(fallbackResult.output);
