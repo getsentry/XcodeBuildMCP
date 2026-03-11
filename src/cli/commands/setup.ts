@@ -1,4 +1,6 @@
 import type { Argv } from 'yargs';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as clack from '@clack/prompts';
 import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../utils/command.ts';
@@ -13,6 +15,7 @@ import {
   persistProjectConfigPatch,
   type ProjectConfig,
 } from '../../utils/project-config.ts';
+import type { SessionDefaults } from '../../utils/session-store.ts';
 import {
   createPrompter,
   isInteractiveTTY,
@@ -30,8 +33,11 @@ interface SetupSelection {
   projectPath?: string;
   workspacePath?: string;
   scheme: string;
-  simulatorId: string;
-  simulatorName: string;
+  deviceId?: string;
+  simulatorId?: string;
+  simulatorName?: string;
+  clearDeviceDefault: boolean;
+  clearSimulatorDefault: boolean;
 }
 
 type SetupOutputFormat = 'yaml' | 'mcp-json';
@@ -52,6 +58,14 @@ export interface SetupRunResult {
 }
 
 const WORKFLOW_EXCLUDES = new Set(['session-management', 'workflow-discovery']);
+const SIMULATOR_DEFAULT_WORKFLOWS = new Set(['debugging', 'logging', 'simulator', 'ui-automation']);
+const DEVICE_DEFAULT_WORKFLOWS = new Set(['device', 'logging']);
+
+interface SetupDevice {
+  name: string;
+  udid: string;
+  platform: string;
+}
 
 function showPromptHelp(helpText: string, quietOutput: boolean): void {
   if (quietOutput) {
@@ -109,6 +123,7 @@ function normalizeExistingDefaults(config?: ProjectConfig): {
   projectPath?: string;
   workspacePath?: string;
   scheme?: string;
+  deviceId?: string;
   simulatorId?: string;
   simulatorName?: string;
 } {
@@ -117,6 +132,7 @@ function normalizeExistingDefaults(config?: ProjectConfig): {
     projectPath: sessionDefaults.projectPath,
     workspacePath: sessionDefaults.workspacePath,
     scheme: sessionDefaults.scheme,
+    deviceId: sessionDefaults.deviceId,
     simulatorId: sessionDefaults.simulatorId,
     simulatorName: sessionDefaults.simulatorName,
   };
@@ -178,6 +194,11 @@ function getChangedFields(
       label: 'sessionDefaults.scheme',
       beforeValue: beforeDefaults.scheme,
       afterValue: afterDefaults.scheme,
+    },
+    {
+      label: 'sessionDefaults.deviceId',
+      beforeValue: beforeDefaults.deviceId,
+      afterValue: afterDefaults.deviceId,
     },
     {
       label: 'sessionDefaults.simulatorId',
@@ -354,7 +375,7 @@ async function selectSimulator(opts: {
   prompter: Prompter;
   isTTY: boolean;
   quietOutput: boolean;
-}): Promise<ListedSimulator> {
+}): Promise<ListedSimulator | null> {
   const simulators = await withSpinner({
     isTTY: opts.isTTY,
     quietOutput: opts.quietOutput,
@@ -378,12 +399,238 @@ async function selectSimulator(opts: {
   );
   return opts.prompter.selectOne({
     message: 'Select a simulator',
-    options: simulators.map((simulator) => ({
-      value: simulator,
-      label: `${simulator.runtime} — ${simulator.name} (${simulator.udid})`,
-      description: simulator.state,
-    })),
-    initialIndex: defaultIndex,
+    options: [
+      {
+        value: null,
+        label: 'No default simulator',
+        description: 'Leave simulator commands unpinned during setup.',
+      },
+      ...simulators.map((simulator) => ({
+        value: simulator,
+        label: `${simulator.runtime} — ${simulator.name} (${simulator.udid})`,
+        description: simulator.state,
+      })),
+    ],
+    initialIndex:
+      (opts.existingSimulatorId ?? opts.existingSimulatorName) != null ? defaultIndex + 1 : 0,
+  });
+}
+
+function requiresSimulatorDefault(enabledWorkflows: string[]): boolean {
+  return enabledWorkflows.some((workflowId) => SIMULATOR_DEFAULT_WORKFLOWS.has(workflowId));
+}
+
+function requiresDeviceDefault(enabledWorkflows: string[]): boolean {
+  return enabledWorkflows.some((workflowId) => DEVICE_DEFAULT_WORKFLOWS.has(workflowId));
+}
+
+function getDevicePlatformLabel(platformIdentifier?: string): string {
+  const platformId = platformIdentifier?.toLowerCase() ?? '';
+
+  if (platformId.includes('ios') || platformId.includes('iphone')) {
+    return 'iOS';
+  }
+  if (platformId.includes('ipad')) {
+    return 'iPadOS';
+  }
+  if (platformId.includes('watch')) {
+    return 'watchOS';
+  }
+  if (platformId.includes('tv') || platformId.includes('apple tv')) {
+    return 'tvOS';
+  }
+  if (platformId.includes('vision')) {
+    return 'visionOS';
+  }
+
+  return 'Unknown';
+}
+
+function parseDeviceListResponse(value: unknown): SetupDevice[] {
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  const result = (value as { result?: unknown }).result;
+  if (!result || typeof result !== 'object') {
+    return [];
+  }
+
+  const devices = (result as { devices?: unknown }).devices;
+  if (!Array.isArray(devices)) {
+    return [];
+  }
+
+  const listed: SetupDevice[] = [];
+  for (const device of devices) {
+    if (!device || typeof device !== 'object') {
+      continue;
+    }
+
+    const record = device as {
+      identifier?: unknown;
+      visibilityClass?: unknown;
+      connectionProperties?: {
+        pairingState?: unknown;
+        tunnelState?: unknown;
+      };
+      deviceProperties?: {
+        name?: unknown;
+        platformIdentifier?: unknown;
+      };
+    };
+
+    if (record.visibilityClass === 'Simulator') {
+      continue;
+    }
+
+    if (
+      typeof record.identifier !== 'string' ||
+      typeof record.deviceProperties?.name !== 'string' ||
+      typeof record.connectionProperties?.pairingState !== 'string'
+    ) {
+      continue;
+    }
+
+    if (record.connectionProperties.pairingState !== 'paired') {
+      continue;
+    }
+
+    const tunnelState = record.connectionProperties.tunnelState;
+    if (
+      tunnelState !== 'connected' &&
+      tunnelState !== undefined &&
+      tunnelState !== 'disconnected'
+    ) {
+      continue;
+    }
+
+    listed.push({
+      name: record.deviceProperties.name,
+      udid: record.identifier,
+      platform:
+        typeof record.deviceProperties.platformIdentifier === 'string'
+          ? getDevicePlatformLabel(record.deviceProperties.platformIdentifier)
+          : 'Unknown',
+    });
+  }
+
+  return listed;
+}
+
+function parseXctraceDevices(output: string): SetupDevice[] {
+  const listed: SetupDevice[] = [];
+  const lines = output.split('\n');
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line.length === 0 || line.includes('Simulator')) {
+      continue;
+    }
+
+    const match = line.match(/^(.+?) \(([0-9A-Fa-f-]{8,})\)(?: .*)?$/);
+    if (!match) {
+      continue;
+    }
+
+    listed.push({
+      name: match[1].trim(),
+      udid: match[2],
+      platform: 'Unknown',
+    });
+  }
+
+  return listed;
+}
+
+async function listAvailableDevices(executor: CommandExecutor): Promise<SetupDevice[]> {
+  const jsonPath = path.join(tmpdir(), `xcodebuildmcp-setup-devices-${Date.now()}.json`);
+
+  try {
+    const result = await executor(
+      ['xcrun', 'devicectl', 'list', 'devices', '--json-output', jsonPath],
+      'List Devices (setup)',
+      false,
+      undefined,
+    );
+
+    if (result.success) {
+      const jsonContent = await fs.readFile(jsonPath, 'utf8');
+      const devices = parseDeviceListResponse(JSON.parse(jsonContent));
+      if (devices.length > 0) {
+        return devices;
+      }
+    }
+  } catch {
+    // Fall back to xctrace below.
+  } finally {
+    await fs.unlink(jsonPath).catch(() => {});
+  }
+
+  const fallbackResult = await executor(
+    ['xcrun', 'xctrace', 'list', 'devices'],
+    'List Devices (setup fallback)',
+    false,
+    undefined,
+  );
+
+  if (!fallbackResult.success) {
+    throw new Error(`Failed to list devices: ${fallbackResult.error}`);
+  }
+
+  return parseXctraceDevices(fallbackResult.output);
+}
+
+function getDefaultDeviceIndex(devices: SetupDevice[], existingDeviceId?: string): number {
+  if (existingDeviceId != null) {
+    const existingIndex = devices.findIndex((device) => device.udid === existingDeviceId);
+    if (existingIndex >= 0) {
+      return existingIndex;
+    }
+  }
+
+  return 0;
+}
+
+async function selectDevice(opts: {
+  existingDeviceId?: string;
+  executor: CommandExecutor;
+  prompter: Prompter;
+  isTTY: boolean;
+  quietOutput: boolean;
+}): Promise<SetupDevice | null> {
+  const devices = await withSpinner({
+    isTTY: opts.isTTY,
+    quietOutput: opts.quietOutput,
+    startMessage: 'Loading devices...',
+    stopMessage: 'Devices loaded.',
+    task: () => listAvailableDevices(opts.executor),
+  });
+
+  if (devices.length === 0) {
+    throw new Error('No available devices were found.');
+  }
+
+  const defaultIndex = getDefaultDeviceIndex(devices, opts.existingDeviceId);
+
+  showPromptHelp(
+    'Select a device to set the default target used by physical-device commands.',
+    opts.quietOutput,
+  );
+  return opts.prompter.selectOne({
+    message: 'Select a device',
+    options: [
+      {
+        value: null,
+        label: 'No default device',
+        description: 'Leave device commands unpinned during setup.',
+      },
+      ...devices.map((device) => ({
+        value: device,
+        label: `${device.platform} — ${device.name} (${device.udid})`,
+      })),
+    ],
+    initialIndex: opts.existingDeviceId != null ? defaultIndex + 1 : 0,
   });
 }
 
@@ -463,14 +710,26 @@ async function collectSetupSelection(
     quietOutput: deps.quietOutput,
   });
 
-  const simulator = await selectSimulator({
-    existingSimulatorId: existing.simulatorId,
-    existingSimulatorName: existing.simulatorName,
-    executor: deps.executor,
-    prompter: deps.prompter,
-    isTTY,
-    quietOutput: deps.quietOutput,
-  });
+  const simulator = requiresSimulatorDefault(enabledWorkflows)
+    ? await selectSimulator({
+        existingSimulatorId: existing.simulatorId,
+        existingSimulatorName: existing.simulatorName,
+        executor: deps.executor,
+        prompter: deps.prompter,
+        isTTY,
+        quietOutput: deps.quietOutput,
+      })
+    : undefined;
+
+  const device = requiresDeviceDefault(enabledWorkflows)
+    ? await selectDevice({
+        existingDeviceId: existing.deviceId,
+        executor: deps.executor,
+        prompter: deps.prompter,
+        isTTY,
+        quietOutput: deps.quietOutput,
+      })
+    : undefined;
 
   return {
     debug,
@@ -479,8 +738,11 @@ async function collectSetupSelection(
     projectPath: projectChoice.kind === 'project' ? projectChoice.absolutePath : undefined,
     workspacePath: projectChoice.kind === 'workspace' ? projectChoice.absolutePath : undefined,
     scheme,
-    simulatorId: simulator.udid,
-    simulatorName: simulator.name,
+    deviceId: device?.udid,
+    simulatorId: simulator?.udid,
+    simulatorName: simulator?.name,
+    clearDeviceDefault: requiresDeviceDefault(enabledWorkflows) && device == null,
+    clearSimulatorDefault: requiresSimulatorDefault(enabledWorkflows) && simulator == null,
   };
 }
 
@@ -506,8 +768,15 @@ function selectionToMcpConfigJson(selection: SetupSelection): string {
   }
 
   env.XCODEBUILDMCP_SCHEME = selection.scheme;
-  env.XCODEBUILDMCP_SIMULATOR_ID = selection.simulatorId;
-  env.XCODEBUILDMCP_SIMULATOR_NAME = selection.simulatorName;
+  if (selection.deviceId) {
+    env.XCODEBUILDMCP_DEVICE_ID = selection.deviceId;
+  }
+  if (selection.simulatorId) {
+    env.XCODEBUILDMCP_SIMULATOR_ID = selection.simulatorId;
+  }
+  if (selection.simulatorName) {
+    env.XCODEBUILDMCP_SIMULATOR_NAME = selection.simulatorName;
+  }
 
   const mcpConfig = {
     mcpServers: {
@@ -544,15 +813,17 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
     if (isMcpJson) {
       clack.log.info(
         'This wizard will configure your project defaults for XcodeBuildMCP.\n' +
-          'You will select a project or workspace, scheme, simulator, and\n' +
-          'which workflows to enable. A ready-to-paste MCP config JSON\n' +
-          'block will be printed at the end.',
+          'You will select a project or workspace, scheme, and any\n' +
+          'simulator/device defaults required by the workflows you enable.\n' +
+          'A bootstrap MCP config JSON block for\n' +
+          'clients with limited workspace support will be printed at the end.',
       );
     } else {
       clack.log.info(
         'This wizard will configure your project defaults for XcodeBuildMCP.\n' +
-          'You will select a project or workspace, scheme, simulator, and\n' +
-          'which workflows to enable. Settings are saved to\n' +
+          'You will select a project or workspace, scheme, and any\n' +
+          'simulator/device defaults required by the workflows you enable.\n' +
+          'Settings are saved to\n' +
           '.xcodebuildmcp/config.yaml in your project directory.',
       );
     }
@@ -576,10 +847,11 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
       clack.log.info(
         'Copy the following JSON block into your MCP client config\n' +
           '(e.g. mcp_config.json for Windsurf, .vscode/mcp.json for VS Code,\n' +
-          'claude_desktop_config.json for Claude Desktop):',
+          'claude_desktop_config.json for Claude Desktop) when you need\n' +
+          'env-based bootstrap defaults:',
       );
       // Print raw JSON to stdout so it can be piped/copied
-      console.log(mcpConfigJson);
+      process.stdout.write(`${mcpConfigJson}\n`);
       clack.outro('Setup complete.');
     }
 
@@ -589,8 +861,14 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
     };
   }
 
-  const deleteSessionDefaultKeys: Array<'projectPath' | 'workspacePath'> =
+  const deleteSessionDefaultKeys: Array<keyof SessionDefaults> =
     selection.workspacePath != null ? ['projectPath'] : ['workspacePath'];
+  if (selection.clearDeviceDefault) {
+    deleteSessionDefaultKeys.push('deviceId');
+  }
+  if (selection.clearSimulatorDefault) {
+    deleteSessionDefaultKeys.push('simulatorId', 'simulatorName');
+  }
 
   const persistedProjectPath =
     selection.projectPath != null
@@ -612,6 +890,7 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
         projectPath: persistedProjectPath,
         workspacePath: persistedWorkspacePath,
         scheme: selection.scheme,
+        deviceId: selection.deviceId,
         simulatorId: selection.simulatorId,
         simulatorName: selection.simulatorName,
       },
@@ -651,7 +930,7 @@ export function registerSetupCommand(app: Argv): void {
         choices: ['yaml', 'mcp-json'] as const,
         default: 'yaml',
         describe:
-          'Output format: yaml writes .xcodebuildmcp/config.yaml, mcp-json prints a ready-to-paste MCP client config block',
+          'Output format: yaml writes .xcodebuildmcp/config.yaml, mcp-json prints an env-based MCP bootstrap config block',
       }),
     async (argv) => {
       await runSetupWizard({ outputFormat: argv.format as SetupOutputFormat });

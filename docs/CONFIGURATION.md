@@ -4,9 +4,9 @@ XcodeBuildMCP reads configuration from environment variables and/or a project co
 
 ## Contents
 
-- [Environment variables](#environment-variables)
 - [Config file](#config-file)
 - [Configuration layering](#configuration-layering)
+- [Environment variables](#environment-variables)
 - [Session defaults](#session-defaults)
 - [Workflow selection](#workflow-selection)
 - [Build settings](#build-settings)
@@ -15,158 +15,6 @@ XcodeBuildMCP reads configuration from environment variables and/or a project co
 - [Templates](#templates)
 - [Telemetry](#telemetry)
 - [Quick reference](#quick-reference)
-
----
-
-## Environment variables
-
-Environment variables are the recommended configuration method for MCP client integration. Set them in the `env` field of your MCP client config (e.g., `mcp_config.json` for Windsurf, `.vscode/mcp.json` for VS Code, `claude_desktop_config.json` for Claude Desktop).
-
-This approach works reliably across all MCP clients regardless of working directory, and avoids the need for filesystem-based config discovery.
-
-### General settings
-
-| Config option | Environment variable |
-|---------------|---------------------|
-| `enabledWorkflows` | `XCODEBUILDMCP_ENABLED_WORKFLOWS` (comma-separated) |
-| `experimentalWorkflowDiscovery` | `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY` |
-| `disableSessionDefaults` | `XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS` |
-| `disableXcodeAutoSync` | `XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC` |
-| `incrementalBuildsEnabled` | `INCREMENTAL_BUILDS_ENABLED` |
-| `debug` | `XCODEBUILDMCP_DEBUG` |
-| `sentryDisabled` | `XCODEBUILDMCP_SENTRY_DISABLED` |
-| `debuggerBackend` | `XCODEBUILDMCP_DEBUGGER_BACKEND` |
-| `dapRequestTimeoutMs` | `XCODEBUILDMCP_DAP_REQUEST_TIMEOUT_MS` |
-| `dapLogEvents` | `XCODEBUILDMCP_DAP_LOG_EVENTS` |
-| `launchJsonWaitMs` | `XBMCP_LAUNCH_JSON_WAIT_MS` |
-| `uiDebuggerGuardMode` | `XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE` |
-| `axePath` | `XCODEBUILDMCP_AXE_PATH` |
-| `iosTemplatePath` | `XCODEBUILDMCP_IOS_TEMPLATE_PATH` |
-| `iosTemplateVersion` | `XCODEBUILD_MCP_IOS_TEMPLATE_VERSION` |
-| `macosTemplatePath` | `XCODEBUILDMCP_MACOS_TEMPLATE_PATH` |
-| `macosTemplateVersion` | `XCODEBUILD_MCP_MACOS_TEMPLATE_VERSION` |
-
-### Session default settings
-
-| Session default | Environment variable |
-|----------------|---------------------|
-| `workspacePath` | `XCODEBUILDMCP_WORKSPACE_PATH` |
-| `projectPath` | `XCODEBUILDMCP_PROJECT_PATH` |
-| `scheme` | `XCODEBUILDMCP_SCHEME` |
-| `configuration` | `XCODEBUILDMCP_CONFIGURATION` |
-| `simulatorName` | `XCODEBUILDMCP_SIMULATOR_NAME` |
-| `simulatorId` | `XCODEBUILDMCP_SIMULATOR_ID` |
-| `simulatorPlatform` | `XCODEBUILDMCP_SIMULATOR_PLATFORM` |
-| `deviceId` | `XCODEBUILDMCP_DEVICE_ID` |
-| `platform` | `XCODEBUILDMCP_PLATFORM` |
-| `useLatestOS` | `XCODEBUILDMCP_USE_LATEST_OS` |
-| `arch` | `XCODEBUILDMCP_ARCH` |
-| `suppressWarnings` | `XCODEBUILDMCP_SUPPRESS_WARNINGS` |
-| `derivedDataPath` | `XCODEBUILDMCP_DERIVED_DATA_PATH` |
-| `preferXcodebuild` | `XCODEBUILDMCP_PREFER_XCODEBUILD` |
-| `bundleId` | `XCODEBUILDMCP_BUNDLE_ID` |
-
-### Example MCP configs
-
-Use one of these as a starting point and fill in your workspace path and scheme.
-
-**macOS app**
-
-```json
-{
-  "mcpServers": {
-    "XcodeBuildMCP": {
-      "command": "npx",
-      "args": ["-y", "xcodebuildmcp@latest", "mcp"],
-      "env": {
-        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "coverage,debugging,doctor,logging,macos,project-discovery,project-scaffolding,swift-package,ui-automation,utilities,xcode-ide",
-        "XCODEBUILDMCP_WORKSPACE_PATH": "/Users/me/MyApp/MyApp.xcworkspace",
-        "XCODEBUILDMCP_SCHEME": "MyApp",
-        "XCODEBUILDMCP_PLATFORM": "macOS"
-      }
-    }
-  }
-}
-```
-
-> `macos` provides build/run/test/stop tools for macOS apps. No simulator workflow needed — macOS apps run natively.
-
----
-
-**iOS app**
-
-```json
-{
-  "mcpServers": {
-    "XcodeBuildMCP": {
-      "command": "npx",
-      "args": ["-y", "xcodebuildmcp@latest", "mcp"],
-      "env": {
-        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "coverage,debugging,doctor,logging,project-discovery,project-scaffolding,simulator,swift-package,ui-automation,utilities,xcode-ide",
-        "XCODEBUILDMCP_WORKSPACE_PATH": "/Users/me/MyApp/MyApp.xcworkspace",
-        "XCODEBUILDMCP_SCHEME": "MyApp",
-        "XCODEBUILDMCP_PLATFORM": "iOS Simulator",
-        "XCODEBUILDMCP_SIMULATOR_NAME": "iPhone 16 Pro"
-      }
-    }
-  }
-}
-```
-
-> `simulator` provides build/run/test/install tools targeting iOS Simulator. Use `XCODEBUILDMCP_SIMULATOR_NAME` or `XCODEBUILDMCP_SIMULATOR_ID` to pin the target device.
-
----
-
-**iOS + macOS (multi-platform or Catalyst)**
-
-```json
-{
-  "mcpServers": {
-    "XcodeBuildMCP": {
-      "command": "npx",
-      "args": ["-y", "xcodebuildmcp@latest", "mcp"],
-      "env": {
-        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "coverage,debugging,doctor,logging,macos,project-discovery,project-scaffolding,simulator,swift-package,ui-automation,utilities,xcode-ide",
-        "XCODEBUILDMCP_WORKSPACE_PATH": "/Users/me/MyApp/MyApp.xcworkspace",
-        "XCODEBUILDMCP_SCHEME": "MyApp"
-      }
-    }
-  }
-}
-```
-
-> Include both `simulator` and `macos` when the project supports multiple platforms. Omit `XCODEBUILDMCP_PLATFORM` to let the agent choose per-command.
-
----
-
-**tvOS or watchOS app**
-
-```json
-{
-  "mcpServers": {
-    "XcodeBuildMCP": {
-      "command": "npx",
-      "args": ["-y", "xcodebuildmcp@latest", "mcp"],
-      "env": {
-        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "debugging,doctor,logging,project-discovery,simulator,swift-package,utilities,xcode-ide",
-        "XCODEBUILDMCP_WORKSPACE_PATH": "/Users/me/MyApp/MyApp.xcworkspace",
-        "XCODEBUILDMCP_SCHEME": "MyApp",
-        "XCODEBUILDMCP_PLATFORM": "tvOS Simulator"
-      }
-    }
-  }
-}
-```
-
-> Replace `tvOS Simulator` with `watchOS Simulator` for watchOS. Coverage and UI automation are not available on these platforms.
-
----
-
-You can also generate a config block interactively:
-
-```bash
-xcodebuildmcp setup --format mcp-json
-```
 
 ---
 
@@ -500,9 +348,89 @@ When multiple configuration sources are present, they are merged with clear prec
 
 This follows the same pattern as tools like `git config` (`--flag` > `--local` > `--global`). Each layer serves a different context:
 
-- **Env vars** are the portable MCP client integration path — they work regardless of working directory and are supported by every MCP client.
-- **Config file** is for repo-scoped, version-controlled settings and interactive CLI usage.
+- **Config file** is the canonical home for structured, repo-scoped, version-controlled settings.
+- **Env vars** are best used to bootstrap flat startup defaults for MCP clients with limited workspace support.
 - **Tool calls** are for agent-driven runtime adjustments.
+
+---
+
+## Environment variables
+
+Environment variables are supported for MCP client integration when a client cannot reliably provide workspace context to the server. Set them in the `env` field of your MCP client config (for example `mcp_config.json` for Windsurf, `.vscode/mcp.json` for VS Code, or `claude_desktop_config.json` for Claude Desktop).
+
+Use env vars for flat bootstrap values such as startup workflow selection, project path, scheme, simulator selector, or other scalar defaults. Keep structured project-owned configuration in `config.yaml`.
+
+### General settings
+
+| Config option | Environment variable |
+|---------------|---------------------|
+| `enabledWorkflows` | `XCODEBUILDMCP_ENABLED_WORKFLOWS` (comma-separated) |
+| `experimentalWorkflowDiscovery` | `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY` |
+| `disableSessionDefaults` | `XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS` |
+| `disableXcodeAutoSync` | `XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC` |
+| `incrementalBuildsEnabled` | `INCREMENTAL_BUILDS_ENABLED` |
+| `debug` | `XCODEBUILDMCP_DEBUG` |
+| `sentryDisabled` | `XCODEBUILDMCP_SENTRY_DISABLED` |
+| `debuggerBackend` | `XCODEBUILDMCP_DEBUGGER_BACKEND` |
+| `dapRequestTimeoutMs` | `XCODEBUILDMCP_DAP_REQUEST_TIMEOUT_MS` |
+| `dapLogEvents` | `XCODEBUILDMCP_DAP_LOG_EVENTS` |
+| `launchJsonWaitMs` | `XBMCP_LAUNCH_JSON_WAIT_MS` |
+| `uiDebuggerGuardMode` | `XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE` |
+| `axePath` | `XCODEBUILDMCP_AXE_PATH` |
+| `iosTemplatePath` | `XCODEBUILDMCP_IOS_TEMPLATE_PATH` |
+| `iosTemplateVersion` | `XCODEBUILD_MCP_IOS_TEMPLATE_VERSION` |
+| `macosTemplatePath` | `XCODEBUILDMCP_MACOS_TEMPLATE_PATH` |
+| `macosTemplateVersion` | `XCODEBUILD_MCP_MACOS_TEMPLATE_VERSION` |
+
+### Session default bootstrap values
+
+| Session default | Environment variable |
+|----------------|---------------------|
+| `workspacePath` | `XCODEBUILDMCP_WORKSPACE_PATH` |
+| `projectPath` | `XCODEBUILDMCP_PROJECT_PATH` |
+| `scheme` | `XCODEBUILDMCP_SCHEME` |
+| `configuration` | `XCODEBUILDMCP_CONFIGURATION` |
+| `simulatorName` | `XCODEBUILDMCP_SIMULATOR_NAME` |
+| `simulatorId` | `XCODEBUILDMCP_SIMULATOR_ID` |
+| `simulatorPlatform` | `XCODEBUILDMCP_SIMULATOR_PLATFORM` |
+| `deviceId` | `XCODEBUILDMCP_DEVICE_ID` |
+| `platform` | `XCODEBUILDMCP_PLATFORM` |
+| `useLatestOS` | `XCODEBUILDMCP_USE_LATEST_OS` |
+| `arch` | `XCODEBUILDMCP_ARCH` |
+| `suppressWarnings` | `XCODEBUILDMCP_SUPPRESS_WARNINGS` |
+| `derivedDataPath` | `XCODEBUILDMCP_DERIVED_DATA_PATH` |
+| `preferXcodebuild` | `XCODEBUILDMCP_PREFER_XCODEBUILD` |
+| `bundleId` | `XCODEBUILDMCP_BUNDLE_ID` |
+
+### Example MCP config
+
+Use this when your MCP client needs env-based bootstrap defaults:
+
+```json
+{
+  "mcpServers": {
+    "XcodeBuildMCP": {
+      "command": "npx",
+      "args": ["-y", "xcodebuildmcp@latest", "mcp"],
+      "env": {
+        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "simulator,debugging,logging",
+        "XCODEBUILDMCP_WORKSPACE_PATH": "/Users/me/MyApp/MyApp.xcworkspace",
+        "XCODEBUILDMCP_SCHEME": "MyApp",
+        "XCODEBUILDMCP_PLATFORM": "iOS Simulator",
+        "XCODEBUILDMCP_SIMULATOR_NAME": "iPhone 16 Pro"
+      }
+    }
+  }
+}
+```
+
+You can also export a bootstrap block interactively:
+
+```bash
+xcodebuildmcp setup --format mcp-json
+```
+
+That export is intended for MCP client bootstrap. It does not replace `config.yaml` as the canonical project configuration.
 
 ---
 

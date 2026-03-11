@@ -4,13 +4,13 @@
 
 ### Added
 
-- Added environment variable support for all session defaults (e.g., `XCODEBUILDMCP_WORKSPACE_PATH`, `XCODEBUILDMCP_SCHEME`, `XCODEBUILDMCP_PLATFORM`), enabling full configuration via the MCP client `env` field without requiring a config file ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
-- Added `--format mcp-json` flag to `xcodebuildmcp setup` that outputs a ready-to-paste MCP client config JSON block instead of writing `config.yaml` ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
-- Added copy-pastable MCP config examples for macOS, iOS, multi-platform, tvOS, and watchOS projects to [docs/CONFIGURATION.md](docs/CONFIGURATION.md) ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Added environment variable support for flat session default bootstrap values (for example `XCODEBUILDMCP_WORKSPACE_PATH`, `XCODEBUILDMCP_SCHEME`, and `XCODEBUILDMCP_PLATFORM`) so constrained MCP clients can supply startup defaults without changing project config files ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Added `--format mcp-json` flag to `xcodebuildmcp setup` that exports an env-based MCP bootstrap config block instead of writing `config.yaml` ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Added MCP bootstrap config examples to [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for clients that need env-based startup defaults ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
 
 ### Changed
 
-- Environment variables are now documented as the recommended configuration method for MCP client integration, replacing the previous "legacy" designation. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
+- Clarified configuration layering: `session_set_defaults` overrides `config.yaml`, which overrides env-based bootstrap values. See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) ([#268](https://github.com/getsentry/XcodeBuildMCP/pull/268) by [@detailobsessed](https://github.com/detailobsessed)).
 
 ## [2.2.1]
 
@@ -406,5 +406,4 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-
 

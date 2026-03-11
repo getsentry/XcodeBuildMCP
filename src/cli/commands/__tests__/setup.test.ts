@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -12,9 +13,36 @@ import { runSetupWizard } from '../setup.ts';
 const cwd = '/repo';
 const configPath = path.join(cwd, '.xcodebuildmcp', 'config.yaml');
 
+async function writeMockDeviceList(jsonPath: string): Promise<void> {
+  await fs.writeFile(
+    jsonPath,
+    JSON.stringify({
+      result: {
+        devices: [
+          {
+            identifier: 'DEVICE-1',
+            visibilityClass: 'Default',
+            connectionProperties: {
+              pairingState: 'paired',
+              tunnelState: 'connected',
+            },
+            deviceProperties: {
+              name: 'Cam iPhone',
+              platformIdentifier: 'com.apple.platform.iphoneos',
+            },
+          },
+        ],
+      },
+    }),
+  );
+}
+
 function createTestPrompter(): Prompter {
   return {
-    selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+    selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+      const preferredOption = opts.options.find((option) => option.value != null);
+      return (preferredOption ?? opts.options[0]).value;
+    },
     selectMany: async <T>(opts: { options: Array<{ value: T }> }) =>
       opts.options.map((option) => option.value),
     confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
@@ -76,6 +104,14 @@ describe('setup command', () => {
     });
 
     const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        await writeMockDeviceList(command[5]);
+        return createMockCommandResponse({
+          success: true,
+          output: '',
+        });
+      }
+
       if (command.includes('--json')) {
         return createMockCommandResponse({
           success: true,
@@ -129,6 +165,7 @@ describe('setup command', () => {
     expect(parsed.sentryDisabled).toBe(false);
     expect(parsed.sessionDefaults?.workspacePath).toBe('App.xcworkspace');
     expect(parsed.sessionDefaults?.scheme).toBe('App');
+    expect(parsed.sessionDefaults?.deviceId).toBe('DEVICE-1');
     expect(parsed.sessionDefaults?.simulatorId).toBe('SIM-1');
   });
 
@@ -167,6 +204,14 @@ describe('setup command', () => {
     });
 
     const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        await writeMockDeviceList(command[5]);
+        return createMockCommandResponse({
+          success: true,
+          output: '',
+        });
+      }
+
       if (command.includes('--json')) {
         return createMockCommandResponse({
           success: true,
@@ -199,7 +244,10 @@ describe('setup command', () => {
     };
 
     const prompter: Prompter = {
-      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const preferredOption = opts.options.find((option) => option.value != null);
+        return (preferredOption ?? opts.options[0]).value;
+      },
       selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
         offeredWorkflowIds = opts.options.map((option) => String(option.value));
         return opts.options.map((option) => option.value);
@@ -270,6 +318,14 @@ describe('setup command', () => {
     });
 
     const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        await writeMockDeviceList(command[5]);
+        return createMockCommandResponse({
+          success: true,
+          output: '',
+        });
+      }
+
       if (command.includes('--json')) {
         return createMockCommandResponse({
           success: true,
@@ -329,8 +385,278 @@ describe('setup command', () => {
     expect(serverConfig.env.XCODEBUILDMCP_ENABLED_WORKFLOWS).toBeDefined();
     expect(serverConfig.env.XCODEBUILDMCP_WORKSPACE_PATH).toBe(path.join(cwd, 'App.xcworkspace'));
     expect(serverConfig.env.XCODEBUILDMCP_SCHEME).toBe('App');
+    expect(serverConfig.env.XCODEBUILDMCP_DEVICE_ID).toBe('DEVICE-1');
     expect(serverConfig.env.XCODEBUILDMCP_SIMULATOR_ID).toBe('SIM-1');
     expect(serverConfig.env.XCODEBUILDMCP_SIMULATOR_NAME).toBe('iPhone 15');
+  });
+
+  it('does not require simulator or device defaults when selected workflows do not depend on them', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected read path: ${targetPath}`);
+        }
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected write path: ${targetPath}`);
+        }
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command.includes('simctl')) {
+        throw new Error('simulator lookup should not run for workflows without simulator defaults');
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        throw new Error('device lookup should not run for workflows without device defaults');
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const preferredOption = opts.options.find((option) => option.value != null);
+        return (preferredOption ?? opts.options[0]).value;
+      },
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const macosOption = opts.options.find((option) => option.value === ('macos' as T));
+        return macosOption ? [macosOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    expect(result.configPath).toBe(configPath);
+
+    const parsed = parseYaml(storedConfig) as {
+      enabledWorkflows?: string[];
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.enabledWorkflows).toEqual(['macos']);
+    expect(parsed.sessionDefaults?.workspacePath).toBe('App.xcworkspace');
+    expect(parsed.sessionDefaults?.scheme).toBe('App');
+    expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
+  it('collects a device default without requiring simulator selection when only device-dependent workflows are enabled', async () => {
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => false,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+
+        return [];
+      },
+      readFile: async () => '',
+      writeFile: async () => {},
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command.includes('simctl')) {
+        throw new Error('simulator lookup should not run for device-only workflows');
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        await writeMockDeviceList(command[5]);
+        return createMockCommandResponse({
+          success: true,
+          output: '',
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const preferredOption = opts.options.find((option) => option.value != null);
+        return (preferredOption ?? opts.options[0]).value;
+      },
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const deviceOption = opts.options.find((option) => option.value === ('device' as T));
+        return deviceOption ? [deviceOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    const result = await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+      outputFormat: 'mcp-json',
+    });
+
+    const parsed = JSON.parse(result.mcpConfigJson!) as {
+      mcpServers: {
+        XcodeBuildMCP: {
+          env: Record<string, string>;
+        };
+      };
+    };
+
+    const env = parsed.mcpServers.XcodeBuildMCP.env;
+    expect(env.XCODEBUILDMCP_ENABLED_WORKFLOWS).toBe('device');
+    expect(env.XCODEBUILDMCP_WORKSPACE_PATH).toBe(path.join(cwd, 'App.xcworkspace'));
+    expect(env.XCODEBUILDMCP_SCHEME).toBe('App');
+    expect(env.XCODEBUILDMCP_DEVICE_ID).toBe('DEVICE-1');
+    expect(env.XCODEBUILDMCP_SIMULATOR_ID).toBeUndefined();
+    expect(env.XCODEBUILDMCP_SIMULATOR_NAME).toBeUndefined();
+  });
+
+  it('allows clearing an existing simulator default when simulator workflows are enabled', async () => {
+    let storedConfig = `schemaVersion: 1
+enabledWorkflows:
+  - simulator
+sessionDefaults:
+  workspacePath: App.xcworkspace
+  scheme: App
+  simulatorId: SIM-1
+  simulatorName: iPhone 15
+`;
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected read path: ${targetPath}`);
+        }
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) {
+          throw new Error(`Unexpected write path: ${targetPath}`);
+        }
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    let selectCallCount = 0;
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => {
+        selectCallCount += 1;
+        if (selectCallCount === 3) {
+          return opts.options[0].value;
+        }
+        const preferredOption = opts.options.find((option) => option.value != null);
+        return (preferredOption ?? opts.options[0]).value;
+      },
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const simulatorOption = opts.options.find((option) => option.value === ('simulator' as T));
+        return simulatorOption
+          ? [simulatorOption.value]
+          : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
   });
 
   it('fails in non-interactive mode', async () => {
