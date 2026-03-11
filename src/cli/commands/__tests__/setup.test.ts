@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -13,28 +12,88 @@ import { runSetupWizard } from '../setup.ts';
 const cwd = '/repo';
 const configPath = path.join(cwd, '.xcodebuildmcp', 'config.yaml');
 
-async function writeMockDeviceList(jsonPath: string): Promise<void> {
-  await fs.writeFile(
-    jsonPath,
-    JSON.stringify({
-      result: {
-        devices: [
-          {
-            identifier: 'DEVICE-1',
-            visibilityClass: 'Default',
-            connectionProperties: {
-              pairingState: 'paired',
-              tunnelState: 'connected',
-            },
-            deviceProperties: {
-              name: 'Cam iPhone',
-              platformIdentifier: 'com.apple.platform.iphoneos',
-            },
+function mockDeviceListJson(): string {
+  return JSON.stringify({
+    result: {
+      devices: [
+        {
+          identifier: 'DEVICE-1',
+          visibilityClass: 'Default',
+          connectionProperties: {
+            pairingState: 'paired',
+            tunnelState: 'connected',
           },
-        ],
-      },
-    }),
-  );
+          deviceProperties: {
+            name: 'Cam iPhone',
+            platformIdentifier: 'com.apple.platform.iphoneos',
+          },
+        },
+      ],
+    },
+  });
+}
+
+function createSetupFs(opts?: {
+  storedConfig?: string;
+  projectEntries?: Array<{
+    name: string;
+    isDirectory: () => boolean;
+    isSymbolicLink: () => boolean;
+  }>;
+}) {
+  let storedConfig = opts?.storedConfig ?? '';
+  const tempFiles = new Map<string, string>();
+
+  const fs = createMockFileSystemExecutor({
+    existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+    stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+    readdir: async (targetPath) => {
+      if (targetPath === cwd) {
+        return (
+          opts?.projectEntries ?? [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ]
+        );
+      }
+
+      return [];
+    },
+    readFile: async (targetPath) => {
+      if (targetPath === configPath) {
+        return storedConfig;
+      }
+
+      const tempContent = tempFiles.get(targetPath);
+      if (tempContent != null) {
+        return tempContent;
+      }
+
+      throw new Error(`Unexpected read path: ${targetPath}`);
+    },
+    writeFile: async (targetPath, content) => {
+      if (targetPath === configPath) {
+        storedConfig = content;
+        return;
+      }
+
+      tempFiles.set(targetPath, content);
+    },
+    rm: async (targetPath) => {
+      tempFiles.delete(targetPath);
+    },
+  });
+
+  return {
+    fs,
+    getStoredConfig: () => storedConfig,
+    setTempFile: (targetPath: string, content: string) => {
+      tempFiles.set(targetPath, content);
+    },
+  };
 }
 
 function createTestPrompter(): Prompter {
@@ -71,41 +130,11 @@ describe('setup command', () => {
   });
 
   it('exports a setup wizard that writes config selections', async () => {
-    let storedConfig = '';
-
-    const fs = createMockFileSystemExecutor({
-      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async (targetPath) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected read path: ${targetPath}`);
-        }
-        return storedConfig;
-      },
-      writeFile: async (targetPath, content) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected write path: ${targetPath}`);
-        }
-        storedConfig = content;
-      },
-    });
+    const { fs, getStoredConfig, setTempFile } = createSetupFs();
 
     const executor: CommandExecutor = async (command) => {
       if (command[0] === 'xcrun' && command[1] === 'devicectl') {
-        await writeMockDeviceList(command[5]);
+        setTempFile(command[5], mockDeviceListJson());
         return createMockCommandResponse({
           success: true,
           output: '',
@@ -152,7 +181,7 @@ describe('setup command', () => {
     });
     expect(result.configPath).toBe(configPath);
 
-    const parsed = parseYaml(storedConfig) as {
+    const parsed = parseYaml(getStoredConfig()) as {
       debug?: boolean;
       sentryDisabled?: boolean;
       enabledWorkflows?: string[];
@@ -170,42 +199,14 @@ describe('setup command', () => {
   });
 
   it('shows debug-gated workflows when existing config enables debug', async () => {
-    let storedConfig = 'schemaVersion: 1\ndebug: true\n';
-    let offeredWorkflowIds: string[] = [];
-
-    const fs = createMockFileSystemExecutor({
-      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async (targetPath) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected read path: ${targetPath}`);
-        }
-        return storedConfig;
-      },
-      writeFile: async (targetPath, content) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected write path: ${targetPath}`);
-        }
-        storedConfig = content;
-      },
+    const { fs, getStoredConfig, setTempFile } = createSetupFs({
+      storedConfig: 'schemaVersion: 1\ndebug: true\n',
     });
+    let offeredWorkflowIds: string[] = [];
 
     const executor: CommandExecutor = async (command) => {
       if (command[0] === 'xcrun' && command[1] === 'devicectl') {
-        await writeMockDeviceList(command[5]);
+        setTempFile(command[5], mockDeviceListJson());
         return createMockCommandResponse({
           success: true,
           output: '',
@@ -263,7 +264,7 @@ describe('setup command', () => {
       quietOutput: true,
     });
 
-    const parsed = parseYaml(storedConfig) as {
+    const parsed = parseYaml(getStoredConfig()) as {
       debug?: boolean;
       enabledWorkflows?: string[];
     };
@@ -297,29 +298,11 @@ describe('setup command', () => {
   });
 
   it('outputs MCP config JSON when format is mcp-json', async () => {
-    const fs = createMockFileSystemExecutor({
-      existsSync: () => false,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async () => '',
-      writeFile: async () => {},
-    });
+    const { fs, setTempFile } = createSetupFs();
 
     const executor: CommandExecutor = async (command) => {
       if (command[0] === 'xcrun' && command[1] === 'devicectl') {
-        await writeMockDeviceList(command[5]);
+        setTempFile(command[5], mockDeviceListJson());
         return createMockCommandResponse({
           success: true,
           output: '',
@@ -391,37 +374,7 @@ describe('setup command', () => {
   });
 
   it('does not require simulator or device defaults when selected workflows do not depend on them', async () => {
-    let storedConfig = '';
-
-    const fs = createMockFileSystemExecutor({
-      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async (targetPath) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected read path: ${targetPath}`);
-        }
-        return storedConfig;
-      },
-      writeFile: async (targetPath, content) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected write path: ${targetPath}`);
-        }
-        storedConfig = content;
-      },
-    });
+    const { fs, getStoredConfig } = createSetupFs();
 
     const executor: CommandExecutor = async (command) => {
       if (command[0] === 'xcrun' && command.includes('simctl')) {
@@ -460,7 +413,7 @@ describe('setup command', () => {
 
     expect(result.configPath).toBe(configPath);
 
-    const parsed = parseYaml(storedConfig) as {
+    const parsed = parseYaml(getStoredConfig()) as {
       enabledWorkflows?: string[];
       sessionDefaults?: Record<string, unknown>;
     };
@@ -474,25 +427,7 @@ describe('setup command', () => {
   });
 
   it('collects a device default without requiring simulator selection when only device-dependent workflows are enabled', async () => {
-    const fs = createMockFileSystemExecutor({
-      existsSync: () => false,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async () => '',
-      writeFile: async () => {},
-    });
+    const { fs, setTempFile } = createSetupFs();
 
     const executor: CommandExecutor = async (command) => {
       if (command[0] === 'xcrun' && command.includes('simctl')) {
@@ -500,7 +435,7 @@ describe('setup command', () => {
       }
 
       if (command[0] === 'xcrun' && command[1] === 'devicectl') {
-        await writeMockDeviceList(command[5]);
+        setTempFile(command[5], mockDeviceListJson());
         return createMockCommandResponse({
           success: true,
           output: '',
@@ -552,7 +487,8 @@ describe('setup command', () => {
   });
 
   it('allows clearing an existing simulator default when simulator workflows are enabled', async () => {
-    let storedConfig = `schemaVersion: 1
+    const { fs, getStoredConfig } = createSetupFs({
+      storedConfig: `schemaVersion: 1
 enabledWorkflows:
   - simulator
 sessionDefaults:
@@ -560,36 +496,7 @@ sessionDefaults:
   scheme: App
   simulatorId: SIM-1
   simulatorName: iPhone 15
-`;
-
-    const fs = createMockFileSystemExecutor({
-      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
-      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-      readdir: async (targetPath) => {
-        if (targetPath === cwd) {
-          return [
-            {
-              name: 'App.xcworkspace',
-              isDirectory: () => true,
-              isSymbolicLink: () => false,
-            },
-          ];
-        }
-
-        return [];
-      },
-      readFile: async (targetPath) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected read path: ${targetPath}`);
-        }
-        return storedConfig;
-      },
-      writeFile: async (targetPath, content) => {
-        if (targetPath !== configPath) {
-          throw new Error(`Unexpected write path: ${targetPath}`);
-        }
-        storedConfig = content;
-      },
+`,
     });
 
     const executor: CommandExecutor = async (command) => {
@@ -651,7 +558,168 @@ sessionDefaults:
       quietOutput: true,
     });
 
-    const parsed = parseYaml(storedConfig) as {
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
+  it('continues setup with no default device when no devices are available', async () => {
+    const { fs, getStoredConfig } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'xctrace') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const loggingOption = opts.options.find((option) => option.value === ('logging' as T));
+        return loggingOption ? [loggingOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
+  it('continues setup with no default device when an existing device default no longer exists', async () => {
+    const { fs, getStoredConfig } = createSetupFs({
+      storedConfig: `schemaVersion: 1
+enabledWorkflows:
+  - device
+sessionDefaults:
+  workspacePath: App.xcworkspace
+  scheme: App
+  deviceId: DEVICE-OLD
+`,
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'xctrace') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const deviceOption = opts.options.find((option) => option.value === ('device' as T));
+        return deviceOption ? [deviceOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+  });
+
+  it('continues setup with no default simulator when no simulators are available', async () => {
+    const { fs, getStoredConfig } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        throw new Error('device lookup should not run for simulator-only workflows');
+      }
+
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({ devices: {} }),
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const simulatorOption = opts.options.find((option) => option.value === ('simulator' as T));
+        return simulatorOption
+          ? [simulatorOption.value]
+          : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
       sessionDefaults?: Record<string, unknown>;
     };
 

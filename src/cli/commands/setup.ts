@@ -1,6 +1,4 @@
 import type { Argv } from 'yargs';
-import { promises as fs } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as clack from '@clack/prompts';
 import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../utils/command.ts';
@@ -383,15 +381,11 @@ async function selectSimulator(opts: {
     stopMessage: 'Simulators loaded.',
     task: () => listSimulators(opts.executor),
   });
-  if (simulators.length === 0) {
-    throw new Error('No available simulators were found.');
-  }
 
-  const defaultIndex = getDefaultSimulatorIndex(
-    simulators,
-    opts.existingSimulatorId,
-    opts.existingSimulatorName,
-  );
+  const defaultIndex =
+    simulators.length > 0
+      ? getDefaultSimulatorIndex(simulators, opts.existingSimulatorId, opts.existingSimulatorName)
+      : 0;
 
   showPromptHelp(
     'Select a simulator to set the default device target used by simulator commands.',
@@ -412,7 +406,9 @@ async function selectSimulator(opts: {
       })),
     ],
     initialIndex:
-      (opts.existingSimulatorId ?? opts.existingSimulatorName) != null ? defaultIndex + 1 : 0,
+      simulators.length > 0 && (opts.existingSimulatorId ?? opts.existingSimulatorName) != null
+        ? defaultIndex + 1
+        : 0,
   });
 }
 
@@ -543,8 +539,11 @@ function parseXctraceDevices(output: string): SetupDevice[] {
   return listed;
 }
 
-async function listAvailableDevices(executor: CommandExecutor): Promise<SetupDevice[]> {
-  const jsonPath = path.join(tmpdir(), `xcodebuildmcp-setup-devices-${Date.now()}.json`);
+async function listAvailableDevices(
+  fileSystem: FileSystemExecutor,
+  executor: CommandExecutor,
+): Promise<SetupDevice[]> {
+  const jsonPath = path.join(fileSystem.tmpdir(), `xcodebuildmcp-setup-devices-${Date.now()}.json`);
 
   try {
     const result = await executor(
@@ -555,7 +554,7 @@ async function listAvailableDevices(executor: CommandExecutor): Promise<SetupDev
     );
 
     if (result.success) {
-      const jsonContent = await fs.readFile(jsonPath, 'utf8');
+      const jsonContent = await fileSystem.readFile(jsonPath, 'utf8');
       const devices = parseDeviceListResponse(JSON.parse(jsonContent));
       if (devices.length > 0) {
         return devices;
@@ -564,7 +563,7 @@ async function listAvailableDevices(executor: CommandExecutor): Promise<SetupDev
   } catch {
     // Fall back to xctrace below.
   } finally {
-    await fs.unlink(jsonPath).catch(() => {});
+    await fileSystem.rm(jsonPath, { force: true }).catch(() => {});
   }
 
   const fallbackResult = await executor(
@@ -594,6 +593,7 @@ function getDefaultDeviceIndex(devices: SetupDevice[], existingDeviceId?: string
 
 async function selectDevice(opts: {
   existingDeviceId?: string;
+  fs: FileSystemExecutor;
   executor: CommandExecutor;
   prompter: Prompter;
   isTTY: boolean;
@@ -604,14 +604,11 @@ async function selectDevice(opts: {
     quietOutput: opts.quietOutput,
     startMessage: 'Loading devices...',
     stopMessage: 'Devices loaded.',
-    task: () => listAvailableDevices(opts.executor),
+    task: () => listAvailableDevices(opts.fs, opts.executor),
   });
 
-  if (devices.length === 0) {
-    throw new Error('No available devices were found.');
-  }
-
-  const defaultIndex = getDefaultDeviceIndex(devices, opts.existingDeviceId);
+  const defaultIndex =
+    devices.length > 0 ? getDefaultDeviceIndex(devices, opts.existingDeviceId) : 0;
 
   showPromptHelp(
     'Select a device to set the default target used by physical-device commands.',
@@ -630,7 +627,7 @@ async function selectDevice(opts: {
         label: `${device.platform} — ${device.name} (${device.udid})`,
       })),
     ],
-    initialIndex: opts.existingDeviceId != null ? defaultIndex + 1 : 0,
+    initialIndex: devices.length > 0 && opts.existingDeviceId != null ? defaultIndex + 1 : 0,
   });
 }
 
@@ -724,6 +721,7 @@ async function collectSetupSelection(
   const device = requiresDeviceDefault(enabledWorkflows)
     ? await selectDevice({
         existingDeviceId: existing.deviceId,
+        fs: deps.fs,
         executor: deps.executor,
         prompter: deps.prompter,
         isTTY,

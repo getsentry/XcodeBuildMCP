@@ -311,6 +311,52 @@ describe('config-store', () => {
     expect(config.sessionDefaults?.platform).toBe('iOS');
   });
 
+  it('preserves injected env session defaults after persisting a session defaults patch', async () => {
+    let persistedYaml = 'schemaVersion: 1\n';
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => true,
+      readFile: async () => persistedYaml,
+      writeFile: async (_targetPath, content) => {
+        persistedYaml = content;
+      },
+    });
+    const env = {
+      XCODEBUILDMCP_WORKSPACE_PATH: '/env/path/App.xcworkspace',
+      XCODEBUILDMCP_SCHEME: 'FromEnv',
+    };
+
+    await initConfigStore({ cwd, fs, env });
+    await persistSessionDefaultsPatch({ patch: { simulatorName: 'iPhone 17' } });
+
+    const config = getConfig();
+    expect(config.sessionDefaults?.workspacePath).toBe('/env/path/App.xcworkspace');
+    expect(config.sessionDefaults?.scheme).toBe('FromEnv');
+    expect(config.sessionDefaults?.simulatorName).toBe('iPhone 17');
+  });
+
+  it('preserves injected env session defaults after persisting the active profile', async () => {
+    let persistedYaml = 'schemaVersion: 1\n';
+    const fs = createMockFileSystemExecutor({
+      existsSync: () => true,
+      readFile: async () => persistedYaml,
+      writeFile: async (_targetPath, content) => {
+        persistedYaml = content;
+      },
+    });
+    const env = {
+      XCODEBUILDMCP_WORKSPACE_PATH: '/env/path/App.xcworkspace',
+      XCODEBUILDMCP_SCHEME: 'FromEnv',
+    };
+
+    await initConfigStore({ cwd, fs, env });
+    await persistActiveSessionDefaultsProfile('ios');
+
+    const config = getConfig();
+    expect(config.sessionDefaults?.workspacePath).toBe('/env/path/App.xcworkspace');
+    expect(config.sessionDefaults?.scheme).toBe('FromEnv');
+    expect(config.activeSessionDefaultsProfile).toBe('ios');
+  });
+
   it('keeps non-session config immutable after init when persisting active profile', async () => {
     let persistedYaml = 'schemaVersion: 1\n';
     const fs = createMockFileSystemExecutor({
