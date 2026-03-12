@@ -379,7 +379,13 @@ async function selectSimulator(opts: {
     quietOutput: opts.quietOutput,
     startMessage: 'Loading simulators...',
     stopMessage: 'Simulators loaded.',
-    task: () => listSimulators(opts.executor),
+    task: async () => {
+      try {
+        return await listSimulators(opts.executor);
+      } catch {
+        return [];
+      }
+    },
   });
 
   const defaultIndex =
@@ -543,41 +549,52 @@ async function listAvailableDevices(
   fileSystem: FileSystemExecutor,
   executor: CommandExecutor,
 ): Promise<SetupDevice[]> {
-  const jsonPath = path.join(fileSystem.tmpdir(), `xcodebuildmcp-setup-devices-${Date.now()}.json`);
+  try {
+    const jsonPath = path.join(
+      fileSystem.tmpdir(),
+      `xcodebuildmcp-setup-devices-${Date.now()}.json`,
+    );
+
+    try {
+      const result = await executor(
+        ['xcrun', 'devicectl', 'list', 'devices', '--json-output', jsonPath],
+        'List Devices (setup)',
+        false,
+        undefined,
+      );
+
+      if (result.success) {
+        const jsonContent = await fileSystem.readFile(jsonPath, 'utf8');
+        const devices = parseDeviceListResponse(JSON.parse(jsonContent));
+        if (devices.length > 0) {
+          return devices;
+        }
+      }
+    } catch {
+      // Fall back to xctrace below.
+    } finally {
+      await fileSystem.rm(jsonPath, { force: true }).catch(() => {});
+    }
+  } catch {
+    return [];
+  }
 
   try {
-    const result = await executor(
-      ['xcrun', 'devicectl', 'list', 'devices', '--json-output', jsonPath],
-      'List Devices (setup)',
+    const fallbackResult = await executor(
+      ['xcrun', 'xctrace', 'list', 'devices'],
+      'List Devices (setup fallback)',
       false,
       undefined,
     );
 
-    if (result.success) {
-      const jsonContent = await fileSystem.readFile(jsonPath, 'utf8');
-      const devices = parseDeviceListResponse(JSON.parse(jsonContent));
-      if (devices.length > 0) {
-        return devices;
-      }
+    if (!fallbackResult.success) {
+      return [];
     }
+
+    return parseXctraceDevices(fallbackResult.output);
   } catch {
-    // Fall back to xctrace below.
-  } finally {
-    await fileSystem.rm(jsonPath, { force: true }).catch(() => {});
-  }
-
-  const fallbackResult = await executor(
-    ['xcrun', 'xctrace', 'list', 'devices'],
-    'List Devices (setup fallback)',
-    false,
-    undefined,
-  );
-
-  if (!fallbackResult.success) {
     return [];
   }
-
-  return parseXctraceDevices(fallbackResult.output);
 }
 
 function getDefaultDeviceIndex(devices: SetupDevice[], existingDeviceId?: string): number {
