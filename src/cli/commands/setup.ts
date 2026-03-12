@@ -549,34 +549,31 @@ async function listAvailableDevices(
   fileSystem: FileSystemExecutor,
   executor: CommandExecutor,
 ): Promise<SetupDevice[]> {
+  let jsonPath: string | undefined;
+
   try {
-    const jsonPath = path.join(
-      fileSystem.tmpdir(),
-      `xcodebuildmcp-setup-devices-${Date.now()}.json`,
+    jsonPath = path.join(fileSystem.tmpdir(), `xcodebuildmcp-setup-devices-${Date.now()}.json`);
+
+    const result = await executor(
+      ['xcrun', 'devicectl', 'list', 'devices', '--json-output', jsonPath],
+      'List Devices (setup)',
+      false,
+      undefined,
     );
 
-    try {
-      const result = await executor(
-        ['xcrun', 'devicectl', 'list', 'devices', '--json-output', jsonPath],
-        'List Devices (setup)',
-        false,
-        undefined,
-      );
-
-      if (result.success) {
-        const jsonContent = await fileSystem.readFile(jsonPath, 'utf8');
-        const devices = parseDeviceListResponse(JSON.parse(jsonContent));
-        if (devices.length > 0) {
-          return devices;
-        }
+    if (result.success) {
+      const jsonContent = await fileSystem.readFile(jsonPath, 'utf8');
+      const devices = parseDeviceListResponse(JSON.parse(jsonContent));
+      if (devices.length > 0) {
+        return devices;
       }
-    } catch {
-      // Fall back to xctrace below.
-    } finally {
-      await fileSystem.rm(jsonPath, { force: true }).catch(() => {});
     }
   } catch {
-    return [];
+    // Fall back to xctrace below.
+  } finally {
+    if (jsonPath != null) {
+      await fileSystem.rm(jsonPath, { force: true }).catch(() => {});
+    }
   }
 
   try {

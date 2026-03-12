@@ -803,13 +803,61 @@ sessionDefaults:
     expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
   });
 
-  it('continues setup with no default device when temp path creation fails', async () => {
+  it('uses xctrace fallback when temp path creation fails', async () => {
     const { fs, getStoredConfig } = createSetupFs();
     fs.tmpdir = () => {
       throw new Error('tmpdir unavailable');
     };
 
     const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'xctrace') {
+        return createMockCommandResponse({
+          success: true,
+          output: 'Cam iPhone (12345678-1234-1234-1234-123456789ABC)',
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) =>
+        opts.options.find((option) => option.value != null)?.value ?? opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const loggingOption = opts.options.find((option) => option.value === ('logging' as T));
+        return loggingOption ? [loggingOption.value] : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.deviceId).toBe('12345678-1234-1234-1234-123456789ABC');
+  });
+
+  it('continues setup with no default device when device json parsing fails', async () => {
+    const { fs, getStoredConfig, setTempFile } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        const jsonPath = command[command.length - 1];
+        setTempFile(jsonPath, 'not json');
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
       if (command[0] === 'xcrun' && command[1] === 'xctrace') {
         throw new Error('xctrace spawn failed');
       }
@@ -842,6 +890,67 @@ sessionDefaults:
     };
 
     expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+  });
+
+  it('continues setup with no default simulator when simctl text fallback fails', async () => {
+    const { fs, getStoredConfig } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        throw new Error('device lookup should not run for simulator-only workflows');
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'simctl' && command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun' && command[1] === 'simctl') {
+        throw new Error('simctl text fallback unavailable');
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    const prompter: Prompter = {
+      selectOne: async <T>(opts: { options: Array<{ value: T }> }) => opts.options[0].value,
+      selectMany: async <T>(opts: { options: Array<{ value: T }> }) => {
+        const simulatorOption = opts.options.find((option) => option.value === ('simulator' as T));
+        return simulatorOption
+          ? [simulatorOption.value]
+          : opts.options.map((option) => option.value);
+      },
+      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
     expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
   });
