@@ -37,6 +37,11 @@ interface ShutdownStepOutcome<T> {
   error?: string;
 }
 
+type RunStepRaceOutcome<T> =
+  | { kind: 'value'; value: T }
+  | { kind: 'error'; error: string }
+  | { kind: 'timed_out' };
+
 export interface McpShutdownResult {
   exitCode: number;
   transportDisconnected: boolean;
@@ -63,14 +68,19 @@ async function runStep<T>(
   let timeoutHandle: NodeJS.Timeout | null = null;
 
   try {
-    const timeoutPromise = new Promise<'timed_out'>((resolve) => {
-      timeoutHandle = createTimer(timeoutMs, () => resolve('timed_out'));
+    const timeoutPromise = new Promise<RunStepRaceOutcome<T>>((resolve) => {
+      timeoutHandle = createTimer(timeoutMs, () => resolve({ kind: 'timed_out' }));
     });
-    const operationPromise = operation();
-    const outcome = await Promise.race([
-      operationPromise.then((value) => ({ kind: 'value' as const, value })),
-      timeoutPromise.then(() => ({ kind: 'timed_out' as const })),
-    ]);
+
+    const operationOutcome = operation()
+      .then((value): RunStepRaceOutcome<T> => ({ kind: 'value', value }))
+      .catch(
+        (error): RunStepRaceOutcome<T> => ({
+          kind: 'error',
+          error: stringifyError(error),
+        }),
+      );
+    const outcome = await Promise.race([operationOutcome, timeoutPromise]);
 
     if (outcome.kind === 'timed_out') {
       return {
@@ -79,16 +89,18 @@ async function runStep<T>(
       };
     }
 
+    if (outcome.kind === 'error') {
+      return {
+        status: 'failed',
+        durationMs: Date.now() - startedAt,
+        error: outcome.error,
+      };
+    }
+
     return {
       status: 'completed',
       durationMs: Date.now() - startedAt,
       value: outcome.value,
-    };
-  } catch (error) {
-    return {
-      status: 'failed',
-      durationMs: Date.now() - startedAt,
-      error: stringifyError(error),
     };
   } finally {
     if (timeoutHandle) {
@@ -152,19 +164,52 @@ export async function runMcpShutdown(input: {
   });
   pushStep('server.close', serverCloseOutcome);
 
-  const cleanupSteps: Array<[string, () => Promise<unknown>]> = [
-    ['watcher.stop', () => stopXcodeStateWatcher()],
-    ['xcode-tools-bridge.shutdown', () => shutdownXcodeToolsBridge()],
-    ['debugger.dispose-all', () => getDefaultDebuggerManager().disposeAll()],
-    ['simulator-logs.stop-all', () => stopAllLogCaptures(STEP_TIMEOUT_MS)],
-    ['device-logs.stop-all', () => stopAllDeviceLogCaptures(STEP_TIMEOUT_MS)],
-    ['video-capture.stop-all', () => stopAllVideoCaptureSessions(STEP_TIMEOUT_MS)],
-    ['swift-processes.stop-all', () => stopAllTrackedProcesses(STEP_TIMEOUT_MS)],
+  const perItemTimeoutMs = STEP_TIMEOUT_MS;
+  const bulkStepTimeoutMs = (itemCount: number): number => {
+    return Math.max(STEP_TIMEOUT_MS, itemCount * perItemTimeoutMs);
+  };
+
+  const cleanupSteps: Array<{
+    name: string;
+    timeoutMs: number;
+    operation: () => Promise<unknown>;
+  }> = [
+    { name: 'watcher.stop', timeoutMs: STEP_TIMEOUT_MS, operation: () => stopXcodeStateWatcher() },
+    {
+      name: 'xcode-tools-bridge.shutdown',
+      timeoutMs: STEP_TIMEOUT_MS,
+      operation: () => shutdownXcodeToolsBridge(),
+    },
+    {
+      name: 'debugger.dispose-all',
+      timeoutMs: STEP_TIMEOUT_MS,
+      operation: () => getDefaultDebuggerManager().disposeAll(),
+    },
+    {
+      name: 'simulator-logs.stop-all',
+      timeoutMs: bulkStepTimeoutMs(input.snapshot.simulatorLogSessionCount),
+      operation: () => stopAllLogCaptures(perItemTimeoutMs),
+    },
+    {
+      name: 'device-logs.stop-all',
+      timeoutMs: bulkStepTimeoutMs(input.snapshot.deviceLogSessionCount),
+      operation: () => stopAllDeviceLogCaptures(perItemTimeoutMs),
+    },
+    {
+      name: 'video-capture.stop-all',
+      timeoutMs: bulkStepTimeoutMs(input.snapshot.videoCaptureSessionCount),
+      operation: () => stopAllVideoCaptureSessions(perItemTimeoutMs),
+    },
+    {
+      name: 'swift-processes.stop-all',
+      timeoutMs: bulkStepTimeoutMs(input.snapshot.swiftPackageProcessCount),
+      operation: () => stopAllTrackedProcesses(perItemTimeoutMs),
+    },
   ];
 
-  for (const [name, operation] of cleanupSteps) {
-    const outcome = await runStep(name, STEP_TIMEOUT_MS, operation);
-    pushStep(name, outcome);
+  for (const cleanupStep of cleanupSteps) {
+    const outcome = await runStep(cleanupStep.name, cleanupStep.timeoutMs, cleanupStep.operation);
+    pushStep(cleanupStep.name, outcome);
   }
 
   const triggerError = input.error === undefined ? undefined : stringifyError(input.error);

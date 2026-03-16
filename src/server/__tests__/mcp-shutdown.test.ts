@@ -56,6 +56,10 @@ vi.mock('../../utils/shutdown-state.ts', () => ({
 
 import { runMcpShutdown } from '../mcp-shutdown.ts';
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 describe('runMcpShutdown', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,5 +104,42 @@ describe('runMcpShutdown', () => {
     expect(mocks.stopAllDeviceLogCaptures).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllVideoCaptureSessions).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses an expanded timeout budget for sequential bulk cleanup steps', async () => {
+    mocks.stopAllLogCaptures.mockImplementationOnce(async () => {
+      await wait(1100);
+      return { stoppedSessionCount: 2, errorCount: 0, errors: [] };
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: {
+        pid: 1,
+        ppid: 1,
+        orphaned: false,
+        phase: 'running',
+        shutdownReason: 'sigterm',
+        uptimeMs: 100,
+        rssBytes: 1,
+        heapUsedBytes: 1,
+        watcherRunning: false,
+        watchedPath: null,
+        activeOperationCount: 0,
+        activeOperationByCategory: {},
+        debuggerSessionCount: 0,
+        simulatorLogSessionCount: 2,
+        deviceLogSessionCount: 0,
+        videoCaptureSessionCount: 0,
+        swiftPackageProcessCount: 0,
+        matchingMcpProcessCount: 0,
+        matchingMcpPeerSummary: [],
+        anomalies: [],
+      },
+      server: { close: async () => undefined },
+    });
+
+    const simulatorLogsStep = result.steps.find((step) => step.name === 'simulator-logs.stop-all');
+    expect(simulatorLogsStep?.status).toBe('completed');
   });
 });
