@@ -137,13 +137,8 @@ export async function listSchemesLogic(
   }
 }
 
-const publicSchemaObject = baseSchemaObject.omit({
-  projectPath: true,
-  workspacePath: true,
-} as const);
-
 export const schema = getSessionAwareToolSchemaShape({
-  sessionAware: publicSchemaObject,
+  sessionAware: baseSchemaObject,
   legacy: baseSchemaObject,
 });
 
