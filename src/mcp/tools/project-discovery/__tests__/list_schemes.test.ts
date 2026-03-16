@@ -23,13 +23,16 @@ describe('list_schemes plugin', () => {
       expect(typeof handler).toBe('function');
     });
 
-    it('should expose an empty public schema', () => {
+    it('should expose projectPath and workspacePath in public schema', () => {
       const schemaObj = z.strictObject(schema);
       expect(schemaObj.safeParse({}).success).toBe(true);
       expect(schemaObj.safeParse({ projectPath: '/path/to/MyProject.xcodeproj' }).success).toBe(
-        false,
+        true,
       );
-      expect(Object.keys(schema)).toEqual([]);
+      expect(schemaObj.safeParse({ workspacePath: '/path/to/MyProject.xcworkspace' }).success).toBe(
+        true,
+      );
+      expect(Object.keys(schema).sort()).toEqual(['projectPath', 'workspacePath']);
     });
   });
 
