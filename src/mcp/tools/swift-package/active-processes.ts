@@ -106,7 +106,7 @@ export async function terminateTrackedProcess(
 }> {
   const info = activeProcesses.get(pid);
   if (!info) {
-    return { status: 'not-found' };
+    return { status: 'not-found', error: `Process not found: ${pid}` };
   }
 
   activeProcesses.delete(pid);
