@@ -1,7 +1,8 @@
 /**
- * Shared process state management for Swift Package tools
- * This module provides a centralized way to manage active processes
- * between swift_package_run and swift_package_stop tools
+ * Shared process state management for Swift Package tools.
+ *
+ * Tracks active child processes so they can be individually stopped
+ * or bulk-terminated during server shutdown.
  */
 
 interface TrackedProcess {
@@ -25,28 +26,28 @@ export interface ProcessInfo {
 
 export const activeProcesses = new Map<number, ProcessInfo>();
 
-export const getProcess = (pid: number): ProcessInfo | undefined => {
+export function getProcess(pid: number): ProcessInfo | undefined {
   return activeProcesses.get(pid);
-};
+}
 
-export const addProcess = (pid: number, processInfo: ProcessInfo): void => {
+export function addProcess(pid: number, processInfo: ProcessInfo): void {
   const existing = activeProcesses.get(pid);
   existing?.releaseActivity?.();
   activeProcesses.set(pid, processInfo);
-};
+}
 
-export const removeProcess = (pid: number): boolean => {
+export function removeProcess(pid: number): boolean {
   const existing = activeProcesses.get(pid);
   existing?.releaseActivity?.();
   return activeProcesses.delete(pid);
-};
+}
 
-export const clearAllProcesses = (): void => {
+export function clearAllProcesses(): void {
   for (const processInfo of activeProcesses.values()) {
     processInfo.releaseActivity?.();
   }
   activeProcesses.clear();
-};
+}
 
 function createTimeoutPromise(timeoutMs: number): Promise<'timed_out'> {
   return new Promise((resolve) => {
@@ -79,7 +80,7 @@ async function terminateProcess(
       return;
     }
     info.process.on('exit', onExit);
-  }).catch(() => 'exited' as const);
+  });
 
   const outcome = await Promise.race([exitPromise, createTimeoutPromise(timeoutMs)]);
   if (outcome === 'timed_out') {

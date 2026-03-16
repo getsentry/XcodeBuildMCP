@@ -18,7 +18,6 @@ import {
 } from '../utils/sentry.ts';
 import { version } from '../version.ts';
 import process from 'node:process';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { bootstrapServer } from './bootstrap.ts';
 import { createStartupProfiler, getStartupProfileNowMs } from './startup-profiler.ts';
 import { getConfig } from '../utils/config-store.ts';
@@ -38,17 +37,13 @@ export async function startMcpServer(): Promise<void> {
       const isCrash = reason === 'uncaught-exception' || reason === 'unhandled-rejection';
       const event = isCrash ? 'crash' : 'shutdown';
 
-      if (reason === 'stdin-end') {
-        log('info', 'MCP stdin ended; shutting down MCP server');
-      } else if (reason === 'stdin-close') {
-        log('info', 'MCP stdin closed; shutting down MCP server');
-      } else if (reason === 'stdout-error') {
-        log('info', 'MCP stdout pipe broke; shutting down MCP server');
-      } else if (reason === 'stderr-error') {
-        log('info', 'MCP stderr pipe broke; shutting down MCP server');
-      } else {
-        log('info', `MCP shutdown requested: ${reason}`);
-      }
+      const transportMessages: Record<string, string> = {
+        'stdin-end': 'MCP stdin ended; shutting down MCP server',
+        'stdin-close': 'MCP stdin closed; shutting down MCP server',
+        'stdout-error': 'MCP stdout pipe broke; shutting down MCP server',
+        'stderr-error': 'MCP stderr pipe broke; shutting down MCP server',
+      };
+      log('info', transportMessages[reason] ?? `MCP shutdown requested: ${reason}`);
 
       if (!isTransportDisconnectReason(reason)) {
         recordMcpLifecycleMetric({
@@ -75,7 +70,7 @@ export async function startMcpServer(): Promise<void> {
         reason,
         error,
         snapshot,
-        server: server ? ({ close: () => server.close() } as Pick<McpServer, 'close'>) : null,
+        server,
       });
 
       lifecycle.detachProcessHandlers();

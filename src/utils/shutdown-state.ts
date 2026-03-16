@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 type WritableMethod = (chunk: unknown, encoding?: unknown, callback?: unknown) => boolean;
 
 interface StdioWriteTarget {
@@ -10,20 +12,12 @@ let originalStdoutWrite: WritableMethod | null = null;
 let originalStderrWrite: WritableMethod | null = null;
 
 function createSuppressedWrite(): WritableMethod {
-  return (chunk: unknown, encoding?: unknown, callback?: unknown): boolean => {
-    const maybeEncoding = typeof encoding === 'function' ? undefined : encoding;
-    const maybeCallback =
-      typeof encoding === 'function'
-        ? encoding
-        : typeof callback === 'function'
-          ? callback
-          : undefined;
+  return (_chunk: unknown, encoding?: unknown, callback?: unknown): boolean => {
+    const resolvedCallback =
+      typeof encoding === 'function' ? encoding : typeof callback === 'function' ? callback : null;
 
-    void chunk;
-    void maybeEncoding;
-
-    if (typeof maybeCallback === 'function') {
-      queueMicrotask(() => maybeCallback(null));
+    if (typeof resolvedCallback === 'function') {
+      queueMicrotask(() => resolvedCallback(null));
     }
 
     return true;

@@ -74,20 +74,15 @@ interface PeerProcessSample {
   peers: McpPeerProcessSummary[];
 }
 
-interface LifecycleStdinLike {
-  once(event: string, listener: (...args: unknown[]) => void): this;
-  removeListener(event: string, listener: (...args: unknown[]) => void): this;
-}
-
-interface LifecycleStdoutLike {
+interface LifecycleStreamLike {
   once(event: string, listener: (...args: unknown[]) => void): this;
   removeListener(event: string, listener: (...args: unknown[]) => void): this;
 }
 
 interface LifecycleProcessLike {
-  stdin: LifecycleStdinLike;
-  stdout?: LifecycleStdoutLike;
-  stderr?: LifecycleStdoutLike;
+  stdin: LifecycleStreamLike;
+  stdout?: LifecycleStreamLike;
+  stderr?: LifecycleStreamLike;
   once(event: string, listener: (...args: unknown[]) => void): this;
   removeListener(event: string, listener: (...args: unknown[]) => void): this;
 }
@@ -178,7 +173,7 @@ export function classifyMcpLifecycleAnomalies(
     anomalies.add('long-lived-high-rss');
   }
 
-  return Array.from(anomalies.values()).sort();
+  return [...anomalies].sort();
 }
 
 function isLikelyMcpProcessCommand(command: string): boolean {

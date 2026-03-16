@@ -166,13 +166,8 @@ export async function runMcpShutdown(input: {
   });
   pushStep('server.close', serverCloseOutcome);
 
-  const perItemTimeoutMs = STEP_TIMEOUT_MS;
   const bulkStepTimeoutMs = (itemCount: number): number => {
-    const boundedCount = Math.max(1, itemCount);
-    return Math.max(
-      STEP_TIMEOUT_MS + STEP_TIMEOUT_HEADROOM_MS,
-      boundedCount * perItemTimeoutMs + STEP_TIMEOUT_HEADROOM_MS,
-    );
+    return Math.max(1, itemCount) * STEP_TIMEOUT_MS + STEP_TIMEOUT_HEADROOM_MS;
   };
 
   const debuggerStepTimeoutMs = (debuggerSessionCount: number): number => {
@@ -202,22 +197,22 @@ export async function runMcpShutdown(input: {
     {
       name: 'simulator-logs.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.simulatorLogSessionCount),
-      operation: () => stopAllLogCaptures(perItemTimeoutMs),
+      operation: () => stopAllLogCaptures(STEP_TIMEOUT_MS),
     },
     {
       name: 'device-logs.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.deviceLogSessionCount),
-      operation: () => stopAllDeviceLogCaptures(perItemTimeoutMs),
+      operation: () => stopAllDeviceLogCaptures(STEP_TIMEOUT_MS),
     },
     {
       name: 'video-capture.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.videoCaptureSessionCount),
-      operation: () => stopAllVideoCaptureSessions(perItemTimeoutMs),
+      operation: () => stopAllVideoCaptureSessions(STEP_TIMEOUT_MS),
     },
     {
       name: 'swift-processes.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.swiftPackageProcessCount),
-      operation: () => stopAllTrackedProcesses(perItemTimeoutMs),
+      operation: () => stopAllTrackedProcesses(STEP_TIMEOUT_MS),
     },
   ];
 

@@ -7,6 +7,7 @@
 import * as Sentry from '@sentry/node';
 import { version } from '../version.ts';
 import { isSentryCaptureSealed } from './shutdown-state.ts';
+
 const USER_HOME_PATH_PATTERN = /\/Users\/[^/\s]+/g;
 const XCODE_VERSION_PATTERN = /^Xcode\s+(.+)$/m;
 const XCODE_BUILD_PATTERN = /^Build version\s+(.+)$/m;
@@ -400,20 +401,22 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
   }
 
   try {
-    const anomalies =
-      (summary.snapshot as { anomalies?: unknown }).anomalies &&
-      Array.isArray((summary.snapshot as { anomalies?: unknown }).anomalies)
-        ? (summary.snapshot as { anomalies: unknown[] }).anomalies.length
-        : 0;
+    const snapshotAnomalies = (summary.snapshot as { anomalies?: unknown }).anomalies;
+    const anomalyCount = Array.isArray(snapshotAnomalies) ? snapshotAnomalies.length : 0;
 
-    const level =
+    const isCrashReason =
       summary.reason === 'startup-failure' ||
       summary.reason === 'uncaught-exception' ||
-      summary.reason === 'unhandled-rejection'
-        ? 'error'
-        : summary.cleanupFailureCount > 0 || anomalies > 0
-          ? 'warning'
-          : 'info';
+      summary.reason === 'unhandled-rejection';
+
+    let level: 'error' | 'warning' | 'info';
+    if (isCrashReason) {
+      level = 'error';
+    } else if (summary.cleanupFailureCount > 0 || anomalyCount > 0) {
+      level = 'warning';
+    } else {
+      level = 'info';
+    }
 
     Sentry.captureEvent({
       level,
