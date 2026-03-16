@@ -73,7 +73,7 @@ function hydrateSessionDefaultsForMcp(
     expectedRevision: revision,
     reason: 'startup-hydration',
     profile: sessionStore.getActiveProfile(),
-    persist: true,
+    persist: false,
     simulatorId: activeDefaults.simulatorId,
     simulatorName: activeDefaults.simulatorName,
     recomputePlatform: true,

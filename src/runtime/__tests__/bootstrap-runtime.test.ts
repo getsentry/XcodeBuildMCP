@@ -1,5 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
+
+const { scheduleSimulatorDefaultsRefreshMock } = vi.hoisted(() => ({
+  scheduleSimulatorDefaultsRefreshMock: vi.fn(),
+}));
+
+vi.mock('../../utils/simulator-defaults-refresh.ts', () => ({
+  scheduleSimulatorDefaultsRefresh: scheduleSimulatorDefaultsRefreshMock,
+}));
+
 import { bootstrapRuntime, type RuntimeKind } from '../bootstrap-runtime.ts';
 import { __resetConfigStoreForTests } from '../../utils/config-store.ts';
 import { sessionStore } from '../../utils/session-store.ts';
@@ -71,6 +80,8 @@ describe('bootstrapRuntime', () => {
   beforeEach(() => {
     __resetConfigStoreForTests();
     sessionStore.clear();
+    scheduleSimulatorDefaultsRefreshMock.mockReset();
+    scheduleSimulatorDefaultsRefreshMock.mockReturnValue(false);
   });
 
   it('hydrates session defaults for mcp runtime', async () => {
@@ -86,6 +97,14 @@ describe('bootstrapRuntime', () => {
       simulatorId: 'SIM-UUID',
       simulatorName: 'iPhone 17',
     });
+    expect(scheduleSimulatorDefaultsRefreshMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'startup-hydration',
+        persist: false,
+        simulatorId: 'SIM-UUID',
+        simulatorName: 'iPhone 17',
+      }),
+    );
   });
 
   it('hydrates non-simulator session defaults for mcp runtime', async () => {

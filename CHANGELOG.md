@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- Fixed startup simulator metadata refresh mutating `.xcodebuildmcp/config.yaml` by keeping derived simulator values in memory instead of persisting them during MCP startup hydration ([#230](https://github.com/getsentry/XcodeBuildMCP/issues/230)).
 - Fixed orphaned MCP server processes by attaching shutdown handlers before async startup, explicitly stopping the Xcode watcher during teardown, and adding lifecycle diagnostics for memory and peer-process anomalies ([#273](https://github.com/getsentry/XcodeBuildMCP/issues/273)).
 
 ## [2.2.1]
