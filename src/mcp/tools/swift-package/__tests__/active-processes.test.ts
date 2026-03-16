@@ -10,6 +10,7 @@ import {
   addProcess,
   removeProcess,
   clearAllProcesses,
+  terminateTrackedProcess,
   type ProcessInfo,
 } from '../active-processes.ts';
 import {
@@ -210,6 +211,34 @@ describe('active-processes module', () => {
       expect(activeProcesses.size).toBe(0);
       clearAllProcesses();
       expect(activeProcesses.size).toBe(0);
+    });
+  });
+
+  describe('process termination helper', () => {
+    it('does not treat killed=true as exited after SIGTERM', async () => {
+      const signals: string[] = [];
+
+      addProcess(4242, {
+        process: {
+          kill: (signal?: string) => {
+            signals.push(signal ?? 'SIGTERM');
+          },
+          on: () => {
+            // never emits exit; allow timeout path
+          },
+          killed: true,
+          exitCode: null,
+          signalCode: null,
+          pid: 4242,
+        },
+        startedAt: new Date('2023-01-01T00:00:00.000Z'),
+      });
+
+      const result = await terminateTrackedProcess(4242, 25);
+
+      expect(result.status).toBe('terminated');
+      expect(result.usedForceKill).toBe(true);
+      expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
     });
   });
 
