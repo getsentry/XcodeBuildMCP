@@ -84,6 +84,8 @@ export class StandaloneXcodeToolsBridge {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return createErrorResponse(classifyBridgeError(error, 'list'), message);
+    } finally {
+      await this.service.disconnect();
     }
   }
 
@@ -100,6 +102,8 @@ export class StandaloneXcodeToolsBridge {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return createErrorResponse(classifyBridgeError(error, 'call'), message);
+    } finally {
+      await this.service.disconnect();
     }
   }
 }

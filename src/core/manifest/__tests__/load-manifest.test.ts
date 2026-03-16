@@ -94,11 +94,11 @@ describe('load-manifest', () => {
       expect(xcodeIde?.predicates).not.toContain('debugEnabled');
     });
 
-    it('should keep xcode bridge debug tools gated by debugEnabled', () => {
+    it('should keep xcode bridge gateway tools daemon-routed and debug tools gated', () => {
       const manifest = loadManifest();
 
-      expect(manifest.tools.get('xcode_ide_list_tools')?.predicates).toContain('mcpRuntimeOnly');
-      expect(manifest.tools.get('xcode_ide_call_tool')?.predicates).toContain('mcpRuntimeOnly');
+      expect(manifest.tools.get('xcode_ide_list_tools')?.routing?.stateful).toBe(true);
+      expect(manifest.tools.get('xcode_ide_call_tool')?.routing?.stateful).toBe(true);
       expect(manifest.tools.get('xcode_tools_bridge_status')?.predicates).toContain('debugEnabled');
       expect(manifest.tools.get('xcode_tools_bridge_sync')?.predicates).toContain('debugEnabled');
       expect(manifest.tools.get('xcode_tools_bridge_disconnect')?.predicates).toContain(

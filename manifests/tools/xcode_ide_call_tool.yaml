@@ -4,8 +4,8 @@ names:
   mcp: xcode_ide_call_tool
   cli: call-tool
 description: Call a remote Xcode IDE MCP tool.
-predicates:
-  - mcpRuntimeOnly
+routing:
+  stateful: true
 annotations:
   title: Call Xcode IDE Tool
   readOnlyHint: false

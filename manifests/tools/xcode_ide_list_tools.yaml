@@ -4,8 +4,8 @@ names:
   mcp: xcode_ide_list_tools
   cli: list-tools
 description: "Lists Xcode-IDE-only MCP capabilities (Use for: SwiftUI previews image capture, code snippet execution, issue Navigator/build logs, and window/tab context)."
-predicates:
-  - mcpRuntimeOnly
+routing:
+  stateful: true
 annotations:
   title: List Xcode IDE Tools
   readOnlyHint: true
