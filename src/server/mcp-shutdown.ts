@@ -18,6 +18,8 @@ import { isTransportDisconnectReason } from './mcp-lifecycle.ts';
 const DISCONNECT_SERVER_CLOSE_TIMEOUT_MS = 150;
 const DEFAULT_SERVER_CLOSE_TIMEOUT_MS = 1000;
 const STEP_TIMEOUT_MS = 1000;
+const STEP_TIMEOUT_HEADROOM_MS = 100;
+const DEBUGGER_STEP_BASE_TIMEOUT_MS = 2200;
 const DISCONNECT_FLUSH_TIMEOUT_MS = 250;
 const DEFAULT_FLUSH_TIMEOUT_MS = 1500;
 
@@ -166,7 +168,19 @@ export async function runMcpShutdown(input: {
 
   const perItemTimeoutMs = STEP_TIMEOUT_MS;
   const bulkStepTimeoutMs = (itemCount: number): number => {
-    return Math.max(STEP_TIMEOUT_MS, itemCount * perItemTimeoutMs);
+    const boundedCount = Math.max(1, itemCount);
+    return Math.max(
+      STEP_TIMEOUT_MS + STEP_TIMEOUT_HEADROOM_MS,
+      boundedCount * perItemTimeoutMs + STEP_TIMEOUT_HEADROOM_MS,
+    );
+  };
+
+  const debuggerStepTimeoutMs = (debuggerSessionCount: number): number => {
+    const boundedCount = Math.max(1, debuggerSessionCount);
+    return Math.max(
+      DEBUGGER_STEP_BASE_TIMEOUT_MS,
+      boundedCount * STEP_TIMEOUT_MS + STEP_TIMEOUT_HEADROOM_MS,
+    );
   };
 
   const cleanupSteps: Array<{
@@ -182,7 +196,7 @@ export async function runMcpShutdown(input: {
     },
     {
       name: 'debugger.dispose-all',
-      timeoutMs: STEP_TIMEOUT_MS,
+      timeoutMs: debuggerStepTimeoutMs(input.snapshot.debuggerSessionCount),
       operation: () => getDefaultDebuggerManager().disposeAll(),
     },
     {

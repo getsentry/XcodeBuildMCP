@@ -106,7 +106,44 @@ describe('runMcpShutdown', () => {
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
   });
 
-  it('uses an expanded timeout budget for sequential bulk cleanup steps', async () => {
+  it('adds outer timeout headroom for one-item bulk cleanup', async () => {
+    mocks.stopAllLogCaptures.mockImplementationOnce(async () => {
+      await wait(1050);
+      return { stoppedSessionCount: 1, errorCount: 0, errors: [] };
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: {
+        pid: 1,
+        ppid: 1,
+        orphaned: false,
+        phase: 'running',
+        shutdownReason: 'sigterm',
+        uptimeMs: 100,
+        rssBytes: 1,
+        heapUsedBytes: 1,
+        watcherRunning: false,
+        watchedPath: null,
+        activeOperationCount: 0,
+        activeOperationByCategory: {},
+        debuggerSessionCount: 0,
+        simulatorLogSessionCount: 1,
+        deviceLogSessionCount: 0,
+        videoCaptureSessionCount: 0,
+        swiftPackageProcessCount: 0,
+        matchingMcpProcessCount: 0,
+        matchingMcpPeerSummary: [],
+        anomalies: [],
+      },
+      server: { close: async () => undefined },
+    });
+
+    const simulatorLogsStep = result.steps.find((step) => step.name === 'simulator-logs.stop-all');
+    expect(simulatorLogsStep?.status).toBe('completed');
+  });
+
+  it('uses an expanded timeout budget for sequential multi-item bulk cleanup steps', async () => {
     mocks.stopAllLogCaptures.mockImplementationOnce(async () => {
       await wait(1100);
       return { stoppedSessionCount: 2, errorCount: 0, errors: [] };
@@ -141,5 +178,41 @@ describe('runMcpShutdown', () => {
 
     const simulatorLogsStep = result.steps.find((step) => step.name === 'simulator-logs.stop-all');
     expect(simulatorLogsStep?.status).toBe('completed');
+  });
+
+  it('uses a larger timeout budget for debugger dispose-all', async () => {
+    mocks.disposeAll.mockImplementationOnce(async () => {
+      await wait(1500);
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: {
+        pid: 1,
+        ppid: 1,
+        orphaned: false,
+        phase: 'running',
+        shutdownReason: 'sigterm',
+        uptimeMs: 100,
+        rssBytes: 1,
+        heapUsedBytes: 1,
+        watcherRunning: false,
+        watchedPath: null,
+        activeOperationCount: 0,
+        activeOperationByCategory: {},
+        debuggerSessionCount: 1,
+        simulatorLogSessionCount: 0,
+        deviceLogSessionCount: 0,
+        videoCaptureSessionCount: 0,
+        swiftPackageProcessCount: 0,
+        matchingMcpProcessCount: 0,
+        matchingMcpPeerSummary: [],
+        anomalies: [],
+      },
+      server: { close: async () => undefined },
+    });
+
+    const debuggerStep = result.steps.find((step) => step.name === 'debugger.dispose-all');
+    expect(debuggerStep?.status).toBe('completed');
   });
 });
