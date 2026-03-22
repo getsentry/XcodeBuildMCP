@@ -19,6 +19,16 @@ function parseGitHubOwnerAndName(url: string): { owner: string; name: string } {
   return { owner: match[1], name: match[2] };
 }
 
+const VERSION_REGEX = /^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/;
+
+function validateVersion(name: string, value: string): void {
+  if (!VERSION_REGEX.test(value)) {
+    throw new Error(
+      `Invalid ${name} in package.json: ${JSON.stringify(value)}. Expected a version string.`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const repoRoot = process.cwd();
   const packagePath = path.join(repoRoot, 'package.json');
@@ -34,13 +44,17 @@ async function main(): Promise<void> {
 
   const repo = parseGitHubOwnerAndName(repoUrl);
 
+  validateVersion('version', pkg.version);
+  validateVersion('iOSTemplateVersion', pkg.iOSTemplateVersion);
+  validateVersion('macOSTemplateVersion', pkg.macOSTemplateVersion);
+
   const content =
-    `export const version = '${pkg.version}';\n` +
-    `export const iOSTemplateVersion = '${pkg.iOSTemplateVersion}';\n` +
-    `export const macOSTemplateVersion = '${pkg.macOSTemplateVersion}';\n` +
-    `export const packageName = '${pkg.name}';\n` +
-    `export const repositoryOwner = '${repo.owner}';\n` +
-    `export const repositoryName = '${repo.name}';\n`;
+    `export const version = ${JSON.stringify(pkg.version)};\n` +
+    `export const iOSTemplateVersion = ${JSON.stringify(pkg.iOSTemplateVersion)};\n` +
+    `export const macOSTemplateVersion = ${JSON.stringify(pkg.macOSTemplateVersion)};\n` +
+    `export const packageName = ${JSON.stringify(pkg.name)};\n` +
+    `export const repositoryOwner = ${JSON.stringify(repo.owner)};\n` +
+    `export const repositoryName = ${JSON.stringify(repo.name)};\n`;
 
   await writeFile(versionPath, content, 'utf8');
 }

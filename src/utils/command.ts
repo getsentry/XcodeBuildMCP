@@ -4,6 +4,7 @@ import * as fsPromises from 'fs/promises';
 import { tmpdir as osTmpdir } from 'os';
 import { log } from './logger.ts';
 import { transcriptEmitterStorage } from './transcript-context.ts';
+import { shellEscapeArg } from './shell-escape.ts';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import type { CommandExecutor, CommandResponse, CommandExecOptions } from './CommandExecutor.ts';
 
@@ -19,14 +20,7 @@ async function defaultExecutor(
 ): Promise<CommandResponse> {
   let escapedCommand = command;
   if (useShell) {
-    const commandString = command
-      .map((arg) => {
-        if (/[\s,"'=$`;&|<>(){}[\]\\*?~]/.test(arg) && !/^".*"$/.test(arg)) {
-          return `"${arg.replace(/(["\\])/g, '\\$1')}"`;
-        }
-        return arg;
-      })
-      .join(' ');
+    const commandString = command.map((arg) => shellEscapeArg(arg)).join(' ');
 
     escapedCommand = ['/bin/sh', '-c', commandString];
   }

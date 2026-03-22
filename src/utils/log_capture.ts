@@ -37,6 +37,15 @@ export interface LogSession {
 export type SubsystemFilter = 'app' | 'all' | 'swiftui' | string[];
 
 /**
+ * Escape a string for safe use inside a double-quoted NSPredicate string literal.
+ * Backslash-escapes any backslashes and double quotes so the value cannot
+ * break out of the `"..."` context in predicates like `subsystem == "VALUE"`.
+ */
+function escapePredicateString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/**
  * Build the predicate string for log filtering based on subsystem filter option.
  */
 function buildLogPredicate(bundleId: string, subsystemFilter: SubsystemFilter): string | null {
@@ -44,16 +53,20 @@ function buildLogPredicate(bundleId: string, subsystemFilter: SubsystemFilter): 
     return null;
   }
 
+  const safeBundleId = escapePredicateString(bundleId);
+
   if (subsystemFilter === 'app') {
-    return `subsystem == "${bundleId}"`;
+    return `subsystem == "${safeBundleId}"`;
   }
 
   if (subsystemFilter === 'swiftui') {
-    return `subsystem == "${bundleId}" OR subsystem == "com.apple.SwiftUI"`;
+    return `subsystem == "${safeBundleId}" OR subsystem == "com.apple.SwiftUI"`;
   }
 
   const subsystems = new Set([bundleId, ...subsystemFilter]);
-  const predicates = Array.from(subsystems).map((s) => `subsystem == "${s}"`);
+  const predicates = Array.from(subsystems).map(
+    (s) => `subsystem == "${escapePredicateString(s)}"`,
+  );
   return predicates.join(' OR ');
 }
 
