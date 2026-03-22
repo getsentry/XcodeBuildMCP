@@ -19,7 +19,7 @@ function parseGitHubOwnerAndName(url: string): { owner: string; name: string } {
   return { owner: match[1], name: match[2] };
 }
 
-const VERSION_REGEX = /^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/;
+const VERSION_REGEX = /^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.\-]+)?(\+[a-zA-Z0-9.\-]+)?$/;
 
 function validateVersion(name: string, value: string): void {
   if (!VERSION_REGEX.test(value)) {
