@@ -13,7 +13,6 @@ type CallHistoryEntry = {
 };
 
 function createMockExecutorWithCalls(callHistory: CallHistoryEntry[]): CommandExecutor {
-  const { ChildProcess } = require('child_process');
   const mockProcess = {
     pid: 12345,
     stdout: null,
