@@ -13,6 +13,7 @@ import { spawn } from 'child_process';
 import { createWriteStream, existsSync } from 'fs';
 import { tmpdir as osTmpdir } from 'os';
 import { log } from './logger.ts';
+import { shellEscapeArg } from './shell-escape.ts';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import type { CommandExecutor, CommandResponse, CommandExecOptions } from './CommandExecutor.ts';
 
@@ -41,16 +42,8 @@ async function defaultExecutor(
   let escapedCommand = command;
   if (useShell) {
     // For shell execution, we need to format as ['/bin/sh', '-c', 'full command string']
-    const commandString = command
-      .map((arg) => {
-        // Shell metacharacters that require quoting: space, quotes, equals, dollar, backticks, semicolons, pipes, etc.
-        if (/[\s,"'=$`;&|<>(){}[\]\\*?~]/.test(arg) && !/^".*"$/.test(arg)) {
-          // Escape all quotes and backslashes, then wrap in double quotes
-          return `"${arg.replace(/(["\\])/g, '\\$1')}"`;
-        }
-        return arg;
-      })
-      .join(' ');
+    // Use POSIX single-quote escaping for each argument to prevent injection
+    const commandString = command.map((arg) => shellEscapeArg(arg)).join(' ');
 
     escapedCommand = ['/bin/sh', '-c', commandString];
   }
