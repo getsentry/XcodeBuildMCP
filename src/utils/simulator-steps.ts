@@ -14,6 +14,8 @@ import {
   stopSimulatorLaunchOsLogSessionsForApp,
 } from './log-capture/simulator-launch-oslog-sessions.ts';
 
+const VALID_LOG_SUBSYSTEM_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
 let logDirOverrideForTests: string | null = null;
 
 interface ResolvedSimulatorLogDir {
@@ -152,6 +154,13 @@ export interface LaunchWithLoggingResult {
   error?: string;
 }
 
+function validateLogSubsystem(value: string): string | undefined {
+  if (VALID_LOG_SUBSYSTEM_PATTERN.test(value)) {
+    return undefined;
+  }
+  return `Invalid bundle identifier: '${value}'. Bundle IDs must contain only alphanumeric characters, dots, hyphens, and underscores.`;
+}
+
 /**
  * Launch an app on a simulator with implicit runtime logging.
  *
@@ -176,6 +185,11 @@ export async function launchSimulatorAppWithLogging(
     spawner?: ProcessSpawner;
   },
 ): Promise<LaunchWithLoggingResult> {
+  const validationError = validateLogSubsystem(bundleId);
+  if (validationError) {
+    return { success: false, error: validationError };
+  }
+
   const spawner = deps?.spawner ?? spawn;
 
   const logsDir = resolveSimulatorLogDir();

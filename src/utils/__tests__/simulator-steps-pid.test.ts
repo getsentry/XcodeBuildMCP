@@ -112,6 +112,24 @@ describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
     expect(result.processId).toBe(42567);
   });
 
+  it('rejects bundle identifiers that would escape the OSLog predicate', async () => {
+    const spawner = vi.fn(createMockSpawner());
+    const executor = vi.fn(createMockExecutor(42567));
+
+    const result = await launchSimulatorAppWithLogging(
+      'test-sim-uuid',
+      'com.evil" OR subsystem != "x',
+      executor,
+      undefined,
+      { spawner },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/invalid.*bundle/i);
+    expect(spawner).not.toHaveBeenCalled();
+    expect(executor).not.toHaveBeenCalled();
+  });
+
   it('writes logs under the current workspace log directory when no test override is set', async () => {
     setSimulatorLogDirOverrideForTests(null);
     const spawner = createMockSpawner();
