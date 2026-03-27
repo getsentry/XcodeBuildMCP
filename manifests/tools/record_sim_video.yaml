@@ -8,7 +8,7 @@ routing:
   stateful: true
 annotations:
   title: Record Simulator Video
-  readOnlyHint: false
+  readOnlyHint: true
   destructiveHint: false
   openWorldHint: false
 nextSteps:
