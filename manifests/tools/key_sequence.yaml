@@ -6,4 +6,6 @@ names:
 description: Press a sequence of keys by their keycodes.
 annotations:
   title: Key Sequence
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

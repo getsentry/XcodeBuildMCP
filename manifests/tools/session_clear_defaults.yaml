@@ -6,4 +6,6 @@ names:
 description: Clear session defaults for the active profile or a specified profile.
 annotations:
   title: Clear Session Defaults
-  destructiveHint: false
+  readOnlyHint: false
+  destructiveHint: true
+  openWorldHint: false

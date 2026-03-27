@@ -7,6 +7,8 @@ description: Get device built app path.
 annotations:
   title: Get Device App Path
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Get bundle ID
     toolId: get_app_bundle_id

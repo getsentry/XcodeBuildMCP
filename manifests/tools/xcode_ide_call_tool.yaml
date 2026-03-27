@@ -9,4 +9,5 @@ routing:
 annotations:
   title: Call Xcode IDE Tool
   readOnlyHint: false
-  destructiveHint: false
+  destructiveHint: true
+  openWorldHint: false

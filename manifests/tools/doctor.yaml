@@ -7,3 +7,5 @@ description: MCP environment info.
 annotations:
   title: Doctor
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

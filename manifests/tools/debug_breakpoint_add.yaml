@@ -6,3 +6,8 @@ names:
 description: Add breakpoint.
 routing:
   stateful: true
+annotations:
+  title: Debug Breakpoint Add
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false

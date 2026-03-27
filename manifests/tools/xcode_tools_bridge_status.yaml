@@ -9,3 +9,5 @@ predicates:
 annotations:
   title: Xcode Tools Bridge Status
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

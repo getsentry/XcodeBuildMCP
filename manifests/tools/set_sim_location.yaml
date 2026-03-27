@@ -6,4 +6,6 @@ names:
 description: Set sim location.
 annotations:
   title: Set Simulator Location
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

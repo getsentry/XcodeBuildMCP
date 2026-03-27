@@ -6,4 +6,6 @@ names:
 description: Press simulator hardware button.
 annotations:
   title: Hardware Button
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

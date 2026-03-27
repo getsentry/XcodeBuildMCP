@@ -8,4 +8,6 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Test Device
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

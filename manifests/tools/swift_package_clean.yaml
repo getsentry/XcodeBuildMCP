@@ -6,4 +6,6 @@ names:
 description: swift package clean.
 annotations:
   title: Swift Package Clean
+  readOnlyHint: false
   destructiveHint: true
+  openWorldHint: false

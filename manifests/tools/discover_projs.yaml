@@ -7,6 +7,8 @@ description: Scans a directory (defaults to workspace root) to find Xcode projec
 annotations:
   title: Discover Projects
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Save discovered project/workspace as session defaults
     toolId: session_set_defaults

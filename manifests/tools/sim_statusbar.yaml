@@ -6,4 +6,6 @@ names:
 description: Set sim status bar network.
 annotations:
   title: Simulator Statusbar
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

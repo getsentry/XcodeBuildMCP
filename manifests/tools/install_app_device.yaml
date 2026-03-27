@@ -6,4 +6,6 @@ names:
 description: Install app on device.
 annotations:
   title: Install App Device
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

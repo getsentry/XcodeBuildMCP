@@ -7,3 +7,5 @@ description: Capture screenshot.
 annotations:
   title: Screenshot
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

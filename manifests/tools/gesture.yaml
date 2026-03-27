@@ -6,4 +6,6 @@ names:
 description: Simulator gesture preset.
 annotations:
   title: Gesture
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

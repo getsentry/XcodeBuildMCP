@@ -97,6 +97,24 @@ describe('XcodeToolsProxyRegistry (stdio integration)', () => {
     expect(res.content[0]).toMatchObject({ type: 'text', text: 'Alpha:hi' });
   });
 
+  it('fills approval annotations for proxied tools when the remote tool omits them', async () => {
+    const tools = await localClient.listTools();
+    const alpha = tools.tools.find((tool) => tool.name === 'xcode_tools_Alpha');
+    const beta = tools.tools.find((tool) => tool.name === 'xcode_tools_Beta');
+
+    expect(alpha?.annotations).toMatchObject({
+      title: 'Alpha',
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    });
+    expect(beta?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+    });
+  });
+
   it('updates registered tools on remote list change', async () => {
     await localClient.callTool({ name: 'xcode_tools_TriggerChange', arguments: {} });
 

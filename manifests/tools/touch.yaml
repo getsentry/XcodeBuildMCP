@@ -6,4 +6,6 @@ names:
 description: Touch down/up at coords.
 annotations:
   title: Touch
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

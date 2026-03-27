@@ -7,6 +7,8 @@ description: Get sim built app path.
 annotations:
   title: Get Simulator App Path
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Get bundle ID
     toolId: get_app_bundle_id

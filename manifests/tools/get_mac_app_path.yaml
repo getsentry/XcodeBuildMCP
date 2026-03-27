@@ -7,6 +7,8 @@ description: Get macOS built app path.
 annotations:
   title: Get macOS App Path
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Get bundle ID
     toolId: get_mac_bundle_id

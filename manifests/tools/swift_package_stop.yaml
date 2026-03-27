@@ -8,4 +8,6 @@ routing:
   stateful: true
 annotations:
   title: Swift Package Stop
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

@@ -10,3 +10,4 @@ annotations:
   title: Sync Xcode Tools Bridge
   readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

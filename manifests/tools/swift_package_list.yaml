@@ -9,3 +9,5 @@ routing:
 annotations:
   title: Swift Package List
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

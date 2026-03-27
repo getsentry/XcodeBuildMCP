@@ -8,7 +8,9 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Build Run Device
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Capture device logs
     toolId: start_device_log_cap

@@ -7,6 +7,8 @@ description: Show per-target code coverage from an xcresult bundle.
 annotations:
   title: Get Coverage Report
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: View file-level coverage
     toolId: get_file_coverage

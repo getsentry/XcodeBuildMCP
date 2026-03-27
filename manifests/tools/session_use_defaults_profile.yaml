@@ -8,3 +8,4 @@ annotations:
   title: Use Session Defaults Profile
   readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

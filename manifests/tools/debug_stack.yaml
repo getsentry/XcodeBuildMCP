@@ -6,3 +6,8 @@ names:
 description: Get backtrace.
 routing:
   stateful: true
+annotations:
+  title: Debug Stack
+  readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

@@ -9,6 +9,8 @@ predicates:
 annotations:
   title: Show Build Settings
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Build for macOS
     toolId: build_macos

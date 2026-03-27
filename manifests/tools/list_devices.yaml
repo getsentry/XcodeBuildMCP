@@ -7,6 +7,8 @@ description: List connected devices.
 annotations:
   title: List Devices
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Build for device
     toolId: build_device

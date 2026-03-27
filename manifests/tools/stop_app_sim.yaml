@@ -6,4 +6,6 @@ names:
 description: Stop sim app.
 annotations:
   title: Stop App Simulator
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

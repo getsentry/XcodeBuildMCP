@@ -6,4 +6,6 @@ names:
 description: Type text.
 annotations:
   title: Type Text
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

@@ -145,14 +145,15 @@ function buildBestEffortInputSchema(tool: Tool): z.ZodTypeAny {
 
 function buildBestEffortAnnotations(tool: Tool, localName: string): ToolAnnotations {
   const existing = (tool.annotations ?? {}) as ToolAnnotations;
-
-  if (existing.readOnlyHint !== undefined) {
-    return existing;
-  }
+  const readOnlyHint = existing.readOnlyHint ?? inferReadOnlyHint(localName);
+  const destructiveHint = existing.destructiveHint ?? inferDestructiveHint(localName, readOnlyHint);
+  const openWorldHint = existing.openWorldHint ?? inferOpenWorldHint(localName);
 
   return {
     ...existing,
-    readOnlyHint: inferReadOnlyHint(localName),
+    readOnlyHint,
+    destructiveHint,
+    openWorldHint,
   };
 }
 
@@ -173,5 +174,24 @@ function inferReadOnlyHint(localToolName: string): boolean {
 
   if (definitelyReadOnlyPrefixes.some((p) => name.startsWith(p))) return true;
 
+  return false;
+}
+
+function inferDestructiveHint(localToolName: string, readOnlyHint: boolean): boolean {
+  if (readOnlyHint) return false;
+
+  const name = localToolName.toLowerCase();
+  const destructivePrefixes = [
+    'xcode_tools_xcodedelete',
+    'xcode_tools_xcodeclean',
+    'xcode_tools_xcodeerase',
+    'xcode_tools_xcoderemove',
+  ];
+
+  return destructivePrefixes.some((p) => name.startsWith(p));
+}
+
+function inferOpenWorldHint(_localToolName: string): boolean {
+  // Xcode bridge tools are local IDE capabilities, not internet-facing or open-world tools.
   return false;
 }

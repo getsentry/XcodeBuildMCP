@@ -8,4 +8,6 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Swift Package Test
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

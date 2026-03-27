@@ -7,6 +7,8 @@ description: Extract bundle id from macOS .app.
 annotations:
   title: Get Mac Bundle ID
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Launch the app
     toolId: launch_mac_app

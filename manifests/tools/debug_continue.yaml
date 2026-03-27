@@ -6,3 +6,8 @@ names:
 description: Continue debug session.
 routing:
   stateful: true
+annotations:
+  title: Debug Continue
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false

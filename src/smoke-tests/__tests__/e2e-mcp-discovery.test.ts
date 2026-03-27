@@ -150,15 +150,29 @@ describe('MCP Discovery (e2e)', () => {
   it('tools have annotations where expected', async () => {
     const result = await harness.client.listTools();
 
-    // build_sim should have destructiveHint annotation
+    // build_sim should have a complete explicit annotation set
     const buildSim = result.tools.find((t) => t.name === 'build_sim');
     expect(buildSim).toBeDefined();
     expect(buildSim!.annotations).toBeDefined();
+    expect(buildSim!.annotations?.readOnlyHint).toBe(false);
+    expect(buildSim!.annotations?.destructiveHint).toBe(false);
+    expect(buildSim!.annotations?.openWorldHint).toBe(false);
 
-    // list_sims should have readOnlyHint annotation
+    // list_sims should advertise read-only closed-world behavior
     const listSims = result.tools.find((t) => t.name === 'list_sims');
     expect(listSims).toBeDefined();
     expect(listSims!.annotations).toBeDefined();
+    expect(listSims!.annotations?.readOnlyHint).toBe(true);
+    expect(listSims!.annotations?.destructiveHint).toBe(false);
+    expect(listSims!.annotations?.openWorldHint).toBe(false);
+
+    // type_text is modeled as read-only from a host-permissions perspective
+    const typeText = result.tools.find((t) => t.name === 'type_text');
+    expect(typeText).toBeDefined();
+    expect(typeText!.annotations).toBeDefined();
+    expect(typeText!.annotations?.readOnlyHint).toBe(true);
+    expect(typeText!.annotations?.destructiveHint).toBe(false);
+    expect(typeText!.annotations?.openWorldHint).toBe(false);
   });
 
   it('no duplicate tool names', async () => {

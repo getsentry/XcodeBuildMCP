@@ -8,4 +8,6 @@ predicates:
   - hideWhenXcodeAgentMode
 annotations:
   title: Build Run macOS
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

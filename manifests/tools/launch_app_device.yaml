@@ -6,7 +6,9 @@ names:
 description: Launch app on device.
 annotations:
   title: Launch App Device
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Stop the app
     toolId: stop_app_device

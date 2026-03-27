@@ -6,6 +6,11 @@ names:
 description: Attach LLDB to sim app.
 routing:
   stateful: true
+annotations:
+  title: Debug Attach Sim
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Add a breakpoint
     toolId: debug_breakpoint_add

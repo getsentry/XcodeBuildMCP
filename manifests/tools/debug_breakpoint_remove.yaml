@@ -6,3 +6,8 @@ names:
 description: Remove breakpoint.
 routing:
   stateful: true
+annotations:
+  title: Debug Breakpoint Remove
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false

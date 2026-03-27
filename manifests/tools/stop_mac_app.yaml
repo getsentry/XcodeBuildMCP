@@ -6,4 +6,6 @@ names:
 description: Stop macOS app.
 annotations:
   title: Stop macOS App
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

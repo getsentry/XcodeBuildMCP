@@ -7,3 +7,5 @@ description: Show current active defaults. Required before your first build/run/
 annotations:
   title: Show Session Defaults
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

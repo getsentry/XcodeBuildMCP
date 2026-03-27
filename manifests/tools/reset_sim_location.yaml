@@ -6,4 +6,6 @@ names:
 description: Reset sim location.
 annotations:
   title: Reset Simulator Location
+  readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

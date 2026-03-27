@@ -7,6 +7,8 @@ description: Show function-level coverage and uncovered line ranges for a specif
 annotations:
   title: Get File Coverage
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: View overall coverage
     toolId: get_coverage_report

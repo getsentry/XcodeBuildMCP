@@ -105,6 +105,30 @@ describe('load-manifest', () => {
         'debugEnabled',
       );
     });
+
+    it('should provide explicit approval annotations for every tool', () => {
+      const manifest = loadManifest();
+
+      for (const [toolId, tool] of manifest.tools) {
+        expect(tool.annotations, `Tool '${toolId}' is missing annotations`).toBeDefined();
+        expect(
+          tool.annotations?.title,
+          `Tool '${toolId}' is missing annotations.title`,
+        ).toBeTruthy();
+        expect(
+          tool.annotations?.readOnlyHint,
+          `Tool '${toolId}' is missing annotations.readOnlyHint`,
+        ).not.toBeUndefined();
+        expect(
+          tool.annotations?.destructiveHint,
+          `Tool '${toolId}' is missing annotations.destructiveHint`,
+        ).not.toBeUndefined();
+        expect(
+          tool.annotations?.openWorldHint,
+          `Tool '${toolId}' is missing annotations.openWorldHint`,
+        ).not.toBeUndefined();
+      }
+    });
   });
 
   describe('getWorkflowTools', () => {

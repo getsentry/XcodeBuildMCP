@@ -10,3 +10,4 @@ annotations:
   title: Sync Xcode Defaults
   readOnlyHint: false
   destructiveHint: false
+  openWorldHint: false

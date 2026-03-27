@@ -7,6 +7,8 @@ description: List iOS simulators.
 annotations:
   title: List Simulators
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Boot a simulator
     toolId: boot_sim

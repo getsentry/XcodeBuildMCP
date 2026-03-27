@@ -6,4 +6,6 @@ names:
 description: Erase simulator.
 annotations:
   title: Erase Simulators
+  readOnlyHint: false
   destructiveHint: true
+  openWorldHint: false

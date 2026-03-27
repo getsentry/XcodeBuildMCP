@@ -9,3 +9,5 @@ routing:
 annotations:
   title: List Xcode IDE Tools
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

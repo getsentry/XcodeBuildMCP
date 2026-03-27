@@ -7,6 +7,8 @@ description: Extract bundle id from .app.
 annotations:
   title: Get App Bundle ID
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false
 nextSteps:
   - label: Install on simulator
     toolId: install_app_sim

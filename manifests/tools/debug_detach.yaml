@@ -6,3 +6,8 @@ names:
 description: Detach debugger.
 routing:
   stateful: true
+annotations:
+  title: Debug Detach
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false

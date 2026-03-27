@@ -6,4 +6,6 @@ names:
 description: Tap UI element by accessibility id/label (recommended) or coordinates as fallback.
 annotations:
   title: Tap
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false

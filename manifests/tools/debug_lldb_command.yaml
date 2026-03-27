@@ -6,3 +6,8 @@ names:
 description: Run LLDB command.
 routing:
   stateful: true
+annotations:
+  title: Debug LLDB Command
+  readOnlyHint: false
+  destructiveHint: true
+  openWorldHint: false

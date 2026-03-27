@@ -22,3 +22,5 @@ nextSteps:
 annotations:
   title: Snapshot UI
   readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

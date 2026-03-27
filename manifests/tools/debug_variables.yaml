@@ -6,3 +6,8 @@ names:
 description: Get frame variables.
 routing:
   stateful: true
+annotations:
+  title: Debug Variables
+  readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

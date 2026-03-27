@@ -6,4 +6,6 @@ names:
 description: Press key by keycode.
 annotations:
   title: Key Press
+  readOnlyHint: true
   destructiveHint: false
+  openWorldHint: false
