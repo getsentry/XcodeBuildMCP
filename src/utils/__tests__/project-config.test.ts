@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
+import { homedir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { createMockFileSystemExecutor } from '../../test-utils/mock-executors.ts';
 import {
@@ -185,6 +186,25 @@ describe('project-config', () => {
       expect(result.config.sessionDefaultsProfiles?.watch?.workspacePath).toBe(
         path.join(cwd, 'Watch.xcworkspace'),
       );
+    });
+
+    it('should expand tilde in derivedDataPath and other path fields', async () => {
+      const yaml = [
+        'schemaVersion: 1',
+        'sessionDefaults:',
+        '  workspacePath: "./App.xcworkspace"',
+        '  derivedDataPath: "~/.derivedData/myproject"',
+        '',
+      ].join('\n');
+
+      const { fs } = createFsFixture({ exists: true, readFile: yaml });
+      const result = await loadProjectConfig({ fs, cwd });
+
+      if (!result.found) throw new Error('expected config to be found');
+
+      const defaults = result.config.sessionDefaults ?? {};
+      expect(defaults.derivedDataPath).toBe(path.join(homedir(), '.derivedData', 'myproject'));
+      expect(defaults.workspacePath).toBe(path.join(cwd, 'App.xcworkspace'));
     });
 
     it('should return an error result when schemaVersion is unsupported', async () => {

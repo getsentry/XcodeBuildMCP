@@ -387,5 +387,41 @@ describe('build-utils Sentry Classification', () => {
       expect(capturedCommand).toContain(expectedDerivedDataPath);
       expect(capturedOptions).toEqual({ cwd: path.dirname(expectedProjectPath) });
     });
+
+    it('should expand tilde in derivedDataPath to home directory', async () => {
+      let capturedCommand: string[] | undefined;
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'BUILD SUCCEEDED',
+        exitCode: 0,
+        onExecute: (command) => {
+          capturedCommand = command;
+        },
+      });
+
+      const { homedir } = await import('os');
+      const expectedDerivedDataPath = path.join(homedir(), '.derivedData/test');
+
+      await executeXcodeBuildCommand(
+        {
+          scheme: 'TestScheme',
+          configuration: 'Debug',
+          projectPath: '/path/to/project.xcodeproj',
+          derivedDataPath: '~/.derivedData/test',
+        },
+        {
+          platform: XcodePlatform.iOSSimulator,
+          simulatorName: 'iPhone 17 Pro',
+          useLatestOS: true,
+          logPrefix: 'iOS Simulator Build',
+        },
+        false,
+        'build',
+        mockExecutor,
+      );
+
+      expect(capturedCommand).toBeDefined();
+      expect(capturedCommand).toContain(expectedDerivedDataPath);
+    });
   });
 });

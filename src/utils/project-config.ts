@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
@@ -123,6 +124,14 @@ function normalizePathValue(value: string, cwd: string): string {
   const fileUrlPath = tryFileUrlToPath(value);
   if (fileUrlPath) {
     return fileUrlPath;
+  }
+
+  if (value === '~') {
+    return homedir();
+  }
+
+  if (value.startsWith('~/')) {
+    return path.join(homedir(), value.slice(2));
   }
 
   if (path.isAbsolute(value)) {

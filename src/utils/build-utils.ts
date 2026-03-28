@@ -32,8 +32,15 @@ import {
 } from './xcodemake.ts';
 import { sessionStore } from './session-store.ts';
 import path from 'path';
+import { homedir } from 'os';
 
 function resolvePathFromCwd(pathValue: string): string {
+  if (pathValue === '~') {
+    return homedir();
+  }
+  if (pathValue.startsWith('~/')) {
+    return path.join(homedir(), pathValue.slice(2));
+  }
   if (path.isAbsolute(pathValue)) {
     return pathValue;
   }
