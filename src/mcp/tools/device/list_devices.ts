@@ -399,7 +399,7 @@ export async function list_devicesLogic(
         'Before running build/run/test/UI automation tools, set the desired device identifier in session defaults.\n';
 
       nextStepParams = {
-        build_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
+        build_device: { scheme: 'SCHEME' },
         build_run_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
         test_device: { scheme: 'SCHEME', deviceId: 'DEVICE_UDID' },
         get_device_app_path: { scheme: 'SCHEME' },
