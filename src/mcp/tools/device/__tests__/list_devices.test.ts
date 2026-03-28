@@ -217,7 +217,7 @@ describe('list_devices plugin (device-shared)', () => {
       expect(text).toContain('Test iPhone');
       expect(text).toContain('test-device-123');
       expect(result.nextStepParams).toEqual({
-        build_device: { scheme: 'YOUR_SCHEME', deviceId: 'UUID_FROM_ABOVE' },
+        build_device: { scheme: 'YOUR_SCHEME' },
         install_app_device: { deviceId: 'UUID_FROM_ABOVE', appPath: 'PATH_TO_APP' },
       });
     });

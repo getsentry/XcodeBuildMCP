@@ -18,7 +18,7 @@ type ListDevicesParams = z.infer<typeof listDevicesSchema>;
 type ListDevicesResult = DeviceListDomainResult;
 
 const NEXT_STEP_PARAMS = {
-  build_device: { scheme: 'YOUR_SCHEME', deviceId: 'UUID_FROM_ABOVE' },
+  build_device: { scheme: 'YOUR_SCHEME' },
   install_app_device: { deviceId: 'UUID_FROM_ABOVE', appPath: 'PATH_TO_APP' },
 } as const;
 
