@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import * as clack from '@clack/prompts';
 import { getResourceRoot } from '../../core/resource-root.ts';
 import { createPrompter, isInteractiveTTY, type Prompter } from '../interactive/prompts.ts';
+import { expandHomePrefix } from '../../utils/expand-home.ts';
 
 type SkillType = 'mcp' | 'cli';
 
@@ -70,18 +71,6 @@ function readSkillContent(skillType: SkillType): string {
     throw new Error(`Skill source not found: ${sourcePath}`);
   }
   return fs.readFileSync(sourcePath, 'utf8');
-}
-
-function expandHomePrefix(inputPath: string): string {
-  if (inputPath === '~') {
-    return os.homedir();
-  }
-
-  if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
-    return path.join(os.homedir(), inputPath.slice(2));
-  }
-
-  return inputPath;
 }
 
 function resolveDestinationPath(inputPath: string): string {

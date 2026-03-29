@@ -1,26 +1,19 @@
 import path from 'node:path';
-import { homedir } from 'node:os';
 import { XcodePlatform } from '../../../types/common.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
+import { expandHomePrefix } from '../../../utils/expand-home.ts';
 
 function resolvePathFromCwd(pathValue?: string): string | undefined {
   if (!pathValue) {
     return undefined;
   }
 
-  if (pathValue === '~') {
-    return homedir();
+  const expanded = expandHomePrefix(pathValue);
+  if (path.isAbsolute(expanded)) {
+    return expanded;
   }
 
-  if (pathValue.startsWith('~/')) {
-    return path.join(homedir(), pathValue.slice(2));
-  }
-
-  if (path.isAbsolute(pathValue)) {
-    return pathValue;
-  }
-
-  return path.resolve(process.cwd(), pathValue);
+  return path.resolve(process.cwd(), expanded);
 }
 
 export type DevicePlatform = 'iOS' | 'watchOS' | 'tvOS' | 'visionOS';

@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import type { SessionDefaults } from './session-store.ts';
 import { log } from './logger.ts';
+import { expandHomePrefix } from './expand-home.ts';
 import { removeUndefined } from './remove-undefined.ts';
 import { runtimeConfigFileSchema, type RuntimeConfigFile } from './runtime-config-schema.ts';
 import { normalizeSessionDefaultsProfileName } from './session-defaults-profile.ts';
@@ -126,19 +126,12 @@ function normalizePathValue(value: string, cwd: string): string {
     return fileUrlPath;
   }
 
-  if (value === '~') {
-    return homedir();
+  const expanded = expandHomePrefix(value);
+  if (path.isAbsolute(expanded)) {
+    return expanded;
   }
 
-  if (value.startsWith('~/')) {
-    return path.join(homedir(), value.slice(2));
-  }
-
-  if (path.isAbsolute(value)) {
-    return value;
-  }
-
-  return path.resolve(cwd, value);
+  return path.resolve(cwd, expanded);
 }
 
 function resolveRelativeSessionPaths(

@@ -32,19 +32,14 @@ import {
 } from './xcodemake.ts';
 import { sessionStore } from './session-store.ts';
 import path from 'path';
-import { homedir } from 'os';
+import { expandHomePrefix } from './expand-home.ts';
 
 function resolvePathFromCwd(pathValue: string): string {
-  if (pathValue === '~') {
-    return homedir();
+  const expanded = expandHomePrefix(pathValue);
+  if (path.isAbsolute(expanded)) {
+    return expanded;
   }
-  if (pathValue.startsWith('~/')) {
-    return path.join(homedir(), pathValue.slice(2));
-  }
-  if (path.isAbsolute(pathValue)) {
-    return pathValue;
-  }
-  return path.resolve(process.cwd(), pathValue);
+  return path.resolve(process.cwd(), expanded);
 }
 
 /**
