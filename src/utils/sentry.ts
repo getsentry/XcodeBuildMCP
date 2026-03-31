@@ -402,7 +402,10 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
 
   try {
     const snapshotAnomalies = (summary.snapshot as { anomalies?: unknown }).anomalies;
-    const anomalyCount = Array.isArray(snapshotAnomalies) ? snapshotAnomalies.length : 0;
+    const PEER_ANOMALIES: ReadonlySet<string> = new Set(['peer-count-high', 'peer-age-high']);
+    const localAnomalyCount = Array.isArray(snapshotAnomalies)
+      ? snapshotAnomalies.filter((a) => typeof a === 'string' && !PEER_ANOMALIES.has(a)).length
+      : 0;
 
     const isCrashReason =
       summary.reason === 'startup-failure' ||
@@ -412,7 +415,7 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
     let level: 'error' | 'warning' | 'info';
     if (isCrashReason) {
       level = 'error';
-    } else if (summary.cleanupFailureCount > 0 || anomalyCount > 0) {
+    } else if (summary.cleanupFailureCount > 0 || localAnomalyCount > 0) {
       level = 'warning';
     } else {
       level = 'info';
