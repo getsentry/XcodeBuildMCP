@@ -1,0 +1,23 @@
+{
+  "name": "xcodebuild-mcp",
+  "version": "0.1.0",
+  "description": "Xcode build and project management tools from Codex",
+  "author": {
+    "name": "getsentry",
+    "url": "https://github.com/getsentry/XcodeBuildMCP"
+  },
+  "homepage": "https://github.com/getsentry/XcodeBuildMCP",
+  "repository": "https://github.com/getsentry/XcodeBuildMCP",
+  "keywords": [
+    "mcp",
+    "codex"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Xcode Build MCP",
+    "shortDescription": "Xcode build and project management tools from Codex",
+    "longDescription": "A MCP server and CLI that provides tools for agent use when working on iOS and macOS projects.",
+    "category": "Development",
+    "websiteURL": "https://github.com/getsentry/XcodeBuildMCP"
+  }
+}

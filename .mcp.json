@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "sentry": {
-      "type": "http",
-      "url": "https://mcp.sentry.dev/mcp"
+    "xcodebuild-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "xcodebuildmcp@latest"
+      ]
     }
   }
 }
