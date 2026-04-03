@@ -4,7 +4,8 @@
       "command": "npx",
       "args": [
         "-y",
-        "xcodebuildmcp@latest"
+        "xcodebuildmcp@latest",
+        "mcp"
       ]
     }
   }

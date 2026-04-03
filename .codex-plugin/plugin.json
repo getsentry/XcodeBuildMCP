@@ -19,5 +19,6 @@
     "longDescription": "A MCP server and CLI that provides tools for agent use when working on iOS and macOS projects.",
     "category": "Development",
     "websiteURL": "https://github.com/getsentry/XcodeBuildMCP"
-  }
+  },
+  "skills": "./skills/"
 }
