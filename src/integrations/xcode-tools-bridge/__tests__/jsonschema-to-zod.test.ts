@@ -105,4 +105,27 @@ describe('jsonSchemaToZod', () => {
     const intSchema = { type: 'integer', default: 7 };
     expect(jsonSchemaToZod(intSchema).parse(undefined)).toBe(7);
   });
+
+  it('applies default values on enum types', () => {
+    // String enum with default
+    const stringEnumSchema = {
+      enum: ['project-relative', 'absolute'],
+      default: 'project-relative',
+    };
+    expect(jsonSchemaToZod(stringEnumSchema).parse(undefined)).toBe('project-relative');
+    expect(jsonSchemaToZod(stringEnumSchema).parse('absolute')).toBe('absolute');
+
+    // Single-value string enum (literal) with default
+    const singleEnumSchema = { enum: ['only'], default: 'only' };
+    expect(jsonSchemaToZod(singleEnumSchema).parse(undefined)).toBe('only');
+
+    // Mixed-type enum with default
+    const mixedEnumSchema = { enum: ['a', 1, true], default: 1 };
+    expect(jsonSchemaToZod(mixedEnumSchema).parse(undefined)).toBe(1);
+    expect(jsonSchemaToZod(mixedEnumSchema).parse('a')).toBe('a');
+
+    // Single mixed literal with default
+    const singleMixedSchema = { enum: [42], default: 42 };
+    expect(jsonSchemaToZod(singleMixedSchema).parse(undefined)).toBe(42);
+  });
 });

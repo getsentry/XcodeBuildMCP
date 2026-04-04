@@ -47,31 +47,37 @@ export function jsonSchemaToZod(schema: JsonSchema | unknown): z.ZodTypeAny {
   if (Array.isArray(s.enum)) {
     const enumValues = s.enum.filter(isEnumValue);
     if (enumValues.length === 0) {
-      return applyDescription(z.any(), s.description);
+      return applyDefault(applyDescription(z.any(), s.description), s.default);
     }
     const allStrings = enumValues.every((v) => typeof v === 'string');
     if (allStrings) {
       const stringValues = enumValues as string[];
       if (stringValues.length === 1) {
-        return applyDescription(z.literal(stringValues[0]), s.description);
+        return applyDefault(applyDescription(z.literal(stringValues[0]), s.description), s.default);
       }
-      return applyDescription(z.enum(stringValues as [string, ...string[]]), s.description);
+      return applyDefault(
+        applyDescription(z.enum(stringValues as [string, ...string[]]), s.description),
+        s.default,
+      );
     }
 
     // z.enum only supports string unions; use z.literal union for mixed enums.
     const literals = enumValues.map((v) => z.literal(v)) as z.ZodLiteral<JsonSchemaEnumValue>[];
     if (literals.length === 1) {
-      return applyDescription(literals[0], s.description);
+      return applyDefault(applyDescription(literals[0], s.description), s.default);
     }
-    return applyDescription(
-      z.union(
-        literals as [
-          z.ZodLiteral<JsonSchemaEnumValue>,
-          z.ZodLiteral<JsonSchemaEnumValue>,
-          ...z.ZodLiteral<JsonSchemaEnumValue>[],
-        ],
+    return applyDefault(
+      applyDescription(
+        z.union(
+          literals as [
+            z.ZodLiteral<JsonSchemaEnumValue>,
+            z.ZodLiteral<JsonSchemaEnumValue>,
+            ...z.ZodLiteral<JsonSchemaEnumValue>[],
+          ],
+        ),
+        s.description,
       ),
-      s.description,
+      s.default,
     );
   }
 
