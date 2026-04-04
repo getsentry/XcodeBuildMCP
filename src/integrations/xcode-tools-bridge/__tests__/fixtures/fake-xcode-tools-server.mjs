@@ -60,6 +60,23 @@ function registerInitialTools() {
       return { content: [{ type: 'text', text: 'changed' }], isError: false };
     },
   );
+
+  server.registerTool(
+    'Echo',
+    {
+      description: 'Echoes back received arguments as JSON',
+      inputSchema: z
+        .object({
+          filePath: z.string(),
+          tabIdentifier: z.string().optional(),
+        })
+        .passthrough(),
+    },
+    async (args) => ({
+      content: [{ type: 'text', text: JSON.stringify(args) }],
+      isError: false,
+    }),
+  );
 }
 
 function applyCatalogChange() {

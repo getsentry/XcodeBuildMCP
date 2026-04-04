@@ -1,4 +1,5 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { log } from '../../utils/logger.ts';
 import {
   XcodeToolsBridgeClient,
   type XcodeToolsBridgeClientOptions,
@@ -95,12 +96,18 @@ export class XcodeIdeToolService {
     opts: { timeoutMs?: number } = {},
   ): Promise<CallToolResult> {
     await this.ensureConnected();
+    log('debug', `[xcode-tools-bridge] invokeTool: ${name} args=${JSON.stringify(args)}`);
     try {
       const response = await this.client.callTool(name, args, opts);
       this.lastError = null;
+      log(
+        'debug',
+        `[xcode-tools-bridge] invokeTool result: ${name} contentItems=${response.content.length} isError=${response.isError ?? false}`,
+      );
       return response;
     } catch (error) {
       this.lastError = toErrorMessage(error);
+      log('debug', `[xcode-tools-bridge] invokeTool error: ${name} error=${this.lastError}`);
       throw error;
     }
   }

@@ -69,4 +69,40 @@ describe('jsonSchemaToZod', () => {
     const parsed = zod.parse({ a: 'x', extra: 1 }) as Record<string, unknown>;
     expect(parsed.extra).toBe(1);
   });
+
+  it('applies default values from JSON Schema', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        format: { type: 'string', default: 'project-relative' },
+      },
+      required: ['name'],
+    };
+
+    const zod = jsonSchemaToZod(schema);
+
+    // Default is applied when property is absent
+    const withDefault = zod.parse({ name: 'test' }) as Record<string, unknown>;
+    expect(withDefault.format).toBe('project-relative');
+
+    // Explicit value overrides the default
+    const withExplicit = zod.parse({ name: 'test', format: 'absolute' }) as Record<string, unknown>;
+    expect(withExplicit.format).toBe('absolute');
+  });
+
+  it('applies default values on primitive types', () => {
+    const stringSchema = { type: 'string', default: 'hello' };
+    expect(jsonSchemaToZod(stringSchema).parse(undefined)).toBe('hello');
+    expect(jsonSchemaToZod(stringSchema).parse('world')).toBe('world');
+
+    const numberSchema = { type: 'number', default: 42 };
+    expect(jsonSchemaToZod(numberSchema).parse(undefined)).toBe(42);
+
+    const boolSchema = { type: 'boolean', default: true };
+    expect(jsonSchemaToZod(boolSchema).parse(undefined)).toBe(true);
+
+    const intSchema = { type: 'integer', default: 7 };
+    expect(jsonSchemaToZod(intSchema).parse(undefined)).toBe(7);
+  });
 });

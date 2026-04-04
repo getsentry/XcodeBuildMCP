@@ -132,4 +132,50 @@ describe('XcodeToolsProxyRegistry (stdio integration)', () => {
     })) as CallToolResult;
     expect(res.content[0]).toMatchObject({ type: 'text', text: 'Alpha2:hi:e' });
   });
+
+  it('passes arguments through the proxy without modification', async () => {
+    const tools = await localClient.listTools();
+    expect(tools.tools.map((t) => t.name)).toContain('xcode_tools_Echo');
+
+    const testCases = [
+      {
+        name: 'file paths with slashes and spaces',
+        args: {
+          filePath: '/Users/test/My Project/Sources/Views/MainTabView.swift',
+          tabIdentifier: 'windowtab1',
+        },
+      },
+      {
+        name: 'unicode characters in paths',
+        args: {
+          filePath: '/Users/test/Projekt/Ansichten/\u00dcbersicht.swift',
+          tabIdentifier: 'tab-2',
+        },
+      },
+      {
+        name: 'extra properties not in schema (passthrough)',
+        args: {
+          filePath: 'Sources/App.swift',
+          tabIdentifier: 'wt1',
+          extraFlag: true,
+          nested: { deep: 'value' },
+        },
+      },
+    ];
+
+    for (const tc of testCases) {
+      const res = (await localClient.callTool({
+        name: 'xcode_tools_Echo',
+        arguments: tc.args,
+      })) as CallToolResult;
+      expect(res.isError).not.toBe(true);
+      const echoed = JSON.parse((res.content[0] as { text: string }).text) as Record<
+        string,
+        unknown
+      >;
+      for (const [key, value] of Object.entries(tc.args)) {
+        expect(echoed[key]).toEqual(value);
+      }
+    }
+  });
 });

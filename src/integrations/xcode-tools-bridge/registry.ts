@@ -1,6 +1,7 @@
 import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod';
+import { log } from '../../utils/logger.ts';
 import { jsonSchemaToZod } from './jsonschema-to-zod.ts';
 
 export type CallRemoteTool = (
@@ -114,7 +115,16 @@ export class XcodeToolsProxyRegistry {
       },
       async (args: unknown) => {
         const params = (args ?? {}) as Record<string, unknown>;
-        return callRemoteTool(tool.name, params);
+        log(
+          'debug',
+          `[xcode-tools-bridge] Proxy call: ${tool.name} args=${JSON.stringify(params)}`,
+        );
+        const result = await callRemoteTool(tool.name, params);
+        log(
+          'debug',
+          `[xcode-tools-bridge] Proxy result: ${tool.name} contentItems=${result.content.length} isError=${result.isError ?? false}`,
+        );
+        return result;
       },
     );
   }

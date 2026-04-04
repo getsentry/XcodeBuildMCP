@@ -5,6 +5,7 @@ type JsonSchemaEnumValue = string | number | boolean | null;
 type JsonSchema = {
   type?: string | string[];
   description?: string;
+  default?: unknown;
   enum?: unknown[];
   items?: JsonSchema;
   properties?: Record<string, JsonSchema>;
@@ -14,6 +15,11 @@ type JsonSchema = {
 function applyDescription<T extends z.ZodTypeAny>(schema: T, description?: string): T {
   if (!description) return schema;
   return schema.describe(description) as T;
+}
+
+function applyDefault(schema: z.ZodTypeAny, defaultValue: unknown): z.ZodTypeAny {
+  if (defaultValue === undefined) return schema;
+  return schema.default(defaultValue);
 }
 
 function isObjectSchema(schema: JsonSchema): boolean {
@@ -74,21 +80,21 @@ export function jsonSchemaToZod(schema: JsonSchema | unknown): z.ZodTypeAny {
 
   switch (primaryType) {
     case 'string':
-      return applyDescription(z.string(), s.description);
+      return applyDefault(applyDescription(z.string(), s.description), s.default);
     case 'integer':
-      return applyDescription(z.number().int(), s.description);
+      return applyDefault(applyDescription(z.number().int(), s.description), s.default);
     case 'number':
-      return applyDescription(z.number(), s.description);
+      return applyDefault(applyDescription(z.number(), s.description), s.default);
     case 'boolean':
-      return applyDescription(z.boolean(), s.description);
+      return applyDefault(applyDescription(z.boolean(), s.description), s.default);
     case 'array': {
       const itemSchema = jsonSchemaToZod(s.items ?? {});
-      return applyDescription(z.array(itemSchema), s.description);
+      return applyDefault(applyDescription(z.array(itemSchema), s.description), s.default);
     }
     case 'object':
     default: {
       if (!isObjectSchema(s)) {
-        return applyDescription(z.any(), s.description);
+        return applyDefault(applyDescription(z.any(), s.description), s.default);
       }
       const required = new Set(s.required ?? []);
       const props = s.properties ?? {};
@@ -98,7 +104,10 @@ export function jsonSchemaToZod(schema: JsonSchema | unknown): z.ZodTypeAny {
         shape[key] = required.has(key) ? propSchema : propSchema.optional();
       }
       // Use passthrough to avoid breaking when Apple adds new fields.
-      return applyDescription(z.object(shape).passthrough(), s.description);
+      return applyDefault(
+        applyDescription(z.object(shape).passthrough(), s.description),
+        s.default,
+      );
     }
   }
 }
