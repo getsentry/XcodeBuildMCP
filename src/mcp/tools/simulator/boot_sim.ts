@@ -7,6 +7,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
+import { ensureSimulatorAccessibility } from '../../../utils/simulator-accessibility.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -49,15 +50,36 @@ export async function boot_simLogic(
     const result = await executor(command, 'Boot Simulator', false);
 
     if (!result.success) {
+      // If the simulator is already booted, still ensure accessibility defaults
+      const alreadyBooted =
+        result.error?.includes('Unable to boot device in current state: Booted') ?? false;
+      if (alreadyBooted) {
+        await ensureSimulatorAccessibility(params.simulatorId, executor);
+      }
       return {
         content: [
           {
             type: 'text',
-            text: `Boot simulator operation failed: ${result.error}`,
+            text: alreadyBooted
+              ? 'Simulator is already booted.'
+              : `Boot simulator operation failed: ${result.error}`,
           },
         ],
+        ...(alreadyBooted && {
+          nextStepParams: {
+            open_sim: {},
+            install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
+            launch_app_sim: {
+              simulatorId: params.simulatorId,
+              bundleId: 'YOUR_APP_BUNDLE_ID',
+            },
+          },
+        }),
       };
     }
+
+    // Ensure accessibility defaults are enabled (required for UI hierarchy on iOS 26+)
+    await ensureSimulatorAccessibility(params.simulatorId, executor);
 
     return {
       content: [

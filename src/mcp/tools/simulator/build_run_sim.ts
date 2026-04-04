@@ -22,6 +22,7 @@ import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { inferPlatform } from '../../../utils/infer-platform.ts';
 import { constructDestinationString } from '../../../utils/xcode.ts';
+import { ensureSimulatorAccessibility } from '../../../utils/simulator-accessibility.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, and XOR between simulatorId and simulatorName
 const baseOptions = {
@@ -346,6 +347,9 @@ export async function build_run_simLogic(
       } else {
         log('info', `Simulator ${simulatorId} is already booted`);
       }
+
+      // Ensure accessibility defaults are enabled (required for UI hierarchy on iOS 26+)
+      await ensureSimulatorAccessibility(simulatorId, executor);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log('error', `Error checking/booting simulator: ${errorMessage}`);

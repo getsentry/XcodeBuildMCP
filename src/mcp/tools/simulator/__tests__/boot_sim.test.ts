@@ -83,6 +83,36 @@ describe('boot_sim tool', () => {
       });
     });
 
+    it('should handle already-booted simulator and still enable accessibility', async () => {
+      const executorCalls: string[][] = [];
+      const mockExecutor = async (
+        command: string[],
+        description?: string,
+        allowStderr?: boolean,
+        opts?: { cwd?: string },
+        detached?: boolean,
+      ) => {
+        executorCalls.push(command);
+        void description;
+        void allowStderr;
+        void opts;
+        void detached;
+        if (command.includes('boot')) {
+          return createMockCommandResponse({
+            success: false,
+            error: 'Unable to boot device in current state: Booted',
+          });
+        }
+        return createMockCommandResponse({ success: true, output: '0' });
+      };
+
+      const result = await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
+
+      expect(result.content[0].text).toBe('Simulator is already booted.');
+      // Should have called accessibility write after detecting already-booted
+      expect(executorCalls.some((cmd) => cmd.join(' ').includes('defaults write'))).toBe(true);
+    });
+
     it('should handle exception with Error object', async () => {
       const mockExecutor = async () => {
         throw new Error('Connection failed');
@@ -142,7 +172,8 @@ describe('boot_sim tool', () => {
 
       await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
 
-      expect(calls).toHaveLength(1);
+      // First call is the boot command; subsequent calls are from ensureSimulatorAccessibility
+      expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]).toEqual({
         command: ['xcrun', 'simctl', 'boot', 'test-uuid-123'],
         description: 'Boot Simulator',

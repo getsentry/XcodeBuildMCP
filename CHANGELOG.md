@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed `snapshot_ui` returning empty accessibility hierarchy on iOS 26+ simulators by auto-enabling accessibility defaults at simulator boot ([#290](https://github.com/getsentry/XcodeBuildMCP/issues/290)).
+
 ## [2.3.2]
 
 ### Fixed
