@@ -4,11 +4,11 @@
 
 ### Added
 
-- Added debug logging for xcode-tools-bridge proxy tool calls to aid diagnosis of bridge-related issues ([#252](https://github.com/getsentry/XcodeBuildMCP/issues/252)).
+- Added debug logging for xcode-tools-bridge proxy tool calls to aid diagnosis of bridge-related issues ([#310](https://github.com/getsentry/XcodeBuildMCP/pull/310) by [@dpearson2699](https://github.com/dpearson2699)).
 
 ### Fixed
 
-- Fixed `jsonSchemaToZod` converter to apply `default` values from remote tool JSON schemas, preventing potential argument loss when proxying bridge tools ([#252](https://github.com/getsentry/XcodeBuildMCP/issues/252)).
+- Fixed `jsonSchemaToZod` converter to apply `default` values from remote tool JSON schemas, preventing potential argument loss when proxying bridge tools ([#310](https://github.com/getsentry/XcodeBuildMCP/pull/310) by [@dpearson2699](https://github.com/dpearson2699)).
 
 ## [2.3.2]
 
