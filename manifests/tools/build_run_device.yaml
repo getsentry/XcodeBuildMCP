@@ -12,9 +12,6 @@ annotations:
   destructiveHint: false
   openWorldHint: false
 nextSteps:
-  - label: Capture device logs
-    toolId: start_device_log_cap
-    priority: 1
   - label: Stop app on device
     toolId: stop_app_device
-    priority: 2
+    priority: 1

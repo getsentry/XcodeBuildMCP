@@ -13,16 +13,3 @@ nextSteps:
   - label: Open Simulator app to see it
     toolId: open_sim
     priority: 1
-  - label: Capture structured logs (app continues running)
-    toolId: start_sim_log_cap
-    params:
-      simulatorId: SIMULATOR_UUID
-      bundleId: BUNDLE_ID
-    priority: 2
-  - label: Capture console + structured logs (app restarts)
-    toolId: start_sim_log_cap
-    params:
-      simulatorId: SIMULATOR_UUID
-      bundleId: BUNDLE_ID
-      captureConsole: true
-    priority: 3

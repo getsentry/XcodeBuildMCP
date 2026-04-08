@@ -12,15 +12,6 @@ annotations:
   destructiveHint: false
   openWorldHint: false
 nextSteps:
-  - label: Capture structured logs (app continues running)
-    toolId: start_sim_log_cap
-    priority: 1
   - label: Stop app in simulator
     toolId: stop_app_sim
-    priority: 2
-  - label: Capture console + structured logs (app restarts)
-    toolId: start_sim_log_cap
-    priority: 3
-  - label: Launch app with logs in one step
-    toolId: launch_app_logs_sim
-    priority: 4
+    priority: 1
