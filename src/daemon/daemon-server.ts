@@ -1,9 +1,12 @@
 import net from 'node:net';
 import { writeFrame, createFrameReader } from './framing.ts';
 import type { ToolCatalog } from '../runtime/types.ts';
+import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { ToolResponse } from '../types/common.ts';
 import type {
   DaemonRequest,
   DaemonResponse,
+  DaemonToolResult,
   ToolInvokeParams,
   DaemonStatusResult,
   ToolListItem,
@@ -14,6 +17,9 @@ import type {
 } from './protocol.ts';
 import { DAEMON_PROTOCOL_VERSION } from './protocol.ts';
 import { DefaultToolInvoker } from '../runtime/tool-invoker.ts';
+import { createRenderSession } from '../rendering/render.ts';
+import type { ToolHandlerContext } from '../rendering/types.ts';
+import { statusLine } from '../utils/tool-event-builders.ts';
 import { log } from '../utils/logger.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
@@ -33,6 +39,28 @@ export interface DaemonServerContext {
   onRequestStarted?: () => void;
   /** Callback invoked after a daemon request has finished processing. */
   onRequestFinished?: () => void;
+}
+
+function toolResponseToDaemonResult(response: ToolResponse): DaemonToolResult {
+  const events: PipelineEvent[] = [];
+  const metaEvents = response._meta?.events;
+  if (Array.isArray(metaEvents) && metaEvents.length > 0) {
+    for (const event of metaEvents as PipelineEvent[]) {
+      events.push(event);
+    }
+  } else {
+    for (const item of response.content) {
+      if (item.type === 'text' && item.text) {
+        events.push(statusLine(response.isError ? 'error' : 'success', item.text));
+      }
+    }
+  }
+  return {
+    events,
+    isError: response.isError === true,
+    nextStepParams: response.nextStepParams,
+    nextSteps: response.nextSteps,
+  };
 }
 
 /**
@@ -117,12 +145,26 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
               }
 
               log('info', `[Daemon] Invoking tool: ${params.tool}`);
-              const response = await invoker.invoke(params.tool, params.args ?? {}, {
+              const session = createRenderSession('text');
+              const handlerContext: ToolHandlerContext = {
+                emit: (event) => session.emit(event),
+                attach: (image) => session.attach(image),
+              };
+              await invoker.invoke(params.tool, params.args ?? {}, {
                 runtime: 'daemon',
+                renderSession: session,
+                handlerContext,
                 enabledWorkflows: ctx.enabledWorkflows,
               });
 
-              return writeFrame(socket, { ...base, result: { response } });
+              const daemonResult: DaemonToolResult = {
+                events: [...session.getEvents()],
+                isError: session.isError(),
+                nextStepParams: handlerContext.nextStepParams,
+                nextSteps: handlerContext.nextSteps,
+              };
+
+              return writeFrame(socket, { ...base, result: { result: daemonResult } });
             }
 
             case 'xcode-ide.list': {
@@ -187,7 +229,8 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                 params.remoteTool,
                 params.args ?? {},
               );
-              const result: XcodeIdeInvokeResult = { response };
+              const xcodeResult = toolResponseToDaemonResult(response as ToolResponse);
+              const result: XcodeIdeInvokeResult = { result: xcodeResult };
               return writeFrame(socket, { ...base, result });
             }
 

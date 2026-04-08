@@ -139,8 +139,7 @@ function buildBestEffortInputSchema(tool: Tool): z.ZodTypeAny {
   if (!tool.inputSchema) {
     return z.object({}).passthrough();
   }
-  const zod = jsonSchemaToZod(tool.inputSchema);
-  return zod;
+  return jsonSchemaToZod(tool.inputSchema);
 }
 
 function buildBestEffortAnnotations(tool: Tool, localName: string): ToolAnnotations {
@@ -158,10 +157,9 @@ function buildBestEffortAnnotations(tool: Tool, localName: string): ToolAnnotati
 }
 
 function inferReadOnlyHint(localToolName: string): boolean {
-  // Default to conservative: most IDE tools can mutate project state.
   const name = localToolName.toLowerCase();
 
-  const definitelyReadOnlyPrefixes = [
+  const readOnlyPrefixes = [
     'xcode_tools_xcodelist',
     'xcode_tools_xcodeglob',
     'xcode_tools_xcodegrep',
@@ -172,9 +170,7 @@ function inferReadOnlyHint(localToolName: string): boolean {
     'xcode_tools_gettestlist',
   ];
 
-  if (definitelyReadOnlyPrefixes.some((p) => name.startsWith(p))) return true;
-
-  return false;
+  return readOnlyPrefixes.some((p) => name.startsWith(p));
 }
 
 function inferDestructiveHint(localToolName: string, readOnlyHint: boolean): boolean {

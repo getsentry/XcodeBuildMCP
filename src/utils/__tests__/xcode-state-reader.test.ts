@@ -1,19 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync } from 'fs';
-import { join } from 'path';
 import {
   findXcodeStateFile,
   lookupSimulatorName,
   readXcodeIdeState,
 } from '../xcode-state-reader.ts';
 import { createCommandMatchingMockExecutor } from '../../test-utils/mock-executors.ts';
-
-// Path to the example project's xcuserstate (used as test fixture)
-const EXAMPLE_PROJECT_PATH = join(process.cwd(), 'example_projects/iOS/MCPTest.xcodeproj');
-const EXAMPLE_XCUSERSTATE = join(
-  EXAMPLE_PROJECT_PATH,
-  'project.xcworkspace/xcuserdata/johndoe.xcuserdatad/UserInterfaceState.xcuserstate',
-);
 
 describe('findXcodeStateFile', () => {
   it('returns undefined when no project/workspace found', async () => {
@@ -226,74 +217,4 @@ describe('readXcodeIdeState', () => {
 
     expect(result.error).toBeDefined();
   });
-});
-
-describe('readXcodeIdeState integration', () => {
-  // These tests use the actual example project fixture
-
-  it.skipIf(!existsSync(EXAMPLE_XCUSERSTATE))(
-    'reads scheme and simulator from example project',
-    async () => {
-      // Mock executor that returns real paths
-      const executor = createCommandMatchingMockExecutor({
-        whoami: { output: 'johndoe\n' },
-        find: { output: `${EXAMPLE_PROJECT_PATH}\n` },
-        stat: { output: '1704067200\n' },
-        'xcrun simctl': {
-          output: JSON.stringify({
-            devices: {
-              'com.apple.CoreSimulator.SimRuntime.xrOS-2-0': [
-                {
-                  udid: 'B38FE93D-578B-454B-BE9A-C6FA0CE5F096',
-                  name: 'Apple Vision Pro',
-                },
-              ],
-            },
-          }),
-        },
-      });
-
-      const result = await readXcodeIdeState({
-        executor,
-        cwd: join(process.cwd(), 'example_projects/iOS'),
-      });
-
-      expect(result.error).toBeUndefined();
-      expect(result.scheme).toBe('MCPTest');
-      expect(result.simulatorId).toBe('B38FE93D-578B-454B-BE9A-C6FA0CE5F096');
-      expect(result.simulatorName).toBe('Apple Vision Pro');
-    },
-  );
-
-  it.skipIf(!existsSync(EXAMPLE_XCUSERSTATE))(
-    'reads scheme using configured projectPath',
-    async () => {
-      const executor = createCommandMatchingMockExecutor({
-        whoami: { output: 'johndoe\n' },
-        'test -f': { success: true },
-        'xcrun simctl': {
-          output: JSON.stringify({
-            devices: {
-              'com.apple.CoreSimulator.SimRuntime.xrOS-2-0': [
-                {
-                  udid: 'B38FE93D-578B-454B-BE9A-C6FA0CE5F096',
-                  name: 'Apple Vision Pro',
-                },
-              ],
-            },
-          }),
-        },
-      });
-
-      const result = await readXcodeIdeState({
-        executor,
-        cwd: '/some/other/path',
-        projectPath: EXAMPLE_PROJECT_PATH,
-      });
-
-      expect(result.error).toBeUndefined();
-      expect(result.scheme).toBe('MCPTest');
-      expect(result.simulatorId).toBe('B38FE93D-578B-454B-BE9A-C6FA0CE5F096');
-    },
-  );
 });

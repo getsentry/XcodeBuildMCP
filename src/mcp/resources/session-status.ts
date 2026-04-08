@@ -33,12 +33,6 @@ export async function sessionStatusResourceLogic(): Promise<{ contents: Array<{ 
   }
 }
 
-export default {
-  uri: 'xcodebuildmcp://session-status',
-  name: 'session-status',
-  description: 'Runtime session state for log capture and debugging',
-  mimeType: 'application/json',
-  async handler(): Promise<{ contents: Array<{ text: string }> }> {
-    return sessionStatusResourceLogic();
-  },
-};
+export async function handler(_uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  return sessionStatusResourceLogic();
+}

@@ -9,27 +9,30 @@ import { log } from '../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../utils/execution/index.ts';
 import { list_devicesLogic } from '../tools/device/list_devices.ts';
+import { createRenderSession } from '../../rendering/render.ts';
+import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
+import type { ToolHandlerContext } from '../../rendering/types.ts';
 
-// Testable resource logic separated from MCP handler
 export async function devicesResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
+  const session = createRenderSession('text');
+  const ctx: ToolHandlerContext = {
+    emit: (event) => session.emit(event),
+    attach: () => {},
+  };
+
   try {
     log('info', 'Processing devices resource request');
-    const result = await list_devicesLogic({}, executor);
-
-    if (result.isError) {
-      const errorText = result.content[0]?.text;
-      throw new Error(typeof errorText === 'string' ? errorText : 'Failed to retrieve device data');
+    await handlerContextStorage.run(ctx, () => list_devicesLogic({}, executor));
+    const text = session.finalize();
+    if (session.isError()) {
+      throw new Error(text || 'Failed to retrieve device data');
     }
-
     return {
       contents: [
         {
-          text:
-            typeof result.content[0]?.text === 'string'
-              ? result.content[0].text
-              : 'No device data available',
+          text: text || 'No device data available',
         },
       ],
     };
@@ -47,12 +50,6 @@ export async function devicesResourceLogic(
   }
 }
 
-export default {
-  uri: 'xcodebuildmcp://devices',
-  name: 'devices',
-  description: 'Connected physical Apple devices with their UUIDs, names, and connection status',
-  mimeType: 'text/plain',
-  async handler(): Promise<{ contents: Array<{ text: string }> }> {
-    return devicesResourceLogic();
-  },
-};
+export async function handler(_uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  return devicesResourceLogic();
+}

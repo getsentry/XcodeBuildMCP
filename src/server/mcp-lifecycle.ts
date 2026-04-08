@@ -132,23 +132,23 @@ function parseElapsedSeconds(value: string): number | null {
   const daySplit = trimmed.split('-');
   const timePart = daySplit.length === 2 ? daySplit[1] : daySplit[0];
   const dayCount = daySplit.length === 2 ? Number(daySplit[0]) : 0;
-  const parts = timePart.split(':').map((part) => Number(part));
+  const parts = timePart.split(':').map(Number);
 
-  if (!Number.isFinite(dayCount) || parts.some((part) => !Number.isFinite(part))) {
+  if (!Number.isFinite(dayCount) || parts.some((p) => !Number.isFinite(p))) {
     return null;
   }
 
-  if (parts.length === 1) {
-    return dayCount * 86400 + parts[0];
+  const daySeconds = dayCount * 86400;
+  switch (parts.length) {
+    case 1:
+      return daySeconds + parts[0];
+    case 2:
+      return daySeconds + parts[0] * 60 + parts[1];
+    case 3:
+      return daySeconds + parts[0] * 3600 + parts[1] * 60 + parts[2];
+    default:
+      return null;
   }
-  if (parts.length === 2) {
-    return dayCount * 86400 + parts[0] * 60 + parts[1];
-  }
-  if (parts.length === 3) {
-    return dayCount * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2];
-  }
-
-  return null;
 }
 
 export function classifyMcpLifecycleAnomalies(
@@ -178,15 +178,12 @@ export function classifyMcpLifecycleAnomalies(
 
 function isLikelyMcpProcessCommand(command: string): boolean {
   const normalized = command.toLowerCase();
-  const hasMcpArg = /(^|\s)mcp(\s|$)/.test(normalized);
-  if (!hasMcpArg) {
+  if (!/(^|\s)mcp(\s|$)/.test(normalized)) {
     return false;
   }
-
   if (/(^|\s)daemon(\s|$)/.test(normalized)) {
     return false;
   }
-
   return (
     normalized.includes('xcodebuildmcp') ||
     normalized.includes('build/cli.js') ||
@@ -199,7 +196,7 @@ function isBrokenPipeLikeError(error: unknown): boolean {
     return false;
   }
 
-  const code = 'code' in error ? String((error as Error & { code?: unknown }).code ?? '') : '';
+  const code = String((error as NodeJS.ErrnoException).code ?? '');
   return code === 'EPIPE' || code === 'ERR_STREAM_DESTROYED';
 }
 
@@ -267,13 +264,15 @@ async function sampleMcpPeerProcesses(
   }
 }
 
+const TRANSPORT_DISCONNECT_REASONS: ReadonlySet<McpShutdownReason> = new Set([
+  'stdin-end',
+  'stdin-close',
+  'stdout-error',
+  'stderr-error',
+]);
+
 export function isTransportDisconnectReason(reason: McpShutdownReason): boolean {
-  return (
-    reason === 'stdin-end' ||
-    reason === 'stdin-close' ||
-    reason === 'stdout-error' ||
-    reason === 'stderr-error'
-  );
+  return TRANSPORT_DISCONNECT_REASONS.has(reason);
 }
 
 export async function buildMcpLifecycleSnapshot(options: {

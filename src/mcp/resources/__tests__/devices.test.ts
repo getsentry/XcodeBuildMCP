@@ -1,29 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
-import devicesResource, { devicesResourceLogic } from '../devices.ts';
+import { devicesResourceLogic } from '../devices.ts';
 import { createMockExecutor } from '../../../test-utils/mock-executors.ts';
 
 describe('devices resource', () => {
-  describe('Export Field Validation', () => {
-    it('should export correct uri', () => {
-      expect(devicesResource.uri).toBe('xcodebuildmcp://devices');
-    });
-
-    it('should export correct description', () => {
-      expect(devicesResource.description).toBe(
-        'Connected physical Apple devices with their UUIDs, names, and connection status',
-      );
-    });
-
-    it('should export correct mimeType', () => {
-      expect(devicesResource.mimeType).toBe('text/plain');
-    });
-
-    it('should export handler function', () => {
-      expect(typeof devicesResource.handler).toBe('function');
-    });
-  });
-
   describe('Handler Functionality', () => {
     it('should handle successful device data retrieval with xctrace fallback', async () => {
       const mockExecutor = createMockExecutor({

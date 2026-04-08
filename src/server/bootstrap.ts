@@ -100,7 +100,7 @@ export async function bootstrapServer(
   xcodeToolsBridge?.setWorkflowEnabled(xcodeIdeEnabled);
 
   stageStartMs = getStartupProfileNowMs();
-  await registerResources(server);
+  await registerResources(server, ctx);
   profiler.mark('registerResources', stageStartMs);
 
   return {

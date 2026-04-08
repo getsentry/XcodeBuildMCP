@@ -19,7 +19,11 @@ import { ChildProcess } from 'child_process';
 import type { WriteStream } from 'fs';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import type { CommandExecutor, CommandResponse } from '../utils/CommandExecutor.ts';
+import type {
+  CommandExecutor,
+  CommandResponse,
+  CommandExecOptions,
+} from '../utils/CommandExecutor.ts';
 import type { FileSystemExecutor } from '../utils/FileSystemExecutor.ts';
 import type { InteractiveProcess, InteractiveSpawner } from '../utils/execution/index.ts';
 
@@ -57,7 +61,7 @@ export function createMockExecutor(
           command: string[],
           logPrefix?: string,
           useShell?: boolean,
-          opts?: { env?: Record<string, string>; cwd?: string },
+          opts?: CommandExecOptions,
           detached?: boolean,
         ) => void;
       }
@@ -413,6 +417,21 @@ export function createNoopFileSystemExecutor(): FileSystemExecutor {
       );
     },
     tmpdir: (): string => '/tmp',
+  };
+}
+
+/**
+ * Create a no-op interactive spawner that throws an error if called.
+ * Use this for tests where a spawner is required but should never be called.
+ */
+export function createNoopInteractiveSpawner(): InteractiveSpawner {
+  return () => {
+    throw new Error(
+      `🚨 NOOP INTERACTIVE SPAWNER CALLED! 🚨\n` +
+        `This spawner should never be called in this test context.\n` +
+        `If you see this error, it means the test is exercising a code path that wasn't expected.\n` +
+        `Either fix the test to avoid this code path, or use createMockInteractiveSpawner() instead.`,
+    );
   };
 }
 

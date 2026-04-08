@@ -28,6 +28,14 @@ export interface AxeHelpers {
   getBundledAxeEnvironment: () => Record<string, string>;
 }
 
+export type StartVideoCaptureResult =
+  | { started: true; sessionId: string; warning?: string }
+  | { started: false; error: string };
+
+export type StopVideoCaptureResult =
+  | { stopped: true; sessionId: string; stdout?: string; parsedPath?: string }
+  | { stopped: false; error: string };
+
 function createTimeoutPromise(timeoutMs: number): Promise<'timed_out'> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve('timed_out'), timeoutMs);
@@ -72,10 +80,14 @@ async function waitForChildToStop(session: Session, timeoutMs: number): Promise<
   }
 }
 
+type StopSessionSuccess = { sessionId: string; stdout: string; parsedPath?: string };
+type StopSessionError = { error: string };
+type StopSessionResult = StopSessionSuccess | StopSessionError;
+
 async function stopSession(
   simulatorUuid: string,
   options: { timeoutMs?: number } = {},
-): Promise<{ sessionId?: string; stdout?: string; parsedPath?: string; error?: string }> {
+): Promise<StopSessionResult> {
   const session = sessions.get(simulatorUuid);
   if (!session) {
     return { error: 'No active video recording session for this simulator' };
@@ -147,7 +159,7 @@ export async function startSimulatorVideoCapture(
   params: { simulatorUuid: string; fps?: number },
   executor: CommandExecutor,
   axeHelpers?: AxeHelpers,
-): Promise<{ started: boolean; sessionId?: string; warning?: string; error?: string }> {
+): Promise<StartVideoCaptureResult> {
   const simulatorUuid = params.simulatorUuid;
   if (!simulatorUuid) {
     return { started: false, error: 'simulatorUuid is required' };
@@ -230,13 +242,7 @@ export async function startSimulatorVideoCapture(
 export async function stopSimulatorVideoCapture(
   params: { simulatorUuid: string },
   executor: CommandExecutor,
-): Promise<{
-  stopped: boolean;
-  sessionId?: string;
-  stdout?: string;
-  parsedPath?: string;
-  error?: string;
-}> {
+): Promise<StopVideoCaptureResult> {
   void executor;
 
   const simulatorUuid = params.simulatorUuid;
@@ -245,7 +251,7 @@ export async function stopSimulatorVideoCapture(
   }
 
   const result = await stopSession(simulatorUuid, { timeoutMs: 5000 });
-  if (result.error) {
+  if ('error' in result) {
     return { stopped: false, error: result.error };
   }
 
@@ -272,7 +278,7 @@ export async function stopAllVideoCaptureSessions(timeoutMs = 1000): Promise<{
 
   for (const simulatorUuid of simulatorIds) {
     const result = await stopSession(simulatorUuid, { timeoutMs });
-    if (result.error) {
+    if ('error' in result) {
       errors.push(`${simulatorUuid}: ${result.error}`);
     }
   }

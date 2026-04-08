@@ -55,12 +55,6 @@ function stringifyError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function createTimer(timeoutMs: number, callback: () => void): NodeJS.Timeout {
-  const timer = setTimeout(callback, timeoutMs);
-  timer.unref?.();
-  return timer;
-}
-
 async function runStep<T>(
   name: string,
   timeoutMs: number,
@@ -71,7 +65,8 @@ async function runStep<T>(
 
   try {
     const timeoutPromise = new Promise<RunStepRaceOutcome<T>>((resolve) => {
-      timeoutHandle = createTimer(timeoutMs, () => resolve({ kind: 'timed_out' }));
+      timeoutHandle = setTimeout(() => resolve({ kind: 'timed_out' }), timeoutMs);
+      timeoutHandle.unref?.();
     });
 
     const operationOutcome = operation()
@@ -111,12 +106,14 @@ async function runStep<T>(
   }
 }
 
+const FAILURE_REASONS: ReadonlySet<McpShutdownReason> = new Set([
+  'startup-failure',
+  'uncaught-exception',
+  'unhandled-rejection',
+]);
+
 function buildExitCode(reason: McpShutdownReason): number {
-  return reason === 'startup-failure' ||
-    reason === 'uncaught-exception' ||
-    reason === 'unhandled-rejection'
-    ? 1
-    : 0;
+  return FAILURE_REASONS.has(reason) ? 1 : 0;
 }
 
 export async function closeServerWithTimeout(

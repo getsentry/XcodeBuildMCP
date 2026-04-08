@@ -41,6 +41,7 @@ function createManifestFixture(): ResolvedManifest {
         },
       ],
     ]),
+    resources: new Map(),
   };
 }
 

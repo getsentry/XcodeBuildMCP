@@ -1,7 +1,8 @@
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
-import type { ToolResponse } from '../types/common.ts';
+import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 
-export const DAEMON_PROTOCOL_VERSION = 1 as const;
+export const DAEMON_PROTOCOL_VERSION = 2 as const;
 
 export type DaemonMethod =
   | 'daemon.status'
@@ -43,8 +44,15 @@ export interface ToolInvokeParams {
   args: Record<string, unknown>;
 }
 
+export interface DaemonToolResult {
+  events: PipelineEvent[];
+  isError: boolean;
+  nextStepParams?: NextStepParamsMap;
+  nextSteps?: NextStep[];
+}
+
 export interface ToolInvokeResult {
-  response: ToolResponse;
+  result: DaemonToolResult;
 }
 
 export interface DaemonStatusResult {
@@ -91,5 +99,5 @@ export interface XcodeIdeInvokeParams {
 }
 
 export interface XcodeIdeInvokeResult {
-  response: unknown;
+  result: DaemonToolResult;
 }

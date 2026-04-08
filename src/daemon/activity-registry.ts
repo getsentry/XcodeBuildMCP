@@ -1,21 +1,16 @@
 const activityCounts = new Map<string, number>();
 
-function normalizeActivityKey(activityKey: string): string {
-  return activityKey.trim();
+function incrementActivity(key: string): void {
+  activityCounts.set(key, (activityCounts.get(key) ?? 0) + 1);
 }
 
-function incrementActivity(activityKey: string): void {
-  const current = activityCounts.get(activityKey) ?? 0;
-  activityCounts.set(activityKey, current + 1);
-}
-
-function decrementActivity(activityKey: string): void {
-  const current = activityCounts.get(activityKey) ?? 0;
+function decrementActivity(key: string): void {
+  const current = activityCounts.get(key) ?? 0;
   if (current <= 1) {
-    activityCounts.delete(activityKey);
+    activityCounts.delete(key);
     return;
   }
-  activityCounts.set(activityKey, current - 1);
+  activityCounts.set(key, current - 1);
 }
 
 /**
@@ -23,12 +18,12 @@ function decrementActivity(activityKey: string): void {
  * Call the returned release function once the activity has finished.
  */
 export function acquireDaemonActivity(activityKey: string): () => void {
-  const normalizedKey = normalizeActivityKey(activityKey);
-  if (!normalizedKey) {
+  const key = activityKey.trim();
+  if (!key) {
     throw new Error('activityKey must be a non-empty string');
   }
 
-  incrementActivity(normalizedKey);
+  incrementActivity(key);
 
   let released = false;
   return (): void => {
@@ -36,7 +31,7 @@ export function acquireDaemonActivity(activityKey: string): () => void {
       return;
     }
     released = true;
-    decrementActivity(normalizedKey);
+    decrementActivity(key);
   };
 }
 

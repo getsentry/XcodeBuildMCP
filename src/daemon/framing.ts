@@ -27,18 +27,13 @@ export function createFrameReader(
     while (buffer.length >= 4) {
       const len = buffer.readUInt32BE(0);
 
-      // Sanity check: reject messages larger than 100MB
       if (len > 100 * 1024 * 1024) {
-        const err = new Error(`Message too large: ${len} bytes`);
-        if (onError) {
-          onError(err);
-        }
+        onError?.(new Error(`Message too large: ${len} bytes`));
         buffer = Buffer.alloc(0);
         return;
       }
 
       if (buffer.length < 4 + len) {
-        // Not enough data yet, wait for more
         return;
       }
 
@@ -49,9 +44,7 @@ export function createFrameReader(
         const msg = JSON.parse(payload.toString('utf8')) as unknown;
         onMessage(msg);
       } catch (err) {
-        if (onError) {
-          onError(err instanceof Error ? err : new Error(String(err)));
-        }
+        onError?.(err instanceof Error ? err : new Error(String(err)));
       }
     }
   };

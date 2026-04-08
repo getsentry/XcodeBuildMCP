@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   DAEMON_IDLE_TIMEOUT_ENV_KEY,
   DEFAULT_DAEMON_IDLE_TIMEOUT_MS,
-  getDaemonRuntimeActivitySnapshot,
   hasActiveRuntimeSessions,
   resolveDaemonIdleTimeoutMs,
 } from '../idle-shutdown.ts';
-import { acquireDaemonActivity, clearDaemonActivityRegistry } from '../activity-registry.ts';
+import {
+  acquireDaemonActivity,
+  clearDaemonActivityRegistry,
+  getDaemonActivitySnapshot,
+} from '../activity-registry.ts';
 
 describe('daemon idle shutdown', () => {
   beforeEach(() => {
@@ -51,11 +54,11 @@ describe('daemon idle shutdown', () => {
     });
   });
 
-  describe('getDaemonRuntimeActivitySnapshot', () => {
+  describe('getDaemonActivitySnapshot', () => {
     it('reports category counters for active daemon activity', () => {
       const release = acquireDaemonActivity('swift-package.background-process');
 
-      const snapshot = getDaemonRuntimeActivitySnapshot();
+      const snapshot = getDaemonActivitySnapshot();
       expect(snapshot.activeOperationCount).toBe(1);
       expect(snapshot.byCategory).toEqual({
         'swift-package.background-process': 1,
