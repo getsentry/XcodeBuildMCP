@@ -1,0 +1,6 @@
+
+📱 Boot Simulator
+
+   Simulator: <UUID>
+
+✅ Simulator booted successfully

@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-03-17T14:58:22.020Z",
+  "mode": "warm",
+  "iterations": 1,
+  "workspacePath": "/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+  "results": [
+    {
+      "tool": "xcodebuildmcp",
+      "iteration": 1,
+      "exitCode": 1,
+      "wallClockMs": 30882.488,
+      "firstStdoutMs": 2.211042000000006,
+      "firstMilestoneMs": 2160.745125,
+      "startupToFirstStreamedTestProgressMs": 14674.5665,
+      "stdoutPath": "/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/benchmarks/simulator-test/2026-03-17T14-57-22-646Z/xcodebuildmcp-run-1.stdout.txt",
+      "stderrPath": "/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/benchmarks/simulator-test/2026-03-17T14-57-22-646Z/xcodebuildmcp-run-1.stderr.txt"
+    },
+    {
+      "tool": "flowdeck",
+      "iteration": 1,
+      "exitCode": 1,
+      "wallClockMs": 28490.114,
+      "firstStdoutMs": 5.035500000001775,
+      "firstMilestoneMs": 12153.824459000003,
+      "startupToFirstStreamedTestProgressMs": 12153.8315,
+      "stdoutPath": "/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/benchmarks/simulator-test/2026-03-17T14-57-22-646Z/flowdeck-run-1.stdout.txt",
+      "stderrPath": "/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/benchmarks/simulator-test/2026-03-17T14-57-22-646Z/flowdeck-run-1.stderr.txt"
+    }
+  ]
+}

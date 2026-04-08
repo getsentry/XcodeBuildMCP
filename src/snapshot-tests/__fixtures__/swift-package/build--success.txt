@@ -1,0 +1,7 @@
+
+📦 Swift Package Build
+
+   Package: <ROOT>/example_projects/spm
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_spm_<TIMESTAMP>_pid<PID>.log

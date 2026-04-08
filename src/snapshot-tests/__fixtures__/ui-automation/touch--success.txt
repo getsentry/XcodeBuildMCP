@@ -1,0 +1,8 @@
+
+👆 Touch
+
+   Simulator: <UUID>
+
+✅ Touch event (touch down+up) at (100, 400) executed successfully.
+
+⚠️ Warning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.

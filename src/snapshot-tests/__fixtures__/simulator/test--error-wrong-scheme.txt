@@ -1,0 +1,15 @@
+
+🧪 Test
+
+   Scheme: NONEXISTENT
+   Configuration: Debug
+   Platform: iOS Simulator
+   Simulator: iPhone 17
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+
+Errors (1):
+
+  ✗ The workspace named "CalculatorApp" does not contain a scheme named "NONEXISTENT". The "-list" option can be used to find the names of the schemes in the workspace.
+
+❌ Test failed. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_sim_<TIMESTAMP>_pid<PID>.log

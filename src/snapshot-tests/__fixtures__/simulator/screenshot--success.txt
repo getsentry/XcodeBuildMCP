@@ -1,0 +1,9 @@
+
+📷 Screenshot
+
+   Simulator: <UUID>
+
+✅ Screenshot captured
+  ├ Screenshot: /var/folders/_t/2njffz894t57qpp76v1sw__h0000gn/T/screenshot_optimized_<UUID>.jpg
+  ├ Format: image/jpeg
+  └ Size: 368x800px

@@ -1,0 +1,6 @@
+
+📍 Reset Location
+
+   Simulator: <UUID>
+
+❌ Failed to reset simulator location: Invalid device: <UUID>

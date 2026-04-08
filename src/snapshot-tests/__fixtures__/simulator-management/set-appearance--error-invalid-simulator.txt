@@ -1,0 +1,7 @@
+
+🎨 Set Appearance
+
+   Simulator: <UUID>
+   Mode: dark
+
+❌ Failed to set simulator appearance: Invalid device: <UUID>

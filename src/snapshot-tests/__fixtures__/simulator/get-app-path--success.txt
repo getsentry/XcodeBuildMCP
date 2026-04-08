@@ -1,0 +1,17 @@
+
+🔍 Get App Path
+
+   Scheme: CalculatorApp
+   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+   Configuration: Debug
+   Platform: iOS Simulator
+   Simulator: iPhone 17
+
+✅ Get app path successful (⏱️ <DURATION>)
+  └ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+
+Next steps:
+1. Get bundle ID: xcodebuildmcp device get-app-bundle-id --app-path "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+2. Boot simulator: xcodebuildmcp simulator-management boot --simulator-id "SIMULATOR_UUID"
+3. Install app: xcodebuildmcp simulator install --simulator-id "SIMULATOR_UUID" --app-path "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+4. Launch app: xcodebuildmcp simulator launch-app --simulator-id "SIMULATOR_UUID" --bundle-id "BUNDLE_ID"

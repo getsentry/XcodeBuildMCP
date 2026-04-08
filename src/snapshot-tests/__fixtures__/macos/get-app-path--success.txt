@@ -1,0 +1,14 @@
+
+🔍 Get App Path
+
+   Scheme: MCPTest
+   Project: example_projects/macOS/MCPTest.xcodeproj
+   Configuration: Debug
+   Platform: macOS
+
+✅ Success
+  └ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app
+
+Next steps:
+1. Get bundle ID: xcodebuildmcp macos get-macos-bundle-id --app-path "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app"
+2. Launch app: xcodebuildmcp macos launch --app-path "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app"

@@ -1,0 +1,120 @@
+
+📱 List Simulators
+
+iOS Simulators:
+
+  iOS 26.4:
+
+    📱 [✗] iPhone 17 Pro (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 17 Pro Max (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 17e (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone Air (Shutdown)
+      UDID: <UUID>
+
+    📱 [✓] iPhone 17 (Booted)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 13-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 11-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad mini (A17 Pro) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 13-inch (M4) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 11-inch (M4) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad (A16) (Shutdown)
+      UDID: <UUID>
+
+  iOS 26.2:
+
+    📱 [✗] iPhone 17 Pro (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 17 Pro Max (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone Air (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 17 (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 16e (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 13-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 11-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad mini (A17 Pro) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad (A16) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 13-inch (M3) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 11-inch (M3) (Shutdown)
+      UDID: <UUID>
+
+visionOS Simulators:
+
+  xrOS 26.2:
+
+    🥽 [✗] Apple Vision Pro (Shutdown)
+      UDID: <UUID>
+
+watchOS Simulators:
+
+  watchOS 26.2:
+
+    ⌚️ [✗] Apple Watch Series 11 (46mm) (Shutdown)
+      UDID: <UUID>
+
+    ⌚️ [✗] Apple Watch Series 11 (42mm) (Shutdown)
+      UDID: <UUID>
+
+    ⌚️ [✗] Apple Watch Ultra 3 (49mm) (Shutdown)
+      UDID: <UUID>
+
+    ⌚️ [✗] Apple Watch SE 3 (44mm) (Shutdown)
+      UDID: <UUID>
+
+    ⌚️ [✗] Apple Watch SE 3 (40mm) (Shutdown)
+      UDID: <UUID>
+
+tvOS Simulators:
+
+  tvOS 26.2:
+
+    📺 [✗] Apple TV 4K (3rd generation) (Shutdown)
+      UDID: <UUID>
+
+    📺 [✗] Apple TV 4K (3rd generation) (at 1080p) (Shutdown)
+      UDID: <UUID>
+
+    📺 [✗] Apple TV (Shutdown)
+      UDID: <UUID>
+
+✅ 31 simulators available (22 iOS, 1 visionOS, 5 watchOS, 3 tvOS).
+
+Hints
+  Use the simulator ID/UDID from above when required by other tools.
+  Save a default simulator with session-set-defaults { simulatorId: 'SIMULATOR_UDID' }.
+  Before running boot/build/run tools, set the desired simulator identifier in session defaults.

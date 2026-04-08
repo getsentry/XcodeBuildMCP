@@ -1,0 +1,51 @@
+^DUsing scheme test configuration: Debug
+🧪 Test: CalculatorApp
+Workspace: /Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+Configuration: Debug
+Target: iPhone 17 Pro
+🧪 Finding available tests...
+Resolved to 21 test(s):
+- CalculatorAppTests/CalculatorAppTests/testAppLaunch
+- CalculatorAppTests/CalculatorAppTests/testCalculationPerformance
+- CalculatorAppTests/CalculatorAppTests/testCalculatorOperationsEnum
+- CalculatorAppTests/CalculatorAppTests/testCalculatorServiceBasicOperation
+- CalculatorAppTests/CalculatorAppTests/testCalculatorServiceChainedOperations
+... and 16 more
+🧪 Running tests (0, 0 failures)
+🧪 Running tests (1, 0 failures)
+🧪 Running tests (2, 0 failures)
+🧪 Running tests (3, 0 failures)
+🧪 Running tests (4, 0 failures)
+🧪 Running tests (5, 0 failures)
+🧪 Running tests (6, 0 failures)
+🧪 Running tests (7, 0 failures)/Users/cameroncooke/.codex/worktrees/43f4/XcodeBuildMCP/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+🧪 Running tests (8, 1 failure)
+🧪 Running tests (9, 1 failure)
+🧪 Running tests (10, 1 failure)
+🧪 Running tests (11, 1 failure)
+🧪 Running tests (12, 1 failure)
+🧪 Running tests (13, 1 failure)
+🧪 Running tests (14, 1 failure)
+🧪 Running tests (15, 1 failure)
+🧪 Running tests (16, 1 failure)
+🧪 Running tests (17, 1 failure)
+🧪 Running tests (18, 1 failure)
+🧪 Running tests (19, 1 failure)
+🧪 Running tests (20, 1 failure)
+🧪 Running tests (21, 1 failure)
+Failed Tests
+CalculatorAppTests
+✗ testCalculatorServiceFailure (0.003s)
+└─ XCTAssertEqual failed: ("0") is not
+equal to ("999") - This test should fail
+- display should be 0, not 999
+(CalculatorAppTests.swift:52)
+Test Summary
+╭───────────────────────────────────────╮
+│ Total:    21                          │
+│ Passed:   20                          │
+│ Failed:   1                           │
+│ Skipped:  0                           │
+│ Duration: 28.08s                      │
+╰───────────────────────────────────────╯
+✗ 1 test(s) failed.

@@ -1,0 +1,9 @@
+
+👆 Swipe
+
+   Simulator: <UUID>
+
+❌ Failed to simulate swipe: axe command 'swipe' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

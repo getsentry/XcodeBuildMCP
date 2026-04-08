@@ -1,0 +1,10 @@
+
+🧪 Test
+
+   Scheme: MCPTest
+   Configuration: Debug
+   Platform: macOS
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+
+✅ 2 tests passed, 0 skipped (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

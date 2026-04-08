@@ -1,0 +1,12 @@
+
+🐛 LLDB Command
+
+   Command: breakpoint list
+
+✅ Command executed
+
+Output:
+  Current breakpoints:
+  1: file = 'ContentView.swift', line = 42, exact_match = 0, locations = <LOCATIONS>
+    Names:
+      dap

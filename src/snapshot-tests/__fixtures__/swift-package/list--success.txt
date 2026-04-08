@@ -1,0 +1,12 @@
+
+📦 Swift Package Processes
+
+Running Processes (2):
+
+  🟢 long-server
+     PID: <PID> | Uptime: <UPTIME>
+     Package: <ROOT>/example_projects/spm
+
+  🟢 quick-task
+     PID: <PID> | Uptime: <UPTIME>
+     Package: <ROOT>/example_projects/spm

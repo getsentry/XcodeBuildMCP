@@ -1,0 +1,9 @@
+
+👆 Tap
+
+   Simulator: <UUID>
+
+❌ Failed to simulate tap at (100, 100): axe command 'tap' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

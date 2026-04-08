@@ -1,0 +1,11 @@
+
+🔍 Get macOS Bundle ID
+
+   App: <TMPDIR>/BundleTest.app
+
+✅ Bundle ID
+  └ com.test.snapshot
+
+Next steps:
+1. Launch the app: xcodebuildmcp macos launch --app-path "<TMPDIR>/BundleTest.app"
+2. Build again: xcodebuildmcp macos build --scheme "SCHEME_NAME"

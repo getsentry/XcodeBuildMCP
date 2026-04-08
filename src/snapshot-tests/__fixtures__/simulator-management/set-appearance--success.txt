@@ -1,0 +1,7 @@
+
+🎨 Set Appearance
+
+   Simulator: <UUID>
+   Mode: dark
+
+✅ Appearance successfully set to dark mode

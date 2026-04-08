@@ -1,0 +1,34 @@
+{
+  "logging": {
+    "simulator": {
+      "activeSessionIds": []
+    },
+    "device": {
+      "activeSessionIds": []
+    }
+  },
+  "debug": {
+    "currentSessionId": null,
+    "sessionIds": []
+  },
+  "watcher": {
+    "running": false,
+    "watchedPath": null
+  },
+  "video": {
+    "activeSessionIds": []
+  },
+  "swiftPackage": {
+    "activePids": []
+  },
+  "activity": {
+    "activeOperationCount": 0,
+    "byCategory": {}
+  },
+  "process": {
+    "pid" : <PID>,
+    "uptimeMs": <UPTIME>,
+    "rssBytes": <BYTES>,
+    "heapUsedBytes": <BYTES>
+  }
+}
