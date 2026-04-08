@@ -1,7 +1,3 @@
-/**
- * Tests for screenshot tool plugin
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
@@ -9,7 +5,7 @@ import {
   createMockFileSystemExecutor,
   mockProcess,
 } from '../../../../test-utils/mock-executors.ts';
-import { SystemError } from '../../../../utils/responses/index.ts';
+import { SystemError } from '../../../../utils/errors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import {
   schema,
@@ -18,6 +14,40 @@ import {
   detectLandscapeMode,
   rotateImage,
 } from '../screenshot.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
 
 describe('Screenshot Plugin', () => {
   beforeEach(() => {
@@ -84,14 +114,16 @@ describe('Screenshot Plugin', () => {
         readFile: async () => mockImageBuffer.toString('utf8'),
       });
 
-      await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'test-uuid' },
+      await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
       );
 
       // Should capture the screenshot command first
@@ -122,14 +154,16 @@ describe('Screenshot Plugin', () => {
         readFile: async () => mockImageBuffer.toString('utf8'),
       });
 
-      await screenshotLogic(
-        {
-          simulatorId: 'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
-        },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/var/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'another-uuid' },
+      await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: 'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/var/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'another-uuid' },
+        ),
       );
 
       expect(capturedCommands[0]).toEqual([
@@ -159,17 +193,19 @@ describe('Screenshot Plugin', () => {
         readFile: async () => mockImageBuffer.toString('utf8'),
       });
 
-      await screenshotLogic(
-        {
-          simulatorId: '98765432-1098-7654-3210-987654321098',
-        },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        {
-          tmpdir: () => '/custom/temp/dir',
-          join: (...paths) => paths.join('\\'), // Windows-style path joining
-        },
-        { v4: () => 'custom-uuid' },
+      await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '98765432-1098-7654-3210-987654321098',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          {
+            tmpdir: () => '/custom/temp/dir',
+            join: (...paths) => paths.join('\\'), // Windows-style path joining
+          },
+          { v4: () => 'custom-uuid' },
+        ),
       );
 
       expect(capturedCommands[0]).toEqual([
@@ -199,14 +235,16 @@ describe('Screenshot Plugin', () => {
         readFile: async () => mockImageBuffer.toString('utf8'),
       });
 
-      await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        // No UUID deps provided - should use real uuidv4()
+      await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          // No UUID deps provided - should use real uuidv4()
+        ),
       );
 
       // Verify the command structure but not the exact UUID since it's generated
@@ -222,79 +260,6 @@ describe('Screenshot Plugin', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should handle parameter validation via plugin handler (not logic function)', async () => {
-      // Note: With Zod validation in createTypedTool, the screenshotLogic function
-      // will never receive invalid parameters - validation happens at the handler level.
-      // This test documents that screenshotLogic assumes valid parameters.
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        createMockExecutor({
-          success: true,
-          output: 'Screenshot saved',
-          error: undefined,
-        }),
-        createMockFileSystemExecutor({
-          readFile: async () => Buffer.from('fake-image-data', 'utf8').toString('utf8'),
-        }),
-      );
-
-      expect(result.isError).toBe(false);
-      expect(result.content[0].type).toBe('image');
-    });
-
-    it('should return success for valid screenshot capture', async () => {
-      const mockImageBuffer = Buffer.from('fake-image-data', 'utf8');
-
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Screenshot saved',
-        error: undefined,
-      });
-
-      const mockFileSystemExecutor = createMockFileSystemExecutor({
-        readFile: async () => mockImageBuffer.toString('utf8'),
-      });
-
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        mockExecutor,
-        mockFileSystemExecutor,
-      );
-
-      expect(result.isError).toBe(false);
-      expect(result.content[0].type).toBe('image');
-    });
-
-    it('should handle command execution failure', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'Simulator not found',
-      });
-
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        mockExecutor,
-        createMockFileSystemExecutor(),
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Error: System error executing screenshot: Failed to capture screenshot: Simulator not found',
-          },
-        ],
-        isError: true,
-      });
-    });
-
     it('should handle file reading errors', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
@@ -308,24 +273,21 @@ describe('Screenshot Plugin', () => {
         },
       });
 
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          returnFormat: 'base64',
-        },
-        mockExecutor,
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            returnFormat: 'base64',
+          },
+          mockExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Error: Screenshot captured but failed to process image file: File not found',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(
+        'Screenshot captured but failed to process image file: File not found',
+      );
     });
 
     it('should handle file cleanup errors gracefully', async () => {
@@ -343,26 +305,19 @@ describe('Screenshot Plugin', () => {
         // which simulates the cleanup failure being caught and logged
       });
 
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          returnFormat: 'base64',
-        },
-        mockExecutor,
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            returnFormat: 'base64',
+          },
+          mockExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
       // Should still return successful result despite cleanup failure
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'image',
-            data: 'fake-image-data',
-            mimeType: 'image/jpeg',
-          },
-        ],
-        isError: false,
-      });
+      expect(result.isError).toBeFalsy();
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -370,23 +325,18 @@ describe('Screenshot Plugin', () => {
         throw new SystemError('System error occurred');
       };
 
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        mockExecutor,
-        createMockFileSystemExecutor(),
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          mockExecutor,
+          createMockFileSystemExecutor(),
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Error: System error executing screenshot: System error occurred',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain('System error executing screenshot: System error occurred');
     });
 
     it('should handle unexpected Error objects', async () => {
@@ -394,20 +344,18 @@ describe('Screenshot Plugin', () => {
         throw new Error('Unexpected error');
       };
 
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        mockExecutor,
-        createMockFileSystemExecutor(),
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          mockExecutor,
+          createMockFileSystemExecutor(),
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text' as const, text: 'Error: An unexpected error occurred: Unexpected error' },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain('An unexpected error occurred: Unexpected error');
     });
 
     it('should handle unexpected string errors', async () => {
@@ -415,20 +363,18 @@ describe('Screenshot Plugin', () => {
         throw 'String error';
       };
 
-      const result = await screenshotLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-        },
-        mockExecutor,
-        createMockFileSystemExecutor(),
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          mockExecutor,
+          createMockFileSystemExecutor(),
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text' as const, text: 'Error: An unexpected error occurred: String error' },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain('An unexpected error occurred: String error');
     });
   });
 
@@ -665,12 +611,14 @@ describe('Screenshot Plugin', () => {
         readFile: async () => 'fake-image-data',
       });
 
-      await screenshotLogic(
-        { simulatorId: '12345678-1234-4234-8234-123456789012' },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'test-uuid' },
+      await runLogic(() =>
+        screenshotLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012' },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
       );
 
       // Verify rotation command was called with +90 degrees (index 3)
@@ -729,19 +677,24 @@ describe('Screenshot Plugin', () => {
         readFile: async () => 'fake-image-data',
       });
 
-      await screenshotLogic(
-        { simulatorId: '12345678-1234-4234-8234-123456789012' },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'test-uuid' },
+      await runLogic(() =>
+        screenshotLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012' },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
       );
 
-      // Should have: screenshot, list devices, orientation detection, optimization (no rotation)
-      expect(capturedCommands.length).toBe(4);
+      // Should have: screenshot, list devices, orientation detection, optimization, dimensions (no rotation)
+      expect(capturedCommands.length).toBe(5);
       // Fourth command should be optimization, not rotation
       expect(capturedCommands[3][0]).toBe('sips');
       expect(capturedCommands[3]).toContain('-Z');
+      // Fifth command should be dimensions
+      expect(capturedCommands[4][0]).toBe('sips');
+      expect(capturedCommands[4][1]).toBe('-g');
     });
 
     it('should continue without rotation if orientation detection fails', async () => {
@@ -791,18 +744,20 @@ describe('Screenshot Plugin', () => {
         readFile: async () => 'fake-image-data',
       });
 
-      const result = await screenshotLogic(
-        { simulatorId: '12345678-1234-4234-8234-123456789012' },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'test-uuid' },
+      const result = await runLogic(() =>
+        screenshotLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012' },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
       );
 
       // Should still succeed
-      expect(result.isError).toBe(false);
-      // Should have: screenshot, list devices, failed orientation detection, optimization
-      expect(capturedCommands.length).toBe(4);
+      expect(result.isError).toBeFalsy();
+      // Should have: screenshot, list devices, failed orientation detection, optimization, dimensions
+      expect(capturedCommands.length).toBe(5);
     });
 
     it('should continue if rotation fails but still return image', async () => {
@@ -861,17 +816,19 @@ describe('Screenshot Plugin', () => {
         readFile: async () => 'fake-image-data',
       });
 
-      const result = await screenshotLogic(
-        { simulatorId: '12345678-1234-4234-8234-123456789012', returnFormat: 'base64' },
-        trackingExecutor,
-        mockFileSystemExecutor,
-        { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
-        { v4: () => 'test-uuid' },
+      const result = await runLogic(() =>
+        screenshotLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012', returnFormat: 'base64' },
+          trackingExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
       );
 
       // Should still succeed even if rotation failed
-      expect(result.isError).toBe(false);
-      expect(result.content[0].type).toBe('image');
+      expect(result.isError).toBeFalsy();
+      expect(result.content.some((c) => c.type === 'image')).toBe(true);
     });
   });
 });

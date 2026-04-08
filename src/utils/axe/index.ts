@@ -1,5 +1,4 @@
 export {
-  createAxeNotAvailableResponse,
   AXE_NOT_AVAILABLE_MESSAGE,
   getAxePath,
   getBundledAxeEnvironment,

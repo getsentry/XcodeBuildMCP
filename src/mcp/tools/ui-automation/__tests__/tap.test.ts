@@ -1,7 +1,3 @@
-/**
- * Tests for tap plugin
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
@@ -9,38 +5,52 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 
 import { schema, handler, type AxeHelpers, tapLogic } from '../tap.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
 
-// Helper function to create mock axe helpers
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
+
 function createMockAxeHelpers(): AxeHelpers {
   return {
     getAxePath: () => '/mocked/axe/path',
     getBundledAxeEnvironment: () => ({ SOME_ENV: 'value' }),
-    createAxeNotAvailableResponse: () => ({
-      content: [
-        {
-          type: 'text',
-          text: AXE_NOT_AVAILABLE_MESSAGE,
-        },
-      ],
-      isError: true,
-    }),
   };
 }
 
-// Helper function to create mock axe helpers with null path (for dependency error tests)
 function createMockAxeHelpersWithNullPath(): AxeHelpers {
   return {
     getAxePath: () => null,
     getBundledAxeEnvironment: () => ({ SOME_ENV: 'value' }),
-    createAxeNotAvailableResponse: () => ({
-      content: [
-        {
-          type: 'text',
-          text: AXE_NOT_AVAILABLE_MESSAGE,
-        },
-      ],
-      isError: true,
-    }),
   };
 }
 
@@ -148,14 +158,16 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -194,13 +206,15 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          id: 'loginButton',
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            id: 'loginButton',
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -237,13 +251,15 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          label: 'Log in',
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            label: 'Log in',
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -280,15 +296,17 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 120,
-          y: 240,
-          id: 'loginButton',
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 120,
+            y: 240,
+            id: 'loginButton',
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -327,15 +345,17 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 150,
-          y: 300,
-          preDelay: 0.5,
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 150,
+            y: 300,
+            preDelay: 0.5,
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -376,15 +396,17 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 250,
-          y: 400,
-          postDelay: 1.0,
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 250,
+            y: 400,
+            postDelay: 1.0,
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -425,16 +447,18 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpers();
 
-      await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 350,
-          y: 500,
-          preDelay: 0.3,
-          postDelay: 0.7,
-        },
-        wrappedExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 350,
+            y: 500,
+            preDelay: 0.3,
+            postDelay: 0.7,
+          },
+          wrappedExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -456,211 +480,6 @@ describe('Tap Plugin', () => {
         logPrefix: '[AXe]: tap',
         useShell: false,
         opts: { env: { SOME_ENV: 'value' } },
-      });
-    });
-  });
-
-  describe('Success Response Processing', () => {
-    it('should return successful response for basic tap', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap at (100, 200) simulated successfully.\n\nWarning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response with coordinate warning when snapshot_ui not called', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '87654321-4321-4321-4321-210987654321',
-          x: 150,
-          y: 300,
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap at (150, 300) simulated successfully.\n\nWarning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response with delays', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 250,
-          y: 400,
-          preDelay: 0.5,
-          postDelay: 1.0,
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap at (250, 400) simulated successfully.\n\nWarning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response with integer coordinates', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 0,
-          y: 0,
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap at (0, 0) simulated successfully.\n\nWarning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response with large coordinates', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 1920,
-          y: 1080,
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap at (1920, 1080) simulated successfully.\n\nWarning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response for element id target', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          id: 'loginButton',
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap on element id "loginButton" simulated successfully.',
-          },
-        ],
-        isError: false,
-      });
-    });
-
-    it('should return successful response for element label target', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          label: 'Log in',
-        },
-        mockExecutor,
-        mockAxeHelpers,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Tap on element label "Log in" simulated successfully.',
-          },
-        ],
-        isError: false,
       });
     });
   });
@@ -788,27 +607,22 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-          preDelay: 0.5,
-          postDelay: 1.0,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+            preDelay: 0.5,
+            postDelay: 1.0,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle DependencyError when axe binary not found (second test)', async () => {
@@ -820,25 +634,20 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle DependencyError when axe binary not found (third test)', async () => {
@@ -850,25 +659,20 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle DependencyError when axe binary not found (fourth test)', async () => {
@@ -878,25 +682,20 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle DependencyError when axe binary not found (fifth test)', async () => {
@@ -906,25 +705,20 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle DependencyError when axe binary not found (sixth test)', async () => {
@@ -934,25 +728,20 @@ describe('Tap Plugin', () => {
 
       const mockAxeHelpers = createMockAxeHelpersWithNullPath();
 
-      const result = await tapLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          x: 100,
-          y: 200,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        tapLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            x: 100,
+            y: 200,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
   });
 });

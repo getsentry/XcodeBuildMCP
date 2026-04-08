@@ -1,7 +1,3 @@
-/**
- * Tests for key_sequence tool
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
@@ -12,6 +8,40 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, key_sequenceLogic } from '../key_sequence.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
 
 describe('Key Sequence Tool', () => {
   beforeEach(() => {
@@ -83,24 +113,17 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40, 42, 44],
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40, 42, 44],
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -128,25 +151,18 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [58, 59, 60],
-          delay: 0.5,
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [58, 59, 60],
+            delay: 0.5,
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -176,24 +192,17 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [255],
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [255],
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -221,25 +230,18 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/path/to/bundled/axe',
         getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [0, 1, 2, 3, 4],
-          delay: 1.0,
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [0, 1, 2, 3, 4],
+            delay: 1.0,
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -260,8 +262,8 @@ describe('Key Sequence Tool', () => {
       const result = await handler({ keyCodes: [40] });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Missing required session defaults');
-      expect(result.content[0].text).toContain('simulatorId is required');
+      expect(allText(result)).toContain('Missing required session defaults');
+      expect(allText(result)).toContain('simulatorId is required');
     });
 
     it('should return success for valid key sequence execution', async () => {
@@ -274,33 +276,22 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40, 42, 44],
-          delay: 0.1,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40, 42, 44],
+            delay: 0.1,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text' as const, text: 'Key sequence [40,42,44] executed successfully.' },
-        ],
-        isError: false,
-      });
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain('Key sequence [40,42,44] executed successfully.');
     });
 
     it('should return success for key sequence without delay', async () => {
@@ -313,65 +304,42 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [{ type: 'text' as const, text: 'Key sequence [40] executed successfully.' }],
-        isError: false,
-      });
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain('Key sequence [40] executed successfully.');
     });
 
     it('should handle DependencyError when axe binary not found', async () => {
       const mockAxeHelpers = {
         getAxePath: () => null,
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        createNoopExecutor(),
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          createNoopExecutor(),
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle AxeError from command execution', async () => {
@@ -384,35 +352,23 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: "Error: Failed to execute key sequence: axe command 'key-sequence' failed.\nDetails: Simulator not found",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(
+        "Failed to execute key sequence: axe command 'key-sequence' failed.",
+      );
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -423,28 +379,21 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result.content[0].text).toMatch(
-        /^Error: System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
+      expect(allText(result)).toMatch(
+        /System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
       );
       expect(result.isError).toBe(true);
     });
@@ -457,28 +406,21 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result.content[0].text).toMatch(
-        /^Error: System error executing axe: Failed to execute axe command: Unexpected error/,
+      expect(allText(result)).toMatch(
+        /System error executing axe: Failed to execute axe command: Unexpected error/,
       );
       expect(result.isError).toBe(true);
     });
@@ -491,35 +433,23 @@ describe('Key Sequence Tool', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await key_sequenceLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          keyCodes: [40],
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        key_sequenceLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            keyCodes: [40],
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Error: System error executing axe: Failed to execute axe command: String error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(
+        'System error executing axe: Failed to execute axe command: String error',
+      );
     });
   });
 });
