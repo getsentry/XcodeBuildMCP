@@ -1,12 +1,13 @@
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
-import type { ToolResponse } from '../types/common.ts';
-import type { ToolSchemaShape, PluginMeta } from '../core/plugin-types.ts';
+import type { ToolSchemaShape } from '../core/plugin-types.ts';
+import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
 
 export interface NextStepTemplate {
   label: string;
   toolId?: string;
   params?: Record<string, string | number | boolean>;
   priority?: number;
+  when?: 'always' | 'success' | 'failure';
 }
 
 export type RuntimeKind = 'cli' | 'daemon' | 'mcp';
@@ -54,7 +55,7 @@ export interface ToolDefinition {
   /**
    * Shared handler (same used by MCP). No duplication.
    */
-  handler: PluginMeta['handler'];
+  handler: (params: Record<string, unknown>, ctx: ToolHandlerContext) => Promise<void>;
 }
 
 export interface ToolResolution {
@@ -81,6 +82,9 @@ export interface ToolCatalog {
 
 export interface InvokeOptions {
   runtime: RuntimeKind;
+  renderSession?: RenderSession;
+  /** Pre-created handler context; if provided, executeTool uses it instead of creating a new one. */
+  handlerContext?: ToolHandlerContext;
   /** CLI-exposed workflow IDs used for daemon environment overrides */
   cliExposedWorkflowIds?: string[];
   /** @deprecated Use cliExposedWorkflowIds instead */
@@ -96,9 +100,5 @@ export interface InvokeOptions {
 }
 
 export interface ToolInvoker {
-  invoke(
-    toolName: string,
-    args: Record<string, unknown>,
-    opts: InvokeOptions,
-  ): Promise<ToolResponse>;
+  invoke(toolName: string, args: Record<string, unknown>, opts: InvokeOptions): Promise<void>;
 }

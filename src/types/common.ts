@@ -28,6 +28,8 @@ export interface NextStep {
   params?: Record<string, string | number | boolean>;
   /** Optional ordering hint for merged steps */
   priority?: number;
+  /** When to show this step: 'always' (default), 'success', or 'failure' */
+  when?: 'always' | 'success' | 'failure';
 }
 
 export type NextStepParams = Record<string, string | number | boolean>;
@@ -102,8 +104,7 @@ export function createImageContent(
  */
 export interface ValidationResult {
   isValid: boolean;
-  errorResponse?: ToolResponse;
-  warningResponse?: ToolResponse;
+  errorMessage?: string;
 }
 
 /**
@@ -140,4 +141,5 @@ export interface PlatformBuildOptions {
   packageCachePath?: string;
   arch?: string;
   logPrefix: string;
+  packageCachePath?: string;
 }

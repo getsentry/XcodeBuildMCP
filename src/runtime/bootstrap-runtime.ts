@@ -87,12 +87,11 @@ function logHydrationResult(hydration: MCPSessionHydrationResult): void {
     return;
   }
 
-  if (hydration.refreshScheduled) {
-    log('info', '[Session] Hydrated MCP session defaults; simulator metadata refresh scheduled.');
-    return;
-  }
-
-  log('info', '[Session] Hydrated MCP session defaults; simulator metadata refresh not scheduled.');
+  const refreshStatus = hydration.refreshScheduled ? 'scheduled' : 'not scheduled';
+  log(
+    'info',
+    `[Session] Hydrated MCP session defaults; simulator metadata refresh ${refreshStatus}.`,
+  );
 }
 
 export async function bootstrapRuntime(

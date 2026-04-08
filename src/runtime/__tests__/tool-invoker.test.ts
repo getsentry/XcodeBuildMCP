@@ -1,31 +1,54 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { ToolResponse } from '../../types/common.ts';
+import type { PipelineEvent } from '../../types/pipeline-events.ts';
+import type { DaemonToolResult } from '../../daemon/protocol.ts';
 import type { ToolDefinition } from '../types.ts';
 import { createToolCatalog } from '../tool-catalog.ts';
 import { DefaultToolInvoker } from '../tool-invoker.ts';
+import { createRenderSession } from '../../rendering/render.ts';
 import { ensureDaemonRunning } from '../../cli/daemon-control.ts';
+import { statusLine } from '../../utils/tool-event-builders.ts';
 
 const daemonClientMock = {
   isRunning: vi.fn<() => Promise<boolean>>(),
   invokeXcodeIdeTool:
-    vi.fn<(name: string, args: Record<string, unknown>) => Promise<ToolResponse>>(),
-  invokeTool: vi.fn<(name: string, args: Record<string, unknown>) => Promise<ToolResponse>>(),
+    vi.fn<(name: string, args: Record<string, unknown>) => Promise<DaemonToolResult>>(),
+  invokeTool: vi.fn<(name: string, args: Record<string, unknown>) => Promise<DaemonToolResult>>(),
   listTools: vi.fn<() => Promise<Array<{ name: string }>>>(),
 };
 
-vi.mock('../../cli/daemon-client.ts', () => ({
-  DaemonClient: vi.fn().mockImplementation(() => daemonClientMock),
-}));
+vi.mock('../../cli/daemon-client.ts', () => {
+  class VersionMismatchError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'DaemonVersionMismatchError';
+    }
+  }
+  return {
+    DaemonClient: vi.fn().mockImplementation(() => daemonClientMock),
+    DaemonVersionMismatchError: VersionMismatchError,
+  };
+});
 
 vi.mock('../../cli/daemon-control.ts', () => ({
   ensureDaemonRunning: vi.fn(),
+  forceStopDaemon: vi.fn(),
   DEFAULT_DAEMON_STARTUP_TIMEOUT_MS: 5000,
 }));
 
-function textResponse(text: string): ToolResponse {
+function daemonResult(text: string, opts?: Partial<DaemonToolResult>): DaemonToolResult {
   return {
-    content: [{ type: 'text', text }],
+    events: [
+      {
+        type: 'status-line',
+        timestamp: new Date().toISOString(),
+        level: 'success',
+        message: text,
+      },
+    ],
+    isError: false,
+    ...opts,
   };
 }
 
@@ -54,17 +77,74 @@ function makeTool(opts: {
   };
 }
 
+function invokeAndFinalize(
+  invoker: DefaultToolInvoker,
+  toolName: string,
+  args: Record<string, unknown>,
+  opts: {
+    runtime: 'cli' | 'daemon' | 'mcp';
+    socketPath?: string;
+    workspaceRoot?: string;
+    cliExposedWorkflowIds?: string[];
+  },
+) {
+  const session = createRenderSession('text');
+  const promise = invoker.invoke(toolName, args, { ...opts, renderSession: session });
+  return promise.then(() => {
+    const text = session.finalize();
+    const events = [...session.getEvents()];
+    return {
+      content: text ? [{ type: 'text' as const, text }] : [],
+      isError: session.isError() || undefined,
+      nextSteps: undefined as ToolResponse['nextSteps'],
+      ...(events.length > 0 ? { _meta: { events } } : {}),
+    } as ToolResponse;
+  });
+}
+
+function emitHandler(text: string): ToolDefinition['handler'] {
+  return vi.fn(async (_params, ctx) => {
+    ctx.emit(statusLine('success', text));
+  });
+}
+
+function emitErrorHandler(text: string): ToolDefinition['handler'] {
+  return vi.fn(async (_params, ctx) => {
+    ctx.emit(statusLine('error', text));
+  });
+}
+
+function emitNextStepsHandler(
+  text: string,
+  nextSteps: ToolResponse['nextSteps'],
+  nextStepParams?: ToolResponse['nextStepParams'],
+): ToolDefinition['handler'] {
+  return vi.fn(async (_params, ctx) => {
+    ctx.emit(statusLine('success', text));
+    if (nextSteps) ctx.nextSteps = nextSteps;
+    if (nextStepParams) ctx.nextStepParams = nextStepParams;
+  });
+}
+
+function emitErrorEventsHandler(events: PipelineEvent[]): ToolDefinition['handler'] {
+  return vi.fn(async (_params, ctx) => {
+    for (const event of events) {
+      ctx.emit(event);
+    }
+  });
+}
+
 describe('DefaultToolInvoker CLI routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     daemonClientMock.isRunning.mockResolvedValue(true);
-    daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(textResponse('daemon-xcode-ide-result'));
-    daemonClientMock.invokeTool.mockResolvedValue(textResponse('daemon-result'));
+    daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(daemonResult('daemon-xcode-ide-result'));
+    daemonClientMock.invokeTool.mockResolvedValue(daemonResult('daemon-result'));
     daemonClientMock.listTools.mockResolvedValue([]);
   });
 
   it('uses direct invocation for stateless tools', async () => {
-    const directHandler = vi.fn().mockResolvedValue(textResponse('direct-result'));
+    const directHandler = emitHandler('direct-result');
     const catalog = createToolCatalog([
       makeTool({
         cliName: 'list-sims',
@@ -75,7 +155,8 @@ describe('DefaultToolInvoker CLI routing', () => {
     ]);
     const invoker = new DefaultToolInvoker(catalog);
 
-    const response = await invoker.invoke(
+    const response = await invokeAndFinalize(
+      invoker,
       'list-sims',
       { value: 'hello' },
       {
@@ -84,15 +165,21 @@ describe('DefaultToolInvoker CLI routing', () => {
       },
     );
 
-    expect(directHandler).toHaveBeenCalledWith({ value: 'hello' });
+    expect(directHandler).toHaveBeenCalledWith(
+      { value: 'hello' },
+      expect.objectContaining({
+        emit: expect.any(Function),
+        attach: expect.any(Function),
+      }),
+    );
     expect(daemonClientMock.isRunning).not.toHaveBeenCalled();
     expect(daemonClientMock.invokeTool).not.toHaveBeenCalled();
-    expect(response.content[0].text).toBe('direct-result');
+    expect(response.content[0].text).toContain('direct-result');
   });
 
   it('routes stateful tools through daemon and auto-starts when needed', async () => {
     daemonClientMock.isRunning.mockResolvedValue(false);
-    const directHandler = vi.fn().mockResolvedValue(textResponse('direct-result'));
+    const directHandler = emitHandler('direct-result');
     const catalog = createToolCatalog([
       makeTool({
         cliName: 'start-sim-log-cap',
@@ -103,7 +190,8 @@ describe('DefaultToolInvoker CLI routing', () => {
     ]);
     const invoker = new DefaultToolInvoker(catalog);
 
-    const response = await invoker.invoke(
+    const response = await invokeAndFinalize(
+      invoker,
       'start-sim-log-cap',
       { value: 'hello' },
       {
@@ -124,7 +212,7 @@ describe('DefaultToolInvoker CLI routing', () => {
       value: 'hello',
     });
     expect(directHandler).not.toHaveBeenCalled();
-    expect(response.content[0].text).toBe('daemon-result');
+    expect(response.content[0].text).toContain('daemon-result');
   });
 });
 
@@ -132,14 +220,14 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     daemonClientMock.isRunning.mockResolvedValue(true);
-    daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(textResponse('daemon-result'));
-    daemonClientMock.invokeTool.mockResolvedValue(textResponse('daemon-generic'));
+    daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(daemonResult('daemon-result'));
+    daemonClientMock.invokeTool.mockResolvedValue(daemonResult('daemon-generic'));
     daemonClientMock.listTools.mockResolvedValue([]);
   });
 
   it('routes dynamic xcode-ide tools through daemon xcode-ide invoke API', async () => {
     daemonClientMock.isRunning.mockResolvedValue(false);
-    const directHandler = vi.fn().mockResolvedValue(textResponse('direct-result'));
+    const directHandler = emitHandler('direct-result');
     const catalog = createToolCatalog([
       makeTool({
         cliName: 'xcode-ide-alpha',
@@ -151,7 +239,8 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     ]);
     const invoker = new DefaultToolInvoker(catalog);
 
-    const response = await invoker.invoke(
+    const response = await invokeAndFinalize(
+      invoker,
       'xcode-ide-alpha',
       { value: 'hello' },
       {
@@ -171,11 +260,11 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     );
     expect(daemonClientMock.invokeXcodeIdeTool).toHaveBeenCalledWith('Alpha', { value: 'hello' });
     expect(directHandler).not.toHaveBeenCalled();
-    expect(response.content[0].text).toBe('daemon-result');
+    expect(response.content[0].text).toContain('daemon-result');
   });
 
   it('fails for dynamic xcode-ide tools when socket path is missing', async () => {
-    const directHandler = vi.fn().mockResolvedValue(textResponse('direct-result'));
+    const directHandler = emitHandler('direct-result');
     const catalog = createToolCatalog([
       makeTool({
         cliName: 'xcode-ide-alpha',
@@ -187,7 +276,8 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     ]);
     const invoker = new DefaultToolInvoker(catalog);
 
-    const response = await invoker.invoke(
+    const response = await invokeAndFinalize(
+      invoker,
       'xcode-ide-alpha',
       { value: 'hello' },
       {
@@ -209,16 +299,13 @@ describe('DefaultToolInvoker next steps post-processing', () => {
   });
 
   it('enriches canonical next-step tool names in CLI runtime', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextSteps: [
-        {
-          tool: 'screenshot',
-          label: 'Take screenshot',
-          params: { simulatorId: '123' },
-        },
-      ],
-    } satisfies ToolResponse);
+    const directHandler = emitNextStepsHandler('ok', [
+      {
+        tool: 'screenshot',
+        label: 'Take screenshot',
+        params: { simulatorId: '123' },
+      },
+    ]);
 
     const catalog = createToolCatalog([
       makeTool({
@@ -234,32 +321,26 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'screenshot',
         workflow: 'ui-automation',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('screenshot')),
+        handler: emitHandler('screenshot'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('snapshot-ui', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(invoker, 'snapshot-ui', {}, { runtime: 'cli' });
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'screenshot',
-        label: 'Take screenshot',
-        params: { simulatorId: '123' },
-        workflow: 'ui-automation',
-        cliTool: 'screenshot',
-      },
-    ]);
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Next steps:');
+    expect(text).toContain('Take screenshot');
+    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id "123"');
   });
 
   it('injects manifest template next steps from dynamic nextStepParams when response omits nextSteps', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextStepParams: {
-        snapshot_ui: { simulatorId: '12345678-1234-4234-8234-123456789012' },
-        tap: { simulatorId: '12345678-1234-4234-8234-123456789012', x: 0, y: 0 },
-      },
-    } satisfies ToolResponse);
+    const directHandler = emitNextStepsHandler('ok', undefined, {
+      snapshot_ui: { simulatorId: '12345678-1234-4234-8234-123456789012' },
+      tap: { simulatorId: '12345678-1234-4234-8234-123456789012', x: 0, y: 0 },
+    });
+
     const catalog = createToolCatalog([
       makeTool({
         id: 'snapshot_ui',
@@ -290,38 +371,58 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'tap',
         workflow: 'ui-automation',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('tap')),
+        handler: emitHandler('tap'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('snapshot-ui', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(invoker, 'snapshot-ui', {}, { runtime: 'cli' });
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'snapshot_ui',
-        label: 'Refresh',
-        params: { simulatorId: '12345678-1234-4234-8234-123456789012' },
-        workflow: 'ui-automation',
-        cliTool: 'snapshot-ui',
-      },
-      {
-        label: 'Visually verify hierarchy output',
-      },
-      {
-        tool: 'tap',
-        label: 'Tap on element',
-        params: { simulatorId: '12345678-1234-4234-8234-123456789012', x: 0, y: 0 },
-        workflow: 'ui-automation',
-        cliTool: 'tap',
-      },
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Refresh');
+    expect(text).toContain('snapshot-ui');
+    expect(text).toContain('Visually verify hierarchy output');
+    expect(text).toContain('Tap on element');
+    expect(text).toContain('tap');
+  });
+
+  it('does not inject manifest template next steps when the tool explicitly returns an empty list', async () => {
+    const directHandler = emitNextStepsHandler('ok', []);
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'list_devices',
+        cliName: 'list',
+        mcpName: 'list_devices',
+        workflow: 'device',
+        stateful: false,
+        nextStepTemplates: [{ label: 'Build for device', toolId: 'build_device' }],
+        handler: directHandler,
+      }),
+      makeTool({
+        id: 'build_device',
+        cliName: 'build',
+        mcpName: 'build_device',
+        workflow: 'device',
+        stateful: false,
+        handler: emitHandler('build'),
+      }),
     ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invokeAndFinalize(invoker, 'list', {}, { runtime: 'cli' });
+
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('ok');
+    expect(text).not.toContain('Next steps:');
   });
 
   it('prefers manifest templates over tool-provided next-step labels and tools', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextSteps: [
+    const directHandler = emitNextStepsHandler(
+      'ok',
+      [
         {
           tool: 'legacy_stop_sim_log_cap',
           label: 'Old label',
@@ -329,10 +430,10 @@ describe('DefaultToolInvoker next steps post-processing', () => {
           priority: 99,
         },
       ],
-      nextStepParams: {
+      {
         stop_sim_log_cap: { logSessionId: 'session-123' },
       },
-    } satisfies ToolResponse);
+    );
 
     const catalog = createToolCatalog([
       makeTool({
@@ -356,37 +457,38 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'stop_sim_log_cap',
         workflow: 'logging',
         stateful: true,
-        handler: vi.fn().mockResolvedValue(textResponse('stop')),
+        handler: emitHandler('stop'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('start-simulator-log-capture', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(
+      invoker,
+      'start-simulator-log-capture',
+      {},
+      { runtime: 'cli' },
+    );
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'stop_sim_log_cap',
-        label: 'Stop capture and retrieve logs',
-        params: { logSessionId: 'session-123' },
-        priority: 1,
-        workflow: 'logging',
-        cliTool: 'stop-simulator-log-capture',
-      },
-    ]);
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Stop capture and retrieve logs');
+    expect(text).toContain('stop-simulator-log-capture');
+    expect(text).toContain('session-123');
   });
 
   it('preserves daemon-provided next-step params when nextStepParams are already consumed', async () => {
-    daemonClientMock.invokeTool.mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextSteps: [
-        {
-          tool: 'stop_sim_log_cap',
-          label: 'Stop capture and retrieve logs',
-          params: { logSessionId: 'session-123' },
-          priority: 1,
-        },
-      ],
-    } satisfies ToolResponse);
+    daemonClientMock.invokeTool.mockResolvedValue(
+      daemonResult('ok', {
+        nextSteps: [
+          {
+            tool: 'stop_sim_log_cap',
+            label: 'Stop capture and retrieve logs',
+            params: { logSessionId: 'session-123' },
+            priority: 1,
+          },
+        ],
+      }),
+    );
 
     const catalog = createToolCatalog([
       makeTool({
@@ -402,7 +504,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
             priority: 1,
           },
         ],
-        handler: vi.fn().mockResolvedValue(textResponse('start')),
+        handler: emitHandler('start'),
       }),
       makeTool({
         id: 'stop_sim_log_cap',
@@ -410,12 +512,13 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'stop_sim_log_cap',
         workflow: 'logging',
         stateful: true,
-        handler: vi.fn().mockResolvedValue(textResponse('stop')),
+        handler: emitHandler('stop'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke(
+    const response = await invokeAndFinalize(
+      invoker,
       'start-simulator-log-capture',
       {},
       {
@@ -424,25 +527,17 @@ describe('DefaultToolInvoker next steps post-processing', () => {
       },
     );
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'stop_sim_log_cap',
-        label: 'Stop capture and retrieve logs',
-        params: { logSessionId: 'session-123' },
-        priority: 1,
-        workflow: 'logging',
-        cliTool: 'stop-simulator-log-capture',
-      },
-    ]);
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Stop capture and retrieve logs');
+    expect(text).toContain('stop-simulator-log-capture');
+    expect(text).toContain('session-123');
   });
 
   it('overrides unresolved template placeholders with dynamic next-step params', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextStepParams: {
-        boot_sim: { simulatorId: 'ABC-123' },
-      },
-    } satisfies ToolResponse);
+    const directHandler = emitNextStepsHandler('ok', undefined, {
+      boot_sim: { simulatorId: 'ABC-123' },
+    });
 
     const catalog = createToolCatalog([
       makeTool({
@@ -466,31 +561,24 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'boot_sim',
         workflow: 'simulator',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('boot')),
+        handler: emitHandler('boot'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('launch-app-sim', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(invoker, 'launch-app-sim', {}, { runtime: 'cli' });
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'boot_sim',
-        label: 'Boot simulator',
-        params: { simulatorId: 'ABC-123' },
-        workflow: 'simulator',
-        cliTool: 'boot-sim',
-      },
-    ]);
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Boot simulator');
+    expect(text).toContain('boot-sim');
+    expect(text).toContain('ABC-123');
   });
 
   it('maps dynamic params to the correct template tool after catalog filtering', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextStepParams: {
-        stop_sim_log_cap: { logSessionId: 'session-123' },
-      },
-    } satisfies ToolResponse);
+    const directHandler = emitNextStepsHandler('ok', undefined, {
+      stop_sim_log_cap: { logSessionId: 'session-123' },
+    });
 
     const catalog = createToolCatalog([
       makeTool({
@@ -518,37 +606,138 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'stop_sim_log_cap',
         workflow: 'logging',
         stateful: true,
-        handler: vi.fn().mockResolvedValue(textResponse('stop')),
+        handler: emitHandler('stop'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('start-simulator-log-capture', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(
+      invoker,
+      'start-simulator-log-capture',
+      {},
+      { runtime: 'cli' },
+    );
 
-    expect(response.nextSteps).toEqual([
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Stop capture and retrieve logs');
+    expect(text).toContain('stop-simulator-log-capture');
+    expect(text).toContain('session-123');
+  });
+
+  it('renders failure next steps for ordinary error responses with replayable events', async () => {
+    const directHandler = emitErrorEventsHandler([
       {
-        tool: 'stop_sim_log_cap',
-        label: 'Stop capture and retrieve logs',
-        params: { logSessionId: 'session-123' },
-        priority: 1,
-        workflow: 'logging',
-        cliTool: 'stop-simulator-log-capture',
+        type: 'status-line',
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: 'failed',
       },
     ]);
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'list_devices',
+        cliName: 'list',
+        mcpName: 'list_devices',
+        workflow: 'device',
+        stateful: false,
+        nextStepTemplates: [
+          {
+            label: 'Try building for device',
+            toolId: 'build_device',
+            when: 'failure',
+          },
+        ],
+        handler: directHandler,
+      }),
+      makeTool({
+        id: 'build_device',
+        cliName: 'build-device',
+        mcpName: 'build_device',
+        workflow: 'device',
+        stateful: false,
+        handler: emitHandler('build'),
+      }),
+    ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invokeAndFinalize(invoker, 'list', {}, { runtime: 'cli' });
+
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((item) => (item.type === 'text' ? item.text : '')).join('\n');
+    expect(text).toContain('Try building for device');
+    expect(text).toContain('build-device');
+  });
+
+  it('suppresses failure next steps for structured xcodebuild failures emitted via handler context', async () => {
+    const directHandler = emitErrorEventsHandler([
+      {
+        type: 'header',
+        timestamp: '2026-03-20T12:00:00.000Z',
+        operation: 'Build',
+        params: [{ label: 'Scheme', value: 'MyApp' }],
+      },
+      {
+        type: 'compiler-error',
+        timestamp: '2026-03-20T12:00:00.500Z',
+        operation: 'BUILD',
+        message: 'Build failed',
+        rawLine: 'Build failed',
+      },
+      {
+        type: 'summary',
+        timestamp: '2026-03-20T12:00:01.000Z',
+        status: 'FAILED',
+        operation: 'BUILD',
+        durationMs: 1000,
+      },
+    ]);
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'build_device',
+        cliName: 'build-device',
+        mcpName: 'build_device',
+        workflow: 'device',
+        stateful: false,
+        nextStepTemplates: [
+          {
+            label: 'Try building for device',
+            toolId: 'list_devices',
+            when: 'failure',
+          },
+        ],
+        handler: directHandler,
+      }),
+      makeTool({
+        id: 'list_devices',
+        cliName: 'list-devices',
+        mcpName: 'list_devices',
+        workflow: 'device',
+        stateful: false,
+        handler: emitHandler('devices'),
+      }),
+    ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invokeAndFinalize(invoker, 'build-device', {}, { runtime: 'cli' });
+
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((item) => (item.type === 'text' ? item.text : '')).join('\n');
+    expect(text).not.toContain('Try building for device');
+    expect(text).not.toContain('list-devices');
   });
 
   it('always uses manifest templates when they exist', async () => {
-    const directHandler = vi.fn().mockResolvedValue({
-      content: [{ type: 'text', text: 'ok' }],
-      nextSteps: [
-        {
-          tool: 'launch_app_sim',
-          label: 'Launch app (platform-specific)',
-          params: { simulatorId: '123', bundleId: 'com.example.app' },
-          priority: 1,
-        },
-      ],
-    } satisfies ToolResponse);
+    const directHandler = emitNextStepsHandler('ok', [
+      {
+        tool: 'launch_app_sim',
+        label: 'Launch app (platform-specific)',
+        params: { simulatorId: '123', bundleId: 'com.example.app' },
+        priority: 1,
+      },
+    ]);
 
     const catalog = createToolCatalog([
       makeTool({
@@ -569,7 +758,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'launch_app_sim',
         workflow: 'simulator',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('launch')),
+        handler: emitHandler('launch'),
       }),
       makeTool({
         id: 'get_app_bundle_id',
@@ -577,7 +766,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'get_app_bundle_id',
         workflow: 'project-discovery',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('bundle')),
+        handler: emitHandler('bundle'),
       }),
       makeTool({
         id: 'boot_sim',
@@ -585,30 +774,18 @@ describe('DefaultToolInvoker next steps post-processing', () => {
         mcpName: 'boot_sim',
         workflow: 'simulator',
         stateful: false,
-        handler: vi.fn().mockResolvedValue(textResponse('boot')),
+        handler: emitHandler('boot'),
       }),
     ]);
 
     const invoker = new DefaultToolInvoker(catalog);
-    const response = await invoker.invoke('get-app-path', {}, { runtime: 'cli' });
+    const response = await invokeAndFinalize(invoker, 'get-app-path', {}, { runtime: 'cli' });
 
-    expect(response.nextSteps).toEqual([
-      {
-        tool: 'get_app_bundle_id',
-        label: 'Get bundle ID',
-        params: {},
-        priority: 1,
-        workflow: 'project-discovery',
-        cliTool: 'get-app-bundle-id',
-      },
-      {
-        tool: 'boot_sim',
-        label: 'Boot simulator',
-        params: {},
-        priority: 2,
-        workflow: 'simulator',
-        cliTool: 'boot',
-      },
-    ]);
+    expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('Get bundle ID');
+    expect(text).toContain('get-app-bundle-id');
+    expect(text).toContain('Boot simulator');
+    expect(text).toContain('boot');
   });
 });

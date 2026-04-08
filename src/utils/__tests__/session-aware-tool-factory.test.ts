@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import { createSessionAwareTool } from '../typed-tool-factory.ts';
+import {
+  createSessionAwareTool,
+  getHandlerContext,
+  type ToolHandler,
+} from '../typed-tool-factory.ts';
 import { sessionStore } from '../session-store.ts';
 import {
   createMockExecutor,
@@ -11,12 +15,30 @@ import {
   initConfigStore,
   type RuntimeConfigOverrides,
 } from '../config-store.ts';
+import { createRenderSession } from '../../rendering/render.ts';
+import type { ToolHandlerContext } from '../../rendering/types.ts';
+import { statusLine } from '../tool-event-builders.ts';
 
 const cwd = '/repo';
 
 async function initConfigStoreForTest(overrides?: RuntimeConfigOverrides): Promise<void> {
   __resetConfigStoreForTests();
   await initConfigStore({ cwd, fs: createMockFileSystemExecutor(), overrides });
+}
+
+function invokeAndCollect(
+  handler: ToolHandler,
+  args: Record<string, unknown>,
+): Promise<{ text: string; isError: boolean }> {
+  const session = createRenderSession('text');
+  const ctx: ToolHandlerContext = {
+    emit: (event) => session.emit(event),
+    attach: (image) => session.attach(image),
+  };
+  return handler(args, ctx).then(() => ({
+    text: session.finalize(),
+    isError: session.isError(),
+  }));
 }
 
 describe('createSessionAwareTool', () => {
@@ -44,8 +66,9 @@ describe('createSessionAwareTool', () => {
 
   type Params = z.infer<typeof internalSchema>;
 
-  async function logic(_params: Params): Promise<import('../../types/common.ts').ToolResponse> {
-    return { content: [{ type: 'text', text: 'OK' }], isError: false };
+  async function logic(_params: Params): Promise<void> {
+    const ctx = getHandlerContext();
+    ctx.emit(statusLine('success', 'OK'));
   }
 
   const handler = createSessionAwareTool<Params>({
@@ -66,19 +89,18 @@ describe('createSessionAwareTool', () => {
       simulatorId: 'SIM-1',
     });
 
-    const result = await handler({});
+    const result = await invokeAndCollect(handler, {});
     expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe('OK');
+    expect(result.text).toContain('OK');
   });
 
   it('should prefer explicit args over session defaults (same key wins)', async () => {
-    // Create a handler that echoes the chosen scheme
     const echoHandler = createSessionAwareTool<Params>({
       internalSchema,
-      logicFunction: async (params) => ({
-        content: [{ type: 'text', text: params.scheme }],
-        isError: false,
-      }),
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusLine('success', params.scheme));
+      },
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [
         { allOf: ['scheme'], message: 'scheme is required' },
@@ -95,45 +117,51 @@ describe('createSessionAwareTool', () => {
       projectPath: '/a.xcodeproj',
       simulatorId: 'SIM-A',
     });
-    const result = await echoHandler({ scheme: 'FromArgs' });
+    const result = await invokeAndCollect(echoHandler, { scheme: 'FromArgs' });
     expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe('FromArgs');
+    expect(result.text).toContain('FromArgs');
   });
 
   it('should return friendly error when allOf requirement missing', async () => {
-    const result = await handler({ projectPath: '/p.xcodeproj', simulatorId: 'SIM-1' });
+    const result = await invokeAndCollect(handler, {
+      projectPath: '/p.xcodeproj',
+      simulatorId: 'SIM-1',
+    });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Missing required session defaults');
-    expect(result.content[0].text).toContain('scheme is required');
+    expect(result.text).toContain('Missing required session defaults');
+    expect(result.text).toContain('scheme is required');
   });
 
   it('should return friendly error when oneOf requirement missing', async () => {
-    const result = await handler({ scheme: 'App', simulatorId: 'SIM-1' });
+    const result = await invokeAndCollect(handler, { scheme: 'App', simulatorId: 'SIM-1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Missing required session defaults');
-    expect(result.content[0].text).toContain('Provide a project or workspace');
+    expect(result.text).toContain('Missing required session defaults');
+    expect(result.text).toContain('Provide a project or workspace');
   });
 
   it('uses opt-out messaging when session defaults schema is disabled', async () => {
     await initConfigStoreForTest({ disableSessionDefaults: true });
 
-    const result = await handler({ projectPath: '/p.xcodeproj', simulatorId: 'SIM-1' });
+    const result = await invokeAndCollect(handler, {
+      projectPath: '/p.xcodeproj',
+      simulatorId: 'SIM-1',
+    });
     expect(result.isError).toBe(true);
-    const text = result.content[0].text;
+    const text = result.text;
     expect(text).toContain('Missing required parameters');
     expect(text).toContain('scheme is required');
     expect(text).not.toContain('session defaults');
   });
 
   it('should surface Zod validation errors when invalid', async () => {
-    const badHandler = createSessionAwareTool<any>({
+    const badHandler = createSessionAwareTool<unknown>({
       internalSchema,
-      logicFunction: logic,
+      logicFunction: logic as (params: unknown, executor: unknown) => Promise<void>,
       getExecutor: () => createMockExecutor({ success: true }),
     });
-    const result = await badHandler({ scheme: 123 });
+    const result = await invokeAndCollect(badHandler, { scheme: 123 });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Parameter validation failed');
+    expect(result.text).toContain('Parameter validation failed');
   });
 
   it('exclusivePairs should NOT prune session defaults when user provides null (treat as not provided)', async () => {
@@ -154,9 +182,11 @@ describe('createSessionAwareTool', () => {
       simulatorId: 'SIM-1',
     });
 
-    const res = await handlerWithExclusive({ workspacePath: null as unknown as string });
+    const res = await invokeAndCollect(handlerWithExclusive, {
+      workspacePath: null as unknown as string,
+    });
     expect(res.isError).toBe(false);
-    expect(res.content[0].text).toBe('OK');
+    expect(res.text).toContain('OK');
   });
 
   it('exclusivePairs should NOT prune when user provides undefined (treated as not provided)', async () => {
@@ -177,9 +207,11 @@ describe('createSessionAwareTool', () => {
       simulatorId: 'SIM-1',
     });
 
-    const res = await handlerWithExclusive({ workspacePath: undefined as unknown as string });
+    const res = await invokeAndCollect(handlerWithExclusive, {
+      workspacePath: undefined as unknown as string,
+    });
     expect(res.isError).toBe(false);
-    expect(res.content[0].text).toBe('OK');
+    expect(res.text).toContain('OK');
   });
 
   it('rejects when multiple explicit args in an exclusive pair are provided (factory-level)', async () => {
@@ -191,23 +223,23 @@ describe('createSessionAwareTool', () => {
 
     const handlerNoXor = createSessionAwareTool<z.infer<typeof internalSchemaNoXor>>({
       internalSchema: internalSchemaNoXor,
-      logicFunction: (async () => ({
-        content: [{ type: 'text', text: 'OK' }],
-        isError: false,
-      })) as any,
+      logicFunction: (async () => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusLine('success', 'OK'));
+      }) as (params: z.infer<typeof internalSchemaNoXor>, executor: unknown) => Promise<void>,
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [{ allOf: ['scheme'], message: 'scheme is required' }],
       exclusivePairs: [['projectPath', 'workspacePath']],
     });
 
-    const res = await handlerNoXor({
+    const res = await invokeAndCollect(handlerNoXor, {
       scheme: 'App',
       projectPath: '/path/a.xcodeproj',
       workspacePath: '/path/b.xcworkspace',
     });
 
     expect(res.isError).toBe(true);
-    const msg = res.content[0].text;
+    const msg = res.text;
     expect(msg).toContain('Parameter validation failed');
     expect(msg).toContain('Mutually exclusive parameters provided');
     expect(msg).toContain('projectPath');
@@ -215,7 +247,6 @@ describe('createSessionAwareTool', () => {
   });
 
   it('prefers first key when both values of exclusive pair come from session defaults', async () => {
-    // Create handler that echoes which simulator param was used
     const echoHandler = createSessionAwareTool<Params>({
       internalSchema: z.object({
         scheme: z.string(),
@@ -223,24 +254,23 @@ describe('createSessionAwareTool', () => {
         simulatorId: z.string().optional(),
         simulatorName: z.string().optional(),
       }),
-      logicFunction: async (params) => ({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(
+          statusLine(
+            'success',
+            JSON.stringify({
               simulatorId: params.simulatorId,
               simulatorName: params.simulatorName,
             }),
-          },
-        ],
-        isError: false,
-      }),
+          ),
+        );
+      },
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [{ allOf: ['scheme'] }],
       exclusivePairs: [['simulatorId', 'simulatorName']],
     });
 
-    // Set both simulatorId and simulatorName in session defaults
     sessionStore.setDefaults({
       scheme: 'App',
       projectPath: '/a.xcodeproj',
@@ -248,13 +278,10 @@ describe('createSessionAwareTool', () => {
       simulatorName: 'iPhone 17',
     });
 
-    // Call with no args - both come from session defaults
-    const result = await echoHandler({});
+    const result = await invokeAndCollect(echoHandler, {});
     expect(result.isError).toBe(false);
 
-    const content = result.content[0] as { type: 'text'; text: string };
-    const parsed = JSON.parse(content.text);
-    // simulatorId should be kept (first in pair), simulatorName should be pruned
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\{.*\}).*$/, '$1'));
     expect(parsed.simulatorId).toBe('SIM-123');
     expect(parsed.simulatorName).toBeUndefined();
   });
@@ -268,10 +295,10 @@ describe('createSessionAwareTool', () => {
 
     const envHandler = createSessionAwareTool<z.infer<typeof envSchema>>({
       internalSchema: envSchema,
-      logicFunction: async (params) => ({
-        content: [{ type: 'text', text: JSON.stringify(params.env) }],
-        isError: false,
-      }),
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusLine('success', JSON.stringify(params.env)));
+      },
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [{ allOf: ['scheme'] }],
     });
@@ -282,12 +309,10 @@ describe('createSessionAwareTool', () => {
       env: { API_KEY: 'abc123', VERBOSE: '1' },
     });
 
-    // User provides additional env var; session default env vars should be preserved
-    const result = await envHandler({ env: { DEBUG: 'true', VERBOSE: '0' } });
+    const result = await invokeAndCollect(envHandler, { env: { DEBUG: 'true', VERBOSE: '0' } });
     expect(result.isError).toBe(false);
 
-    const envContent = result.content[0] as { type: 'text'; text: string };
-    const parsed = JSON.parse(envContent.text);
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\{.*\}).*$/, '$1'));
     expect(parsed).toEqual({ API_KEY: 'abc123', DEBUG: 'true', VERBOSE: '0' });
   });
 
@@ -300,10 +325,10 @@ describe('createSessionAwareTool', () => {
 
     const envHandler = createSessionAwareTool<z.infer<typeof envSchema>>({
       internalSchema: envSchema,
-      logicFunction: async (params) => ({
-        content: [{ type: 'text', text: JSON.stringify(params.env) }],
-        isError: false,
-      }),
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusLine('success', JSON.stringify(params.env)));
+      },
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [{ allOf: ['scheme'] }],
     });
@@ -314,9 +339,8 @@ describe('createSessionAwareTool', () => {
       env: { API_KEY: 'abc123' },
     });
 
-    // Array should not be deep-merged; Zod validation should reject it
-    const result = await envHandler({ env: ['not', 'a', 'record'] as unknown });
+    const result = await invokeAndCollect(envHandler, { env: ['not', 'a', 'record'] as unknown });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Parameter validation failed');
+    expect(result.text).toContain('Parameter validation failed');
   });
 });
