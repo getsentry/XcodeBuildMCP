@@ -1,8 +1,11 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createErrorResponse, createTextResponse } from '../../../utils/responses/index.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
   type DebuggerToolContext,
@@ -21,16 +24,30 @@ export type DebugLldbCommandParams = z.infer<typeof debugLldbCommandSchema>;
 export async function debug_lldb_commandLogic(
   params: DebugLldbCommandParams,
   ctx: DebuggerToolContext,
-): Promise<ToolResponse> {
-  try {
-    const output = await ctx.debugger.runCommand(params.debugSessionId, params.command, {
-      timeoutMs: params.timeoutMs,
-    });
-    return createTextResponse(output.trim());
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to run LLDB command', message);
-  }
+): Promise<void> {
+  const headerEvent = header('LLDB Command', [{ label: 'Command', value: params.command }]);
+
+  const handlerCtx = getHandlerContext();
+
+  return withErrorHandling(
+    handlerCtx,
+    async () => {
+      const output = await ctx.debugger.runCommand(params.debugSessionId, params.command, {
+        timeoutMs: params.timeoutMs,
+      });
+      const trimmed = output.trim();
+
+      handlerCtx.emit(headerEvent);
+      handlerCtx.emit(statusLine('success', 'Command executed'));
+      if (trimmed) {
+        handlerCtx.emit(section('Output:', trimmed.split('\n')));
+      }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to run LLDB command: ${message}`,
+    },
+  );
 }
 
 export const schema = baseSchemaObject.shape;

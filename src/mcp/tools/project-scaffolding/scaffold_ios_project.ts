@@ -1,22 +1,20 @@
-/**
- * Utilities Plugin: Scaffold iOS Project
- *
- * Scaffold a new iOS project from templates.
- */
-
 import * as z from 'zod';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename } from 'node:path';
 import { log } from '../../../utils/logging/index.ts';
-import { ValidationError } from '../../../utils/responses/index.ts';
+import { ValidationError } from '../../../utils/errors.ts';
 import { TemplateManager } from '../../../utils/template/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 
-// Common base schema for both iOS and macOS
 const BaseScaffoldSchema = z.object({
   projectName: z.string().min(1),
   outputPath: z.string(),
@@ -27,7 +25,6 @@ const BaseScaffoldSchema = z.object({
   customizeNames: z.boolean().default(true),
 });
 
-// iOS-specific schema
 const ScaffoldiOSProjectSchema = BaseScaffoldSchema.extend({
   deploymentTarget: z.string().optional(),
   targetedDeviceFamily: z.array(z.enum(['iphone', 'ipad', 'universal'])).optional(),
@@ -343,7 +340,6 @@ async function processDirectory(
   }
 }
 
-// Use z.infer for type safety
 type ScaffoldIOSProjectParams = z.infer<typeof ScaffoldiOSProjectSchema>;
 
 /**
@@ -353,29 +349,28 @@ export async function scaffold_ios_projectLogic(
   params: ScaffoldIOSProjectParams,
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
-): Promise<ToolResponse> {
-  try {
-    const projectParams = { ...params, platform: 'iOS' };
-    const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
+): Promise<void> {
+  const ctx = getHandlerContext();
 
-    const generatedProjectName = params.customizeNames === false ? 'MyProject' : params.projectName;
-    const workspacePath = `${projectPath}/${generatedProjectName}.xcworkspace`;
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const projectParams = { ...params, platform: 'iOS' };
+      const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
 
-    const response = {
-      success: true,
-      projectPath,
-      platform: 'iOS',
-      message: `Successfully scaffolded iOS project "${params.projectName}" in ${projectPath}`,
-    };
+      const generatedProjectName =
+        params.customizeNames === false ? 'MyProject' : params.projectName;
+      const workspacePath = `${projectPath}/${generatedProjectName}.xcworkspace`;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response, null, 2),
-        },
-      ],
-      nextStepParams: {
+      ctx.emit(
+        header('Scaffold iOS Project', [
+          { label: 'Name', value: params.projectName },
+          { label: 'Path', value: projectPath },
+          { label: 'Platform', value: 'iOS' },
+        ]),
+      );
+      ctx.emit(statusLine('success', `Project scaffolded successfully\n  └ ${projectPath}`));
+      ctx.nextStepParams = {
         build_sim: {
           workspacePath,
           scheme: generatedProjectName,
@@ -386,31 +381,18 @@ export async function scaffold_ios_projectLogic(
           scheme: generatedProjectName,
           simulatorName: 'iPhone 17',
         },
-      },
-    };
-  } catch (error) {
-    log(
-      'error',
-      `Failed to scaffold iOS project: ${error instanceof Error ? error.message : String(error)}`,
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error: error instanceof Error ? error.message : 'Unknown error occurred',
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-      isError: true,
-    };
-  }
+      };
+    },
+    {
+      header: header('Scaffold iOS Project', [
+        { label: 'Name', value: params.projectName },
+        { label: 'Path', value: params.outputPath },
+        { label: 'Platform', value: 'iOS' },
+      ]),
+      errorMessage: ({ message }) => message,
+      logMessage: ({ message }) => `Failed to scaffold iOS project: ${message}`,
+    },
+  );
 }
 
 /**
@@ -480,11 +462,17 @@ async function scaffoldProject(
 
 export const schema = ScaffoldiOSProjectSchema.shape;
 
-export async function handler(args: Record<string, unknown>): Promise<ToolResponse> {
-  const params = ScaffoldiOSProjectSchema.parse(args);
-  return scaffold_ios_projectLogic(
-    params,
-    getDefaultCommandExecutor(),
-    getDefaultFileSystemExecutor(),
-  );
+interface ScaffoldIOSToolContext {
+  commandExecutor: CommandExecutor;
+  fileSystemExecutor: FileSystemExecutor;
 }
+
+export const handler = createTypedToolWithContext(
+  ScaffoldiOSProjectSchema,
+  (params: ScaffoldIOSProjectParams, ctx: ScaffoldIOSToolContext) =>
+    scaffold_ios_projectLogic(params, ctx.commandExecutor, ctx.fileSystemExecutor),
+  () => ({
+    commandExecutor: getDefaultCommandExecutor(),
+    fileSystemExecutor: getDefaultFileSystemExecutor(),
+  }),
+);

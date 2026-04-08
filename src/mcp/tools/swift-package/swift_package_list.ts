@@ -1,18 +1,9 @@
-// Note: This tool shares the activeProcesses map with swift_package_run
-// Since both are in the same workflow directory, they can share state
-
-// Import the shared activeProcesses map from swift_package_run
-// This maintains the same behavior as the original implementation
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createTextContent } from '../../../types/common.ts';
-import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/command.ts';
 import { activeProcesses } from './active-processes.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 
-/**
- * Process list dependencies for dependency injection
- */
 type ListProcessInfo = {
   executableName?: string;
   packagePath?: string;
@@ -25,16 +16,11 @@ export interface ProcessListDependencies {
   dateNow?: typeof Date.now;
 }
 
-/**
- * Swift package list business logic - extracted for testability and separation of concerns
- * @param params - Parameters (unused, but maintained for consistency)
- * @param dependencies - Injectable dependencies for testing
- * @returns ToolResponse with process list information
- */
 export async function swift_package_listLogic(
   params?: unknown,
   dependencies?: ProcessListDependencies,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const processMap =
     dependencies?.processMap ??
     new Map<number, ListProcessInfo>(
@@ -52,45 +38,45 @@ export async function swift_package_listLogic(
 
   const processes = arrayFrom(processMap.entries());
 
+  const headerEvent = header('Swift Package Processes');
+
   if (processes.length === 0) {
-    return {
-      content: [
-        createTextContent('ℹ️ No Swift Package processes currently running.'),
-        createTextContent('💡 Use swift_package_run to start an executable.'),
-      ],
-    };
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('info', 'No Swift Package processes currently running.'));
+    return;
   }
 
-  const content = [createTextContent(`📋 Active Swift Package processes (${processes.length}):`)];
+  ctx.emit(headerEvent);
 
-  for (const [pid, info] of processes) {
-    // Use logical OR instead of nullish coalescing to treat empty strings as falsy
+  const cardLines: string[] = [''];
+  for (const [pid, info] of processes as Array<[number, ListProcessInfo]>) {
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const executableName = info.executableName || 'default';
     const runtime = Math.max(1, Math.round((dateNow() - info.startedAt.getTime()) / 1000));
     const packagePath = info.packagePath ?? 'unknown package';
-    content.push(
-      createTextContent(`  • PID ${pid}: ${executableName} (${packagePath}) - running ${runtime}s`),
+    cardLines.push(
+      `\u{1F7E2} ${executableName}`,
+      `   PID: ${pid} | Uptime: ${runtime}s`,
+      `   Package: ${packagePath}`,
+      '',
     );
   }
 
-  content.push(createTextContent('💡 Use swift_package_stop with a PID to terminate a process.'));
+  while (cardLines.at(-1) === '') {
+    cardLines.pop();
+  }
 
-  return { content };
+  ctx.emit(section(`Running Processes (${processes.length}):`, cardLines));
 }
 
-// Define schema as ZodObject (empty for this tool)
 const swiftPackageListSchema = z.object({});
 
-// Use z.infer for type safety
 type SwiftPackageListParams = z.infer<typeof swiftPackageListSchema>;
 
 export const schema = swiftPackageListSchema.shape;
 
 export const handler = createTypedTool(
   swiftPackageListSchema,
-  (params: SwiftPackageListParams) => {
-    return swift_package_listLogic(params);
-  },
+  (params: SwiftPackageListParams) => swift_package_listLogic(params),
   getDefaultCommandExecutor,
 );

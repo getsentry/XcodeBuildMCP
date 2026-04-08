@@ -1,8 +1,3 @@
-/**
- * Tests for active-processes module
- * Following CLAUDE.md testing standards with literal validation
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   activeProcesses,

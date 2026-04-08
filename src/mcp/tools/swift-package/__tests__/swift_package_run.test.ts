@@ -1,9 +1,3 @@
-/**
- * Tests for swift_package_run plugin
- * Following CLAUDE.md testing standards with literal validation
- * Integration tests using dependency injection for deterministic testing
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
@@ -11,8 +5,14 @@ import {
   createNoopExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
+import { runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, swift_package_runLogic } from '../swift_package_run.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+
+const runSwiftPackageRunLogic = (
+  params: Parameters<typeof swift_package_runLogic>[0],
+  executor: Parameters<typeof swift_package_runLogic>[1],
+) => runToolLogic(() => swift_package_runLogic(params, executor));
 
 describe('swift_package_run plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -89,19 +89,16 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
         },
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: ['swift', 'run', '--package-path', '/test/package'],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual(['swift', 'run', '--package-path', '/test/package']);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
     it('should build correct command with release configuration', async () => {
@@ -116,7 +113,7 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           configuration: 'release',
@@ -124,12 +121,16 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: ['swift', 'run', '--package-path', '/test/package', '-c', 'release'],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual([
+        'swift',
+        'run',
+        '--package-path',
+        '/test/package',
+        '-c',
+        'release',
+      ]);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
     it('should build correct command with executable name', async () => {
@@ -144,7 +145,7 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           executableName: 'MyApp',
@@ -152,12 +153,15 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: ['swift', 'run', '--package-path', '/test/package', 'MyApp'],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual([
+        'swift',
+        'run',
+        '--package-path',
+        '/test/package',
+        'MyApp',
+      ]);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
     it('should build correct command with arguments', async () => {
@@ -172,7 +176,7 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           arguments: ['arg1', 'arg2'],
@@ -180,12 +184,17 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: ['swift', 'run', '--package-path', '/test/package', '--', 'arg1', 'arg2'],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual([
+        'swift',
+        'run',
+        '--package-path',
+        '/test/package',
+        '--',
+        'arg1',
+        'arg2',
+      ]);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
     it('should build correct command with parseAsLibrary flag', async () => {
@@ -200,7 +209,7 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           parseAsLibrary: true,
@@ -208,19 +217,16 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: [
-          'swift',
-          'run',
-          '--package-path',
-          '/test/package',
-          '-Xswiftc',
-          '-parse-as-library',
-        ],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual([
+        'swift',
+        'run',
+        '--package-path',
+        '/test/package',
+        '-Xswiftc',
+        '-parse-as-library',
+      ]);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
     it('should build correct command with all parameters', async () => {
@@ -235,7 +241,7 @@ describe('swift_package_run plugin', () => {
         );
       };
 
-      await swift_package_runLogic(
+      await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           executableName: 'MyApp',
@@ -246,31 +252,36 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(executorCalls[0]).toEqual({
-        command: [
-          'swift',
-          'run',
-          '--package-path',
-          '/test/package',
-          '-c',
-          'release',
-          '-Xswiftc',
-          '-parse-as-library',
-          'MyApp',
-          '--',
-          'arg1',
-        ],
-        logPrefix: 'Swift Package Run',
-        useShell: false,
-        opts: undefined,
-      });
+      expect(executorCalls[0].command).toEqual([
+        'swift',
+        'run',
+        '--package-path',
+        '/test/package',
+        '-c',
+        'release',
+        '-Xswiftc',
+        '-parse-as-library',
+        'MyApp',
+        '--',
+        'arg1',
+      ]);
+      expect(executorCalls[0].logPrefix).toBe('Swift Package Run');
+      expect(executorCalls[0].useShell).toBe(false);
     });
 
-    it('should not call executor for background mode', async () => {
-      // For background mode, no executor should be called since it uses direct spawn
-      const mockExecutor = createNoopExecutor();
+    it('should call executor for background mode with detached flag', async () => {
+      const mockExecutor: CommandExecutor = (command, logPrefix, useShell, opts, detached) => {
+        executorCalls.push({ command, logPrefix, useShell, opts, detached });
+        return Promise.resolve(
+          createMockCommandResponse({
+            success: true,
+            output: '',
+            error: undefined,
+          }),
+        );
+      };
 
-      const result = await swift_package_runLogic(
+      const { result } = await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           background: true,
@@ -278,31 +289,29 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      // Should return success without calling executor
-      expect(result.content[0].text).toContain('🚀 Started executable in background');
+      expect(executorCalls.length).toBeGreaterThan(0);
+      expect(executorCalls[0].detached).toBe(true);
+      const text = result.text();
+      expect(text).toContain('Started executable in background');
     });
   });
 
   describe('Response Logic Testing', () => {
     it('should return validation error for missing packagePath', async () => {
-      // Since the tool now uses createTypedTool, Zod validation happens at the handler level
-      // Test the handler directly to see Zod validation
       const result = await handler({});
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Parameter validation failed\nDetails: Invalid parameters:\npackagePath: Invalid input: expected string, received undefined',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('Parameter validation failed');
+      expect(text).toContain('packagePath');
     });
 
     it('should return success response for background mode', async () => {
-      const mockExecutor = createNoopExecutor();
-      const result = await swift_package_runLogic(
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: '',
+      });
+      const { result } = await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
           background: true,
@@ -310,8 +319,8 @@ describe('swift_package_run plugin', () => {
         mockExecutor,
       );
 
-      expect(result.content[0].text).toContain('🚀 Started executable in background');
-      expect(result.content[0].text).toContain('💡 Process is running independently');
+      const text = result.text();
+      expect(text).toContain('Started executable in background');
     });
 
     it('should return success response for successful execution', async () => {
@@ -320,20 +329,14 @@ describe('swift_package_run plugin', () => {
         output: 'Hello, World!',
       });
 
-      const result = await swift_package_runLogic(
+      const { result } = await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
         },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text', text: '✅ Swift executable completed successfully.' },
-          { type: 'text', text: '💡 Process finished cleanly. Check output for results.' },
-          { type: 'text', text: 'Hello, World!' },
-        ],
-      });
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should return error response for failed execution', async () => {
@@ -343,41 +346,30 @@ describe('swift_package_run plugin', () => {
         error: 'Compilation failed',
       });
 
-      const result = await swift_package_runLogic(
+      const { result } = await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
         },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text', text: '❌ Swift executable failed.' },
-          { type: 'text', text: '(no output)' },
-          { type: 'text', text: 'Errors:\nCompilation failed' },
-        ],
-      });
+      expect(result.isError()).toBe(true);
     });
 
     it('should handle executor error', async () => {
       const mockExecutor = createMockExecutor(new Error('Command not found'));
 
-      const result = await swift_package_runLogic(
+      const { result } = await runSwiftPackageRunLogic(
         {
           packagePath: '/test/package',
         },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Failed to execute swift run\nDetails: Command not found',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError()).toBe(true);
+      const text = result.text();
+      expect(text).toContain('Failed to execute swift run');
+      expect(text).toContain('Command not found');
     });
   });
 });

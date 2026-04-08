@@ -1,7 +1,10 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createErrorResponse, createTextResponse } from '../../../utils/responses/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
   type DebuggerToolContext,
@@ -17,14 +20,31 @@ export type DebugBreakpointRemoveParams = z.infer<typeof debugBreakpointRemoveSc
 export async function debug_breakpoint_removeLogic(
   params: DebugBreakpointRemoveParams,
   ctx: DebuggerToolContext,
-): Promise<ToolResponse> {
-  try {
-    const output = await ctx.debugger.removeBreakpoint(params.debugSessionId, params.breakpointId);
-    return createTextResponse(`✅ Breakpoint ${params.breakpointId} removed.\n\n${output.trim()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to remove breakpoint', message);
-  }
+): Promise<void> {
+  const headerEvent = header('Remove Breakpoint');
+
+  const handlerCtx = getHandlerContext();
+
+  return withErrorHandling(
+    handlerCtx,
+    async () => {
+      const output = await ctx.debugger.removeBreakpoint(
+        params.debugSessionId,
+        params.breakpointId,
+      );
+      const rawOutput = output.trim();
+
+      handlerCtx.emit(headerEvent);
+      handlerCtx.emit(statusLine('success', `Breakpoint ${params.breakpointId} removed`));
+      if (rawOutput) {
+        handlerCtx.emit(section('Output:', rawOutput.split('\n')));
+      }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to remove breakpoint: ${message}`,
+    },
+  );
 }
 
 export const schema = debugBreakpointRemoveSchema.shape;

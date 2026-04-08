@@ -101,6 +101,17 @@ function createDefaultHandlers() {
         output: 'evaluated',
       },
     }),
+    pause: () => ({
+      body: {},
+      events: [
+        {
+          seq: 2000,
+          type: 'event',
+          event: 'stopped',
+          body: { reason: 'pause', threadId: 1 },
+        },
+      ],
+    }),
     setBreakpoints: (request: DapRequest) => {
       const args = request.arguments as { breakpoints: Array<{ line: number }> };
       const breakpoints = (args?.breakpoints ?? []).map((bp, index) => ({
@@ -164,6 +175,24 @@ describe('DapBackend', () => {
     expect(fnBreakpoint.id).toBe(200);
 
     await backend.removeBreakpoint(fnBreakpoint.id);
+
+    await backend.detach();
+    await backend.dispose();
+  });
+
+  it('maps process interrupt to a DAP pause request', async () => {
+    const handlers = createDefaultHandlers();
+    const spawner = createDapSpawner(handlers);
+    const executor = createMockExecutor({ success: true, output: '/usr/bin/lldb-dap' });
+
+    const backend = await createDapBackend({ executor, spawner, requestTimeoutMs: 1_000 });
+    await backend.attach({ pid: 4242, simulatorId: 'sim-1' });
+
+    const output = await backend.runCommand('process interrupt');
+    expect(output).toBe('Process interrupted.');
+
+    const stack = await backend.getStack();
+    expect(stack).toContain('frame #0: main at /tmp/main.swift:42');
 
     await backend.detach();
     await backend.dispose();

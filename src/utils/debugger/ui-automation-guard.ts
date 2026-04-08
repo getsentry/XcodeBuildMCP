@@ -1,12 +1,9 @@
-import type { ToolResponse } from '../../types/common.ts';
-import { createErrorResponse } from '../responses/index.ts';
 import { log } from '../logging/index.ts';
 import { getUiDebuggerGuardMode } from '../environment.ts';
 import type { DebugExecutionState } from './types.ts';
 import type { DebuggerManager } from './debugger-manager.ts';
 
-type GuardResult = {
-  blockedResponse?: ToolResponse;
+export type GuardResult = {
   blockedMessage?: string;
   warningText?: string;
 };
@@ -52,10 +49,6 @@ export async function guardUiAutomationAgainstStoppedDebugger(opts: {
   }
 
   return {
-    blockedResponse: createErrorResponse(
-      'UI automation blocked: app is paused in debugger',
-      details,
-    ),
     blockedMessage: `UI automation blocked: app is paused in debugger\n${details}`,
   };
 }

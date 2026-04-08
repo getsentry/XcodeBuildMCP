@@ -173,7 +173,9 @@ export class DapTransport {
       clearTimeout(pending.timeout);
 
       if (!message.success) {
-        const detail = message.message ?? 'DAP request failed';
+        const bodyError = (message.body as { error?: { format?: string } } | undefined)?.error
+          ?.format;
+        const detail = message.message ?? bodyError ?? 'DAP request failed';
         pending.reject(new Error(`${pending.command} failed: ${detail}`));
         return;
       }

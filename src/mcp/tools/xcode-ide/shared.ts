@@ -1,15 +1,35 @@
-import type { ToolResponse } from '../../../types/common.ts';
-import type { XcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tools-bridge/index.ts';
+import type {
+  BridgeToolResult,
+  XcodeToolsBridgeToolHandler,
+} from '../../../integrations/xcode-tools-bridge/index.ts';
 import { getServer } from '../../../server/server-state.ts';
 import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tools-bridge/index.ts';
-import { createErrorResponse } from '../../../utils/responses/index.ts';
+import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 export async function withBridgeToolHandler(
-  callback: (bridge: XcodeToolsBridgeToolHandler) => Promise<ToolResponse>,
-): Promise<ToolResponse> {
+  operation: string,
+  callback: (bridge: XcodeToolsBridgeToolHandler) => Promise<BridgeToolResult>,
+): Promise<void> {
+  const ctx = getHandlerContext();
   const bridge = getXcodeToolsBridgeToolHandler(getServer());
   if (!bridge) {
-    return createErrorResponse('Bridge unavailable', 'Unable to initialize xcode tools bridge');
+    ctx.emit(header(operation));
+    ctx.emit(statusLine('error', 'Unable to initialize xcode tools bridge'));
+    return;
   }
-  return callback(bridge);
+
+  const result = await callback(bridge);
+
+  for (const event of result.events) {
+    ctx.emit(event);
+  }
+
+  for (const img of result.images ?? []) {
+    ctx.attach(img);
+  }
+
+  if (result.nextStepParams) {
+    ctx.nextStepParams = result.nextStepParams;
+  }
 }

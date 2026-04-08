@@ -6,12 +6,15 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
-import { validateFileExists } from '../../../utils/validation/index.ts';
+import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../../utils/execution/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 
 const getCoverageReportSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -60,12 +63,21 @@ type GetCoverageReportContext = {
 export async function get_coverage_reportLogic(
   params: GetCoverageReportParams,
   context: GetCoverageReportContext,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const { xcresultPath, target, showFiles } = params;
+
+  const headerParams = [{ label: 'xcresult', value: xcresultPath }];
+  if (target) {
+    headerParams.push({ label: 'Target Filter', value: target });
+  }
+  const headerEvent = header('Coverage Report', headerParams);
 
   const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
   if (!fileExistsValidation.isValid) {
-    return { content: [{ type: 'text', text: fileExistsValidation.errorMessage! }], isError: true };
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('error', fileExistsValidation.errorMessage!));
+    return;
   }
 
   log('info', `Getting coverage report from: ${xcresultPath}`);
@@ -76,36 +88,25 @@ export async function get_coverage_reportLogic(
   }
   cmd.push('--json', xcresultPath);
 
-  const result = await context.executor(cmd, 'Get Coverage Report', false, undefined);
+  const result = await context.executor(cmd, 'Get Coverage Report', false);
 
   if (!result.success) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to get coverage report: ${result.error ?? result.output}\n\nMake sure the xcresult bundle exists and contains coverage data.\nHint: Run tests with coverage enabled (e.g., xcodebuild test -enableCodeCoverage YES).`,
-        },
-      ],
-      isError: true,
-    };
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('error', `Failed to get coverage report: ${result.error ?? result.output}`));
+    return;
   }
 
   let data: unknown;
   try {
     data = JSON.parse(result.output);
   } catch {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to parse coverage JSON output.\n\nRaw output:\n${result.output}`,
-        },
-      ],
-      isError: true,
-    };
+    ctx.emit(headerEvent);
+    ctx.emit(
+      statusLine('error', `Failed to parse coverage JSON output.\n\nRaw output:\n${result.output}`),
+    );
+    return;
   }
 
-  // Validate structure: expect an array of target objects or { targets: [...] }
   let rawTargets: unknown[] = [];
   if (Array.isArray(data)) {
     rawTargets = data;
@@ -117,53 +118,34 @@ export async function get_coverage_reportLogic(
   ) {
     rawTargets = (data as { targets: unknown[] }).targets;
   } else {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Unexpected coverage data format.\n\nRaw output:\n${result.output}`,
-        },
-      ],
-      isError: true,
-    };
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('error', `Unexpected coverage data format.\n\nRaw output:\n${result.output}`));
+    return;
   }
 
   let targets = rawTargets.filter(isValidCoverageTarget);
 
-  // Filter by target name if specified
   if (target) {
     const lowerTarget = target.toLowerCase();
     targets = targets.filter((t) => t.name.toLowerCase().includes(lowerTarget));
     if (targets.length === 0) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `No targets found matching "${target}".`,
-          },
-        ],
-        isError: true,
-      };
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('error', `No targets found matching "${target}".`));
+      return;
     }
   }
 
   if (targets.length === 0) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'No coverage data found in the xcresult bundle.\n\nMake sure tests were run with coverage enabled.',
-        },
-      ],
-      isError: true,
-    };
+    ctx.emit(headerEvent);
+    ctx.emit(
+      statusLine(
+        'error',
+        'No coverage data found in the xcresult bundle.\n\nMake sure tests were run with coverage enabled.',
+      ),
+    );
+    return;
   }
 
-  // Build human-readable output
-  let text = 'Code Coverage Report\n';
-  text += '====================\n\n';
-
-  // Calculate overall stats
   let totalCovered = 0;
   let totalExecutable = 0;
   for (const t of targets) {
@@ -171,31 +153,30 @@ export async function get_coverage_reportLogic(
     totalExecutable += t.executableLines;
   }
   const overallPct = totalExecutable > 0 ? (totalCovered / totalExecutable) * 100 : 0;
-  text += `Overall: ${overallPct.toFixed(1)}% (${totalCovered}/${totalExecutable} lines)\n\n`;
 
-  text += 'Targets:\n';
-  // Sort by coverage ascending (lowest coverage first)
   targets.sort((a, b) => a.lineCoverage - b.lineCoverage);
 
+  const targetLines: string[] = [];
   for (const t of targets) {
     const pct = (t.lineCoverage * 100).toFixed(1);
-    text += `  ${t.name}: ${pct}% (${t.coveredLines}/${t.executableLines} lines)\n`;
+    targetLines.push(`${t.name}: ${pct}% (${t.coveredLines}/${t.executableLines} lines)`);
 
     if (showFiles && t.files && t.files.length > 0) {
       const sortedFiles = [...t.files].sort((a, b) => a.lineCoverage - b.lineCoverage);
       for (const f of sortedFiles) {
         const fPct = (f.lineCoverage * 100).toFixed(1);
-        text += `    ${f.name}: ${fPct}% (${f.coveredLines}/${f.executableLines} lines)\n`;
+        targetLines.push(`  ${f.name}: ${fPct}% (${f.coveredLines}/${f.executableLines} lines)`);
       }
-      text += '\n';
     }
   }
 
-  return {
-    content: [{ type: 'text', text }],
-    nextStepParams: {
-      get_file_coverage: { xcresultPath },
-    },
+  ctx.emit(headerEvent);
+  ctx.emit(
+    statusLine('info', `Overall: ${overallPct.toFixed(1)}% (${totalCovered}/${totalExecutable} lines)`),
+  );
+  ctx.emit(section('Targets', targetLines));
+  ctx.nextStepParams = {
+    get_file_coverage: { xcresultPath },
   };
 }
 

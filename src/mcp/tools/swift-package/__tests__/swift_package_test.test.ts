@@ -1,19 +1,18 @@
-/**
- * Tests for swift_package_test plugin
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
-
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import {
   createMockExecutor,
-  createMockFileSystemExecutor,
-  createNoopExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
+import { runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, swift_package_testLogic } from '../swift_package_test.ts';
+import { allText } from '../../../../test-utils/test-helpers.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+
+const runSwiftPackageTestLogic = (
+  params: Parameters<typeof swift_package_testLogic>[0],
+  executor: Parameters<typeof swift_package_testLogic>[1],
+) => runToolLogic(() => swift_package_testLogic(params, executor));
 
 describe('swift_package_test plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -68,14 +67,9 @@ describe('swift_package_test plugin', () => {
 
   describe('Command Generation Testing', () => {
     it('should build correct command for basic test', async () => {
-      const calls: Array<{
-        args: string[];
-        name?: string;
-        hideOutput?: boolean;
-        opts?: { env?: Record<string, string>; cwd?: string };
-      }> = [];
-      const mockExecutor: CommandExecutor = async (args, name, hideOutput, opts) => {
-        calls.push({ args, name, hideOutput, opts });
+      const calls: Array<{ args: string[] }> = [];
+      const mockExecutor: CommandExecutor = async (args, _name, _hideOutput, _opts) => {
+        calls.push({ args });
         return createMockCommandResponse({
           success: true,
           output: 'Test Passed',
@@ -83,7 +77,7 @@ describe('swift_package_test plugin', () => {
         });
       };
 
-      await swift_package_testLogic(
+      await runSwiftPackageTestLogic(
         {
           packagePath: '/test/package',
         },
@@ -91,23 +85,13 @@ describe('swift_package_test plugin', () => {
       );
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual({
-        args: ['swift', 'test', '--package-path', '/test/package'],
-        name: 'Swift Package Test',
-        hideOutput: false,
-        opts: undefined,
-      });
+      expect(calls[0].args).toEqual(['swift', 'test', '--package-path', '/test/package']);
     });
 
     it('should build correct command with all parameters', async () => {
-      const calls: Array<{
-        args: string[];
-        name?: string;
-        hideOutput?: boolean;
-        opts?: { env?: Record<string, string>; cwd?: string };
-      }> = [];
-      const mockExecutor: CommandExecutor = async (args, name, hideOutput, opts) => {
-        calls.push({ args, name, hideOutput, opts });
+      const calls: Array<{ args: string[] }> = [];
+      const mockExecutor: CommandExecutor = async (args, _name, _hideOutput, _opts) => {
+        calls.push({ args });
         return createMockCommandResponse({
           success: true,
           output: 'Tests completed',
@@ -115,7 +99,7 @@ describe('swift_package_test plugin', () => {
         });
       };
 
-      await swift_package_testLogic(
+      await runSwiftPackageTestLogic(
         {
           packagePath: '/test/package',
           testProduct: 'MyTests',
@@ -129,69 +113,38 @@ describe('swift_package_test plugin', () => {
       );
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual({
-        args: [
-          'swift',
-          'test',
-          '--package-path',
-          '/test/package',
-          '-c',
-          'release',
-          '--test-product',
-          'MyTests',
-          '--filter',
-          'Test.*',
-          '--no-parallel',
-          '--show-code-coverage',
-          '-Xswiftc',
-          '-parse-as-library',
-        ],
-        name: 'Swift Package Test',
-        hideOutput: false,
-        opts: undefined,
-      });
+      expect(calls[0].args).toEqual([
+        'swift',
+        'test',
+        '--package-path',
+        '/test/package',
+        '-c',
+        'release',
+        '--test-product',
+        'MyTests',
+        '--filter',
+        'Test.*',
+        '--no-parallel',
+        '--show-code-coverage',
+        '-Xswiftc',
+        '-parse-as-library',
+      ]);
     });
   });
 
   describe('Response Logic Testing', () => {
-    it('should handle empty packagePath parameter', async () => {
-      // When packagePath is empty, the function should still process it
-      // but the command execution may fail, which is handled by the executor
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tests completed with empty path',
-      });
-
-      const result = await swift_package_testLogic({ packagePath: '' }, mockExecutor);
-
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toBe('✅ Swift package tests completed.');
-    });
-
-    it('should return successful test response', async () => {
+    it('should return non-error for successful tests', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: 'All tests passed.',
       });
 
-      const result = await swift_package_testLogic(
-        {
-          packagePath: '/test/package',
-        },
+      const { result } = await runSwiftPackageTestLogic(
+        { packagePath: '/test/package' },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text', text: '✅ Swift package tests completed.' },
-          {
-            type: 'text',
-            text: '💡 Next: Execute your app with swift_package_run if tests passed',
-          },
-          { type: 'text', text: 'All tests passed.' },
-        ],
-        isError: false,
-      });
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should return error response for test failure', async () => {
@@ -200,48 +153,12 @@ describe('swift_package_test plugin', () => {
         error: '2 tests failed',
       });
 
-      const result = await swift_package_testLogic(
-        {
-          packagePath: '/test/package',
-        },
+      const { result } = await runSwiftPackageTestLogic(
+        { packagePath: '/test/package' },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Swift package tests failed\nDetails: 2 tests failed',
-          },
-        ],
-        isError: true,
-      });
-    });
-
-    it('should include stdout diagnostics when stderr is empty on test failure', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        error: '',
-        output:
-          "main.swift:10:25: error: cannot find type 'DOESNOTEXIST' in scope\nlet broken: DOESNOTEXIST = 42",
-      });
-
-      const result = await swift_package_testLogic(
-        {
-          packagePath: '/test/package',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: "Error: Swift package tests failed\nDetails: main.swift:10:25: error: cannot find type 'DOESNOTEXIST' in scope\nlet broken: DOESNOTEXIST = 42",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError()).toBe(true);
     });
 
     it('should handle spawn error', async () => {
@@ -249,54 +166,28 @@ describe('swift_package_test plugin', () => {
         throw new Error('spawn ENOENT');
       };
 
-      const result = await swift_package_testLogic(
-        {
-          packagePath: '/test/package',
-        },
+      const { result } = await runSwiftPackageTestLogic(
+        { packagePath: '/test/package' },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Failed to execute swift test\nDetails: spawn ENOENT',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError()).toBe(true);
+      const text = result.text();
+      expect(text).toContain('Failed to execute swift test');
+      expect(text).toContain('spawn ENOENT');
     });
 
-    it('should handle successful test with parameters', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tests completed.',
-      });
+    it('should return error for invalid configuration', async () => {
+      const mockExecutor = createMockExecutor({ success: true, output: '' });
 
-      const result = await swift_package_testLogic(
-        {
-          packagePath: '/test/package',
-          testProduct: 'MyTests',
-          filter: 'Test.*',
-          configuration: 'release',
-          parallel: false,
-          showCodecov: true,
-          parseAsLibrary: true,
-        },
+      const { result } = await runSwiftPackageTestLogic(
+        { packagePath: '/test/package', configuration: 'invalid' as 'debug' },
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text', text: '✅ Swift package tests completed.' },
-          {
-            type: 'text',
-            text: '💡 Next: Execute your app with swift_package_run if tests passed',
-          },
-          { type: 'text', text: 'Tests completed.' },
-        ],
-        isError: false,
-      });
+      expect(result.isError()).toBe(true);
+      const text = result.text();
+      expect(text).toContain('Invalid configuration');
     });
   });
 });

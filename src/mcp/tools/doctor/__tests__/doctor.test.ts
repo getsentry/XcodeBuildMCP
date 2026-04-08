@@ -1,13 +1,8 @@
-/**
- * Tests for doctor plugin
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
-
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { schema, runDoctor, type DoctorDependencies } from '../doctor.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import { allText } from '../../../../test-utils/test-helpers.ts';
 
 function createDeps(overrides?: Partial<DoctorDependencies>): DoctorDependencies {
   const base: DoctorDependencies = {
@@ -141,15 +136,10 @@ describe('doctor tool', () => {
       const deps = createDeps();
       const result = await runDoctor({}, deps);
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: result.content[0].text,
-        },
-      ]);
-      expect(typeof result.content[0].text).toBe('string');
-      expect(result.content[0].text).toContain('### Manifest Tool Inventory');
-      expect(result.content[0].text).not.toContain('Total Plugins');
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('Manifest Tool Inventory');
+      expect(text).not.toContain('Total Plugins');
     });
 
     it('should handle manifest loading failure', async () => {
@@ -163,13 +153,9 @@ describe('doctor tool', () => {
 
       const result = await runDoctor({}, deps);
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: result.content[0].text,
-        },
-      ]);
-      expect(typeof result.content[0].text).toBe('string');
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('Manifest loading failed');
     });
 
     it('should handle xcode command failure', async () => {
@@ -182,13 +168,9 @@ describe('doctor tool', () => {
       });
       const result = await runDoctor({}, deps);
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: result.content[0].text,
-        },
-      ]);
-      expect(typeof result.content[0].text).toBe('string');
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('Xcode not found');
     });
 
     it('should handle xcodemake check failure', async () => {
@@ -209,13 +191,9 @@ describe('doctor tool', () => {
       });
       const result = await runDoctor({}, deps);
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: result.content[0].text,
-        },
-      ]);
-      expect(typeof result.content[0].text).toBe('string');
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('xcodemake: Not found');
     });
 
     it('should redact path and sensitive values in output', async () => {
@@ -255,8 +233,7 @@ describe('doctor tool', () => {
       });
 
       const result = await runDoctor({}, deps);
-      const text = result.content[0].text;
-      if (typeof text !== 'string') throw new Error('Unexpected doctor output type');
+      const text = allText(result);
 
       expect(text).toContain('<redacted>');
       expect(text).not.toContain('testuser');
@@ -302,10 +279,9 @@ describe('doctor tool', () => {
       });
 
       const result = await runDoctor({ nonRedacted: true }, deps);
-      const text = result.content[0].text;
-      if (typeof text !== 'string') throw new Error('Unexpected doctor output type');
+      const text = allText(result);
 
-      expect(text).toContain('Output Mode: ⚠️ Non-redacted (opt-in)');
+      expect(text).toContain('Output Mode: Non-redacted (opt-in)');
       expect(text).toContain('testuser');
       expect(text).toContain('MySecretProject');
     });
@@ -368,13 +344,10 @@ describe('doctor tool', () => {
 
       const result = await runDoctor({}, deps);
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: result.content[0].text,
-        },
-      ]);
-      expect(typeof result.content[0].text).toBe('string');
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('Available: No');
+      expect(text).toContain('UI Automation Supported: No');
     });
   });
 });

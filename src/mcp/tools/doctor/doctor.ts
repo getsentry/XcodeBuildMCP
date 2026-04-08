@@ -9,15 +9,16 @@ import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { version } from '../../../utils/version/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import type { PipelineEvent } from '../../../types/pipeline-events.ts';
+import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getConfig } from '../../../utils/config-store.ts';
 import { detectXcodeRuntime } from '../../../utils/xcode-process.ts';
 import { type DoctorDependencies, createDoctorDependencies } from './lib/doctor.deps.ts';
 import { peekXcodeToolsBridgeManager } from '../../../integrations/xcode-tools-bridge/index.ts';
 import { getMcpBridgeAvailability } from '../../../integrations/xcode-tools-bridge/core.ts';
+import { header, statusLine, section, detailTree } from '../../../utils/tool-event-builders.ts';
+import { renderEvents } from '../../../rendering/render.ts';
 
-// Constants
 const LOG_PREFIX = '[Doctor]';
 const USER_HOME_PATH_PATTERN = /\/Users\/[^/\s]+/g;
 const SENSITIVE_KEY_PATTERN =
@@ -25,7 +26,6 @@ const SENSITIVE_KEY_PATTERN =
 const SECRET_VALUE_PATTERN =
   /((token|secret|password|passphrase|api[_-]?key|auth|cookie|session|private[_-]?key)\s*[=:]\s*)([^\s,;]+)/gi;
 
-// Define schema as ZodObject
 const doctorSchema = z.object({
   nonRedacted: z
     .boolean()
@@ -33,7 +33,6 @@ const doctorSchema = z.object({
     .describe('Opt-in: when true, disable redaction and include full raw doctor output.'),
 });
 
-// Use z.infer for type safety
 type DoctorParams = z.infer<typeof doctorSchema>;
 
 function escapeRegExp(value: string): string {
@@ -162,13 +161,9 @@ async function getXcodeToolsBridgeDoctorInfo(
 }
 
 /**
- * Run the doctor tool and return the results
+ * Run the doctor tool and return the results.
  */
-export async function runDoctor(
-  params: DoctorParams,
-  deps: DoctorDependencies,
-  showAsciiLogo = false,
-): Promise<ToolResponse> {
+export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) {
   const prevSilence = process.env.XCODEBUILDMCP_SILENCE_LOGS;
   process.env.XCODEBUILDMCP_SILENCE_LOGS = 'true';
   log('info', `${LOG_PREFIX}: Running doctor tool`);
@@ -263,231 +258,263 @@ export async function runDoctor(
     ? doctorInfoRaw
     : (sanitizeValue(doctorInfoRaw, '', projectNames, piiTerms) as typeof doctorInfoRaw);
 
-  // Custom ASCII banner (multiline)
-  const asciiLogo = `
-██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗██████╗ ██╗   ██╗██╗██╗     ██████╗ ███╗   ███╗ ██████╗██████╗
-╚██╗██╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔══██╗██║   ██║██║██║     ██╔══██╗████╗ ████║██╔════╝██╔══██╗
- ╚███╔╝ ██║     ██║   ██║██║  ██║█████╗  ██████╔╝██║   ██║██║██║     ██║  ██║██╔████╔██║██║     ██████╔╝
- ██╔██╗ ██║     ██║   ██║██║  ██║██╔══╝  ██╔══██╗██║   ██║██║██║     ██║  ██║██║╚██╔╝██║██║     ██╔═══╝
-██╔╝ ██╗╚██████╗╚██████╔╝██████╔╝███████╗██████╔╝╚██████╔╝██║███████╗██████╔╝██║ ╚═╝ ██║╚██████╗██║
-╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═════╝  ╚═════╝ ╚═╝╚══════╝╚═════╝ ╚═╝     ╚═╝ ╚═════╝╚═╝
+  const events: PipelineEvent[] = [
+    header('XcodeBuildMCP Doctor', [
+      { label: 'Generated', value: doctorInfo.timestamp },
+      { label: 'Server Version', value: doctorInfo.serverVersion },
+      {
+        label: 'Output Mode',
+        value: params.nonRedacted ? 'Non-redacted (opt-in)' : 'Redacted (default)',
+      },
+    ]),
+  ];
 
-██████╗  ██████╗  ██████╗████████╗ ██████╗ ██████╗
-██╔══██╗██╔═══██╗██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗
-██║  ██║██║   ██║██║        ██║   ██║   ██║██████╔╝
-██║  ██║██║   ██║██║        ██║   ██║   ██║██╔══██╗
-██████╔╝╚██████╔╝╚██████╗   ██║   ╚██████╔╝██║  ██║
-╚═════╝  ╚═════╝  ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
-`;
-
-  const RESET = '\x1b[0m';
-  // 256-color: orangey-pink foreground and lighter shade for outlines
-  const FOREGROUND = '\x1b[38;5;209m';
-  const SHADOW = '\x1b[38;5;217m';
-
-  function colorizeAsciiArt(ascii: string): string {
-    const lines = ascii.split('\n');
-    const coloredLines: string[] = [];
-    const shadowChars = new Set([
-      '╔',
-      '╗',
-      '╝',
-      '╚',
-      '═',
-      '║',
-      '╦',
-      '╩',
-      '╠',
-      '╣',
-      '╬',
-      '┌',
-      '┐',
-      '└',
-      '┘',
-      '│',
-      '─',
-    ]);
-    for (const line of lines) {
-      let colored = '';
-      for (const ch of line) {
-        if (ch === '█') {
-          colored += `${FOREGROUND}${ch}${RESET}`;
-        } else if (shadowChars.has(ch)) {
-          colored += `${SHADOW}${ch}${RESET}`;
-        } else {
-          colored += ch;
-        }
-      }
-      coloredLines.push(colored + RESET);
-    }
-    return coloredLines.join('\n');
-  }
-
-  const outputLines = [];
-
-  // Only show ASCII logo when explicitly requested (CLI usage)
-  if (showAsciiLogo) {
-    outputLines.push(colorizeAsciiArt(asciiLogo));
-  }
-
-  outputLines.push(
-    'XcodeBuildMCP Doctor',
-    `\nGenerated: ${doctorInfo.timestamp}`,
-    `Server Version: ${doctorInfo.serverVersion}`,
-    `Output Mode: ${params.nonRedacted ? '⚠️ Non-redacted (opt-in)' : 'Redacted (default)'}`,
+  // System Information
+  events.push(
+    detailTree(
+      Object.entries(doctorInfo.system).map(([key, value]) => ({
+        label: key,
+        value: String(value),
+      })),
+    ),
   );
 
-  const formattedOutput = [
-    ...outputLines,
-
-    `\n## System Information`,
-    ...Object.entries(doctorInfo.system).map(([key, value]) => `- ${key}: ${value}`),
-
-    `\n## Node.js Information`,
-    ...Object.entries(doctorInfo.node).map(([key, value]) => `- ${key}: ${value}`),
-
-    `\n## Process Tree`,
-    `- Running under Xcode: ${doctorInfo.runningUnderXcode ? '✅ Yes' : '❌ No'}`,
-    ...(doctorInfo.processTree.length > 0
-      ? doctorInfo.processTree.map(
-          (entry) =>
-            `- ${entry.pid} (ppid ${entry.ppid}): ${entry.name}${
-              entry.command ? ` — ${entry.command}` : ''
-            }`,
-        )
-      : ['- (unavailable)']),
-    ...(doctorInfo.processTreeError ? [`- Error: ${doctorInfo.processTreeError}`] : []),
-
-    `\n## Xcode Information`,
-    ...('error' in doctorInfo.xcode
-      ? [`- Error: ${doctorInfo.xcode.error}`]
-      : Object.entries(doctorInfo.xcode).map(([key, value]) => `- ${key}: ${value}`)),
-
-    `\n## Dependencies`,
-    ...Object.entries(doctorInfo.dependencies).map(
-      ([binary, status]) =>
-        `- ${binary}: ${status.available ? `✅ ${status.version ?? 'Available'}` : '❌ Not found'}`,
+  // Node.js Information
+  events.push(
+    section(
+      'Node.js Information',
+      Object.entries(doctorInfo.node).map(([key, value]) => `${key}: ${value}`),
     ),
+  );
 
-    `\n## Environment Variables`,
-    ...Object.entries(doctorInfo.environmentVariables)
-      .filter(([key]) => key !== 'PATH' && key !== 'PYTHONPATH') // These are too long, handle separately
-      .map(([key, value]) => `- ${key}: ${value ?? '(not set)'}`),
+  // Process Tree
+  const processTreeLines: string[] = [
+    `Running under Xcode: ${doctorInfo.runningUnderXcode ? 'Yes' : 'No'}`,
+  ];
+  if (doctorInfo.processTree.length > 0) {
+    for (const entry of doctorInfo.processTree) {
+      processTreeLines.push(
+        `${entry.pid} (ppid ${entry.ppid}): ${entry.name}${entry.command ? ` -- ${entry.command}` : ''}`,
+      );
+    }
+  } else {
+    processTreeLines.push('(unavailable)');
+  }
+  if (doctorInfo.processTreeError) {
+    processTreeLines.push(`Error: ${doctorInfo.processTreeError}`);
+  }
+  events.push(section('Process Tree', processTreeLines));
 
-    `\n### PATH`,
-    `\`\`\``,
-    `${doctorInfo.environmentVariables.PATH ?? '(not set)'}`.split(':').join('\n'),
-    `\`\`\``,
+  // Xcode Information
+  if ('error' in doctorInfo.xcode) {
+    events.push(
+      section('Xcode Information', [`Error: ${doctorInfo.xcode.error}`], { icon: 'cross' }),
+    );
+  } else {
+    events.push(
+      section(
+        'Xcode Information',
+        Object.entries(doctorInfo.xcode).map(([key, value]) => `${key}: ${value}`),
+      ),
+    );
+  }
 
-    `\n## Feature Status`,
-    `\n### UI Automation (axe)`,
-    `- Available: ${doctorInfo.features.axe.available ? '✅ Yes' : '❌ No'}`,
-    `- UI Automation Supported: ${doctorInfo.features.axe.uiAutomationSupported ? '✅ Yes' : '❌ No'}`,
-    `- Simulator Video Capture Supported (AXe >= 1.1.0): ${doctorInfo.features.axe.videoCaptureSupported ? '✅ Yes' : '❌ No'}`,
-    `- UI-Debugger Guard Mode: ${uiDebuggerGuardMode}`,
+  // Dependencies
+  events.push(
+    section(
+      'Dependencies',
+      Object.entries(doctorInfo.dependencies).map(
+        ([binary, status]) =>
+          `${binary}: ${status.available ? (status.version ?? 'Available') : 'Not found'}`,
+      ),
+    ),
+  );
 
-    `\n### Incremental Builds`,
-    `- Enabled: ${doctorInfo.features.xcodemake.enabled ? '✅ Yes' : '❌ No'}`,
-    `- xcodemake Binary Available: ${doctorInfo.features.xcodemake.binaryAvailable ? '✅ Yes' : '❌ No'}`,
-    `- Makefile exists (cwd): ${doctorInfo.features.xcodemake.makefileExists === null ? '(not checked: incremental builds disabled)' : doctorInfo.features.xcodemake.makefileExists ? '✅ Yes' : '❌ No'}`,
+  // Environment Variables
+  const envLines = Object.entries(doctorInfo.environmentVariables)
+    .filter(([key]) => key !== 'PATH' && key !== 'PYTHONPATH')
+    .map(([key, value]) => `${key}: ${value ?? '(not set)'}`);
+  events.push(section('Environment Variables', envLines));
 
-    `\n### Mise Integration`,
-    `- Running under mise: ${doctorInfo.features.mise.running_under_mise ? '✅ Yes' : '❌ No'}`,
-    `- Mise available: ${doctorInfo.features.mise.available ? '✅ Yes' : '❌ No'}`,
+  // PATH
+  const pathValue = doctorInfo.environmentVariables.PATH ?? '(not set)';
+  events.push(section('PATH', pathValue.split(':')));
 
-    `\n### Debugger Backend (DAP)`,
-    `- lldb-dap available: ${doctorInfo.features.debugger.dap.available ? '✅ Yes' : '❌ No'}`,
-    `- Selected backend: ${doctorInfo.features.debugger.dap.selected}`,
-    ...(dapSelected && !lldbDapAvailable
-      ? [
-          `- Warning: DAP backend selected but lldb-dap not available. Set XCODEBUILDMCP_DEBUGGER_BACKEND=lldb-cli to use the CLI backend.`,
-        ]
-      : []),
+  // UI Automation (axe)
+  const axeLines: string[] = [
+    `Available: ${doctorInfo.features.axe.available ? 'Yes' : 'No'}`,
+    `UI Automation Supported: ${doctorInfo.features.axe.uiAutomationSupported ? 'Yes' : 'No'}`,
+    `Simulator Video Capture Supported (AXe >= 1.1.0): ${doctorInfo.features.axe.videoCaptureSupported ? 'Yes' : 'No'}`,
+    `UI-Debugger Guard Mode: ${uiDebuggerGuardMode}`,
+  ];
+  events.push(section('UI Automation (axe)', axeLines));
 
-    `\n### Manifest Tool Inventory`,
-    ...('error' in doctorInfo.manifestTools
-      ? [`- Error: ${doctorInfo.manifestTools.error}`]
-      : [
-          `- Total Unique Tools: ${doctorInfo.manifestTools.totalTools}`,
-          `- Workflow Count: ${doctorInfo.manifestTools.workflowCount}`,
-          ...Object.entries(doctorInfo.manifestTools.toolsByWorkflow).map(
-            ([workflow, count]) => `- ${workflow}: ${count} tools`,
-          ),
-        ]),
+  // Incremental Builds
+  let makefileStatus: string;
+  if (doctorInfo.features.xcodemake.makefileExists === null) {
+    makefileStatus = '(not checked: incremental builds disabled)';
+  } else {
+    makefileStatus = doctorInfo.features.xcodemake.makefileExists ? 'Yes' : 'No';
+  }
+  events.push(
+    section('Incremental Builds', [
+      `Enabled: ${doctorInfo.features.xcodemake.enabled ? 'Yes' : 'No'}`,
+      `xcodemake Binary Available: ${doctorInfo.features.xcodemake.binaryAvailable ? 'Yes' : 'No'}`,
+      `Makefile exists (cwd): ${makefileStatus}`,
+    ]),
+  );
 
-    `\n### Runtime Tool Registration`,
-    `- Enabled Workflows: ${runtimeRegistration.enabledWorkflows.length}`,
-    `- Registered Tools: ${runtimeRegistration.registeredToolCount}`,
-    ...(runtimeNote ? [`- Note: ${runtimeNote}`] : []),
-    ...(runtimeRegistration.enabledWorkflows.length > 0
-      ? [`- Workflows: ${runtimeRegistration.enabledWorkflows.join(', ')}`]
-      : []),
+  // Mise Integration
+  events.push(
+    section('Mise Integration', [
+      `Running under mise: ${doctorInfo.features.mise.running_under_mise ? 'Yes' : 'No'}`,
+      `Mise available: ${doctorInfo.features.mise.available ? 'Yes' : 'No'}`,
+    ]),
+  );
 
-    `\n### Xcode IDE Bridge (mcpbridge)`,
-    ...(doctorInfo.xcodeToolsBridge.available
-      ? [
-          `- Workflow enabled: ${doctorInfo.xcodeToolsBridge.workflowEnabled ? '✅ Yes' : '❌ No'}`,
-          `- mcpbridge path: ${doctorInfo.xcodeToolsBridge.bridgePath ?? '(not found)'}`,
-          `- Xcode running: ${doctorInfo.xcodeToolsBridge.xcodeRunning ?? '(unknown)'}`,
-          `- Connected: ${doctorInfo.xcodeToolsBridge.connected ? '✅ Yes' : '❌ No'}`,
-          `- Bridge PID: ${doctorInfo.xcodeToolsBridge.bridgePid ?? '(none)'}`,
-          `- Proxied tools: ${doctorInfo.xcodeToolsBridge.proxiedToolCount}`,
-          `- Last error: ${doctorInfo.xcodeToolsBridge.lastError ?? '(none)'}`,
-          `- Note: Bridge debug tools (status/sync/disconnect) are only registered when debug: true`,
-        ]
-      : [`- Unavailable: ${doctorInfo.xcodeToolsBridge.reason}`]),
+  // Debugger Backend (DAP)
+  const debuggerLines: string[] = [
+    `lldb-dap available: ${doctorInfo.features.debugger.dap.available ? 'Yes' : 'No'}`,
+    `Selected backend: ${doctorInfo.features.debugger.dap.selected}`,
+  ];
+  if (dapSelected && !lldbDapAvailable) {
+    debuggerLines.push(
+      'Warning: DAP backend selected but lldb-dap not available. Set XCODEBUILDMCP_DEBUGGER_BACKEND=lldb-cli to use the CLI backend.',
+    );
+  }
+  events.push(section('Debugger Backend (DAP)', debuggerLines));
 
-    `\n## Tool Availability Summary`,
-    `- Build Tools: ${!('error' in doctorInfo.xcode) ? '\u2705 Available' : '\u274c Not available'}`,
-    `- UI Automation Tools: ${doctorInfo.features.axe.uiAutomationSupported ? '\u2705 Available' : '\u274c Not available'}`,
-    `- Incremental Build Support: ${doctorInfo.features.xcodemake.binaryAvailable && doctorInfo.features.xcodemake.enabled ? '\u2705 Available & Enabled' : doctorInfo.features.xcodemake.binaryAvailable ? '\u2705 Available but Disabled' : '\u274c Not available'}`,
+  // Manifest Tool Inventory
+  if ('error' in doctorInfo.manifestTools) {
+    events.push(
+      section('Manifest Tool Inventory', [`Error: ${doctorInfo.manifestTools.error}`], {
+        icon: 'cross',
+      }),
+    );
+  } else {
+    events.push(
+      section('Manifest Tool Inventory', [
+        `Total Unique Tools: ${doctorInfo.manifestTools.totalTools}`,
+        `Workflow Count: ${doctorInfo.manifestTools.workflowCount}`,
+        ...Object.entries(doctorInfo.manifestTools.toolsByWorkflow).map(
+          ([workflow, count]) => `${workflow}: ${count} tools`,
+        ),
+      ]),
+    );
+  }
 
-    `\n## Sentry`,
-    `- Sentry enabled: ${doctorInfo.environmentVariables.SENTRY_DISABLED !== 'true' ? '✅ Yes' : '❌ No'}`,
+  // Runtime Tool Registration
+  const runtimeLines: string[] = [
+    `Enabled Workflows: ${runtimeRegistration.enabledWorkflows.length}`,
+    `Registered Tools: ${runtimeRegistration.registeredToolCount}`,
+  ];
+  if (runtimeNote) {
+    runtimeLines.push(`Note: ${runtimeNote}`);
+  }
+  if (runtimeRegistration.enabledWorkflows.length > 0) {
+    runtimeLines.push(`Workflows: ${runtimeRegistration.enabledWorkflows.join(', ')}`);
+  }
+  events.push(section('Runtime Tool Registration', runtimeLines));
 
-    `\n## Troubleshooting Tips`,
-    `- If UI automation tools are not available, install axe: \`brew tap cameroncooke/axe && brew install axe\``,
-    `- If incremental build support is not available, install xcodemake (https://github.com/cameroncooke/xcodemake) and ensure it is executable and available in your PATH`,
-    `- To enable xcodemake, set environment variable: \`export INCREMENTAL_BUILDS_ENABLED=1\``,
-    `- For mise integration, follow instructions in the README.md file`,
-  ].join('\n');
+  // Xcode IDE Bridge
+  if (doctorInfo.xcodeToolsBridge.available) {
+    events.push(
+      section('Xcode IDE Bridge (mcpbridge)', [
+        `Workflow enabled: ${doctorInfo.xcodeToolsBridge.workflowEnabled ? 'Yes' : 'No'}`,
+        `mcpbridge path: ${doctorInfo.xcodeToolsBridge.bridgePath ?? '(not found)'}`,
+        `Xcode running: ${doctorInfo.xcodeToolsBridge.xcodeRunning ?? '(unknown)'}`,
+        `Connected: ${doctorInfo.xcodeToolsBridge.connected ? 'Yes' : 'No'}`,
+        `Bridge PID: ${doctorInfo.xcodeToolsBridge.bridgePid ?? '(none)'}`,
+        `Proxied tools: ${doctorInfo.xcodeToolsBridge.proxiedToolCount}`,
+        `Last error: ${doctorInfo.xcodeToolsBridge.lastError ?? '(none)'}`,
+        'Note: Bridge debug tools (status/sync/disconnect) are only registered when debug: true',
+      ]),
+    );
+  } else {
+    events.push(
+      section('Xcode IDE Bridge (mcpbridge)', [
+        `Unavailable: ${doctorInfo.xcodeToolsBridge.reason}`,
+      ]),
+    );
+  }
 
-  const result: ToolResponse = {
-    content: [
-      {
-        type: 'text',
-        text: formattedOutput,
-      },
-    ],
-  };
-  // Restore previous silence flag
+  // Tool Availability Summary
+  const buildToolsAvailable = !('error' in doctorInfo.xcode);
+  let incrementalStatus: string;
+  if (doctorInfo.features.xcodemake.binaryAvailable && doctorInfo.features.xcodemake.enabled) {
+    incrementalStatus = 'Available & Enabled';
+  } else if (doctorInfo.features.xcodemake.binaryAvailable) {
+    incrementalStatus = 'Available but Disabled';
+  } else {
+    incrementalStatus = 'Not available';
+  }
+  events.push(
+    section('Tool Availability Summary', [
+      `Build Tools: ${buildToolsAvailable ? 'Available' : 'Not available'}`,
+      `UI Automation Tools: ${doctorInfo.features.axe.uiAutomationSupported ? 'Available' : 'Not available'}`,
+      `Incremental Build Support: ${incrementalStatus}`,
+    ]),
+  );
+
+  // Sentry
+  events.push(
+    section('Sentry', [
+      `Sentry enabled: ${doctorInfo.environmentVariables.SENTRY_DISABLED !== 'true' ? 'Yes' : 'No'}`,
+    ]),
+  );
+
+  // Troubleshooting Tips
+  events.push(
+    section('Troubleshooting Tips', [
+      'If UI automation tools are not available, install axe: brew tap cameroncooke/axe && brew install axe',
+      'If incremental build support is not available, install xcodemake (https://github.com/cameroncooke/xcodemake) and ensure it is executable and available in your PATH',
+      'To enable xcodemake, set environment variable: export INCREMENTAL_BUILDS_ENABLED=1',
+      'For mise integration, follow instructions in the README.md file',
+    ]),
+  );
+
+  events.push(statusLine('success', 'Doctor diagnostics complete'));
+
   if (prevSilence === undefined) {
     delete process.env.XCODEBUILDMCP_SILENCE_LOGS;
   } else {
     process.env.XCODEBUILDMCP_SILENCE_LOGS = prevSilence;
   }
-  return result;
+  const rendered = renderEvents(events, 'text');
+  const hasError = events.some(
+    (e) =>
+      (e.type === 'status-line' && e.level === 'error') ||
+      (e.type === 'summary' && e.status === 'FAILED'),
+  );
+  return {
+    content: [{ type: 'text' as const, text: rendered }],
+    isError: hasError || undefined,
+    _meta: { events: [...events] },
+  };
 }
 
-export async function doctorLogic(
-  params: DoctorParams,
-  executor: CommandExecutor,
-  showAsciiLogo = false,
-): Promise<ToolResponse> {
+export async function doctorLogic(params: DoctorParams, executor: CommandExecutor) {
   const deps = createDoctorDependencies(executor);
-  return runDoctor(params, deps, showAsciiLogo);
+  return runDoctor(params, deps);
 }
 
-// MCP wrapper that ensures ASCII logo is never shown for MCP server calls
-async function doctorMcpHandler(
+export async function doctorToolLogic(
   params: DoctorParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
-  return doctorLogic(params, executor, false); // Always false for MCP
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const response = await doctorLogic(params, executor);
+
+  const events = response._meta?.events;
+  if (Array.isArray(events)) {
+    for (const event of events as PipelineEvent[]) {
+      ctx.emit(event);
+    }
+  }
 }
 
-export const schema = doctorSchema.shape; // MCP SDK compatibility
+export const schema = doctorSchema.shape;
 
-export const handler = createTypedTool(doctorSchema, doctorMcpHandler, getDefaultCommandExecutor);
+export const handler = createTypedTool(doctorSchema, doctorToolLogic, getDefaultCommandExecutor);
 
 export type { DoctorDependencies } from './lib/doctor.deps.ts';
