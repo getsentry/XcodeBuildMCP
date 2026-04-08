@@ -1,0 +1,6 @@
+id: simulators
+module: mcp/resources/simulators
+name: simulators
+uri: xcodebuildmcp://simulators
+description: Available iOS simulators with their UUIDs and states
+mimeType: text/plain

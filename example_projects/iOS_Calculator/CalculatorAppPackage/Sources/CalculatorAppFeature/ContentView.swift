@@ -70,7 +70,7 @@ public struct ContentView: View {
     }
     
     private func handleButtonPress(_ button: String) {
-        print("[CalculatorApp] Button pressed: \(button)")
+        print("Key pressed = \(button)")
 
         // Process input through the input handler
         inputHandler.handleInput(button)

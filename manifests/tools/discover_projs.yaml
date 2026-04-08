@@ -13,6 +13,8 @@ nextSteps:
   - label: Save discovered project/workspace as session defaults
     toolId: session_set_defaults
     priority: 1
+    when: success
   - label: Build and run once defaults are set
     toolId: build_run_sim
     priority: 2
+    when: success

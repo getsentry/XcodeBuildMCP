@@ -1,0 +1,8 @@
+id: xcode-ide-state
+module: mcp/resources/xcode-ide-state
+name: xcode-ide-state
+uri: xcodebuildmcp://xcode-ide-state
+description: "Current Xcode IDE selection (scheme and simulator) from Xcode's UI state"
+mimeType: application/json
+predicates:
+  - runningUnderXcodeAgent

@@ -63,7 +63,7 @@ XcodeBuildMCP follows a dependency-injection testing philosophy for external bou
 2. **Real Coverage**: Tests verify actual user data flows
 3. **Maintainability**: No brittle vitest mocks that break on implementation changes
 4. **True Integration**: Catches integration bugs between layers
-5. **Test Safety**: Default executors throw errors in test environment
+5. **Test Safety**: A Vitest setup file installs blocking executor overrides for unit tests
 
 ### Automated Violation Checking
 
@@ -1196,30 +1196,31 @@ This systematic approach ensures comprehensive, accurate testing using programma
 
 ### Common Issues
 
-#### 1. "Real System Executor Detected" Error
-**Symptoms**: Test fails with error about real system executor being used
-**Cause**: Handler not receiving mock executor parameter
-**Fix**: Ensure test passes createMockExecutor() to handler:
+#### 1. "Noop Executor Called" Error
+**Symptoms**: Test fails with `NOOP EXECUTOR CALLED` or `NOOP FILESYSTEM EXECUTOR CALLED`
+**Cause**: The Vitest unit setup (`src/test-utils/vitest-executor-safety.setup.ts`) installs
+blocking noop overrides for all unit tests. If a handler calls `getDefaultCommandExecutor()` or
+`getDefaultFileSystemExecutor()` without an explicit test override, the noop throws.
+**Fix**: Either inject a mock executor directly into the logic function, or use the override hooks:
 
 ```typescript
-// ❌ WRONG
-const result = await tool.handler(params);
-
-// ✅ CORRECT
+// Option A: Direct injection into the logic function
 const mockExecutor = createMockExecutor({ success: true });
-const result = await tool.handler(params, mockExecutor);
+const result = await toolLogic(params, mockExecutor);
+
+// Option B: Override hooks (for handler-level tests)
+import { __setTestCommandExecutorOverride } from '../utils/command.ts';
+__setTestCommandExecutorOverride(createMockExecutor({ success: true }));
+const result = await handler(params);
 ```
 
-#### 2. "Real Filesystem Executor Detected" Error
-**Symptoms**: Test fails when trying to access file system
-**Cause**: Handler not receiving mock file system executor
-**Fix**: Pass createMockFileSystemExecutor():
+**Note**: The setup file only applies to `vitest.config.ts` (unit tests). Snapshot and smoke
+tests use separate configs and are not affected.
 
-```typescript
-const mockCmd = createMockExecutor({ success: true });
-const mockFS = createMockFileSystemExecutor({ readFile: async () => 'content' });
-const result = await tool.handler(params, mockCmd, mockFS);
-```
+#### 2. "Noop Interactive Spawner Called" Error
+**Symptoms**: Test fails with `NOOP INTERACTIVE SPAWNER CALLED`
+**Cause**: Same mechanism as above but for `getDefaultInteractiveSpawner()`.
+**Fix**: Use `createMockInteractiveSpawner()` from `test-utils/mock-executors.ts`.
 
 #### 3. Handler Signature Errors
 **Symptoms**: TypeScript errors about handler parameters

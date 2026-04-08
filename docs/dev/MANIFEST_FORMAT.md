@@ -12,9 +12,13 @@ manifests/
 │   ├── build_sim.yaml
 │   ├── list_sims.yaml
 │   └── ...
-└── workflows/       # Workflow manifest files
-    ├── simulator.yaml
-    ├── device.yaml
+├── workflows/       # Workflow manifest files
+│   ├── simulator.yaml
+│   ├── device.yaml
+│   └── ...
+└── resources/       # Resource manifest files
+    ├── simulators.yaml
+    ├── devices.yaml
     └── ...
 ```
 
@@ -247,9 +251,7 @@ At runtime, this resolves to:
 build/mcp/tools/<category>/<tool_name>.js
 ```
 
-The module must export either:
-1. **Named exports** (preferred): `{ schema, handler }`
-2. **Legacy default export**: `export default { schema, handler }`
+The module must export named exports: `{ schema, handler }`
 
 Note: `name`, `description`, and `annotations` are defined in the YAML manifest, not the module.
 
@@ -433,10 +435,83 @@ At startup, tools are registered dynamically from manifests:
 
 Key files:
 - `src/core/manifest/load-manifest.ts` - Manifest loading and caching
-- `src/core/manifest/import-tool-module.ts` - Dynamic module imports
+- `src/core/manifest/import-tool-module.ts` - Dynamic tool module imports
+- `src/core/manifest/import-resource-module.ts` - Dynamic resource module imports
 - `src/utils/tool-registry.ts` - MCP server tool registration
+- `src/core/resources.ts` - MCP server resource registration
 - `src/runtime/tool-catalog.ts` - CLI/daemon tool catalog building
-- `src/visibility/exposure.ts` - Workflow/tool visibility filtering
+- `src/visibility/exposure.ts` - Workflow/tool/resource visibility filtering
+
+## Resource Manifest Format
+
+Resource manifests define MCP resources exposed by the server.
+
+### Schema
+
+```yaml
+# Required fields
+id: string              # Unique resource identifier (must match filename without .yaml)
+module: string          # Module path (see Module Path section)
+name: string            # MCP resource name
+uri: string             # Resource URI (e.g., xcodebuildmcp://simulators)
+description: string     # Resource description
+mimeType: string        # MIME type for the resource content
+
+# Optional fields
+availability:           # Per-runtime availability flags
+  mcp: boolean          # Available via MCP server (default: true)
+predicates: string[]    # Predicate names for visibility filtering (default: [])
+```
+
+### Example: Basic Resource
+
+```yaml
+id: simulators
+module: mcp/resources/simulators
+name: simulators
+uri: xcodebuildmcp://simulators
+description: Available iOS simulators with their UUIDs and states
+mimeType: text/plain
+```
+
+### Example: Predicate-Gated Resource
+
+```yaml
+id: xcode-ide-state
+module: mcp/resources/xcode-ide-state
+name: xcode-ide-state
+uri: xcodebuildmcp://xcode-ide-state
+description: "Current Xcode IDE selection (scheme and simulator) from Xcode's UI state"
+mimeType: application/json
+predicates:
+  - runningUnderXcodeAgent  # Only exposed when running under Xcode
+```
+
+### Resource Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `id` | string | Yes | - | Unique identifier, must match filename |
+| `module` | string | Yes | - | Module path relative to `src/` (extensionless) |
+| `name` | string | Yes | - | MCP resource name |
+| `uri` | string | Yes | - | Resource URI |
+| `description` | string | Yes | - | Resource description |
+| `mimeType` | string | Yes | - | Content MIME type |
+| `availability.mcp` | boolean | No | `true` | Available via MCP |
+| `predicates` | string[] | No | `[]` | Visibility predicates (all must pass) |
+
+### Resource Module Contract
+
+Resource modules must export a named `handler` function:
+
+```typescript
+// src/mcp/resources/simulators.ts
+export async function handler(uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  // Implementation
+}
+```
+
+Metadata (name, description, URI, mimeType) is defined in the YAML manifest, not the module.
 
 ## Creating a New Tool
 

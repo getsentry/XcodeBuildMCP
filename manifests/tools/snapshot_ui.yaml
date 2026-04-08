@@ -9,16 +9,19 @@ nextSteps:
     toolId: snapshot_ui
     params:
       simulatorId: SIMULATOR_UUID
+    when: success
   - label: Tap on element
     toolId: tap
     params:
       simulatorId: SIMULATOR_UUID
       x: 0
       y: 0
+    when: success
   - label: Take screenshot for verification
     toolId: screenshot
     params:
       simulatorId: SIMULATOR_UUID
+    when: success
 annotations:
   title: Snapshot UI
   readOnlyHint: true

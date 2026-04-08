@@ -38,20 +38,20 @@ XcodeBuildMCP is a Model Context Protocol (MCP) server that exposes Xcode operat
    - MCP server created with stdio transport
    - Plugin discovery system initialized
 
-3. **Plugin Discovery (Build-Time)**
-   - A build-time script (`build-plugins/plugin-discovery.ts`) scans the `src/mcp/tools/` and `src/mcp/resources/` directories
-   - It generates `src/core/generated-plugins.ts` and `src/core/generated-resources.ts` with dynamic import maps
-   - This approach improves startup performance by avoiding synchronous file system scans and enables code-splitting
-   - Tool code is only loaded when needed, reducing initial memory footprint
+3. **Manifest-Driven Discovery**
+   - YAML manifests in `manifests/tools/`, `manifests/workflows/`, and `manifests/resources/` define all metadata
+   - `loadManifest()` reads and validates all YAML files at startup against Zod schemas
+   - Tool and resource code modules are dynamically imported on demand
 
-4. **Plugin & Resource Loading (Runtime)**
-   - At runtime, `loadPlugins()` and `loadResources()` use the generated loaders from the previous step
-   - All workflow loaders are executed at startup to register tools
-- If `XCODEBUILDMCP_ENABLED_WORKFLOWS` is set, only those workflows (plus `session-management`) are registered; `workflow-discovery` is only auto-included when `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY=true`
+4. **Tool & Resource Loading (Runtime)**
+   - `registerWorkflowsFromManifest()` selects workflows based on config and predicate context, then dynamically imports tool modules
+   - `registerResources()` loads resource manifests, filters by predicates, and dynamically imports resource modules
+   - Both systems share the same `PredicateContext` for visibility filtering
+   - If `XCODEBUILDMCP_ENABLED_WORKFLOWS` is set, only those workflows (plus `session-management`) are registered; `workflow-discovery` is only auto-included when `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY=true`
 
-5. **Tool Registration**
-   - Discovered tools automatically registered with server using pre-generated maps
-   - No manual registration or configuration required
+5. **Tool & Resource Registration**
+   - Tools are registered via `server.registerTool()` after manifest-driven workflow selection
+   - Resources are registered via `server.resource()` after manifest-driven predicate filtering
    - Environment variables control workflow selection behavior
 
 5. **Request Handling**

@@ -1,6 +1,6 @@
 # XcodeBuildMCP MCP Tools Reference
 
-This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP provides 82 canonical tools organized into 16 workflow groups for comprehensive Apple development workflows.
+This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP provides 77 canonical tools organized into 15 workflow groups for comprehensive Apple development workflows.
 
 ## Workflow Groups
 
@@ -20,10 +20,10 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 
 
 ### iOS Device Development (`device`)
-**Purpose**: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro). (17 tools)
+**Purpose**: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro). (15 tools)
 
 - `build_device` - Build for device.
-- `build_run_device` - Build, install, and launch on physical device. Preferred single-step run tool when defaults are set.
+- `build_run_device` - Build, install, and launch on physical device. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.
 - `clean` - Clean build products.
 - `discover_projs` - Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.
 - `get_app_bundle_id` - Extract bundle id from .app.
@@ -35,18 +35,16 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 - `list_devices` - List connected devices.
 - `list_schemes` - List Xcode schemes.
 - `show_build_settings` - Show build settings.
-- `start_device_log_cap` - Start device log capture.
 - `stop_app_device` - Stop device app.
-- `stop_device_log_cap` - Stop device app and return logs.
 - `test_device` - Test on device.
 
 
 
 ### iOS Simulator Development (`simulator`)
-**Purpose**: Complete iOS development workflow for both .xcodeproj and .xcworkspace files targeting simulators. (23 tools)
+**Purpose**: Complete iOS development workflow for both .xcodeproj and .xcworkspace files targeting simulators. (20 tools)
 
 - `boot_sim` - Defined in Simulator Management workflow.
-- `build_run_sim` - Build, install, and launch on iOS Simulator; boots simulator and attempts to open Simulator.app as needed. Preferred single-step run tool when defaults are set.
+- `build_run_sim` - Build, install, and launch on iOS Simulator; boots simulator and attempts to open Simulator.app as needed. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.
 - `build_sim` - Build for iOS sim (compile-only, no launch).
 - `clean` - Defined in iOS Device Development workflow.
 - `discover_projs` - Defined in iOS Device Development workflow.
@@ -55,8 +53,7 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 - `get_file_coverage` - Defined in Code Coverage workflow.
 - `get_sim_app_path` - Get sim built app path.
 - `install_app_sim` - Install app on sim.
-- `launch_app_logs_sim` - Launch sim app with logs.
-- `launch_app_sim` - Launch app on simulator.
+- `launch_app_sim` - Launch app on simulator. Runtime logs are captured automatically and the log file path is included in the response.
 - `list_schemes` - Defined in iOS Device Development workflow.
 - `list_sims` - Defined in Simulator Management workflow.
 - `open_sim` - Defined in Simulator Management workflow.
@@ -64,9 +61,7 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 - `screenshot` - Capture screenshot.
 - `show_build_settings` - Defined in iOS Device Development workflow.
 - `snapshot_ui` - Print view hierarchy with precise view coordinates (x, y, width, height) for visible elements.
-- `start_sim_log_cap` - Defined in Log Capture workflow.
 - `stop_app_sim` - Stop sim app.
-- `stop_sim_log_cap` - Defined in Log Capture workflow.
 - `test_sim` - Test on iOS sim.
 
 
@@ -82,16 +77,6 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 - `debug_lldb_command` - Run LLDB command.
 - `debug_stack` - Get backtrace.
 - `debug_variables` - Get frame variables.
-
-
-
-### Log Capture (`logging`)
-**Purpose**: Capture and retrieve logs from simulator and device apps. (4 tools)
-
-- `start_device_log_cap` - Defined in iOS Device Development workflow.
-- `start_sim_log_cap` - Start sim log capture.
-- `stop_device_log_cap` - Defined in iOS Device Development workflow.
-- `stop_sim_log_cap` - Stop sim app and return logs.
 
 
 
@@ -216,10 +201,10 @@ This document lists MCP tool names as exposed to MCP clients. XcodeBuildMCP prov
 
 ## Summary Statistics
 
-- **Canonical Tools**: 82
-- **Total Tools**: 114
-- **Workflow Groups**: 16
+- **Canonical Tools**: 77
+- **Total Tools**: 105
+- **Workflow Groups**: 15
 
 ---
 
-*This documentation is automatically generated by `scripts/update-tools-docs.ts` from the tools manifest. Last updated: 2026-03-16T20:47:13.697Z UTC*
+*This documentation is automatically generated by `scripts/update-tools-docs.ts` from the tools manifest. Last updated: 2026-04-07T11:23:03.868Z UTC*

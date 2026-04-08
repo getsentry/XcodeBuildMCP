@@ -3,7 +3,7 @@ module: mcp/tools/device/build_run_device
 names:
   mcp: build_run_device
   cli: build-and-run
-description: Build, install, and launch on physical device. Preferred single-step run tool when defaults are set.
+description: Build, install, and launch on physical device. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.
 predicates:
   - hideWhenXcodeAgentMode
 annotations:
@@ -15,3 +15,4 @@ nextSteps:
   - label: Stop app on device
     toolId: stop_app_device
     priority: 1
+    when: success

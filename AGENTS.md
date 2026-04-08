@@ -46,6 +46,7 @@ Use these sections under `## [Unreleased]`:
 - Append to existing subsections (e.g., `### Fixed`), do not create duplicates
 - NEVER modify already-released version sections (e.g., `## [0.12.2]`)
 - Each version section is immutable once released
+- NEVER update snapshot fixtures unless asked to do so, these are integration tests, on failure assume code is wrong before questioning the fixture
 -
 #### Attribution
 - **Internal changes (from issues)**: `Fixed foo bar ([#123](https://github.com/cameroncook/XcodeBuildMCP/issues/123))`

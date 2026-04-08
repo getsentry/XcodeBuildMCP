@@ -13,15 +13,18 @@ nextSteps:
   - label: Open the Simulator app (makes it visible)
     toolId: open_sim
     priority: 1
+    when: success
   - label: Install an app
     toolId: install_app_sim
     params:
       simulatorId: SIMULATOR_UUID
       appPath: PATH_TO_YOUR_APP
     priority: 2
+    when: success
   - label: Launch an app
     toolId: launch_app_sim
     params:
       simulatorId: SIMULATOR_UUID
       bundleId: YOUR_APP_BUNDLE_ID
     priority: 3
+    when: success
