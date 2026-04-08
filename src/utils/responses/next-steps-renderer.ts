@@ -1,15 +1,6 @@
 import type { RuntimeKind } from '../../runtime/types.ts';
-import type { NextStep, OutputStyle, ToolResponse } from '../../types/common.ts';
-
-/**
- * Convert a string to kebab-case for CLI flag names.
- */
-function toKebabCase(name: string): string {
-  return name
-    .replace(/_/g, '-')
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .toLowerCase();
-}
+import type { NextStep } from '../../types/common.ts';
+import { toKebabCase } from '../../runtime/naming.ts';
 
 function resolveLabel(step: NextStep): string {
   if (step.label?.trim()) return step.label;
@@ -31,7 +22,6 @@ function formatNextStepForCli(step: NextStep): string {
   const cliTool = step.cliTool ?? toKebabCase(step.tool);
   const params = step.params ?? {};
 
-  // Include workflow as subcommand if provided
   if (step.workflow) {
     parts.push(step.workflow);
   }
@@ -79,9 +69,6 @@ function formatNextStepForMcp(step: NextStep): string {
   return `${step.tool}({ ${paramsStr} })`;
 }
 
-/**
- * Render a single next step based on runtime.
- */
 export function renderNextStep(step: NextStep, runtime: RuntimeKind): string {
   if (!step.tool) {
     return resolveLabel(step);
@@ -93,10 +80,6 @@ export function renderNextStep(step: NextStep, runtime: RuntimeKind): string {
   return `${step.label}: ${formatted}`;
 }
 
-/**
- * Render the full next steps section.
- * Returns empty string if no steps.
- */
 export function renderNextStepsSection(steps: NextStep[], runtime: RuntimeKind): string {
   if (steps.length === 0) {
     return '';
@@ -105,45 +88,5 @@ export function renderNextStepsSection(steps: NextStep[], runtime: RuntimeKind):
   const sorted = [...steps].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const lines = sorted.map((step, index) => `${index + 1}. ${renderNextStep(step, runtime)}`);
 
-  return `\n\nNext steps:\n${lines.join('\n')}`;
-}
-
-/**
- * Process a tool response, applying next steps rendering based on runtime and style.
- *
- * - In 'minimal' style, nextSteps are stripped entirely
- * - In 'normal' style, nextSteps are rendered and appended to text content
- *
- * Returns a new response object (does not mutate the original).
- */
-export function processToolResponse(
-  response: ToolResponse,
-  runtime: RuntimeKind,
-  style: OutputStyle = 'normal',
-): ToolResponse {
-  const { nextSteps, ...rest } = response;
-
-  // If no nextSteps or minimal style, strip nextSteps and return
-  if (!nextSteps || nextSteps.length === 0 || style === 'minimal') {
-    return { ...rest };
-  }
-
-  // Render next steps section
-  const nextStepsSection = renderNextStepsSection(nextSteps, runtime);
-
-  // Append to the last text content item
-  const processedContent = response.content.map((item, index) => {
-    if (item.type === 'text' && index === response.content.length - 1) {
-      return { ...item, text: item.text + nextStepsSection };
-    }
-    return item;
-  });
-
-  // If no text content existed, add one with just the next steps
-  const hasTextContent = response.content.some((item) => item.type === 'text');
-  if (!hasTextContent && nextStepsSection) {
-    processedContent.push({ type: 'text', text: nextStepsSection.trim() });
-  }
-
-  return { ...rest, content: processedContent };
+  return `Next steps:\n${lines.join('\n')}`;
 }

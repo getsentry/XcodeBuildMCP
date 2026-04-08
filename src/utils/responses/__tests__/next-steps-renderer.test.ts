@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  renderNextStep,
-  renderNextStepsSection,
-  processToolResponse,
-} from '../next-steps-renderer.ts';
-import type { NextStep, ToolResponse } from '../../../types/common.ts';
+import { renderNextStep, renderNextStepsSection } from '../next-steps-renderer.ts';
+import type { NextStep } from '../../../types/common.ts';
 
 describe('next-steps-renderer', () => {
   describe('renderNextStep', () => {
@@ -180,7 +176,7 @@ describe('next-steps-renderer', () => {
 
       const result = renderNextStepsSection(steps, 'cli');
       expect(result).toBe(
-        '\n\nNext steps:\n' +
+        'Next steps:\n' +
           '1. Open Simulator: xcodebuildmcp open-sim\n' +
           '2. Install app: xcodebuildmcp install-app-sim --simulator-id "X"',
       );
@@ -194,7 +190,7 @@ describe('next-steps-renderer', () => {
 
       const result = renderNextStepsSection(steps, 'mcp');
       expect(result).toBe(
-        '\n\nNext steps:\n' +
+        'Next steps:\n' +
           '1. Open Simulator: open_sim()\n' +
           '2. Install app: install_app_sim({ simulatorId: "X" })',
       );
@@ -246,112 +242,6 @@ describe('next-steps-renderer', () => {
       const result = renderNextStepsSection(steps, 'cli');
       expect(result).toContain('xcodebuildmcp tap-coordinate');
       expect(result).toContain('xcodebuildmcp take-screenshot');
-    });
-  });
-
-  describe('processToolResponse', () => {
-    it('should pass through response with no nextSteps', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Success!' }],
-      };
-
-      const result = processToolResponse(response, 'cli', 'normal');
-      expect(result).toEqual({
-        content: [{ type: 'text', text: 'Success!' }],
-      });
-    });
-
-    it('should strip nextSteps in minimal style', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Success!' }],
-        nextSteps: [{ tool: 'foo', cliTool: 'foo', label: 'Do foo', params: {} }],
-      };
-
-      const result = processToolResponse(response, 'cli', 'minimal');
-      expect(result).toEqual({
-        content: [{ type: 'text', text: 'Success!' }],
-      });
-      expect(result.nextSteps).toBeUndefined();
-    });
-
-    it('should append next steps to last text content in normal style', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Simulator booted.' }],
-        nextSteps: [
-          {
-            tool: 'open_sim',
-            cliTool: 'open-sim',
-            label: 'Open Simulator',
-            params: {},
-            priority: 1,
-          },
-        ],
-      };
-
-      const result = processToolResponse(response, 'cli', 'normal');
-      expect(result.content[0].text).toBe(
-        'Simulator booted.\n\nNext steps:\n1. Open Simulator: xcodebuildmcp open-sim',
-      );
-      expect(result.nextSteps).toBeUndefined();
-    });
-
-    it('should render MCP-style for MCP runtime', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Simulator booted.' }],
-        nextSteps: [{ tool: 'open_sim', label: 'Open Simulator', params: {}, priority: 1 }],
-      };
-
-      const result = processToolResponse(response, 'mcp', 'normal');
-      expect(result.content[0].text).toBe(
-        'Simulator booted.\n\nNext steps:\n1. Open Simulator: open_sim()',
-      );
-    });
-
-    it('should handle response with empty nextSteps array', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Done.' }],
-        nextSteps: [],
-      };
-
-      const result = processToolResponse(response, 'cli', 'normal');
-      expect(result).toEqual({
-        content: [{ type: 'text', text: 'Done.' }],
-      });
-    });
-
-    it('should preserve other response properties', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Error!' }],
-        isError: true,
-        _meta: { foo: 'bar' },
-        nextSteps: [{ tool: 'retry', cliTool: 'retry', label: 'Retry', params: {} }],
-      };
-
-      const result = processToolResponse(response, 'cli', 'minimal');
-      expect(result.isError).toBe(true);
-      expect(result._meta).toEqual({ foo: 'bar' });
-    });
-
-    it('should not mutate original response', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Original' }],
-        nextSteps: [{ tool: 'foo', cliTool: 'foo', label: 'Foo', params: {} }],
-      };
-
-      processToolResponse(response, 'cli', 'normal');
-
-      expect(response.content[0].text).toBe('Original');
-      expect(response.nextSteps).toHaveLength(1);
-    });
-
-    it('should default to normal style when not specified', () => {
-      const response: ToolResponse = {
-        content: [{ type: 'text', text: 'Success!' }],
-        nextSteps: [{ tool: 'foo', cliTool: 'foo', label: 'Do foo', params: {} }],
-      };
-
-      const result = processToolResponse(response, 'cli');
-      expect(result.content[0].text).toContain('Next steps:');
     });
   });
 });
