@@ -4,9 +4,20 @@ import {
   createMockCommandResponse,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
+import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
 
-// Import the named exports and logic function
 import { schema, handler, list_simsLogic, listSimulators } from '../list_sims.ts';
+import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+
+async function runListSimsLogic(params: { enabled?: boolean }, executor: CommandExecutor) {
+  const { ctx, result, run } = createMockToolHandlerContext();
+  await run(() => list_simsLogic(params, executor));
+  return {
+    content: [{ type: 'text' as const, text: result.text() }],
+    isError: result.isError() || undefined,
+    nextStepParams: ctx.nextStepParams,
+  };
+}
 
 describe('list_sims tool', () => {
   let callHistory: Array<{
@@ -26,13 +37,11 @@ describe('list_sims tool', () => {
     it('should have correct schema with enabled boolean field', () => {
       const schemaObj = z.object(schema);
 
-      // Valid inputs
       expect(schemaObj.safeParse({ enabled: true }).success).toBe(true);
       expect(schemaObj.safeParse({ enabled: false }).success).toBe(true);
       expect(schemaObj.safeParse({ enabled: undefined }).success).toBe(true);
       expect(schemaObj.safeParse({}).success).toBe(true);
 
-      // Invalid inputs
       expect(schemaObj.safeParse({ enabled: 'yes' }).success).toBe(false);
       expect(schemaObj.safeParse({ enabled: 1 }).success).toBe(false);
       expect(schemaObj.safeParse({ enabled: null }).success).toBe(false);
@@ -97,7 +106,6 @@ describe('list_sims tool', () => {
 -- iOS 17.0 --
     iPhone 15 (test-uuid-123) (Shutdown)`;
 
-      // Create a mock executor that returns different outputs based on command
       const mockExecutor = async (
         command: string[],
         logPrefix?: string,
@@ -108,7 +116,6 @@ describe('list_sims tool', () => {
         callHistory.push({ command, logPrefix, useShell, env: opts?.env });
         void detached;
 
-        // Return JSON output for JSON command
         if (command.includes('--json')) {
           return createMockCommandResponse({
             success: true,
@@ -117,7 +124,6 @@ describe('list_sims tool', () => {
           });
         }
 
-        // Return text output for text command
         return createMockCommandResponse({
           success: true,
           output: mockTextOutput,
@@ -125,9 +131,8 @@ describe('list_sims tool', () => {
         });
       };
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      // Verify both commands were called
       expect(callHistory).toHaveLength(2);
       expect(callHistory[0]).toEqual({
         command: ['xcrun', 'simctl', 'list', 'devices', '--json'],
@@ -142,28 +147,20 @@ describe('list_sims tool', () => {
         env: undefined,
       });
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: `Available iOS Simulators:
-
-iOS 17.0:
-- iPhone 15 (test-uuid-123)
-
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
-Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
-          },
-        ],
-        nextStepParams: {
-          boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
-          open_sim: {},
-          build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
-          get_sim_app_path: {
-            scheme: 'YOUR_SCHEME',
-            platform: 'iOS Simulator',
-            simulatorId: 'UUID_FROM_ABOVE',
-          },
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('List Simulators');
+      expect(text).toContain('iOS 17.0');
+      expect(text).toContain('iPhone 15');
+      expect(text).toContain('test-uuid-123');
+      expect(text).toContain('Shutdown');
+      expect(result.nextStepParams).toEqual({
+        boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
+        open_sim: {},
+        build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
+        get_sim_app_path: {
+          scheme: 'YOUR_SCHEME',
+          platform: 'iOS Simulator',
+          simulatorId: 'UUID_FROM_ABOVE',
         },
       });
     });
@@ -201,30 +198,22 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
         });
       };
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: `Available iOS Simulators:
-
-iOS 17.0:
-- iPhone 15 (test-uuid-123) [Booted]
-
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
-Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
-          },
-        ],
-        nextStepParams: {
-          boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
-          open_sim: {},
-          build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
-          get_sim_app_path: {
-            scheme: 'YOUR_SCHEME',
-            platform: 'iOS Simulator',
-            simulatorId: 'UUID_FROM_ABOVE',
-          },
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('List Simulators');
+      expect(text).toContain('iOS 17.0');
+      expect(text).toContain('iPhone 15');
+      expect(text).toContain('test-uuid-123');
+      expect(text).toContain('Booted');
+      expect(result.nextStepParams).toEqual({
+        boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
+        open_sim: {},
+        build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
+        get_sim_app_path: {
+          scheme: 'YOUR_SCHEME',
+          platform: 'iOS Simulator',
+          simulatorId: 'UUID_FROM_ABOVE',
         },
       });
     });
@@ -264,34 +253,23 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
         });
       };
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      // Should contain both iOS 18.6 from JSON and iOS 26.0 from text
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: `Available iOS Simulators:
-
-iOS 18.6:
-- iPhone 15 (json-uuid-123)
-
-iOS 26.0:
-- iPhone 17 Pro (text-uuid-456)
-
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
-Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
-          },
-        ],
-        nextStepParams: {
-          boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
-          open_sim: {},
-          build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
-          get_sim_app_path: {
-            scheme: 'YOUR_SCHEME',
-            platform: 'iOS Simulator',
-            simulatorId: 'UUID_FROM_ABOVE',
-          },
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('iOS 18.6');
+      expect(text).toContain('iPhone 15');
+      expect(text).toContain('json-uuid-123');
+      expect(text).toContain('iOS 26.0');
+      expect(text).toContain('iPhone 17 Pro');
+      expect(text).toContain('text-uuid-456');
+      expect(result.nextStepParams).toEqual({
+        boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
+        open_sim: {},
+        build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
+        get_sim_app_path: {
+          scheme: 'YOUR_SCHEME',
+          platform: 'iOS Simulator',
+          simulatorId: 'UUID_FROM_ABOVE',
         },
       });
     });
@@ -304,16 +282,11 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
         process: { pid: 12345 },
       });
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to list simulators: Command failed',
-          },
-        ],
-      });
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('Failed to list simulators');
+      expect(text).toContain('Command failed');
     });
 
     it('should handle JSON parse failure and fall back to text parsing', async () => {
@@ -322,7 +295,6 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
     iPhone 15 (test-uuid-456) (Shutdown)`;
 
       const mockExecutor = async (command: string[]) => {
-        // JSON command returns invalid JSON
         if (command.includes('--json')) {
           return createMockCommandResponse({
             success: true,
@@ -331,7 +303,6 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
           });
         }
 
-        // Text command returns valid text output
         return createMockCommandResponse({
           success: true,
           output: mockTextOutput,
@@ -339,31 +310,20 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
         });
       };
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      // Should fall back to text parsing and extract devices
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: `Available iOS Simulators:
-
-iOS 17.0:
-- iPhone 15 (test-uuid-456)
-
-Hint: Save a default simulator with session-set-defaults { simulatorId: 'UUID_FROM_ABOVE' } (or simulatorName).
-Before running build/run/test/UI automation tools, set the desired simulator identifier in session defaults.`,
-          },
-        ],
-        nextStepParams: {
-          boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
-          open_sim: {},
-          build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
-          get_sim_app_path: {
-            scheme: 'YOUR_SCHEME',
-            platform: 'iOS Simulator',
-            simulatorId: 'UUID_FROM_ABOVE',
-          },
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('iOS 17.0');
+      expect(text).toContain('iPhone 15');
+      expect(text).toContain('test-uuid-456');
+      expect(result.nextStepParams).toEqual({
+        boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
+        open_sim: {},
+        build_sim: { scheme: 'YOUR_SCHEME', simulatorId: 'UUID_FROM_ABOVE' },
+        get_sim_app_path: {
+          scheme: 'YOUR_SCHEME',
+          platform: 'iOS Simulator',
+          simulatorId: 'UUID_FROM_ABOVE',
         },
       });
     });
@@ -371,31 +331,21 @@ Before running build/run/test/UI automation tools, set the desired simulator ide
     it('should handle exception with Error object', async () => {
       const mockExecutor = createMockExecutor(new Error('Command execution failed'));
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to list simulators: Command execution failed',
-          },
-        ],
-      });
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('Failed to list simulators');
+      expect(text).toContain('Command execution failed');
     });
 
     it('should handle exception with string error', async () => {
       const mockExecutor = createMockExecutor('String error');
 
-      const result = await list_simsLogic({ enabled: true }, mockExecutor);
+      const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to list simulators: String error',
-          },
-        ],
-      });
+      const text = result.content.map((c) => c.text).join('\n');
+      expect(text).toContain('Failed to list simulators');
+      expect(text).toContain('String error');
     });
   });
 });

@@ -120,7 +120,7 @@ describe('determineSimulatorUuid', () => {
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
-      expect(result.error?.content[0].text).toContain('exists but is not available');
+      expect(result.error).toContain('exists but is not available');
     });
 
     it('should error for non-existent simulator', async () => {
@@ -133,7 +133,7 @@ describe('determineSimulatorUuid', () => {
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
-      expect(result.error?.content[0].text).toContain('not found');
+      expect(result.error).toContain('not found');
     });
 
     it('should handle simctl list failure', async () => {
@@ -146,7 +146,7 @@ describe('determineSimulatorUuid', () => {
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
-      expect(result.error?.content[0].text).toContain('Failed to list simulators');
+      expect(result.error).toContain('Failed to list simulators');
     });
 
     it('should handle invalid JSON from simctl', async () => {
@@ -159,7 +159,7 @@ describe('determineSimulatorUuid', () => {
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
-      expect(result.error?.content[0].text).toContain('Failed to parse simulator list');
+      expect(result.error).toContain('Failed to parse simulator list');
     });
   });
 
@@ -173,7 +173,7 @@ describe('determineSimulatorUuid', () => {
 
       expect(result.uuid).toBeUndefined();
       expect(result.error).toBeDefined();
-      expect(result.error?.content[0].text).toContain('No simulator identifier provided');
+      expect(result.error).toContain('No simulator identifier provided');
     });
   });
 });

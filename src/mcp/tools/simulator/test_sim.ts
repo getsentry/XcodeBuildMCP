@@ -9,17 +9,22 @@
 import * as z from 'zod';
 import { handleTestLogic } from '../../../utils/test/index.ts';
 import { log } from '../../../utils/logging/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
-import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
+import {
+  getDefaultCommandExecutor,
+  getDefaultFileSystemExecutor,
+} from '../../../utils/execution/index.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { inferPlatform } from '../../../utils/infer-platform.ts';
+import { resolveTestPreflight } from '../../../utils/test-preflight.ts';
+import { resolveSimulatorIdOrName } from '../../../utils/simulator-resolver.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
-// Define base schema object with all fields
 const baseSchemaObject = z.object({
   projectPath: z
     .string()
@@ -56,9 +61,12 @@ const baseSchemaObject = z.object({
     .describe(
       'Environment variables to pass to the test runner (TEST_RUNNER_ prefix added automatically)',
     ),
+  progress: z
+    .boolean()
+    .optional()
+    .describe('Show detailed test progress output (MCP defaults to true, CLI defaults to false)'),
 });
 
-// Apply XOR validation: exactly one of projectPath OR workspacePath, and exactly one of simulatorId OR simulatorName required
 const testSimulatorSchema = z.preprocess(
   nullifyEmptyStrings,
   baseSchemaObject
@@ -76,18 +84,17 @@ const testSimulatorSchema = z.preprocess(
     }),
 );
 
-// Use z.infer for type safety
 type TestSimulatorParams = z.infer<typeof testSimulatorSchema>;
 
 export async function test_simLogic(
   params: TestSimulatorParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
-  // Log warning if useLatestOS is provided with simulatorId
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+): Promise<void> {
   if (params.simulatorId && params.useLatestOS !== undefined) {
     log(
       'warn',
-      `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
+      'useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)',
     );
   }
 
@@ -106,22 +113,53 @@ export async function test_simLogic(
     `Inferred simulator platform for tests: ${inferred.platform} (source: ${inferred.source})`,
   );
 
-  return handleTestLogic(
+  const ctx = getHandlerContext();
+
+  const simulatorResolution = await resolveSimulatorIdOrName(
+    executor,
+    params.simulatorId,
+    params.simulatorName,
+  );
+  if (!simulatorResolution.success) {
+    ctx.emit(header('Test Simulator'));
+    ctx.emit(statusLine('error', simulatorResolution.error));
+    return;
+  }
+
+  const destinationName = params.simulatorName ?? simulatorResolution.simulatorName;
+  const preflight = await resolveTestPreflight(
     {
       projectPath: params.projectPath,
       workspacePath: params.workspacePath,
       scheme: params.scheme,
-      simulatorId: params.simulatorId,
+      configuration: params.configuration ?? 'Debug',
+      extraArgs: params.extraArgs,
+      destinationName,
+    },
+    fileSystemExecutor,
+  );
+
+  await handleTestLogic(
+    {
+      projectPath: params.projectPath,
+      workspacePath: params.workspacePath,
+      scheme: params.scheme,
+      simulatorId: simulatorResolution.simulatorId,
       simulatorName: params.simulatorName,
       configuration: params.configuration ?? 'Debug',
       derivedDataPath: params.derivedDataPath,
       extraArgs: params.extraArgs,
-      useLatestOS: params.simulatorId ? false : (params.useLatestOS ?? false),
+      useLatestOS: false,
       preferXcodebuild: params.preferXcodebuild ?? false,
       platform: inferred.platform,
       testRunnerEnv: params.testRunnerEnv,
+      progress: params.progress,
     },
     executor,
+    {
+      preflight: preflight ?? undefined,
+      toolName: 'test_sim',
+    },
   );
 }
 
@@ -144,7 +182,8 @@ export const schema = getSessionAwareToolSchemaShape({
 
 export const handler = createSessionAwareTool<TestSimulatorParams>({
   internalSchema: testSimulatorSchema as unknown as z.ZodType<TestSimulatorParams, unknown>,
-  logicFunction: test_simLogic,
+  logicFunction: (params, executor) =>
+    test_simLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,
   requirements: [
     { allOf: ['scheme'], message: 'scheme is required' },

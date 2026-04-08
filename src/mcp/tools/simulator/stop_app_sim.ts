@@ -1,12 +1,14 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -24,7 +26,6 @@ const baseSchemaObject = z.object({
   bundleId: z.string().describe('Bundle identifier of the app to stop'),
 });
 
-// Internal schema requires simulatorId (factory resolves simulatorName → simulatorId)
 const internalSchemaObject = z.object({
   simulatorId: z.string(),
   simulatorName: z.string().optional(),
@@ -36,7 +37,7 @@ export type StopAppSimParams = z.infer<typeof internalSchemaObject>;
 export async function stop_app_simLogic(
   params: StopAppSimParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   const simulatorId = params.simulatorId;
   const simulatorDisplayName = params.simulatorName
     ? `"${params.simulatorName}" (${simulatorId})`
@@ -44,43 +45,34 @@ export async function stop_app_simLogic(
 
   log('info', `Stopping app ${params.bundleId} in simulator ${simulatorId}`);
 
-  try {
-    const command = ['xcrun', 'simctl', 'terminate', simulatorId, params.bundleId];
-    const result = await executor(command, 'Stop App in Simulator', false, undefined);
+  const headerEvent = header('Stop App', [
+    { label: 'Simulator', value: simulatorDisplayName },
+    { label: 'Bundle ID', value: params.bundleId },
+  ]);
 
-    if (!result.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Stop app in simulator operation failed: ${result.error}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+  const ctx = getHandlerContext();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `App ${params.bundleId} stopped successfully in simulator ${simulatorDisplayName}`,
-        },
-      ],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error stopping app in simulator: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Stop app in simulator operation failed: ${errorMessage}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const command = ['xcrun', 'simctl', 'terminate', simulatorId, params.bundleId];
+      const result = await executor(command, 'Stop App in Simulator', false);
+
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Stop app in simulator operation failed: ${result.error}`));
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'App stopped successfully'));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Stop app in simulator operation failed: ${message}`,
+      logMessage: ({ message }) => `Error stopping app in simulator: ${message}`,
+    },
+  );
 }
 
 const publicSchemaObject = z.strictObject(

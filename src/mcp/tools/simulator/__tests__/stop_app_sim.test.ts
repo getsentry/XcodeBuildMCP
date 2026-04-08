@@ -7,6 +7,40 @@ import {
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, stop_app_simLogic } from '../stop_app_sim.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
 
 describe('stop_app_sim tool', () => {
   beforeEach(() => {
@@ -71,44 +105,42 @@ describe('stop_app_sim tool', () => {
     it('should stop app successfully with simulatorId', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: '' });
 
-      const result = await stop_app_simLogic(
-        {
-          simulatorId: 'test-uuid',
-          bundleId: 'io.sentry.App',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'test-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'App io.sentry.App stopped successfully in simulator test-uuid',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Stop App');
+      expect(text).toContain('io.sentry.App');
+      expect(text).toContain('stopped successfully');
+      expect(text).toContain('test-uuid');
     });
 
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: '' });
 
-      const result = await stop_app_simLogic(
-        {
-          simulatorId: 'resolved-uuid',
-          simulatorName: 'iPhone 17',
-          bundleId: 'io.sentry.App',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'resolved-uuid',
+            simulatorName: 'iPhone 17',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'App io.sentry.App stopped successfully in simulator "iPhone 17" (resolved-uuid)',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Stop App');
+      expect(text).toContain('io.sentry.App');
+      expect(text).toContain('stopped successfully');
+      expect(text).toContain('"iPhone 17" (resolved-uuid)');
     });
 
     it('should surface terminate failures', async () => {
@@ -118,23 +150,20 @@ describe('stop_app_sim tool', () => {
         error: 'Simulator not found',
       });
 
-      const result = await stop_app_simLogic(
-        {
-          simulatorId: 'invalid-uuid',
-          bundleId: 'io.sentry.App',
-        },
-        terminateExecutor,
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'invalid-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          terminateExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Stop app in simulator operation failed: Simulator not found',
-          },
-        ],
-        isError: true,
-      });
+      const text = allText(result);
+      expect(text).toContain('Stop app in simulator operation failed');
+      expect(text).toContain('Simulator not found');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle unexpected exceptions', async () => {
@@ -142,23 +171,20 @@ describe('stop_app_sim tool', () => {
         throw new Error('Unexpected error');
       };
 
-      const result = await stop_app_simLogic(
-        {
-          simulatorId: 'test-uuid',
-          bundleId: 'io.sentry.App',
-        },
-        throwingExecutor,
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'test-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          throwingExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Stop app in simulator operation failed: Unexpected error',
-          },
-        ],
-        isError: true,
-      });
+      const text = allText(result);
+      expect(text).toContain('Stop app in simulator operation failed');
+      expect(text).toContain('Unexpected error');
+      expect(result.isError).toBe(true);
     });
 
     it('should call correct terminate command', async () => {
@@ -185,12 +211,14 @@ describe('stop_app_sim tool', () => {
         });
       };
 
-      await stop_app_simLogic(
-        {
-          simulatorId: 'test-uuid',
-          bundleId: 'io.sentry.App',
-        },
-        trackingExecutor,
+      await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'test-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          trackingExecutor,
+        ),
       );
 
       expect(calls).toEqual([

@@ -1,12 +1,14 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -23,7 +25,6 @@ const baseSchemaObject = z.object({
     ),
 });
 
-// Internal schema requires simulatorId (factory resolves simulatorName → simulatorId)
 const internalSchemaObject = z.object({
   simulatorId: z.string(),
   simulatorName: z.string().optional(),
@@ -41,49 +42,39 @@ const publicSchemaObject = z.strictObject(
 export async function boot_simLogic(
   params: BootSimParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   log('info', `Starting xcrun simctl boot request for simulator ${params.simulatorId}`);
 
-  try {
-    const command = ['xcrun', 'simctl', 'boot', params.simulatorId];
-    const result = await executor(command, 'Boot Simulator', false);
+  const headerEvent = header('Boot Simulator', [{ label: 'Simulator', value: params.simulatorId }]);
 
-    if (!result.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Boot simulator operation failed: ${result.error}`,
-          },
-        ],
-      };
-    }
+  const ctx = getHandlerContext();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Simulator booted successfully.`,
-        },
-      ],
-      nextStepParams: {
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const command = ['xcrun', 'simctl', 'boot', params.simulatorId];
+      const result = await executor(command, 'Boot Simulator', false);
+
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Boot simulator operation failed: ${result.error}`));
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'Simulator booted successfully'));
+      ctx.nextStepParams = {
         open_sim: {},
         install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
         launch_app_sim: { simulatorId: params.simulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
-      },
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error during boot simulator operation: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Boot simulator operation failed: ${errorMessage}`,
-        },
-      ],
-    };
-  }
+      };
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Boot simulator operation failed: ${message}`,
+      logMessage: ({ message }) => `Error during boot simulator operation: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

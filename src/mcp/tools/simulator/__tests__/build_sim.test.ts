@@ -1,14 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import * as z from 'zod';
 import {
   createMockExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
-import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 
-// Import the named exports and logic function
 import { schema, handler, build_simLogic } from '../build_sim.ts';
+
+const runBuildSimLogic = (
+  params: Parameters<typeof build_simLogic>[0],
+  executor: Parameters<typeof build_simLogic>[1],
+) => runToolLogic(() => build_simLogic(params, executor));
 
 describe('build_sim tool', () => {
   beforeEach(() => {
@@ -23,17 +28,14 @@ describe('build_sim tool', () => {
     it('should have correct public schema (only non-session fields)', () => {
       const schemaObj = z.strictObject(schema);
 
-      // Public schema should allow empty input
       expect(schemaObj.safeParse({}).success).toBe(true);
 
-      // Valid public inputs
       expect(
         schemaObj.safeParse({
           extraArgs: ['--verbose'],
         }).success,
       ).toBe(true);
 
-      // Invalid types or unknown fields on public inputs
       expect(schemaObj.safeParse({ derivedDataPath: '/path/to/derived' }).success).toBe(false);
       expect(schemaObj.safeParse({ extraArgs: [123] }).success).toBe(false);
       expect(schemaObj.safeParse({ preferXcodebuild: false }).success).toBe(false);
@@ -70,7 +72,7 @@ describe('build_sim tool', () => {
     it('should handle empty workspacePath parameter', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '',
           scheme: 'MyScheme',
@@ -79,17 +81,7 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      // Empty string passes validation but may cause build issues
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
 
     it('should handle missing scheme parameter', async () => {
@@ -106,7 +98,7 @@ describe('build_sim tool', () => {
     it('should handle empty scheme parameter', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: '',
@@ -115,17 +107,7 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      // Empty string passes validation but may cause build issues
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme .',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
 
     it('should handle missing both simulatorId and simulatorName', async () => {
@@ -142,7 +124,6 @@ describe('build_sim tool', () => {
     it('should handle both simulatorId and simulatorName provided', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'Build succeeded' });
 
-      // Should fail with XOR validation
       const result = await handler({
         workspacePath: '/path/to/workspace',
         scheme: 'MyScheme',
@@ -164,7 +145,7 @@ describe('build_sim tool', () => {
         error: 'For iOS Simulator platform, either simulatorId or simulatorName must be provided',
       });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -173,11 +154,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      // Empty simulatorName passes validation but causes early failure in destination construction
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe(
-        'For iOS Simulator platform, either simulatorId or simulatorName must be provided',
-      );
+      expect(result.isError()).toBe(true);
+      expectPendingBuildResponse(result);
     });
   });
 
@@ -209,7 +187,7 @@ describe('build_sim tool', () => {
     it('should generate correct build command with minimal parameters (workspace)', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
@@ -231,6 +209,8 @@ describe('build_sim tool', () => {
           '-skipMacroValidation',
           '-destination',
           'platform=iOS Simulator,name=iPhone 17,OS=latest',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
           'build',
         ],
         'iOS Simulator Build',
@@ -240,7 +220,7 @@ describe('build_sim tool', () => {
     it('should generate correct build command with minimal parameters (project)', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           projectPath: '/path/to/MyProject.xcodeproj',
           scheme: 'MyScheme',
@@ -262,6 +242,8 @@ describe('build_sim tool', () => {
           '-skipMacroValidation',
           '-destination',
           'platform=iOS Simulator,name=iPhone 17,OS=latest',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
           'build',
         ],
         'iOS Simulator Build',
@@ -271,7 +253,7 @@ describe('build_sim tool', () => {
     it('should generate correct build command with all optional parameters', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
@@ -309,7 +291,7 @@ describe('build_sim tool', () => {
     it('should handle paths with spaces in command generation', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           workspacePath: '/Users/dev/My Project/MyProject.xcworkspace',
           scheme: 'My Scheme',
@@ -331,6 +313,8 @@ describe('build_sim tool', () => {
           '-skipMacroValidation',
           '-destination',
           'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
           'build',
         ],
         'iOS Simulator Build',
@@ -340,7 +324,7 @@ describe('build_sim tool', () => {
     it('should generate correct build command with useLatestOS set to true', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
@@ -363,6 +347,8 @@ describe('build_sim tool', () => {
           '-skipMacroValidation',
           '-destination',
           'platform=iOS Simulator,name=iPhone 17,OS=latest',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
           'build',
         ],
         'iOS Simulator Build',
@@ -372,7 +358,7 @@ describe('build_sim tool', () => {
     it('should infer watchOS platform from simulator name', async () => {
       const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
 
-      await build_simLogic(
+      await runBuildSimLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyWatchScheme',
@@ -394,6 +380,8 @@ describe('build_sim tool', () => {
           '-skipMacroValidation',
           '-destination',
           'platform=watchOS Simulator,name=Apple Watch Ultra 2,OS=latest',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
           'build',
         ],
         'watchOS Simulator Build',
@@ -405,7 +393,7 @@ describe('build_sim tool', () => {
     it('should handle successful build', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -414,22 +402,14 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expect(result.isError()).toBeFalsy();
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
 
     it('should handle successful build with all optional parameters', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -443,16 +423,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expect(result.isError()).toBeFalsy();
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
 
     it('should handle build failure', async () => {
@@ -462,7 +434,7 @@ describe('build_sim tool', () => {
         error: 'Build failed: Compilation error',
       });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -471,19 +443,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '❌ [stderr] Build failed: Compilation error',
-          },
-          {
-            type: 'text',
-            text: '❌ iOS Simulator Build build failed for scheme MyScheme.',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError()).toBe(true);
+      expectPendingBuildResponse(result);
     });
 
     it('should handle build warnings', async () => {
@@ -492,7 +453,7 @@ describe('build_sim tool', () => {
         output: 'warning: deprecated method used\nBUILD SUCCEEDED',
       });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -501,22 +462,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result.content).toEqual(
-        expect.arrayContaining([
-          {
-            type: 'text',
-            text: expect.stringContaining('⚠️'),
-          },
-          {
-            type: 'text',
-            text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-          },
-          {
-            type: 'text',
-            text: expect.stringContaining('Next Steps:'),
-          },
-        ]),
-      );
+      expect(result.isError()).toBeFalsy();
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
 
     it('should handle command executor errors', async () => {
@@ -525,7 +472,7 @@ describe('build_sim tool', () => {
         error: 'spawn xcodebuild ENOENT',
       });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -534,8 +481,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('❌ [stderr] spawn xcodebuild ENOENT');
+      expect(result.isError()).toBe(true);
+      expectPendingBuildResponse(result);
     });
 
     it('should handle mixed warning and error output', async () => {
@@ -545,7 +492,7 @@ describe('build_sim tool', () => {
         error: 'Build failed',
       });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -554,60 +501,32 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      expect(result.isError).toBe(true);
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '⚠️ Warning: warning: deprecated method',
-        },
-        {
-          type: 'text',
-          text: '❌ Error: error: undefined symbol',
-        },
-        {
-          type: 'text',
-          text: '❌ [stderr] Build failed',
-        },
-        {
-          type: 'text',
-          text: '❌ iOS Simulator Build build failed for scheme MyScheme.',
-        },
-      ]);
+      expect(result.isError()).toBe(true);
+      expectPendingBuildResponse(result);
     });
 
     it('should use default configuration when not provided', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
           simulatorName: 'iPhone 17',
-          // configuration intentionally omitted - should default to Debug
         },
         mockExecutor,
       );
 
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expect(result.isError()).toBeFalsy();
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
   });
 
   describe('Error Handling', () => {
     it('should handle catch block exceptions', async () => {
-      // Create a mock that throws an error when called
       const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
 
-      // Mock the handler to throw an error by passing invalid parameters to internal functions
-      const result = await build_simLogic(
+      const { result } = await runBuildSimLogic(
         {
           workspacePath: '/path/to/workspace',
           scheme: 'MyScheme',
@@ -616,17 +535,8 @@ describe('build_sim tool', () => {
         mockExecutor,
       );
 
-      // Should handle the build successfully
-      expect(result.content).toEqual([
-        {
-          type: 'text',
-          text: '✅ iOS Simulator Build build succeeded for scheme MyScheme.',
-        },
-        {
-          type: 'text',
-          text: expect.stringContaining('Next Steps:'),
-        },
-      ]);
+      expect(result.isError()).toBeFalsy();
+      expectPendingBuildResponse(result, 'get_sim_app_path');
     });
   });
 });
