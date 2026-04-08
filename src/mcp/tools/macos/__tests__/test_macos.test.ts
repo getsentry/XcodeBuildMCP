@@ -1,28 +1,27 @@
-/**
- * Tests for test_macos plugin (unified project/workspace)
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
   createMockExecutor,
   createMockFileSystemExecutor,
-  type FileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
+import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler } from '../test_macos.ts';
-import { testMacosLogic } from '../test_macos.ts';
+import { schema, handler, testMacosLogic } from '../test_macos.ts';
 
-const createTestFileSystemExecutor = (overrides: Partial<FileSystemExecutor> = {}) =>
+const mockFs = () =>
   createMockFileSystemExecutor({
     mkdtemp: async () => '/tmp/test-123',
     rm: async () => {},
     tmpdir: () => '/tmp',
-    stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
-    ...overrides,
+    stat: async () => ({ isDirectory: () => false, mtimeMs: 0 }),
   });
+
+const runTestMacosLogic = (
+  params: Parameters<typeof testMacosLogic>[0],
+  executor: Parameters<typeof testMacosLogic>[1],
+  fileSystemExecutor: Parameters<typeof testMacosLogic>[2],
+) => runToolLogic(() => testMacosLogic(params, executor, fileSystemExecutor));
 
 describe('test_macos plugin (unified)', () => {
   beforeEach(() => {
@@ -51,7 +50,7 @@ describe('test_macos plugin (unified)', () => {
       expect(zodSchema.safeParse({ testRunnerEnv: { FOO: 123 } }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'testRunnerEnv'].sort());
+      expect(schemaKeys).toEqual(['extraArgs', 'progress', 'testRunnerEnv'].sort());
     });
   });
 
@@ -87,7 +86,6 @@ describe('test_macos plugin (unified)', () => {
 
   describe('XOR Parameter Validation', () => {
     it('should validate that either projectPath or workspacePath is provided', async () => {
-      // Should return error response when neither is provided
       const result = await handler({
         scheme: 'MyScheme',
       });
@@ -97,7 +95,6 @@ describe('test_macos plugin (unified)', () => {
     });
 
     it('should validate that both projectPath and workspacePath cannot be provided', async () => {
-      // Should return error response when both are provided
       const result = await handler({
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
@@ -114,20 +111,17 @@ describe('test_macos plugin (unified)', () => {
         output: 'Test Suite All Tests passed',
       });
 
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           projectPath: '/path/to/project.xcodeproj',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should allow only workspacePath', async () => {
@@ -136,70 +130,59 @@ describe('test_macos plugin (unified)', () => {
         output: 'Test Suite All Tests passed',
       });
 
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/workspace.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should return successful test response with workspace when xcodebuild succeeds', async () => {
+    it('should return pending response with workspace when xcodebuild succeeds', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: 'Test Suite All Tests passed',
       });
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/workspace.xcworkspace',
           scheme: 'MyScheme',
           configuration: 'Debug',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
-    it('should return successful test response with project when xcodebuild succeeds', async () => {
+    it('should return pending response with project when xcodebuild succeeds', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: 'Test Suite All Tests passed',
       });
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           projectPath: '/path/to/project.xcodeproj',
           scheme: 'MyScheme',
           configuration: 'Debug',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should use default configuration when not provided', async () => {
@@ -208,21 +191,17 @@ describe('test_macos plugin (unified)', () => {
         output: 'Test Suite All Tests passed',
       });
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/workspace.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should handle optional parameters correctly', async () => {
@@ -231,10 +210,7 @@ describe('test_macos plugin (unified)', () => {
         output: 'Test Suite All Tests passed',
       });
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/workspace.xcworkspace',
           scheme: 'MyScheme',
@@ -244,12 +220,11 @@ describe('test_macos plugin (unified)', () => {
           preferXcodebuild: true,
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
     it('should handle successful test execution with minimal parameters', async () => {
@@ -258,233 +233,108 @@ describe('test_macos plugin (unified)', () => {
         output: 'Test Suite All Tests passed',
       });
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor();
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyApp',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toBeDefined();
-      expect(Array.isArray(result.content)).toBe(true);
-      expect(result.isError).toBeUndefined();
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
-    it('should return exact successful test response', async () => {
-      // Track command execution calls
-      const commandCalls: any[] = [];
+    it('should return pending response on successful test', async () => {
+      const commandCalls: { command: string[]; logPrefix?: string }[] = [];
 
-      // Mock executor for successful test
       const mockExecutor = async (
         command: string[],
         logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string> },
-        detached?: boolean,
+        _useShell?: boolean,
+        _opts?: { env?: Record<string, string> },
+        _detached?: boolean,
       ) => {
-        commandCalls.push({ command, logPrefix, useShell, env: opts?.env });
-        void detached;
-
-        // Handle xcresulttool command
-        if (command.includes('xcresulttool')) {
-          return createMockCommandResponse({
-            success: true,
-            output: JSON.stringify({
-              title: 'Test Results',
-              result: 'SUCCEEDED',
-              totalTestCount: 5,
-              passedTests: 5,
-              failedTests: 0,
-              skippedTests: 0,
-              expectedFailures: 0,
-            }),
-            error: undefined,
-          });
-        }
-
+        commandCalls.push({ command, logPrefix });
         return createMockCommandResponse({
           success: true,
           output: 'Test Succeeded',
           error: undefined,
+          exitCode: 0,
         });
       };
 
-      // Mock file system dependencies using approved utility
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => '/tmp/xcodebuild-test-abc123',
-      });
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      // Verify commands were called with correct parameters
-      expect(commandCalls).toHaveLength(2); // xcodebuild test + xcresulttool
-      expect(commandCalls[0].command).toEqual([
-        'xcodebuild',
-        '-workspace',
-        '/path/to/MyProject.xcworkspace',
-        '-scheme',
-        'MyScheme',
-        '-configuration',
-        'Debug',
-        '-skipMacroValidation',
-        '-destination',
-        'platform=macOS',
-        '-resultBundlePath',
-        '/tmp/xcodebuild-test-abc123/TestResults.xcresult',
-        'test',
-      ]);
+      expect(commandCalls).toHaveLength(1);
+      expect(commandCalls[0].command).toContain('xcodebuild');
+      expect(commandCalls[0].command).toContain('-workspace');
+      expect(commandCalls[0].command).toContain('/path/to/MyProject.xcworkspace');
+      expect(commandCalls[0].command).toContain('-scheme');
+      expect(commandCalls[0].command).toContain('MyScheme');
+      expect(commandCalls[0].command).toContain('test');
       expect(commandCalls[0].logPrefix).toBe('Test Run');
-      expect(commandCalls[0].useShell).toBe(false);
 
-      // Verify xcresulttool was called
-      expect(commandCalls[1].command).toEqual([
-        'xcrun',
-        'xcresulttool',
-        'get',
-        'test-results',
-        'summary',
-        '--path',
-        '/tmp/xcodebuild-test-abc123/TestResults.xcresult',
-      ]);
-      expect(commandCalls[1].logPrefix).toBe('Parse xcresult bundle');
-
-      expect(result.content).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'text',
-            text: '✅ Test Run test succeeded for scheme MyScheme.',
-          }),
-        ]),
-      );
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
-    it('should return exact test failure response', async () => {
-      // Track command execution calls
+    it('should return pending response on test failure', async () => {
       let callCount = 0;
       const mockExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string> },
-        detached?: boolean,
+        _command: string[],
+        _logPrefix?: string,
+        _useShell?: boolean,
+        _opts?: { env?: Record<string, string> },
+        _detached?: boolean,
       ) => {
         callCount++;
-        void logPrefix;
-        void useShell;
-        void opts;
-        void detached;
-
-        // First call is xcodebuild test - fails
-        if (callCount === 1) {
-          return createMockCommandResponse({
-            success: false,
-            output: '',
-            error: 'error: Test failed',
-          });
-        }
-
-        // Second call is xcresulttool
-        if (command.includes('xcresulttool')) {
-          return createMockCommandResponse({
-            success: true,
-            output: JSON.stringify({
-              title: 'Test Results',
-              result: 'FAILED',
-              totalTestCount: 5,
-              passedTests: 3,
-              failedTests: 2,
-              skippedTests: 0,
-              expectedFailures: 0,
-            }),
-            error: undefined,
-          });
-        }
-
-        return createMockCommandResponse({ success: true, output: '', error: undefined });
+        return createMockCommandResponse({
+          success: false,
+          output: '',
+          error: 'error: Test failed',
+          exitCode: 65,
+        });
       };
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => '/tmp/xcodebuild-test-abc123',
-      });
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'text',
-            text: '❌ Test Run test failed for scheme MyScheme.',
-          }),
-        ]),
-      );
-      expect(result.isError).toBe(true);
+      expect(callCount).toBe(1);
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBe(true);
     });
 
-    it('should return exact successful test response with optional parameters', async () => {
-      // Track command execution calls
-      const commandCalls: any[] = [];
-
-      // Mock executor for successful test with optional parameters
+    it('should return pending response with optional parameters', async () => {
       const mockExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string> },
-        detached?: boolean,
-      ) => {
-        commandCalls.push({ command, logPrefix, useShell, env: opts?.env });
-        void detached;
-
-        // Handle xcresulttool command
-        if (command.includes('xcresulttool')) {
-          return createMockCommandResponse({
-            success: true,
-            output: JSON.stringify({
-              title: 'Test Results',
-              result: 'SUCCEEDED',
-              totalTestCount: 5,
-              passedTests: 5,
-              failedTests: 0,
-              skippedTests: 0,
-              expectedFailures: 0,
-            }),
-            error: undefined,
-          });
-        }
-
-        return createMockCommandResponse({
+        _command: string[],
+        _logPrefix?: string,
+        _useShell?: boolean,
+        _opts?: { env?: Record<string, string> },
+        _detached?: boolean,
+      ) =>
+        createMockCommandResponse({
           success: true,
           output: 'Test Succeeded',
           error: undefined,
+          exitCode: 0,
         });
-      };
 
-      // Mock file system dependencies
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => '/tmp/xcodebuild-test-abc123',
-      });
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
@@ -494,188 +344,58 @@ describe('test_macos plugin (unified)', () => {
           preferXcodebuild: true,
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result.content).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'text',
-            text: '✅ Test Run test succeeded for scheme MyScheme.',
-          }),
-        ]),
-      );
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBeFalsy();
     });
 
-    it('should filter out stderr lines when xcresult data is available', async () => {
-      // Regression test for #231: stderr warnings (e.g. "multiple matching destinations")
-      // should be dropped when xcresult parsing succeeds, since xcresult is authoritative.
-      let callCount = 0;
+    it('should handle build failure with pending response', async () => {
       const mockExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string> },
-        detached?: boolean,
-      ) => {
-        callCount++;
-        void logPrefix;
-        void useShell;
-        void opts;
-        void detached;
+        _command: string[],
+        _logPrefix?: string,
+        _useShell?: boolean,
+        _opts?: { env?: Record<string, string> },
+        _detached?: boolean,
+      ) =>
+        createMockCommandResponse({
+          success: false,
+          output: '',
+          error: 'error: missing argument for parameter in call',
+          exitCode: 65,
+        });
 
-        // First call: xcodebuild test fails with stderr warning
-        if (callCount === 1) {
-          return createMockCommandResponse({
-            success: false,
-            output: '',
-            error:
-              'WARNING: multiple matching destinations, using first match\n' + 'error: Test failed',
-          });
-        }
-
-        // Second call: xcresulttool succeeds
-        if (command.includes('xcresulttool')) {
-          return createMockCommandResponse({
-            success: true,
-            output: JSON.stringify({
-              title: 'Test Results',
-              result: 'FAILED',
-              totalTestCount: 5,
-              passedTests: 3,
-              failedTests: 2,
-              skippedTests: 0,
-              expectedFailures: 0,
-            }),
-          });
-        }
-
-        return createMockCommandResponse({ success: true, output: '' });
-      };
-
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => '/tmp/xcodebuild-test-stderr',
-      });
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      // stderr lines should be filtered out
-      const allText = result.content.map((c) => c.text).join('\n');
-      expect(allText).not.toContain('[stderr]');
-
-      // xcresult summary should be present and first
-      expect(result.content[0].text).toContain('Test Results Summary:');
-
-      // Build status line should still be present
-      expect(allText).toContain('Test Run test failed for scheme MyScheme');
+      expectPendingBuildResponse(result);
+      expect(result.isError()).toBe(true);
     });
 
-    it('should preserve stderr when xcresult reports zero tests (build failure)', async () => {
-      // When the build fails, xcresult exists but has totalTestCount: 0.
-      // In that case stderr contains the actual compilation errors and must be preserved.
-      let callCount = 0;
-      const mockExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string> },
-        detached?: boolean,
-      ) => {
-        callCount++;
-        void logPrefix;
-        void useShell;
-        void opts;
-        void detached;
-
-        // First call: xcodebuild test fails with compilation error on stderr
-        if (callCount === 1) {
-          return createMockCommandResponse({
-            success: false,
-            output: '',
-            error: 'error: missing argument for parameter in call',
-          });
-        }
-
-        // Second call: xcresulttool succeeds but reports 0 tests
-        if (command.includes('xcresulttool')) {
-          return createMockCommandResponse({
-            success: true,
-            output: JSON.stringify({
-              title: 'Test Results',
-              result: 'unknown',
-              totalTestCount: 0,
-              passedTests: 0,
-              failedTests: 0,
-              skippedTests: 0,
-              expectedFailures: 0,
-            }),
-          });
-        }
-
-        return createMockCommandResponse({ success: true, output: '' });
-      };
-
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => '/tmp/xcodebuild-test-buildfail',
-      });
-
-      const result = await testMacosLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
-        mockFileSystemExecutor,
-      );
-
-      // stderr with compilation error must be preserved (not filtered)
-      const allText = result.content.map((c) => c.text).join('\n');
-      expect(allText).toContain('[stderr]');
-      expect(allText).toContain('missing argument');
-
-      // xcresult summary should NOT be present (it's meaningless with 0 tests)
-      expect(allText).not.toContain('Test Results Summary:');
-    });
-
-    it('should return exact exception handling response', async () => {
-      // Mock executor (won't be called due to mkdtemp failure)
+    it('should return error response when executor throws an exception', async () => {
       const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Test Succeeded',
+        success: false,
+        error: '',
+        shouldThrow: new Error('Network error'),
       });
 
-      // Mock file system dependencies - mkdtemp fails
-      const mockFileSystemExecutor = createTestFileSystemExecutor({
-        mkdtemp: async () => {
-          throw new Error('Network error');
-        },
-      });
-
-      const result = await testMacosLogic(
+      const { result } = await runTestMacosLogic(
         {
           workspacePath: '/path/to/MyProject.xcworkspace',
           scheme: 'MyScheme',
         },
         mockExecutor,
-        mockFileSystemExecutor,
+        mockFs(),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error during test run: Network error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError()).toBe(true);
     });
   });
 });

@@ -1,10 +1,5 @@
-/**
- * Tests for device tool named exports
- * Verifies that device tools export schema and handler as named exports
- */
 import { describe, it, expect } from 'vitest';
 
-// Import all tools as modules to check named exports
 import * as launchAppDevice from '../launch_app_device.ts';
 import * as stopAppDevice from '../stop_app_device.ts';
 import * as listDevices from '../list_devices.ts';

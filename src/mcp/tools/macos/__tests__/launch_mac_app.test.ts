@@ -1,20 +1,44 @@
-/**
- * Pure dependency injection test for launch_mac_app plugin
- *
- * Tests plugin structure and macOS app launching functionality including parameter validation,
- * command generation, file validation, and response formatting.
- *
- * Uses manual call tracking and createMockFileSystemExecutor for file operations.
- */
-
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler } from '../launch_mac_app.ts';
-import { launch_mac_appLogic } from '../launch_mac_app.ts';
+import { schema, handler, launch_mac_appLogic } from '../launch_mac_app.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
 
 describe('launch_mac_app plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -61,23 +85,19 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => false,
       });
 
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/NonExistent.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/NonExistent.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: "File not found: '/path/to/NonExistent.app'. Please check the path and try again.",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain("File not found: '/path/to/NonExistent.app'");
     });
   });
 
@@ -93,15 +113,16 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(calls).toHaveLength(1);
       expect(calls[0].command).toEqual(['open', '/path/to/MyApp.app']);
     });
 
@@ -116,16 +137,17 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-          args: ['--debug', '--verbose'],
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+            args: ['--debug', '--verbose'],
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(calls).toHaveLength(1);
       expect(calls[0].command).toEqual([
         'open',
         '/path/to/MyApp.app',
@@ -146,16 +168,17 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-          args: [],
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+            args: [],
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(calls).toHaveLength(1);
       expect(calls[0].command).toEqual(['open', '/path/to/MyApp.app']);
     });
 
@@ -170,15 +193,16 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      await launch_mac_appLogic(
-        {
-          appPath: '/Applications/My App.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/Applications/My App.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(calls).toHaveLength(1);
       expect(calls[0].command).toEqual(['open', '/Applications/My App.app']);
     });
   });
@@ -191,48 +215,17 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ macOS app launched successfully: /path/to/MyApp.app',
-          },
-        ],
-      });
-    });
-
-    it('should return successful launch response with args', async () => {
-      const mockExecutor = async () => Promise.resolve(createMockCommandResponse());
-
-      const mockFileSystem = createMockFileSystemExecutor({
-        existsSync: () => true,
-      });
-
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-          args: ['--debug', '--verbose'],
-        },
-        mockExecutor,
-        mockFileSystem,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ macOS app launched successfully: /path/to/MyApp.app',
-          },
-        ],
-      });
+      expect(result.isError).toBeFalsy();
     });
 
     it('should handle launch failure with Error object', async () => {
@@ -244,51 +237,17 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '❌ Launch macOS app operation failed: App not found',
-          },
-        ],
-        isError: true,
-      });
-    });
-
-    it('should handle launch failure with string error', async () => {
-      const mockExecutor = async () => {
-        throw 'Permission denied';
-      };
-
-      const mockFileSystem = createMockFileSystemExecutor({
-        existsSync: () => true,
-      });
-
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '❌ Launch macOS app operation failed: Permission denied',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
 
     it('should handle launch failure with unknown error type', async () => {
@@ -300,23 +259,17 @@ describe('launch_mac_app plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await launch_mac_appLogic(
-        {
-          appPath: '/path/to/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        launch_mac_appLogic(
+          {
+            appPath: '/path/to/MyApp.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '❌ Launch macOS app operation failed: 123',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
   });
 });

@@ -6,22 +6,23 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 
-// Define schema as ZodObject
 const stopAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
   processId: z.number(),
 });
 
-// Use z.infer for type safety
 type StopAppDeviceParams = z.infer<typeof stopAppDeviceSchema>;
 
 const publicSchemaObject = stopAppDeviceSchema.omit({ deviceId: true } as const);
@@ -29,62 +30,51 @@ const publicSchemaObject = stopAppDeviceSchema.omit({ deviceId: true } as const)
 export async function stop_app_deviceLogic(
   params: StopAppDeviceParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   const { deviceId, processId } = params;
+  const headerEvent = header('Stop App', [
+    { label: 'Device', value: formatDeviceId(deviceId) },
+    { label: 'PID', value: processId.toString() },
+  ]);
 
   log('info', `Stopping app with PID ${processId} on device ${deviceId}`);
 
-  try {
-    const result = await executor(
-      [
-        'xcrun',
-        'devicectl',
-        'device',
-        'process',
-        'terminate',
-        '--device',
-        deviceId,
-        '--pid',
-        processId.toString(),
-      ],
-      'Stop app on device',
-      false, // useShell
-      undefined, // env
-    );
+  const ctx = getHandlerContext();
 
-    if (!result.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to stop app: ${result.error}`,
-          },
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const result = await executor(
+        [
+          'xcrun',
+          'devicectl',
+          'device',
+          'process',
+          'terminate',
+          '--device',
+          deviceId,
+          '--pid',
+          processId.toString(),
         ],
-        isError: true,
-      };
-    }
+        'Stop app on device',
+        false,
+      );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ App stopped successfully\n\n${result.output}`,
-        },
-      ],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error stopping app on device: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to stop app on device: ${errorMessage}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Failed to stop app: ${result.error}`));
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'App stopped successfully'));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to stop app on device: ${message}`,
+      logMessage: ({ message }) => `Error stopping app on device: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({
