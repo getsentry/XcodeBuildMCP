@@ -181,6 +181,8 @@ describe('get_coverage_report', () => {
       expect(result.isError).toBeUndefined();
       expect(result.content.length).toBeGreaterThanOrEqual(1);
       const text = allText(result);
+      expect(text).toContain('Overall: 24.7%');
+      expect(text).toContain('180/730 lines');
       const coreIdx = text.indexOf('Core');
       const appIdx = text.indexOf('MyApp.app');
       const testIdx = text.indexOf('MyAppTests.xctest');
@@ -218,6 +220,9 @@ describe('get_coverage_report', () => {
 
       expect(result.isError).toBeUndefined();
       expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
+      expect(text).toContain('Core: 10.0%');
+      expect(text).toContain('MyApp.app: 50.0%');
     });
   });
 

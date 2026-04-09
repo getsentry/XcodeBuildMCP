@@ -110,6 +110,12 @@ export async function swift_package_testLogic(
       header: headerEvent,
       errorMessage: ({ message }) => `Failed to execute swift test: ${message}`,
       logMessage: ({ message }) => `Swift package test failed: ${message}`,
+      mapError: ({ message, headerEvent: hdr, emit }) => {
+        if (emit) {
+          emit(hdr);
+          emit(statusLine('error', `Failed to execute swift test: ${message}`));
+        }
+      },
     },
   );
 }

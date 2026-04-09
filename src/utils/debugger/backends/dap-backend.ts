@@ -137,8 +137,10 @@ class DapBackend implements DebuggerBackend {
 
     const normalizedCommand = command.trim().toLowerCase();
     if (normalizedCommand === 'process interrupt') {
-      await this.pauseExecution(opts?.timeoutMs);
-      return 'Process interrupted.';
+      return this.enqueue(async () => {
+        await this.pauseExecution(opts?.timeoutMs);
+        return 'Process interrupted.';
+      });
     }
 
     try {

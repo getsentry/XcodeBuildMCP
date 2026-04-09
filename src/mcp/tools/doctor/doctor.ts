@@ -167,6 +167,7 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
   const prevSilence = process.env.XCODEBUILDMCP_SILENCE_LOGS;
   process.env.XCODEBUILDMCP_SILENCE_LOGS = 'true';
   log('info', `${LOG_PREFIX}: Running doctor tool`);
+  try {
 
   const xcodemakeEnabled = deps.features.isXcodemakeEnabled();
   const requiredBinaries = ['axe', 'mise', ...(xcodemakeEnabled ? ['xcodemake'] : [])];
@@ -475,11 +476,6 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
 
   events.push(statusLine('success', 'Doctor diagnostics complete'));
 
-  if (prevSilence === undefined) {
-    delete process.env.XCODEBUILDMCP_SILENCE_LOGS;
-  } else {
-    process.env.XCODEBUILDMCP_SILENCE_LOGS = prevSilence;
-  }
   const rendered = renderEvents(events, 'text');
   const hasError = events.some(
     (e) =>
@@ -491,6 +487,14 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     isError: hasError || undefined,
     _meta: { events: [...events] },
   };
+
+  } finally {
+    if (prevSilence === undefined) {
+      delete process.env.XCODEBUILDMCP_SILENCE_LOGS;
+    } else {
+      process.env.XCODEBUILDMCP_SILENCE_LOGS = prevSilence;
+    }
+  }
 }
 
 export async function doctorLogic(params: DoctorParams, executor: CommandExecutor) {
