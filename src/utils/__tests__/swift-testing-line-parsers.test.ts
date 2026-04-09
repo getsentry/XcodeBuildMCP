@@ -33,7 +33,7 @@ describe('Swift Testing line parsers', () => {
       });
     });
 
-    it('should parse a passed parameterized test', () => {
+    it('should parse a passed parameterized test with case count', () => {
       const result = parseSwiftTestingResultLine(
         '✔ Test "Parameterized test" with 3 test cases passed after 0.001 seconds.',
       );
@@ -42,6 +42,20 @@ describe('Swift Testing line parsers', () => {
         rawName: 'Parameterized test',
         testName: 'Parameterized test',
         durationText: '0.001s',
+        caseCount: 3,
+      });
+    });
+
+    it('should parse a failed parameterized test with case count', () => {
+      const result = parseSwiftTestingResultLine(
+        '✘ Test "Parameterized failure" with 3 test cases failed after 0.001 seconds with 1 issue.',
+      );
+      expect(result).toEqual({
+        status: 'failed',
+        rawName: 'Parameterized failure',
+        testName: 'Parameterized failure',
+        durationText: '0.001s',
+        caseCount: 3,
       });
     });
 

@@ -356,6 +356,31 @@ describe('xcodebuild-run-state', () => {
     expect(state.highestStageRank()).toBe(STAGE_RANK.COMPILING);
   });
 
+  it('does not deduplicate distinct test failures sharing the same assertion location', () => {
+    const state = createXcodebuildRunState({ operation: 'TEST' });
+
+    state.push({
+      type: 'test-failure',
+      timestamp: ts(),
+      operation: 'TEST',
+      suite: 'SuiteA',
+      test: 'testOne',
+      message: 'XCTAssertTrue failed',
+      location: '/tmp/SharedAssert.swift:10',
+    });
+    state.push({
+      type: 'test-failure',
+      timestamp: ts(),
+      operation: 'TEST',
+      suite: 'SuiteB',
+      test: 'testTwo',
+      message: 'XCTAssertTrue failed',
+      location: '/tmp/SharedAssert.swift:10',
+    });
+
+    expect(state.snapshot().testFailures).toHaveLength(2);
+  });
+
   it('passes through header and next-steps events', () => {
     const forwarded: PipelineEvent[] = [];
     const state = createXcodebuildRunState({
