@@ -91,7 +91,7 @@ export function parseSwiftTestingResultLine(line: string): ParsedTestCase | null
 export function parseSwiftTestingIssueLine(line: string): ParsedFailureDiagnostic | null {
   // Match with location -- handle both aka suffix and parameterized argument values before "at"
   const locationRegex = new RegExp(
-    `^[✘] Test "(.+)"${OPTIONAL_AKA} recorded an issue(?:\\s+with \\d+ argument values?[^:]*?)? at (.+?):(\\d+):\\d+: (.+)$`,
+    `^[✘] Test "(.+)"${OPTIONAL_AKA} recorded an issue(?:\\s+with \\d+ argument values?.*?)? at (.+?):(\\d+):\\d+: (.+)$`,
     'u',
   );
   const locationMatch = line.match(locationRegex);

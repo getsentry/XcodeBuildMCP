@@ -83,7 +83,6 @@ describe('Swift Testing line parsers', () => {
       });
     });
 
-
     it('should parse a skipped test (arrow format)', () => {
       const result = parseSwiftTestingResultLine('➜ Test disabledTest() skipped: "Not ready yet"');
       expect(result).toEqual({
@@ -151,6 +150,18 @@ describe('Swift Testing line parsers', () => {
         testName: 'Parameterized failure',
         location: 'ParameterizedTests.swift:10',
         message: 'Expectation failed: (value → 0) > 0',
+      });
+    });
+
+    it('should parse a parameterized issue with colon in argument value', () => {
+      const result = parseSwiftTestingIssueLine(
+        '✘ Test "Dict test" recorded an issue with 1 argument value → key:value at DictTests.swift:5:3: failed',
+      );
+      expect(result).toEqual({
+        rawTestName: 'Dict test',
+        testName: 'Dict test',
+        location: 'DictTests.swift:5',
+        message: 'failed',
       });
     });
 
