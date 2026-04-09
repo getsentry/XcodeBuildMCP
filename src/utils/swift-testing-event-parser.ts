@@ -123,6 +123,9 @@ export function createSwiftTestingEventParser(
     // Swift Testing result line: ✔/✘/◇ Test "Name" passed/failed/skipped (non-failure or no pending issue)
     if (stResult) {
       completedCount += 1;
+      if (stResult.status === 'failed') {
+        failedCount += 1;
+      }
       if (stResult.status === 'skipped') {
         skippedCount += 1;
       }
