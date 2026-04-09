@@ -7,6 +7,7 @@ import type { DebuggerManager } from './debugger-manager.ts';
 
 type GuardResult = {
   blockedResponse?: ToolResponse;
+  blockedMessage?: string;
   warningText?: string;
 };
 
@@ -55,6 +56,7 @@ export async function guardUiAutomationAgainstStoppedDebugger(opts: {
       'UI automation blocked: app is paused in debugger',
       details,
     ),
+    blockedMessage: `UI automation blocked: app is paused in debugger\n${details}`,
   };
 }
 

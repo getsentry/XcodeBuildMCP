@@ -276,6 +276,11 @@ export async function screenshotLogic(
             log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
           }
 
+          ctx.emit(headerEvent);
+          ctx.emit(statusLine('success', 'Screenshot captured'));
+          ctx.emit(
+            detailTree([{ label: 'Format', value: 'image/png (optimization failed)' }]),
+          );
           ctx.attach({ data: base64Image, mimeType: 'image/png' });
           return;
         }
