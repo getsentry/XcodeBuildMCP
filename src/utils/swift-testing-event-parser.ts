@@ -37,6 +37,7 @@ export function createSwiftTestingEventParser(
   let skippedCount = 0;
 
   let lastIssueDiagnostic: {
+    suiteName?: string;
     testName?: string;
     message: string;
     location?: string;
@@ -50,6 +51,7 @@ export function createSwiftTestingEventParser(
       type: 'test-failure',
       timestamp: now(),
       operation: 'TEST',
+      suite: lastIssueDiagnostic.suiteName,
       test: lastIssueDiagnostic.testName,
       message: lastIssueDiagnostic.message,
       location: lastIssueDiagnostic.location,
@@ -88,6 +90,7 @@ export function createSwiftTestingEventParser(
     const issue = parseSwiftTestingIssueLine(line);
     if (issue) {
       lastIssueDiagnostic = {
+        suiteName: issue.suiteName,
         testName: issue.testName,
         message: issue.message,
         location: issue.location,
