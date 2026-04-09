@@ -3,7 +3,10 @@ import { readFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const CACHE_TTL_MS = 30_000;
+
 let cachedDevices: Map<string, string> | null = null;
+let cacheTimestamp = 0;
 
 interface DeviceCtlEntry {
   identifier: string;
@@ -12,7 +15,9 @@ interface DeviceCtlEntry {
 }
 
 function loadDeviceNames(): Map<string, string> {
-  if (cachedDevices) return cachedDevices;
+  if (cachedDevices && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedDevices;
+  }
 
   const map = new Map<string, string>();
   const tmpFile = join(tmpdir(), `devicectl-list-${process.pid}.json`);
@@ -36,7 +41,7 @@ function loadDeviceNames(): Map<string, string> {
       }
     }
   } catch {
-    // Device list unavailable — return empty map, will fall back to UUID only
+    // Device list unavailable -- return empty map, will fall back to UUID only
   } finally {
     try {
       unlinkSync(tmpFile);
@@ -46,6 +51,7 @@ function loadDeviceNames(): Map<string, string> {
   }
 
   cachedDevices = map;
+  cacheTimestamp = Date.now();
   return map;
 }
 
