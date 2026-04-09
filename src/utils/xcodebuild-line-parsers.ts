@@ -26,6 +26,7 @@ export interface ParsedTestCase {
   suiteName?: string;
   testName: string;
   durationText?: string;
+  caseCount?: number;
 }
 
 export interface ParsedTotals {

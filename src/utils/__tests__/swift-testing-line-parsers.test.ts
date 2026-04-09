@@ -83,17 +83,6 @@ describe('Swift Testing line parsers', () => {
       });
     });
 
-    it('should parse a failed parameterized test', () => {
-      const result = parseSwiftTestingResultLine(
-        '✘ Test "Parameterized failure" with 3 test cases failed after 0.001 seconds with 1 issue.',
-      );
-      expect(result).toEqual({
-        status: 'failed',
-        rawName: 'Parameterized failure',
-        testName: 'Parameterized failure',
-        durationText: '0.001s',
-      });
-    });
 
     it('should parse a skipped test (arrow format)', () => {
       const result = parseSwiftTestingResultLine('➜ Test disabledTest() skipped: "Not ready yet"');

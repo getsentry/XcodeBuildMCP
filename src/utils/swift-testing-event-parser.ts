@@ -100,8 +100,9 @@ export function createSwiftTestingEventParser(
         durationMs,
       });
       lastIssueDiagnostic = null;
-      completedCount += 1;
-      failedCount += 1;
+      const increment = stResult.caseCount ?? 1;
+      completedCount += increment;
+      failedCount += increment;
       emitTestProgress();
       return;
     }
@@ -122,12 +123,13 @@ export function createSwiftTestingEventParser(
 
     // Swift Testing result line: ✔/✘/◇ Test "Name" passed/failed/skipped (non-failure or no pending issue)
     if (stResult) {
-      completedCount += 1;
+      const increment = stResult.caseCount ?? 1;
+      completedCount += increment;
       if (stResult.status === 'failed') {
-        failedCount += 1;
+        failedCount += increment;
       }
       if (stResult.status === 'skipped') {
-        skippedCount += 1;
+        skippedCount += increment;
       }
       emitTestProgress();
       return;

@@ -50,12 +50,16 @@ function normalizeTestFailureLocation(location: string | undefined): string | nu
 function normalizeTestFailureKey(event: TestFailureEvent): string {
   const normalizedLocation = normalizeTestFailureLocation(event.location);
   const normalizedMessage = event.message.trim().toLowerCase();
+  const suite = normalizeTestIdentifier(event.suite);
+  const test = normalizeTestIdentifier(event.test);
 
   if (normalizedLocation) {
-    return `${normalizedLocation}|${normalizedMessage}`;
+    // Include test name but NOT suite -- suite naming disagrees between xcresult
+    // and live parsing (e.g. 'Module.Suite' vs absent). Test name is consistent.
+    return `${test}|${normalizedLocation}|${normalizedMessage}`;
   }
 
-  return `${normalizeTestIdentifier(event.suite)}|${normalizeTestIdentifier(event.test)}|${normalizedMessage}`;
+  return `${suite}|${test}|${normalizedMessage}`;
 }
 
 export interface FinalizeOptions {

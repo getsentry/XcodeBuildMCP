@@ -8,7 +8,7 @@ import {
 // Optional verbose suffix: (aka 'funcName()')
 // Optional parameterized suffix: with N test cases
 const OPTIONAL_AKA = `(?:\\s*\\(aka '[^']*'\\))?`;
-const OPTIONAL_PARAMETERIZED = `(?:\\s+with \\d+ test cases?)?`;
+const OPTIONAL_PARAMETERIZED = `(?:\\s+with (\\d+) test cases?)?`;
 
 /**
  * Parse a Swift Testing result line (passed/failed/skipped).
@@ -29,14 +29,16 @@ export function parseSwiftTestingResultLine(line: string): ParsedTestCase | null
   );
   const passedMatch = line.match(passedRegex);
   if (passedMatch) {
-    const [, name, duration] = passedMatch;
+    const [, name, caseCountStr, duration] = passedMatch;
     const { suiteName, testName } = parseRawTestName(name);
+    const caseCount = caseCountStr ? Number(caseCountStr) : undefined;
     return {
       status: 'passed',
       rawName: name,
       suiteName,
       testName,
       durationText: `${duration}s`,
+      ...(caseCount !== undefined && { caseCount }),
     };
   }
 
@@ -46,14 +48,16 @@ export function parseSwiftTestingResultLine(line: string): ParsedTestCase | null
   );
   const failedMatch = line.match(failedRegex);
   if (failedMatch) {
-    const [, name, duration] = failedMatch;
+    const [, name, caseCountStr, duration] = failedMatch;
     const { suiteName, testName } = parseRawTestName(name);
+    const caseCount = caseCountStr ? Number(caseCountStr) : undefined;
     return {
       status: 'failed',
       rawName: name,
       suiteName,
       testName,
       durationText: `${duration}s`,
+      ...(caseCount !== undefined && { caseCount }),
     };
   }
 
