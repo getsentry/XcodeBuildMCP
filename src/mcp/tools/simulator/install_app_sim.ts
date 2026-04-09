@@ -48,7 +48,10 @@ export async function install_app_simLogic(
 ): Promise<ToolResponse> {
   const appPathExistsValidation = validateFileExists(params.appPath, fileSystem);
   if (!appPathExistsValidation.isValid) {
-    return appPathExistsValidation.errorResponse!;
+    return {
+      content: [{ type: 'text', text: appPathExistsValidation.errorMessage! }],
+      isError: true,
+    };
   }
 
   log('info', `Starting xcrun simctl install request for simulator ${params.simulatorId}`);

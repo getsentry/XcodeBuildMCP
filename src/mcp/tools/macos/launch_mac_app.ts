@@ -30,7 +30,7 @@ export async function launch_mac_appLogic(
   // Validate that the app file exists
   const fileExistsValidation = validateFileExists(params.appPath, fileSystem);
   if (!fileExistsValidation.isValid) {
-    return fileExistsValidation.errorResponse!;
+    return { content: [{ type: 'text', text: fileExistsValidation.errorMessage! }], isError: true };
   }
 
   log('info', `Starting launch macOS app request for ${params.appPath}`);

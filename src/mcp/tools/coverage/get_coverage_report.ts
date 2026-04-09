@@ -65,7 +65,7 @@ export async function get_coverage_reportLogic(
 
   const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
   if (!fileExistsValidation.isValid) {
-    return fileExistsValidation.errorResponse!;
+    return { content: [{ type: 'text', text: fileExistsValidation.errorMessage! }], isError: true };
   }
 
   log('info', `Getting coverage report from: ${xcresultPath}`);
