@@ -2,40 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { schema, handler, discover_projsLogic, discoverProjects } from '../discover_projs.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
-import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-const runLogic = async (logic: () => Promise<unknown>) => {
-  const { result, run } = createMockToolHandlerContext();
-  const response = await run(logic);
-
-  if (
-    response &&
-    typeof response === 'object' &&
-    'content' in (response as Record<string, unknown>)
-  ) {
-    return response as {
-      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
-      isError?: boolean;
-      nextStepParams?: unknown;
-    };
-  }
-
-  const text = result.text();
-  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
-  const imageContent = result.attachments.map((attachment) => ({
-    type: 'image' as const,
-    data: attachment.data,
-    mimeType: attachment.mimeType,
-  }));
-
-  return {
-    content: [...textContent, ...imageContent],
-    isError: result.isError() ? true : undefined,
-    nextStepParams: result.nextStepParams,
-    attachments: result.attachments,
-    text,
-  };
-};
 
 describe('discover_projs plugin', () => {
   describe('Export Field Validation (Literal)', () => {
