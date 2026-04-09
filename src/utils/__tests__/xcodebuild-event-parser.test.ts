@@ -279,6 +279,21 @@ describe('xcodebuild-event-parser', () => {
     expect(types).toContain('test-failure');
   });
 
+  it('increments counts by caseCount for parameterized Swift Testing results', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: '✔ Test "Parameterized test" with 3 test cases passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const progress = events.filter((e) => e.type === 'test-progress');
+    expect(progress).toHaveLength(1);
+    if (progress[0].type === 'test-progress') {
+      expect(progress[0].completed).toBe(3);
+    }
+  });
+
   it('skips Test Suite and Testing started noise lines without emitting events', () => {
     const events = collectEvents('TEST', [
       { source: 'stdout', text: "Test Suite 'All tests' started at 2025-01-01 00:00:00.000.\n" },
