@@ -62,7 +62,7 @@ export function parseRawTestName(rawName: string): { suiteName?: string; testNam
 
   const slashParts = rawName.split('/').filter(Boolean);
   if (slashParts.length >= 3) {
-    return { suiteName: `${slashParts[0]}/${slashParts[1]}`, testName: slashParts[2] };
+    return { suiteName: slashParts.slice(0, -1).join('/'), testName: slashParts.at(-1)! };
   }
 
   if (slashParts.length === 2) {
