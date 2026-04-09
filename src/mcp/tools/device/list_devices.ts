@@ -15,7 +15,7 @@ const listDevicesSchema = z.object({});
 type ListDevicesParams = z.infer<typeof listDevicesSchema>;
 
 function isAvailableState(state: string): boolean {
-  return state === 'Available' || state === 'Available (WiFi)' || state === 'Connected';
+  return state === 'Available' || state === 'Connected';
 }
 
 const PLATFORM_KEYWORDS: Array<{ keywords: string[]; label: string }> = [
@@ -339,6 +339,10 @@ export async function list_devicesLogic(
       for (const event of events) {
         ctx.emit(event);
       }
+      ctx.nextStepParams = {
+        build_device: { scheme: 'YOUR_SCHEME', deviceId: 'UUID_FROM_ABOVE' },
+        install_app_device: { deviceId: 'UUID_FROM_ABOVE', appPath: 'PATH_TO_APP' },
+      };
     },
     {
       header: headerEvent,

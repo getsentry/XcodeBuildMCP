@@ -1,13 +1,5 @@
 import { XcodePlatform } from '../../../types/common.ts';
 
-export {
-  getBuildSettingsDestination,
-  extractAppPathFromBuildSettingsOutput,
-  resolveAppPathFromBuildSettings,
-} from '../../../utils/app-path-resolver.ts';
-
-export type { ResolveAppPathFromBuildSettingsParams } from '../../../utils/app-path-resolver.ts';
-
 export type DevicePlatform = 'iOS' | 'watchOS' | 'tvOS' | 'visionOS';
 
 export function mapDevicePlatform(platform?: DevicePlatform): XcodePlatform {
