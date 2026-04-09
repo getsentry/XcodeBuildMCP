@@ -9,6 +9,7 @@ import {
   parseTestCaseLine,
   parseTotalsLine,
   parseFailureDiagnostic,
+  parseDurationMs,
 } from './xcodebuild-line-parsers.ts';
 
 export interface SwiftTestingEventParser {
@@ -84,6 +85,27 @@ export function createSwiftTestingEventParser(
       return;
     }
 
+    // Check result line BEFORE flushing so we can attach duration to pending issue
+    const stResult = parseSwiftTestingResultLine(line);
+    if (stResult && stResult.status === 'failed' && lastIssueDiagnostic) {
+      const durationMs = parseDurationMs(stResult.durationText);
+      onEvent({
+        type: 'test-failure',
+        timestamp: now(),
+        operation: 'TEST',
+        suite: lastIssueDiagnostic.suiteName,
+        test: lastIssueDiagnostic.testName,
+        message: lastIssueDiagnostic.message,
+        location: lastIssueDiagnostic.location,
+        durationMs,
+      });
+      lastIssueDiagnostic = null;
+      completedCount += 1;
+      failedCount += 1;
+      emitTestProgress();
+      return;
+    }
+
     flushPendingIssue();
 
     // Swift Testing issue line: ✘ Test "Name" recorded an issue at file:line:col: message
@@ -98,13 +120,9 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // Swift Testing result line: ✔/✘/◇ Test "Name" passed/failed/skipped
-    const stResult = parseSwiftTestingResultLine(line);
+    // Swift Testing result line: ✔/✘/◇ Test "Name" passed/failed/skipped (non-failure or no pending issue)
     if (stResult) {
       completedCount += 1;
-      if (stResult.status === 'failed') {
-        failedCount += 1;
-      }
       if (stResult.status === 'skipped') {
         skippedCount += 1;
       }

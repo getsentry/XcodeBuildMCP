@@ -76,7 +76,7 @@ const IGNORED_NOISE_PATTERNS = [
   /^(?:COMPILER_INDEX_STORE_ENABLE|ONLY_ACTIVE_ARCH)\s*=\s*.+$/u,
   /^Resolve Package Graph$/u,
   /^Resolved source packages:$/u,
-  /^\s*[A-Za-z0-9_.-]+:\s+.+$/u,
+  /^\s*[A-Za-z0-9_.-]+:\s+https?:\/\/.+$/u,
   /^--- xcodebuild: WARNING: Using the first of multiple matching destinations:$/u,
   /^\{\s*platform:.+\}$/u,
   /^(?:ComputePackagePrebuildTargetDependencyGraph|Prepare packages|CreateBuildRequest|SendProjectDescription|CreateBuildOperation|ComputeTargetDependencyGraph|GatherProvisioningInputs|CreateBuildDescription)$/u,

@@ -225,11 +225,25 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         accept(tailEvent);
       }
 
-      return { ...state };
+      return {
+        ...state,
+        events: [...state.events],
+        milestones: [...state.milestones],
+        warnings: [...state.warnings],
+        errors: [...state.errors],
+        testFailures: [...state.testFailures],
+      };
     },
 
     snapshot(): Readonly<XcodebuildRunState> {
-      return { ...state };
+      return {
+        ...state,
+        events: [...state.events],
+        milestones: [...state.milestones],
+        warnings: [...state.warnings],
+        errors: [...state.errors],
+        testFailures: [...state.testFailures],
+      };
     },
 
     highestStageRank(): number {
