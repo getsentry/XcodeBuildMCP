@@ -199,7 +199,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         const reconciledFailedTests = Math.max(state.failedTests, state.testFailures.length);
         const reconciledPassedTests = Math.max(
           0,
-          state.completedTests - state.failedTests - state.skippedTests,
+          state.completedTests - reconciledFailedTests - state.skippedTests,
         );
         const reconciledTotalTests =
           operation === 'TEST'

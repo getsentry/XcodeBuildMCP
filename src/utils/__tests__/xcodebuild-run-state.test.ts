@@ -328,8 +328,8 @@ describe('xcodebuild-run-state', () => {
 
     expect(summary).toBeDefined();
     if (summary?.type === 'summary') {
-      expect(summary.totalTests).toBe(7);
-      expect(summary.passedTests).toBe(5);
+      expect(summary.totalTests).toBe(6);
+      expect(summary.passedTests).toBe(4);
       expect(summary.failedTests).toBe(2);
       expect(summary.skippedTests).toBe(0);
     }
