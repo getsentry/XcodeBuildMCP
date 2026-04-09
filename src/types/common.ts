@@ -137,6 +137,7 @@ export interface PlatformBuildOptions {
   simulatorId?: string;
   deviceId?: string;
   useLatestOS?: boolean;
+  packageCachePath?: string;
   arch?: string;
   logPrefix: string;
 }

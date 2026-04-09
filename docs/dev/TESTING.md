@@ -20,11 +20,16 @@ This document provides comprehensive testing guidelines for XcodeBuildMCP plugin
 
 ### 🚨 CRITICAL: External Dependency Mocking Rules
 
-### ABSOLUTE RULE: External side effects must use dependency injection utilities
+### When to use dependency-injection executors
 
-### Use dependency-injection mocks for EXTERNAL dependencies:
-- `createMockExecutor()` / `createNoopExecutor()` for command execution (`xcrun`, `xcodebuild`, AXe, etc.)
-- `createMockFileSystemExecutor()` / `createNoopFileSystemExecutor()` for file system interactions
+`CommandExecutor` / `FileSystemExecutor` DI is required for **MCP tool logic functions** that orchestrate complex, long-running processes with sub-processes (e.g., `xcodebuild`, multi-step build pipelines). Standard vitest mocking produces race conditions with these because sub-process ordering is non-deterministic.
+
+- `createMockExecutor()` / `createNoopExecutor()` for command execution in tool logic
+- `createMockFileSystemExecutor()` / `createNoopFileSystemExecutor()` for file system interactions in tool logic
+
+### When standard vitest mocking is fine
+
+Standalone utility modules that invoke simple, short-lived commands (e.g., `xcrun devicectl list`, `xcrun xcresulttool get`) may use direct `child_process`/`fs` imports and be tested with standard vitest mocking (`vi.fn`, `vi.mock`, `vi.spyOn`, etc.). This is simpler and perfectly adequate for deterministic, single-command utilities.
 
 ### Internal mocking guidance:
 - Vitest mocking (`vi.fn`, `vi.mock`, `vi.spyOn`, `.mockResolvedValue`, etc.) is allowed for internal modules and in-memory collaborators
@@ -32,16 +37,15 @@ This document provides comprehensive testing guidelines for XcodeBuildMCP plugin
 
 ### Still forbidden:
 - Hitting real external systems in unit tests (real `xcodebuild`, `xcrun`, AXe, filesystem writes/reads outside test harness)
-- Bypassing dependency injection for external effects
 
 ### OUR CORE PRINCIPLE
 
-**Simple Rule**: Use dependency-injection mock executors for external boundaries; use Vitest mocking only for internal behavior.
+**Simple Rule**: Use dependency-injection mock executors for complex process orchestration in tool logic; use standard vitest mocking for simple utility modules and internal behavior.
 
 **Why This Rule Exists**:
-1. **Reliability**: External side effects stay deterministic and hermetic
-2. **Clarity**: Internal collaboration assertions remain concise and readable
-3. **Architectural Enforcement**: External boundaries are explicit in tool logic signatures
+1. **Reliability**: Complex multi-process orchestration stays deterministic and hermetic via DI executors
+2. **Simplicity**: Simple utilities use standard vitest mocking without unnecessary abstraction
+3. **Architectural Enforcement**: External boundaries for complex processes are explicit in tool logic signatures
 4. **Maintainability**: Tests fail for behavior regressions, not incidental environment differences
 
 ### Integration Testing with Dependency Injection
@@ -111,7 +115,7 @@ Test → Plugin Handler → utilities → [DEPENDENCY INJECTION] createMockExecu
 
 ### Handler Requirements
 
-All plugin handlers must support dependency injection:
+MCP tool logic functions that orchestrate complex processes must support dependency injection:
 
 ```typescript
 export function tool_nameLogic(
@@ -134,12 +138,9 @@ export default {
 };
 ```
 
-**Important**: The dependency injection pattern applies to ALL handlers, including:
-- Tool handlers
-- Resource handlers
-- Any future handler types (prompts, etc.)
+**Important**: The dependency injection pattern applies to tool and resource handler logic that orchestrates complex, long-running processes (e.g., `xcodebuild`). Standalone utility modules with simple commands may use direct imports and standard vitest mocking.
 
-Always use default parameter values (e.g., `= getDefaultCommandExecutor()`) to ensure production code works without explicit executor injection, while tests can override with mock executors.
+Always use default parameter values (e.g., `= getDefaultCommandExecutor()`) in tool logic to ensure production code works without explicit executor injection, while tests can override with mock executors.
 
 ### Test Requirements
 

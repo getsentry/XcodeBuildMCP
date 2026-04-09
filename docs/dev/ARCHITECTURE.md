@@ -418,13 +418,13 @@ Not all parts are required for every tool. For example, `swift_package_build` ha
 
 ### Testing Principles
 
-XcodeBuildMCP uses a **Dependency Injection (DI)** pattern for testing external boundaries (command execution, filesystem, and other side effects). Vitest mocking libraries (`vi.mock`, `vi.fn`, etc.) are acceptable for internal collaborators when needed. This keeps tests robust while preserving deterministic behavior at external boundaries.
+XcodeBuildMCP uses a **Dependency Injection (DI)** pattern for MCP tool logic functions that orchestrate complex, long-running processes with sub-processes (e.g., `xcodebuild`), where standard vitest mocking produces race conditions. Standalone utility modules with simple commands may use direct `child_process`/`fs` imports and standard vitest mocking. Vitest mocking libraries (`vi.mock`, `vi.fn`, etc.) are also acceptable for internal collaborators.
 
 For detailed guidelines, see the [Testing Guide](TESTING.md).
 
 ### Test Structure Example
 
-Tests inject mock "executors" for external interactions like command-line execution or file system access. This allows for deterministic testing of tool logic without mocking the implementation itself. The project provides helper functions like `createMockExecutor` and `createMockFileSystemExecutor` in `src/test-utils/mock-executors.ts` to facilitate this pattern.
+Tests for MCP tool logic inject mock "executors" for complex process orchestration (e.g., xcodebuild). This allows for deterministic testing without race conditions from non-deterministic sub-process ordering. The project provides helper functions like `createMockExecutor` and `createMockFileSystemExecutor` in `src/test-utils/mock-executors.ts`. Standalone utility modules with simple commands use standard vitest mocking.
 
 ```typescript
 import { describe, it, expect } from 'vitest';

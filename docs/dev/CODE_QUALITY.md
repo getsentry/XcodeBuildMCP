@@ -53,17 +53,18 @@ XcodeBuildMCP enforces several architectural patterns that cannot be expressed t
 
 ### 1. Dependency Injection Pattern
 
-**Rule**: All tools must use dependency injection for external interactions.
+**Rule**: MCP tool logic functions that orchestrate complex, long-running processes with sub-processes (e.g., `xcodebuild`) must use dependency injection for external interactions. This is because standard vitest mocking produces race conditions when sub-process ordering is non-deterministic.
+
+Standalone utility modules that invoke simple, short-lived commands (e.g., `xcrun devicectl list`, `xcrun xcresulttool get`) may use direct `child_process`/`fs` imports and be tested with standard vitest mocking.
 
 ✅ **Allowed**:
-- `createMockExecutor()` for command execution mocking
-- `createMockFileSystemExecutor()` for file system mocking
-- Logic functions accepting `executor?: CommandExecutor` parameter
+- `createMockExecutor()` / `createMockFileSystemExecutor()` for complex process orchestration in tool logic
+- Logic functions accepting `executor?: CommandExecutor` parameter for xcodebuild and similar pipelines
+- Direct `child_process`/`fs` imports in standalone utility modules with simple commands, tested via vitest mocking
 
 ❌ **Forbidden**:
-- Direct calls to `execSync`, `spawn`, or `exec` in production code
 - Testing handler functions directly
-- Real external side effects in unit tests (xcodebuild/xcrun/filesystem writes outside mocks)
+- Real external side effects in unit tests (real `xcodebuild`, `xcrun`, AXe, filesystem writes/reads outside test harness)
 
 ### 2. Handler Signature Compliance
 

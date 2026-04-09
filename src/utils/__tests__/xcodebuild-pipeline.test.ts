@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
 import { STAGE_RANK } from '../../types/pipeline-events.ts';
 import type { PipelineEvent } from '../../types/pipeline-events.ts';
@@ -146,7 +146,7 @@ describe('xcodebuild-pipeline', () => {
       truncated: false,
     });
 
-    const result = pipeline.finalize(true, 100);
+    pipeline.finalize(true, 100);
 
     const discoveryEvents = emittedEvents.filter((e) => e.type === 'test-discovery');
     expect(discoveryEvents).toHaveLength(1);

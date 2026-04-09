@@ -1,5 +1,5 @@
 import type { RuntimeKind } from '../../runtime/types.ts';
-import type { NextStep } from '../../types/common.ts';
+import type { NextStep, OutputStyle, ToolResponse } from '../../types/common.ts';
 import { toKebabCase } from '../../runtime/naming.ts';
 
 function resolveLabel(step: NextStep): string {
@@ -89,4 +89,32 @@ export function renderNextStepsSection(steps: NextStep[], runtime: RuntimeKind):
   const lines = sorted.map((step, index) => `${index + 1}. ${renderNextStep(step, runtime)}`);
 
   return `Next steps:\n${lines.join('\n')}`;
+}
+
+export function processToolResponse(
+  response: ToolResponse,
+  runtime: RuntimeKind,
+  style: OutputStyle = 'normal',
+): ToolResponse {
+  const { nextSteps, ...rest } = response;
+
+  if (!nextSteps || nextSteps.length === 0 || style === 'minimal') {
+    return { ...rest };
+  }
+
+  const nextStepsSection = renderNextStepsSection(nextSteps, runtime);
+
+  const processedContent = response.content.map((item, index) => {
+    if (item.type === 'text' && index === response.content.length - 1) {
+      return { ...item, text: item.text + nextStepsSection };
+    }
+    return item;
+  });
+
+  const hasTextContent = response.content.some((item) => item.type === 'text');
+  if (!hasTextContent && nextStepsSection) {
+    processedContent.push({ type: 'text', text: nextStepsSection.trim() });
+  }
+
+  return { ...rest, content: processedContent };
 }
