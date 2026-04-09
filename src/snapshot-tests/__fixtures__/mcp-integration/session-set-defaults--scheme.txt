@@ -1,0 +1,23 @@
+
+⚙️ Set Defaults
+
+   Scheme: CalculatorApp
+   Profile: (default)
+
+✅ Session defaults updated (default profile)
+  ├ projectPath: (not set)
+  ├ workspacePath: (not set)
+  ├ scheme: CalculatorApp
+  ├ configuration: (not set)
+  ├ simulatorName: (not set)
+  ├ simulatorId: (not set)
+  ├ simulatorPlatform: (not set)
+  ├ deviceId: (not set)
+  ├ useLatestOS: (not set)
+  ├ arch: (not set)
+  ├ suppressWarnings: (not set)
+  ├ derivedDataPath: (not set)
+  ├ preferXcodebuild: (not set)
+  ├ platform: (not set)
+  ├ bundleId: (not set)
+  └ env: (not set)

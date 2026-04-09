@@ -1,0 +1,3 @@
+
+❌ Missing required session defaults: Provide a project or workspace
+Set with: session-set-defaults { "projectPath": "..." } OR session-set-defaults { "workspacePath": "..." }
