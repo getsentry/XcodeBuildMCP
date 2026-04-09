@@ -147,12 +147,13 @@ export function createSwiftTestingEventParser(
     // XCTest: Test Case '...' passed/failed (for mixed output from `swift test`)
     const xcTestCase = parseTestCaseLine(line);
     if (xcTestCase) {
-      completedCount += 1;
+      const xcIncrement = xcTestCase.caseCount ?? 1;
+      completedCount += xcIncrement;
       if (xcTestCase.status === 'failed') {
-        failedCount += 1;
+        failedCount += xcIncrement;
       }
       if (xcTestCase.status === 'skipped') {
-        skippedCount += 1;
+        skippedCount += xcIncrement;
       }
       emitTestProgress();
       return;

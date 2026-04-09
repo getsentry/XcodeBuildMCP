@@ -234,10 +234,12 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     suiteName?: string;
     testName?: string;
     durationText?: string;
+    caseCount?: number;
   }): void {
-    completedCount += 1;
+    const increment = testCase.caseCount ?? 1;
+    completedCount += increment;
     if (testCase.status === 'failed') {
-      failedCount += 1;
+      failedCount += increment;
       applyFailureDuration(
         testCase.suiteName,
         testCase.testName,
@@ -245,7 +247,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       );
     }
     if (testCase.status === 'skipped') {
-      skippedCount += 1;
+      skippedCount += increment;
     }
     emitTestProgress();
   }
