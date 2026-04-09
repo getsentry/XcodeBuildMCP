@@ -200,7 +200,7 @@ describe('Swift Testing line parsers', () => {
       expect(result).toEqual({
         executed: 6,
         failed: 1,
-        durationText: '0.001s',
+        displayDurationText: '0.001s',
       });
     });
 
@@ -211,7 +211,7 @@ describe('Swift Testing line parsers', () => {
       expect(result).toEqual({
         executed: 5,
         failed: 0,
-        durationText: '0.003s',
+        displayDurationText: '0.003s',
       });
     });
 
@@ -222,7 +222,7 @@ describe('Swift Testing line parsers', () => {
       expect(result).toEqual({
         executed: 5,
         failed: 3,
-        durationText: '0.001s',
+        displayDurationText: '0.001s',
       });
     });
 

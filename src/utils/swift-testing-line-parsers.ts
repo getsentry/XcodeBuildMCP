@@ -140,7 +140,7 @@ export function parseSwiftTestingRunSummary(line: string): ParsedTotals | null {
   }
 
   const total = Number(match[1]);
-  const durationText = `${match[2]}s`;
+  const displayDurationText = `${match[2]}s`;
 
   // Swift Testing reports "issues" not "failed tests" -- a single test can produce
   // multiple issues (e.g. multiple #expect failures). This is the best available
@@ -150,7 +150,7 @@ export function parseSwiftTestingRunSummary(line: string): ParsedTotals | null {
   const issueMatch = line.match(/with (\d+) issues?/u);
   const failed = issueMatch ? Number(issueMatch[1]) : 0;
 
-  return { executed: total, failed, durationText };
+  return { executed: total, failed, displayDurationText };
 }
 
 /**

@@ -32,7 +32,7 @@ export interface ParsedTestCase {
 export interface ParsedTotals {
   executed: number;
   failed: number;
-  durationText?: string;
+  displayDurationText?: string;
 }
 
 export interface ParsedFailureDiagnostic {
@@ -104,7 +104,7 @@ export function parseTotalsLine(line: string): ParsedTotals | null {
   if (!match) {
     return null;
   }
-  return { executed: Number(match[1]), failed: Number(match[2]), durationText: match[3] };
+  return { executed: Number(match[1]), failed: Number(match[2]), displayDurationText: match[3] };
 }
 
 export function parseFailureDiagnostic(line: string): ParsedFailureDiagnostic | null {

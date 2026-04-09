@@ -74,8 +74,6 @@ const IGNORED_NOISE_PATTERNS = [
   /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+xcodebuild\[.+\]\s+Writing error result bundle to\s+/u,
   /^Build settings from command line:$/u,
   /^(?:COMPILER_INDEX_STORE_ENABLE|ONLY_ACTIVE_ARCH)\s*=\s*.+$/u,
-  /^Resolve Package Graph$/u,
-  /^Resolved source packages:$/u,
   /^\s*[A-Za-z0-9_.-]+:\s+https?:\/\/.+$/u,
   /^--- xcodebuild: WARNING: Using the first of multiple matching destinations:$/u,
   /^\{\s*platform:.+\}$/u,
