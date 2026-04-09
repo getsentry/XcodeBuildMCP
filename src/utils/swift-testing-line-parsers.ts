@@ -110,6 +110,11 @@ export function parseSwiftTestingRunSummary(line: string): ParsedTotals | null {
   const total = Number(match[1]);
   const durationText = `${match[2]}s`;
 
+  // Swift Testing reports "issues" not "failed tests" -- a single test can produce
+  // multiple issues (e.g. multiple #expect failures). This is the best available
+  // approximation; the framework doesn't report a distinct failed-test count in its
+  // summary line. Downstream reconciliation via Math.max(failedTests, testFailures.length)
+  // partially mitigates overcounting.
   const issueMatch = line.match(/with (\d+) issues?/u);
   const failed = issueMatch ? Number(issueMatch[1]) : 0;
 

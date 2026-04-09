@@ -176,6 +176,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const durationMs = pendingFailureDurations.get(key);
     if (durationMs !== undefined) {
+      pendingFailureDurations.delete(key);
       emitFailureEvent({ ...failure, durationMs });
       return;
     }
@@ -211,6 +212,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       emitFailureEvent({ ...failure, durationMs });
     }
     pendingFailureDiagnostics.delete(key);
+    pendingFailureDurations.delete(key);
   }
 
   function emitTestProgress(): void {
