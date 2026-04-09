@@ -23,7 +23,7 @@ describe('Swift Testing line parsers', () => {
 
     it('should parse a passed test with verbose aka suffix', () => {
       const result = parseSwiftTestingResultLine(
-        "✔ Test \"String operations\" (aka 'stringTest()') passed after 0.001 seconds.",
+        '✔ Test "String operations" (aka \'stringTest()\') passed after 0.001 seconds.',
       );
       expect(result).toEqual({
         status: 'passed',
@@ -59,7 +59,7 @@ describe('Swift Testing line parsers', () => {
 
     it('should parse a failed test with verbose aka suffix', () => {
       const result = parseSwiftTestingResultLine(
-        "✘ Test \"Expected failure\" (aka 'deliberateFailure()') failed after 0.001 seconds with 1 issue.",
+        '✘ Test "Expected failure" (aka \'deliberateFailure()\') failed after 0.001 seconds with 1 issue.',
       );
       expect(result).toEqual({
         status: 'failed',
@@ -129,7 +129,7 @@ describe('Swift Testing line parsers', () => {
 
     it('should parse an issue with verbose aka suffix', () => {
       const result = parseSwiftTestingIssueLine(
-        "✘ Test \"Expected failure\" (aka 'deliberateFailure()') recorded an issue at AuditTests.swift:5:5: Expectation failed: true == false",
+        '✘ Test "Expected failure" (aka \'deliberateFailure()\') recorded an issue at AuditTests.swift:5:5: Expectation failed: true == false',
       );
       expect(result).toEqual({
         rawTestName: 'Expected failure',
@@ -164,7 +164,7 @@ describe('Swift Testing line parsers', () => {
 
     it('should parse an issue without location with verbose aka suffix', () => {
       const result = parseSwiftTestingIssueLine(
-        "✘ Test \"Some test\" (aka 'someFunc()') recorded an issue: Something went wrong",
+        '✘ Test "Some test" (aka \'someFunc()\') recorded an issue: Something went wrong',
       );
       expect(result).toEqual({
         rawTestName: 'Some test',

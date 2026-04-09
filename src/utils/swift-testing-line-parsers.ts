@@ -60,8 +60,7 @@ export function parseSwiftTestingResultLine(line: string): ParsedTestCase | null
   // Skipped: ➜ Test funcName() skipped: "reason"
   // Also handle legacy format: ◇ Test "Name" skipped
   const skippedMatch =
-    line.match(/^[➜] Test (\S+?)(?:\(\))? skipped/u) ??
-    line.match(/^[◇] Test "(.+)" skipped/u);
+    line.match(/^[➜] Test (\S+?)(?:\(\))? skipped/u) ?? line.match(/^[◇] Test "(.+)" skipped/u);
   if (skippedMatch) {
     const rawName = skippedMatch[1];
     const { suiteName, testName } = parseRawTestName(rawName);
@@ -105,10 +104,7 @@ export function parseSwiftTestingIssueLine(line: string): ParsedFailureDiagnosti
   }
 
   // Match without location
-  const simpleRegex = new RegExp(
-    `^[✘] Test "(.+)"${OPTIONAL_AKA} recorded an issue: (.+)$`,
-    'u',
-  );
+  const simpleRegex = new RegExp(`^[✘] Test "(.+)"${OPTIONAL_AKA} recorded an issue: (.+)$`, 'u');
   const simpleMatch = line.match(simpleRegex);
   if (simpleMatch) {
     const [, rawTestName, message] = simpleMatch;
