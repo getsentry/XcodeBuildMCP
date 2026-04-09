@@ -129,7 +129,8 @@ export async function build_run_simLogic(
           projectPath: params.projectPath,
           workspacePath: params.workspacePath,
           scheme: params.scheme,
-          simulatorName: params.simulatorId ? undefined : params.simulatorName,
+          simulatorId: params.simulatorId,
+          simulatorName: params.simulatorName,
         },
         executor,
       );
