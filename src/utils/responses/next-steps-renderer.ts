@@ -106,7 +106,7 @@ export function processToolResponse(
 
   const processedContent = response.content.map((item, index) => {
     if (item.type === 'text' && index === response.content.length - 1) {
-      return { ...item, text: item.text + nextStepsSection };
+      return { ...item, text: item.text + '\n\n' + nextStepsSection };
     }
     return item;
   });
