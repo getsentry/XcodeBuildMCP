@@ -33,7 +33,7 @@ function resolveStageFromLine(line: string): XcodebuildStage | null {
   }
   if (
     /^Testing started$/u.test(line) ||
-    /^Test Suite .+ started/u.test(line) ||
+    /^Test [Ss]uite .+ started/u.test(line) ||
     /^[◇] Test run started/u.test(line)
   ) {
     return 'RUN_TESTS';
@@ -373,7 +373,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       return;
     }
 
-    if (/^Test Suite /u.test(line)) {
+    if (/^Test [Ss]uite /u.test(line)) {
       return;
     }
 

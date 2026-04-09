@@ -141,6 +141,7 @@ export function parseDurationMs(durationText?: string): number | undefined {
 }
 
 export function parseBuildErrorDiagnostic(line: string): ParsedBuildError | null {
+  // File path with line number: /path/to/File.swift:42:10: error: message
   const locationMatch = line.match(/^(.*?):(\d+)(?::\d+)?: (?:fatal error|error): (.+)$/u);
   if (locationMatch) {
     const [, filePath, lineNumber, message] = locationMatch;
@@ -151,6 +152,18 @@ export function parseBuildErrorDiagnostic(line: string): ParsedBuildError | null
     };
   }
 
+  // Path-based error without line number: /path/to/Project.xcodeproj: error: message
+  const pathErrorMatch = line.match(/^(\/[^:]+): (?:fatal error|error): (.+)$/u);
+  if (pathErrorMatch) {
+    const [, filePath, message] = pathErrorMatch;
+    return {
+      location: filePath,
+      message,
+      renderedLine: line,
+    };
+  }
+
+  // Prefixed error: xcodebuild: error: message / error: message
   const rawMatch = line.match(/^(?:[\w-]+:\s+)?(?:fatal error|error): (.+)$/u);
   if (!rawMatch) {
     return null;
