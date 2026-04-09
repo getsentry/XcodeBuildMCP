@@ -15,7 +15,7 @@ Settings
       ALLOW_TARGET_PLATFORM_SPECIALIZATION = NO
       ALTERNATE_GROUP = staff
       ALTERNATE_MODE = u+w,go-w,a+rX
-      ALTERNATE_OWNER = cameroncooke
+      ALTERNATE_OWNER = <USER>
       ALTERNATIVE_DISTRIBUTION_WEB = NO
       ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO
       ALWAYS_SEARCH_USER_PATHS = NO
@@ -293,7 +293,7 @@ Settings
       INSTALL_DIR = /tmp/CalculatorApp.dst/Applications
       INSTALL_GROUP = staff
       INSTALL_MODE_FLAG = u+w,go-w,a+rX
-      INSTALL_OWNER = cameroncooke
+      INSTALL_OWNER = <USER>
       INSTALL_PATH = /Applications
       INSTALL_ROOT = /tmp/CalculatorApp.dst
       IPHONEOS_DEPLOYMENT_TARGET = 17.0
@@ -562,13 +562,13 @@ Settings
       TREAT_MISSING_BASELINES_AS_TEST_FAILURES = NO
       TREAT_MISSING_SCRIPT_PHASE_OUTPUTS_AS_ERRORS = NO
       TVOS_DEPLOYMENT_TARGET = 26.4
-      UID = 501
+      UID = <UID>
       UNINSTALLED_PRODUCTS_DIR = <HOME>/Library/Developer/Xcode/DerivedData/CalculatorApp-<HASH>/Build/Intermediates.noindex/UninstalledProducts
       UNLOCALIZED_RESOURCES_FOLDER_PATH = CalculatorApp.app
       UNLOCALIZED_RESOURCES_FOLDER_PATH_SHALLOW_BUNDLE_NO = CalculatorApp.app/Resources
       UNLOCALIZED_RESOURCES_FOLDER_PATH_SHALLOW_BUNDLE_YES = CalculatorApp.app
       UNSTRIPPED_PRODUCT = NO
-      USER = cameroncooke
+      USER = <USER>
       USER_APPS_DIR = <HOME>/Applications
       USER_LIBRARY_DIR = <HOME>/Library
       USE_DYNAMIC_NO_PIC = YES
@@ -579,7 +579,7 @@ Settings
       VALID_ARCHS = arm64 arm64e armv7 armv7s
       VERBOSE_PBXCP = NO
       VERSIONPLIST_PATH = CalculatorApp.app/version.plist
-      VERSION_INFO_BUILDER = cameroncooke
+      VERSION_INFO_BUILDER = <USER>
       VERSION_INFO_FILE = CalculatorApp_vers.c
       VERSION_INFO_STRING = "@(#)PROGRAM:CalculatorApp  PROJECT:CalculatorApp-1"
       WATCHOS_DEPLOYMENT_TARGET = 26.4

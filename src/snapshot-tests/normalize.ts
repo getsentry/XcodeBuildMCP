@@ -87,6 +87,16 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(/~\//g, '<HOME>/');
   normalized = normalized.replace(/(?<=\s|:)~(?=\s|$)/gm, '<HOME>');
 
+  const username = os.userInfo().username;
+  normalized = normalized.replace(
+    new RegExp(`((?:ALTERNATE_OWNER|INSTALL_OWNER|USER|VERSION_INFO_BUILDER)\\s*=\\s*)${escapeRegex(username)}`, 'g'),
+    '$1<USER>',
+  );
+  normalized = normalized.replace(
+    new RegExp(`(UID\\s*=\\s*)${os.userInfo().uid}`, 'g'),
+    '$1<UID>',
+  );
+
   const tmpDir = os.tmpdir();
   normalized = normalized.replace(
     new RegExp(escapeRegex(tmpDir) + '/[A-Za-z0-9._-]+/', 'g'),
