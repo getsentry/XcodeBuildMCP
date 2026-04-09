@@ -99,8 +99,8 @@ export function normalizeSnapshotOutput(text: string): string {
 
   const tmpDir = os.tmpdir();
   normalized = normalized.replace(
-    new RegExp(escapeRegex(tmpDir) + '/[A-Za-z0-9._-]+/', 'g'),
-    '<TMPDIR>/',
+    new RegExp(escapeRegex(tmpDir) + '/[A-Za-z0-9._-]+(?=/|[^A-Za-z0-9._/-]|$)', 'g'),
+    '<TMPDIR>',
   );
 
   normalized = normalized.replace(DERIVED_DATA_HASH_REGEX, '$1-<HASH>');
