@@ -77,18 +77,6 @@ xcodebuildmcp simulator launch-app --simulator-id <UDID> --bundle-id io.sentry.M
 xcodebuildmcp simulator build-and-run --scheme MyApp --project-path ./MyApp.xcodeproj
 ```
 
-### Log Capture Workflow
-
-```bash
-# Start log capture
-xcodebuildmcp logging start-simulator-log-capture --simulator-id <UDID> --bundle-id io.sentry.MyApp
-
-> Log capture started successfully. Session ID: 51e2142a-1a99-442a-af01-0586540043df.
-
-# Stop and retrieve logs
-xcodebuildmcp logging stop-simulator-log-capture --session-id <SESSION_ID>
-```
-
 ### Testing
 
 ```bash
@@ -219,7 +207,6 @@ Most tools run directly without the daemon:
 
 ### Stateful Tools (require daemon)
 Some tools maintain state and route through the daemon:
-- Log capture: `start-simulator-log-capture`, `stop-simulator-log-capture`
 - Video recording: `record-video`
 - Debugging: `attach`, `continue`, etc.
 - Background processes: `run`, `stop`
