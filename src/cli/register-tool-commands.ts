@@ -1,7 +1,6 @@
 import type { Argv } from 'yargs';
 import yargsParser from 'yargs-parser';
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
-import type { OutputStyle } from '../types/common.ts';
 import { DefaultToolInvoker } from '../runtime/tool-invoker.ts';
 import { schemaToYargsOptions, getUnsupportedSchemaKeys } from './schema-to-yargs.ts';
 import { convertArgvToToolParams } from '../runtime/naming.ts';
@@ -221,7 +220,6 @@ function registerToolSubcommand(
       const jsonArg = argv.json as string | undefined;
       const profileOverride = argv.profile as string | undefined;
       const outputFormat = (argv.output as OutputFormat) ?? 'text';
-      const outputStyle = (argv.style as OutputStyle) ?? 'normal';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
 
