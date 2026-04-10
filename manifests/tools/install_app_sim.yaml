@@ -13,6 +13,8 @@ nextSteps:
   - label: Open the Simulator app
     toolId: open_sim
     priority: 1
+    when: success
   - label: Launch the app
     toolId: launch_app_sim
     priority: 2
+    when: success

@@ -13,12 +13,16 @@ nextSteps:
   - label: Build for macOS
     toolId: build_macos
     priority: 1
+    when: success
   - label: Build and run on iOS Simulator (default for run intent)
     toolId: build_run_sim
     priority: 2
+    when: success
   - label: Build for iOS Simulator (compile-only)
     toolId: build_sim
     priority: 3
+    when: success
   - label: Show build settings
     toolId: show_build_settings
     priority: 4
+    when: success

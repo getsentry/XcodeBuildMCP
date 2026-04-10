@@ -15,3 +15,4 @@ nextSteps:
     params:
       simulatorId: UUID_FROM_LIST_SIMS
     priority: 1
+    when: success

@@ -9,21 +9,28 @@ It also documents the current and intended **visibility filtering** behavior (po
 
 ## Terminology
 
-- **Workflow**: a directory under `src/mcp/tools/<workflow>/` containing an `index.ts` with workflow metadata and tool modules.
-- **Tool**: a `PluginMeta` exported from a workflow module with `name`, `schema`, and `handler`.
+- **Workflow**: a manifest entry in `manifests/workflows/<id>.yaml` referencing tool IDs.
+- **Tool**: a manifest entry in `manifests/tools/<id>.yaml` with a module path; the module exports `{ schema, handler }`.
+- **Resource**: a manifest entry in `manifests/resources/<id>.yaml` with a module path; the module exports `{ handler }`.
 - **Workflow selection**: picking which workflows are active (coarse-grained inclusion).
-- **Visibility filtering**: hiding specific tools even if their workflow is enabled (fine-grained exclusion).
+- **Visibility filtering**: hiding specific tools/resources even if their workflow is enabled (fine-grained exclusion via predicates).
 - **Dynamic tools**: tools registered at runtime that do not come from static workflows (e.g. proxied Xcode Tools).
 
-## Where workflows/tools come from (source of truth)
+## Where workflows/tools/resources come from (source of truth)
 
-Workflows are discovered via generated loaders in `src/core/generated-plugins.ts` (the `WORKFLOW_LOADERS` map). At runtime, `loadWorkflowGroups()` imports each workflow module via these loaders and collects tools from it (`src/core/plugin-registry.ts`).
+YAML manifests in `manifests/` are the single source of truth for metadata:
+
+- `manifests/tools/*.yaml` define individual tools and their module paths
+- `manifests/workflows/*.yaml` define workflow groupings that reference tool IDs
+- `manifests/resources/*.yaml` define MCP resources and their module paths
+
+At runtime, `loadManifest()` reads all YAML files and returns a `ResolvedManifest` containing tools, workflows, and resources. Tool/resource code modules are dynamically imported via `importToolModule()` and `importResourceModule()`.
 
 Key properties of this design:
 
-- Workflows are “discoverable” by enumerating `Object.keys(WORKFLOW_LOADERS)`.
-- Tools within a workflow are whatever `index.ts` exports (excluding `workflow` itself).
-- A single tool name can appear in multiple workflows (re-exports). This matters for workflow management and hiding.
+- Workflows are discoverable by enumerating the manifest's workflow entries.
+- Tools within a workflow are listed by tool ID references.
+- A single tool can appear in multiple workflows (referenced by ID). This matters for workflow management and hiding.
 
 ## MCP server: registration pipeline
 

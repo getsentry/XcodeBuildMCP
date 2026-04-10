@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "scripts/check-code-patterns.js",
+    "scripts/probe-xcode-mcpbridge.ts",
+    "scripts/repro-mcp-parent-exit-helper.mjs",
+    "src/integrations/xcode-tools-bridge/__tests__/fixtures/fake-xcode-tools-server.mjs"
+  ],
+  "project": [
+    "src/**/*.{ts,js,mjs}",
+    "scripts/**/*.{ts,js,mjs}"
+  ],
+  "ignoreBinaries": [
+    "scripts/bundle-axe.sh",
+    "scripts/package-macos-portable.sh",
+    "scripts/verify-portable-install.sh",
+    "scripts/create-homebrew-formula.sh",
+    "pkg-pr-new",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "Unlicense",
+    "FSL-1.1-MIT"
+  ]
+}

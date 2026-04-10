@@ -13,3 +13,4 @@ nextSteps:
   - label: View overall coverage
     toolId: get_coverage_report
     priority: 1
+    when: success

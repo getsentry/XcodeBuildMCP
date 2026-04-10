@@ -13,9 +13,12 @@ nextSteps:
   - label: Build for device
     toolId: build_device
     priority: 1
+    when: success
   - label: Run tests on device
     toolId: test_device
     priority: 2
+    when: success
   - label: Get app path
     toolId: get_device_app_path
     priority: 3
+    when: success

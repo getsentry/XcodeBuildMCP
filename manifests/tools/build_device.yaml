@@ -11,3 +11,8 @@ annotations:
   readOnlyHint: false
   destructiveHint: false
   openWorldHint: false
+nextSteps:
+  - label: Get built device app path
+    toolId: get_device_app_path
+    priority: 1
+    when: success

@@ -13,3 +13,4 @@ nextSteps:
   - label: Stop the app
     toolId: stop_app_device
     priority: 1
+    when: success
