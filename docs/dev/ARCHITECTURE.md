@@ -201,11 +201,12 @@ Each tool is implemented in TypeScript and follows a standardized pattern that s
 
 ```typescript
 import { z } from 'zod';
-import { createTypedTool } from '../../../utils/typed-tool-factory.js';
+import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.js';
 import type { CommandExecutor } from '../../../utils/execution/index.js';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.js';
 import { log } from '../../../utils/logging/index.js';
-import { createTextResponse, createErrorResponse } from '../../../utils/responses/index.js';
+import { withErrorHandling } from '../../../utils/tool-error-handling.js';
+import { header, statusLine } from '../../../utils/tool-event-builders.js';
 
 // 1. Define the Zod schema for parameters
 const someToolSchema = z.object({
@@ -216,41 +217,46 @@ const someToolSchema = z.object({
 // 2. Infer the parameter type from the schema
 type SomeToolParams = z.infer<typeof someToolSchema>;
 
-// 3. Implement the core logic in a separate, testable function
-// This function receives strongly-typed parameters and an injected executor.
+// 3. Implement the core logic as an event-emitting function.
+// Handlers emit structured events via ctx.emit() instead of returning ToolResponse.
 export async function someToolLogic(
   params: SomeToolParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
-  log('info', `Executing some_tool with param: ${params.requiredParam}`);
+): Promise<void> {
+  const headerEvent = header('Some Tool', [
+    { label: 'Param', value: params.requiredParam },
+  ]);
+  const ctx = getHandlerContext();
 
-  try {
-    const result = await executor(['some', 'command'], 'Some Tool Operation');
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const result = await executor(['some', 'command'], 'Some Tool Operation');
 
-    if (!result.success) {
-      return createErrorResponse('Operation failed', result.error);
-    }
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Operation failed: ${result.error}`));
+        return;
+      }
 
-    return createTextResponse(`✅ Success: ${result.output}`);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Tool execution failed', errorMessage);
-  }
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', `Success: ${result.output}`));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Tool execution failed: ${message}`,
+    },
+  );
 }
 
-// 4. Export the tool definition for auto-discovery
-export default {
-  name: 'some_tool',
-  description: 'Tool description for AI agents. Example: some_tool({ requiredParam: "value" })',
-  schema: someToolSchema.shape, // Expose shape for MCP SDK
+// 4. Export schema shape and handler for manifest-driven auto-discovery
+export const schema = someToolSchema.shape;
 
-  // 5. Create the handler using the type-safe factory
-  handler: createTypedTool(
-    someToolSchema,
-    someToolLogic,
-    getDefaultCommandExecutor,
-  ),
-};
+export const handler = createTypedTool(
+  someToolSchema,
+  someToolLogic,
+  getDefaultCommandExecutor,
+);
 ```
 
 This pattern ensures that:
