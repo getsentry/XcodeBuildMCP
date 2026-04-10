@@ -15,6 +15,7 @@ import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.
 const mockLauncher: SimulatorLauncher = async (
   _uuid,
   _bundleId,
+  _executor,
   _opts?,
 ): Promise<LaunchWithLoggingResult> => ({
   success: true,

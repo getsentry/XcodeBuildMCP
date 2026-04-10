@@ -103,10 +103,15 @@ export async function launch_app_simLogic(
   return withErrorHandling(
     ctx,
     async () => {
-      const launchResult: LaunchWithLoggingResult = await launcher(simulatorId, params.bundleId, {
-        args: params.args,
-        env: params.env,
-      });
+      const launchResult: LaunchWithLoggingResult = await launcher(
+        simulatorId,
+        params.bundleId,
+        executor,
+        {
+          args: params.args,
+          env: params.env,
+        },
+      );
 
       if (!launchResult.success) {
         ctx.emit(headerEvent);

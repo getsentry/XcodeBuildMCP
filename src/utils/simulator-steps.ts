@@ -112,9 +112,6 @@ export async function launchSimulatorApp(
   return { success: true, processId };
 }
 
-const PID_POLL_TIMEOUT_MS = 5000;
-const PID_POLL_INTERVAL_MS = 100;
-
 export type ProcessSpawner = (
   command: string,
   args: string[],
@@ -131,13 +128,20 @@ export interface LaunchWithLoggingResult {
 
 /**
  * Launch an app on a simulator with implicit runtime logging.
- * Uses `simctl launch --console-pty` to both launch the app and stream its
- * stdout/stderr directly to a log file via OS-level fd inheritance.
- * The process is fully detached — no Node.js streams or lifecycle management.
+ *
+ * Uses a two-phase approach:
+ * 1. `simctl launch --console-pty` captures the app's stdout/stderr (print/NSLog)
+ *    to a log file via detached fd inheritance. PTY buffering prevents reading
+ *    the PID banner from this file reliably.
+ * 2. A follow-up idempotent `simctl launch` (without --terminate) returns the
+ *    already-running app's PID without relaunching it.
+ *
+ * OSLog (Logger) messages are captured separately via `simctl spawn log stream`.
  */
 export async function launchSimulatorAppWithLogging(
   simulatorUuid: string,
   bundleId: string,
+  executor: CommandExecutor,
   options?: {
     args?: string[];
     env?: Record<string, string>;
@@ -183,8 +187,8 @@ export async function launchSimulatorAppWithLogging(
     fs.closeSync(fd);
     fd = undefined;
 
-    // Brief wait then check for immediate crash
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Wait for app startup then check for immediate crash
+    await new Promise((resolve) => setTimeout(resolve, 500));
     if (child.exitCode !== null && child.exitCode !== 0) {
       const logContent = readLogFileSafe(logFilePath);
       return {
@@ -194,7 +198,8 @@ export async function launchSimulatorAppWithLogging(
       };
     }
 
-    const processId = await resolveAppPid(logFilePath);
+    // Resolve PID via idempotent simctl launch (returns existing app's PID)
+    const processId = await resolveAppPidViaLaunch(simulatorUuid, bundleId, executor);
 
     // Start OSLog stream as a separate detached process writing to its own file
     const osLogPath = startOsLogStream(simulatorUuid, bundleId, logsDir, spawner);
@@ -215,22 +220,24 @@ export async function launchSimulatorAppWithLogging(
   }
 }
 
-async function resolveAppPid(logFilePath: string): Promise<number | undefined> {
-  const start = Date.now();
-  while (Date.now() - start < PID_POLL_TIMEOUT_MS) {
-    const content = readLogFileSafe(logFilePath);
-    if (content) {
-      const firstLine = content.split('\n').find((l) => l.trim().length > 0);
-      if (firstLine) {
-        const colonMatch = firstLine.match(/:\s*(\d+)\s*$/);
-        if (colonMatch) {
-          return parseInt(colonMatch[1], 10);
-        }
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, PID_POLL_INTERVAL_MS));
+async function resolveAppPidViaLaunch(
+  simulatorUuid: string,
+  bundleId: string,
+  executor: CommandExecutor,
+): Promise<number | undefined> {
+  // simctl launch is idempotent: calling it on an already-running app
+  // returns the existing PID without relaunching.
+  const result = await executor(
+    ['xcrun', 'simctl', 'launch', simulatorUuid, bundleId],
+    'Resolve App PID',
+    false,
+  );
+  if (!result.success) {
+    log('warn', `Failed to resolve app PID: ${result.error ?? result.output}`);
+    return undefined;
   }
-  return undefined;
+  const pidMatch = result.output?.match(/:\s*(\d+)\s*$/);
+  return pidMatch ? parseInt(pidMatch[1], 10) : undefined;
 }
 
 function readLogFileSafe(filePath: string): string {
