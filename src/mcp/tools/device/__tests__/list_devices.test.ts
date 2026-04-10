@@ -216,7 +216,10 @@ describe('list_devices plugin (device-shared)', () => {
       const text = allText(result);
       expect(text).toContain('Test iPhone');
       expect(text).toContain('test-device-123');
-      expect(result.nextStepParams).toBeUndefined();
+      expect(result.nextStepParams).toEqual({
+        build_device: { scheme: 'YOUR_SCHEME', deviceId: 'UUID_FROM_ABOVE' },
+        install_app_device: { deviceId: 'UUID_FROM_ABOVE', appPath: 'PATH_TO_APP' },
+      });
     });
 
     it('should return successful xctrace fallback response', async () => {

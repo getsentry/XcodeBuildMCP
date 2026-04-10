@@ -141,5 +141,4 @@ export interface PlatformBuildOptions {
   packageCachePath?: string;
   arch?: string;
   logPrefix: string;
-  packageCachePath?: string;
 }
