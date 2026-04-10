@@ -4,5 +4,5 @@
    App: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app
 
 ✅ App launched successfully
-  ├ Bundle ID: io.sentry.calculatorapp
+  ├ Bundle ID: io.sentry.MCPTest.macOS
   └ Process ID: <PID>

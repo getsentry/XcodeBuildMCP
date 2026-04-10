@@ -8,7 +8,7 @@
    Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
 
 ✅ Build succeeded. (⏱️ <DURATION>)
-  ├ Bundle ID: io.sentry.calculatorapp
+  ├ Bundle ID: io.sentry.MCPTest.macOS
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_macos_<TIMESTAMP>_pid<PID>.log
 
 Next steps:

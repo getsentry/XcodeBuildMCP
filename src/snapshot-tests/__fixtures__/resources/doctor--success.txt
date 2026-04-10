@@ -22,7 +22,7 @@ Node.js Information
   ppid: <PID>
   platform: darwin
   arch: arm64
-  cwd: /Users/<redacted>/.codex/worktrees/43f4/<redacted>
+  cwd: <CWD>
   argv: <ARGV>
 
 Process Tree
@@ -59,7 +59,7 @@ PATH
 UI Automation (axe)
   Available: Yes
   UI Automation Supported: Yes
-  Simulator Video Capture Supported (AXe >= 1.1.0): No
+  Simulator Video Capture Supported (AXe >= <VERSION>): <AVAILABLE>
   UI-Debugger Guard Mode: error
 
 Incremental Builds

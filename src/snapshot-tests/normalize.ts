@@ -149,6 +149,12 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(COVERAGE_CALL_COUNT_REGEX, 'called <N>x)');
 
+  // Normalize final test summary line (counts vary across environments)
+  normalized = normalized.replace(
+    /\d+ (tests? failed), \d+ (passed)(?:, \d+ (skipped))?/g,
+    '<FAIL_COUNT> $1, <PASS_COUNT> $2, <SKIP_COUNT> skipped',
+  );
+
   normalized = normalized.replace(
     /("(?:x|y|width|height)"\s*:\s*)(\d+\.\d{2,})/g,
     (_, prefix, num) => `${prefix}${parseFloat(num).toFixed(1)}`,
@@ -179,8 +185,8 @@ export function normalizeSnapshotOutput(text: string): string {
     '  selectedXcode: <XCODE_PATH>',
   );
   normalized = normalized.replace(/  xcrunVersion: xcrun version .+/g, '  xcrunVersion: <VERSION>');
-  normalized = normalized.replace(/  axe: [\d.]+[^\n]*/g, '  axe: <VERSION>');
-  normalized = normalized.replace(/  mise: [\d.]+[^\n]*/g, '  mise: <VERSION>');
+  normalized = normalized.replace(/  axe: v?[\d.]+[^\n]*/g, '  axe: <VERSION>');
+  normalized = normalized.replace(/  mise: v?[\d.]+[^\n]*/g, '  mise: <VERSION>');
   normalized = normalized.replace(
     /  mcpbridge path: \/Applications\/Xcode[^\n]+/g,
     '  mcpbridge path: <XCODE_PATH>',
@@ -188,6 +194,13 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(/  Total Unique Tools: \d+/g, '  Total Unique Tools: <COUNT>');
   normalized = normalized.replace(/  Workflow Count: \d+/g, '  Workflow Count: <COUNT>');
   normalized = normalized.replace(/  (\w[\w-]*): \d+ tools$/gm, '  $1: <N> tools');
+  // Sanitize cwd (volatile across environments — local dev, codex worktrees, CI)
+  normalized = normalized.replace(/  cwd: [^\n]+/g, '  cwd: <CWD>');
+  // Sanitize environment-dependent capability flags
+  normalized = normalized.replace(
+    /Simulator Video Capture Supported \(AXe >= [\d.]+\): (?:Yes|No)/g,
+    'Simulator Video Capture Supported (AXe >= <VERSION>): <AVAILABLE>',
+  );
   // Sanitize the entire PATH section (volatile across environments)
   normalized = normalized.replace(/\nPATH\n(?:  [^\n]+\n)*/g, '\nPATH\n  <PATH_ENTRIES>\n');
 
