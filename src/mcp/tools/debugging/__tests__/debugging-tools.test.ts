@@ -47,7 +47,6 @@ import {
 } from '../debug_variables.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 function createMockBackend(overrides: Partial<DebuggerBackend> = {}): DebuggerBackend {
   return {
     kind: 'dap',

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { schema, handler, stop_mac_appLogic } from '../stop_mac_app.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('stop_mac_app plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

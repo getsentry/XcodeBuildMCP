@@ -16,7 +16,6 @@ import {
 } from '../screenshot.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Screenshot Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

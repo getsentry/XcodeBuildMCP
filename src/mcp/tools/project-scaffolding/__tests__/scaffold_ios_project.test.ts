@@ -12,7 +12,6 @@ import {
 } from '../../../../utils/config-store.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 const cwd = '/repo';
 
 async function initConfigStoreForTest(overrides?: RuntimeConfigOverrides): Promise<void> {

@@ -8,7 +8,6 @@ import {
 import { schema, handler, open_simLogic } from '../open_sim.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('open_sim tool', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

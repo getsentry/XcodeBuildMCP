@@ -3,7 +3,6 @@ import * as z from 'zod';
 import { schema, handler, get_app_bundle_idLogic } from '../get_app_bundle_id.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 import {
   createMockFileSystemExecutor,
   createCommandMatchingMockExecutor,

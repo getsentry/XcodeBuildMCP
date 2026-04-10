@@ -5,7 +5,6 @@ import { schema, handler, showBuildSettingsLogic } from '../show_build_settings.
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('show_build_settings plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

@@ -23,7 +23,6 @@ import { manage_workflowsLogic } from '../manage_workflows.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 import {
   applyWorkflowSelectionFromManifest,
   getRegisteredWorkflows,

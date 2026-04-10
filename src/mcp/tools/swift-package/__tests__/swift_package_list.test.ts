@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { schema, handler, swift_package_listLogic } from '../swift_package_list.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('swift_package_list plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

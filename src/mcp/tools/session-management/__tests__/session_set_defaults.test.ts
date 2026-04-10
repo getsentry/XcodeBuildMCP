@@ -8,7 +8,6 @@ import { schema, handler, sessionSetDefaultsLogic } from '../session_set_default
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('session-set-defaults tool', () => {
   beforeEach(() => {
     __resetConfigStoreForTests();

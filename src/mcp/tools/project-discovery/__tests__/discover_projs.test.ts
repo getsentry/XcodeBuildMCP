@@ -4,7 +4,6 @@ import { schema, handler, discover_projsLogic, discoverProjects } from '../disco
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('discover_projs plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

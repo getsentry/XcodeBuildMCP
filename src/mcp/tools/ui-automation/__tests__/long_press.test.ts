@@ -6,7 +6,6 @@ import { schema, handler, long_pressLogic } from '../long_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Long Press Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

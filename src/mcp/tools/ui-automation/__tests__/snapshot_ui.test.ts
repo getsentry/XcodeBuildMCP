@@ -6,7 +6,6 @@ import { schema, handler, snapshot_uiLogic } from '../snapshot_ui.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Snapshot UI Plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

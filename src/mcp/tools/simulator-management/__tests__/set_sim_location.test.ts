@@ -8,7 +8,6 @@ import {
 import { schema, handler, set_sim_locationLogic } from '../set_sim_location.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('set_sim_location tool', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

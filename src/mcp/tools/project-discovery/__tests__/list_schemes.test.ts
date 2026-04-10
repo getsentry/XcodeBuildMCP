@@ -8,7 +8,6 @@ import { schema, handler, listSchemes, listSchemesLogic } from '../list_schemes.
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('list_schemes plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

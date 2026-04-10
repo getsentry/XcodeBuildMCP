@@ -11,7 +11,6 @@ import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { schema, handler, install_app_simLogic } from '../install_app_sim.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('install_app_sim tool', () => {
   beforeEach(() => {
     sessionStore.clear();

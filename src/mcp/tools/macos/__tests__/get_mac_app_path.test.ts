@@ -10,7 +10,6 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, get_mac_app_pathLogic } from '../get_mac_app_path.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('get_mac_app_path plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

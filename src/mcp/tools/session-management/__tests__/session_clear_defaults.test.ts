@@ -3,7 +3,6 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, sessionClearDefaultsLogic } from '../session_clear_defaults.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('session-clear-defaults tool', () => {
   beforeEach(() => {
     sessionStore.clearAll();

@@ -25,10 +25,7 @@ export async function createMcpSnapshotHarness(
 ): Promise<McpSnapshotHarness> {
   const harness = await createMcpTestHarness(opts);
 
-  async function callTool(
-    name: string,
-    args: Record<string, unknown>,
-  ): Promise<McpSnapshotResult> {
+  async function callTool(name: string, args: Record<string, unknown>): Promise<McpSnapshotResult> {
     const result = await harness.client.callTool({ name, arguments: args });
     const rawText = extractText(result) + '\n';
     const text = normalizeSnapshotOutput(rawText);

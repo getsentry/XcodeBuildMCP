@@ -8,7 +8,6 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, boot_simLogic } from '../boot_sim.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('boot_sim tool', () => {
   beforeEach(() => {
     sessionStore.clear();

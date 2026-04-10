@@ -5,7 +5,6 @@ import { schema, handler, stop_app_deviceLogic } from '../stop_app_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('stop_app_device plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

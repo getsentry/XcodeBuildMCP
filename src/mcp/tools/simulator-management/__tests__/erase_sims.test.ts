@@ -3,7 +3,6 @@ import { schema, erase_simsLogic } from '../erase_sims.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('erase_sims tool (single simulator)', () => {
   describe('Plugin Structure', () => {
     it('should expose schema', () => {

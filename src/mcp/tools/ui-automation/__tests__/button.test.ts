@@ -10,7 +10,6 @@ import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Button Plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

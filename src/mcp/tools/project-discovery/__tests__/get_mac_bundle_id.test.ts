@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { schema, handler, get_mac_bundle_idLogic } from '../get_mac_bundle_id.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 import {
   createMockFileSystemExecutor,
   createCommandMatchingMockExecutor,

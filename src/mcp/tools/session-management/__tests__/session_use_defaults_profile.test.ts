@@ -11,7 +11,6 @@ import {
 } from '../session_use_defaults_profile.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('session-use-defaults-profile tool', () => {
   beforeEach(() => {
     __resetConfigStoreForTests();

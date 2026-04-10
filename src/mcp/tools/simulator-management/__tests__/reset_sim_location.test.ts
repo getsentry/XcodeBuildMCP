@@ -4,7 +4,6 @@ import { schema, reset_sim_locationLogic } from '../reset_sim_location.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('reset_sim_location plugin', () => {
   describe('Schema Validation', () => {
     it('should hide simulatorId from public schema', () => {

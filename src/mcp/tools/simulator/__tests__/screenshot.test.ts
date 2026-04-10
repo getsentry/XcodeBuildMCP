@@ -12,7 +12,6 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, screenshotLogic } from '../../ui-automation/screenshot.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('screenshot plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

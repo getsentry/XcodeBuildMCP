@@ -8,7 +8,6 @@ import { schema, handler, launch_app_deviceLogic } from '../launch_app_device.ts
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('launch_app_device plugin (device-shared)', () => {
   beforeEach(() => {
     sessionStore.clear();

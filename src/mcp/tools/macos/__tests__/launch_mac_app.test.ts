@@ -7,7 +7,6 @@ import {
 import { schema, handler, launch_mac_appLogic } from '../launch_mac_app.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('launch_mac_app plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

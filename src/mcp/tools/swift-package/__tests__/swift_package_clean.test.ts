@@ -9,7 +9,6 @@ import { schema, handler, swift_package_cleanLogic } from '../swift_package_clea
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('swift_package_clean plugin', () => {
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {

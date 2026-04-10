@@ -9,7 +9,6 @@ import { schema, handler, get_device_app_pathLogic } from '../get_device_app_pat
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('get_device_app_path plugin', () => {
   beforeEach(() => {
     sessionStore.clear();

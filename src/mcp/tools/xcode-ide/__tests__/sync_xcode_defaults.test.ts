@@ -4,7 +4,6 @@ import { createCommandMatchingMockExecutor } from '../../../../test-utils/mock-e
 import { schema, syncXcodeDefaultsLogic } from '../sync_xcode_defaults.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('sync_xcode_defaults tool', () => {
   beforeEach(() => {
     sessionStore.clear();

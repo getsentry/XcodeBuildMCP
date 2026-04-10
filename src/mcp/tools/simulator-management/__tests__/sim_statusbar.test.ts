@@ -8,7 +8,6 @@ import {
 import { schema, sim_statusbarLogic } from '../sim_statusbar.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('sim_statusbar tool', () => {
   describe('Schema Validation', () => {
     it('should expose public schema without simulatorId field', () => {

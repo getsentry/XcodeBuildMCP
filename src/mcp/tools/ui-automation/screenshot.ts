@@ -278,9 +278,7 @@ export async function screenshotLogic(
 
           ctx.emit(headerEvent);
           ctx.emit(statusLine('success', 'Screenshot captured'));
-          ctx.emit(
-            detailTree([{ label: 'Format', value: 'image/png (optimization failed)' }]),
-          );
+          ctx.emit(detailTree([{ label: 'Format', value: 'image/png (optimization failed)' }]));
           ctx.attach({ data: base64Image, mimeType: 'image/png' });
           return;
         }

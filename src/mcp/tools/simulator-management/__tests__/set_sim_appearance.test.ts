@@ -3,7 +3,6 @@ import * as z from 'zod';
 import { schema, handler, set_sim_appearanceLogic } from '../set_sim_appearance.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 import {
   createMockCommandResponse,
   createMockExecutor,

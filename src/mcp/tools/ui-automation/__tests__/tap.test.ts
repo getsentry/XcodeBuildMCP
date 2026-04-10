@@ -7,7 +7,6 @@ import { schema, handler, type AxeHelpers, tapLogic } from '../tap.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 function createMockAxeHelpers(): AxeHelpers {
   return {
     getAxePath: () => '/mocked/axe/path',

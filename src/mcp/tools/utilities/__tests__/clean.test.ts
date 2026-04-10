@@ -8,7 +8,6 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('clean (unified) tool', () => {
   beforeEach(() => {
     sessionStore.clear();

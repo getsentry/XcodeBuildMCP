@@ -11,7 +11,6 @@ import { schema, handler, key_pressLogic } from '../key_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 function createDefaultMockAxeHelpers() {
   return {
     getAxePath: () => '/usr/local/bin/axe',

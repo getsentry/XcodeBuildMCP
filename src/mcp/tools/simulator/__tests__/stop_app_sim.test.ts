@@ -9,7 +9,6 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, stop_app_simLogic } from '../stop_app_sim.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('stop_app_sim tool', () => {
   beforeEach(() => {
     sessionStore.clear();

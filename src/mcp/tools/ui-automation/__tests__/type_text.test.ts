@@ -10,7 +10,6 @@ import { schema, handler, type_textLogic } from '../type_text.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 // Mock axe helpers for dependency injection
 function createMockAxeHelpers(
   overrides: {

@@ -10,7 +10,6 @@ import { schema, handler, key_sequenceLogic } from '../key_sequence.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Key Sequence Tool', () => {
   beforeEach(() => {
     sessionStore.clear();

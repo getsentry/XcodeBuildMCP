@@ -8,7 +8,6 @@ import { schema, handler, type AxeHelpers, swipeLogic, type SwipeParams } from '
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 function createMockAxeHelpers(): AxeHelpers {
   return {
     getAxePath: () => '/mocked/axe/path',

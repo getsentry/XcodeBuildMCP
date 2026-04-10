@@ -9,7 +9,6 @@ import type { CommandExecutor } from '../../../../utils/CommandExecutor.ts';
 import { XcodePlatform } from '../../../../types/common.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('get_sim_app_path tool', () => {
   beforeEach(() => {
     sessionStore.clear();

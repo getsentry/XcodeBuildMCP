@@ -6,7 +6,6 @@ import { schema, handler, launch_app_simLogic, type SimulatorLauncher } from '..
 import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 function createMockLauncher(overrides?: Partial<LaunchWithLoggingResult>): SimulatorLauncher {
   return async (_uuid, _bundleId, _opts?) => ({
     success: true,

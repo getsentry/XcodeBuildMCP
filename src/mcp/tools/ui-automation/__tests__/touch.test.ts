@@ -6,7 +6,6 @@ import { schema, handler, touchLogic } from '../touch.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
-
 describe('Touch Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();
