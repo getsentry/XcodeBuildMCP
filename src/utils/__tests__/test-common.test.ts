@@ -246,6 +246,45 @@ describe('handleTestLogic (pipeline)', () => {
     expect(renderedText).toContain('Running tests');
   });
 
+  it('finalizes the pipeline when the executor throws after startup', async () => {
+    const executor = async () => {
+      throw new Error('spawn blew up');
+    };
+
+    const { result } = await runToolLogic(() =>
+      handleTestLogic(
+        {
+          projectPath: '/tmp/App.xcodeproj',
+          scheme: 'App',
+          configuration: 'Debug',
+          platform: XcodePlatform.macOS,
+          progress: true,
+        },
+        executor,
+        {
+          preflight: {
+            scheme: 'App',
+            configuration: 'Debug',
+            destinationName: 'iPhone 17 Pro',
+            projectPath: '/tmp/App.xcodeproj',
+            selectors: { onlyTesting: [], skipTesting: [] },
+            targets: [],
+            warnings: [],
+            totalTests: 1,
+            completeness: 'complete',
+          },
+          toolName: 'test_macos',
+        },
+      ),
+    );
+
+    expectPendingTestResponse(result, true);
+
+    const renderedText = finalizeAndGetText(result);
+    expect(renderedText).toContain('spawn blew up');
+    expect(renderedText).toContain('Build Logs:');
+  });
+
   it('returns a pending xcodebuild response when compilation fails before tests start', async () => {
     const executor = async (
       _command: string[],

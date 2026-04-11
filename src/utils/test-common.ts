@@ -27,7 +27,7 @@ import { formatToolPreflight } from './build-preflight.ts';
 import { resolveDeviceName } from './device-name-resolver.ts';
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
 import { startBuildPipeline } from './xcodebuild-pipeline.ts';
-import type { XcodebuildPipeline } from './xcodebuild-pipeline.ts';
+import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.ts';
 import { finalizeInlineXcodebuild } from './xcodebuild-output.ts';
 import { getHandlerContext } from './typed-tool-factory.ts';
 
@@ -77,6 +77,7 @@ export async function handleTestLogic(
     `Starting test run for scheme ${params.scheme} on platform ${params.platform} (internal)`,
   );
   const ctx = getHandlerContext();
+  let started: StartedPipeline | null = null;
 
   try {
     const execOpts: CommandExecOptions | undefined = params.testRunnerEnv
@@ -118,7 +119,7 @@ export async function handleTestLogic(
         : `${configText}\n${discoveryText}`;
     }
 
-    const started = startBuildPipeline({
+    started = startBuildPipeline({
       operation: 'TEST',
       toolName: resolvedToolName,
       params: {
@@ -242,6 +243,19 @@ export async function handleTestLogic(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log('error', `Error during test run: ${errorMessage}`);
+
+    if (started) {
+      finalizeInlineXcodebuild({
+        started,
+        emit: ctx.emit,
+        succeeded: false,
+        durationMs: Date.now() - started.startedAt,
+        responseContent: [{ type: 'text', text: `Error during test run: ${errorMessage}` }],
+        errorFallbackPolicy: 'always',
+      });
+      return;
+    }
+
     ctx.emit(
       header('Test Run', [
         { label: 'Scheme', value: params.scheme },
