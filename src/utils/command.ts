@@ -76,25 +76,118 @@ async function defaultExecutor(
 
     const childProcess = spawn(executable, args, spawnOpts);
 
-    if (verbose) {
-      childProcess.stdout?.pipe(process.stderr, { end: false });
-      childProcess.stderr?.pipe(process.stderr, { end: false });
-    }
-
     let stdout = '';
     let stderr = '';
 
-    childProcess.stdout?.on('data', (data: Buffer) => {
-      const chunk = data.toString();
-      stdout += chunk;
-      opts?.onStdout?.(chunk);
-    });
+    const streamClosers: Array<() => void> = [];
+    const streamDetachers: Array<() => void> = [];
+    let openStreamCount = 0;
+    let settled = false;
+    let exitObserved = false;
+    let exitCode: number | null = null;
+    let exitSettleTimer: NodeJS.Timeout | null = null;
 
-    childProcess.stderr?.on('data', (data: Buffer) => {
-      const chunk = data.toString();
-      stderr += chunk;
-      opts?.onStderr?.(chunk);
-    });
+    const clearExitSettleTimer = (): void => {
+      if (exitSettleTimer) {
+        clearTimeout(exitSettleTimer);
+        exitSettleTimer = null;
+      }
+    };
+
+    const detachStreamListeners = (): void => {
+      for (const detachStream of streamDetachers) {
+        detachStream();
+      }
+      streamDetachers.length = 0;
+    };
+
+    const handleError = (err: Error): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearExitSettleTimer();
+      detachStreamListeners();
+      logSpawnError(err);
+      reject(err);
+    };
+
+    const settle = (code: number | null): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearExitSettleTimer();
+      detachStreamListeners();
+
+      const success = code === 0;
+      const response: CommandResponse = {
+        success,
+        output: stdout,
+        error: success ? undefined : stderr,
+        process: childProcess,
+        exitCode: code ?? undefined,
+      };
+
+      resolve(response);
+    };
+
+    const maybeSettleAfterExit = (): void => {
+      if (!exitObserved || settled || openStreamCount > 0) {
+        return;
+      }
+      settle(exitCode);
+    };
+
+    const scheduleExitSettle = (): void => {
+      if (settled || exitSettleTimer) {
+        return;
+      }
+      exitSettleTimer = setTimeout(() => {
+        settle(exitCode);
+      }, 100);
+    };
+
+    const attachStream = (
+      stream: NodeJS.ReadableStream | null | undefined,
+      onChunk: (chunk: string) => void,
+      mirrorToStderr: boolean,
+    ): void => {
+      if (!stream) {
+        return;
+      }
+
+      openStreamCount += 1;
+      let streamClosed = false;
+
+      const markClosed = (): void => {
+        if (streamClosed) {
+          return;
+        }
+        streamClosed = true;
+        openStreamCount = Math.max(0, openStreamCount - 1);
+        maybeSettleAfterExit();
+      };
+
+      const handleData = (data: Buffer | string): void => {
+        if (settled) {
+          return;
+        }
+        const chunk = data.toString();
+        onChunk(chunk);
+        if (mirrorToStderr) {
+          process.stderr.write(chunk);
+        }
+      };
+
+      stream.on('data', handleData);
+      stream.once('end', markClosed);
+      stream.once('close', markClosed);
+      streamClosers.push(markClosed);
+      streamDetachers.push(() => {
+        stream.off('data', handleData);
+      });
+    };
 
     if (detached) {
       let resolved = false;
@@ -126,25 +219,41 @@ async function defaultExecutor(
           }
         }
       }, 100);
-    } else {
-      childProcess.on('close', (code) => {
-        const success = code === 0;
-        const response: CommandResponse = {
-          success,
-          output: stdout,
-          error: success ? undefined : stderr,
-          process: childProcess,
-          exitCode: code ?? undefined,
-        };
-
-        resolve(response);
-      });
-
-      childProcess.on('error', (err) => {
-        logSpawnError(err);
-        reject(err);
-      });
+      return;
     }
+
+    attachStream(
+      childProcess.stdout,
+      (chunk) => {
+        stdout += chunk;
+        opts?.onStdout?.(chunk);
+      },
+      verbose,
+    );
+
+    attachStream(
+      childProcess.stderr,
+      (chunk) => {
+        stderr += chunk;
+        opts?.onStderr?.(chunk);
+      },
+      verbose,
+    );
+
+    childProcess.once('error', handleError);
+    childProcess.once('exit', (code) => {
+      exitObserved = true;
+      exitCode = code;
+      maybeSettleAfterExit();
+      scheduleExitSettle();
+    });
+    childProcess.once('close', (code) => {
+      clearExitSettleTimer();
+      for (const closeStream of streamClosers) {
+        closeStream();
+      }
+      settle(code ?? exitCode);
+    });
   });
 }
 
