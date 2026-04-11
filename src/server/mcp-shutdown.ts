@@ -13,6 +13,7 @@ import {
   type FlushSentryOutcome,
 } from '../utils/sentry.ts';
 import { sealSentryCapture } from '../utils/shutdown-state.ts';
+import { toErrorMessage } from '../utils/errors.ts';
 import type { McpLifecycleSnapshot, McpShutdownReason } from './mcp-lifecycle.ts';
 import { isTransportDisconnectReason } from './mcp-lifecycle.ts';
 
@@ -52,10 +53,6 @@ export interface McpShutdownResult {
   steps: ShutdownStepResult[];
 }
 
-function stringifyError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function runStep<T>(
   name: string,
   timeoutMs: number,
@@ -75,7 +72,7 @@ async function runStep<T>(
       .catch(
         (error): RunStepRaceOutcome<T> => ({
           kind: 'error',
-          error: stringifyError(error),
+          error: toErrorMessage(error),
         }),
       );
     const outcome = await Promise.race([operationOutcome, timeoutPromise]);
@@ -147,12 +144,15 @@ export async function runMcpShutdown(input: {
   const steps: ShutdownStepResult[] = [];
 
   const pushStep = (name: string, outcome: ShutdownStepOutcome<unknown>): void => {
-    steps.push({
+    const step: ShutdownStepResult = {
       name,
       status: outcome.status,
       durationMs: outcome.durationMs,
-      ...(outcome.error ? { error: outcome.error } : {}),
-    });
+    };
+    if (outcome.error) {
+      step.error = outcome.error;
+    }
+    steps.push(step);
   };
 
   const serverCloseTimeout = transportDisconnected
@@ -224,7 +224,7 @@ export async function runMcpShutdown(input: {
     pushStep(cleanupStep.name, outcome);
   }
 
-  const triggerError = input.error === undefined ? undefined : stringifyError(input.error);
+  const triggerError = input.error === undefined ? undefined : toErrorMessage(input.error);
   const cleanupFailureCount = steps.filter(
     (step) => step.status === 'failed' || step.status === 'timed_out',
   ).length;

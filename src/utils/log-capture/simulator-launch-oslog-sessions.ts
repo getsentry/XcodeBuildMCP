@@ -4,6 +4,7 @@ import { acquireDaemonActivity } from '../../daemon/activity-registry.ts';
 import { getRuntimeInstance } from '../runtime-instance.ts';
 import {
   clearSimulatorLaunchOsLogRegistryForTests,
+  compareOsLogSortKeys,
   isSimulatorLaunchOsLogRegistryRecordActive,
   listSimulatorLaunchOsLogRegistryRecords,
   removeSimulatorLaunchOsLogRegistryRecord,
@@ -56,22 +57,6 @@ function toSummary(
   };
 }
 
-function sortSummaries(
-  left: SimulatorLaunchOsLogSessionSummary,
-  right: SimulatorLaunchOsLogSessionSummary,
-): number {
-  if (left.simulatorUuid !== right.simulatorUuid) {
-    return left.simulatorUuid.localeCompare(right.simulatorUuid);
-  }
-  if (left.bundleId !== right.bundleId) {
-    return left.bundleId.localeCompare(right.bundleId);
-  }
-  if (left.startedAtMs !== right.startedAtMs) {
-    return left.startedAtMs - right.startedAtMs;
-  }
-  return left.sessionId.localeCompare(right.sessionId);
-}
-
 function buildExpectedCommandParts(simulatorUuid: string, bundleId: string): string[] {
   return ['simctl', 'spawn', simulatorUuid, 'log', 'stream', bundleId];
 }
@@ -81,9 +66,7 @@ function finalizeLiveSession(sessionId: string, session: SimulatorLaunchOsLogSes
   if (current === session) {
     activeSimulatorLaunchOsLogSessions.delete(sessionId);
   }
-  if (!session.hasEnded) {
-    session.hasEnded = true;
-  }
+  session.hasEnded = true;
   if (session.releaseActivity) {
     const release = session.releaseActivity;
     session.releaseActivity = undefined;
@@ -123,6 +106,34 @@ async function confirmRecordStopped(
   }
 }
 
+async function sendSignalAndWait(
+  record: SimulatorLaunchOsLogRegistryRecord,
+  liveSession: SimulatorLaunchOsLogSession | undefined,
+  signal: NodeJS.Signals,
+  timeoutMs: number,
+): Promise<boolean> {
+  try {
+    if (liveSession) {
+      liveSession.process.kill?.(signal);
+    } else {
+      process.kill(record.helperPid, signal);
+    }
+  } catch (error) {
+    if (!(await isSimulatorLaunchOsLogRegistryRecordActive(record))) {
+      await confirmRecordStopped(record, liveSession);
+      return true;
+    }
+    throw error;
+  }
+
+  if (await waitForRegistryRecordExit(record, timeoutMs)) {
+    await confirmRecordStopped(record, liveSession);
+    return true;
+  }
+
+  return false;
+}
+
 async function stopRecord(
   record: SimulatorLaunchOsLogRegistryRecord,
   timeoutMs: number,
@@ -134,41 +145,11 @@ async function stopRecord(
     return;
   }
 
-  try {
-    if (liveSession) {
-      liveSession.process.kill?.('SIGTERM');
-    } else {
-      process.kill(record.helperPid, 'SIGTERM');
-    }
-  } catch (error) {
-    if (!(await isSimulatorLaunchOsLogRegistryRecordActive(record))) {
-      await confirmRecordStopped(record, liveSession);
-      return;
-    }
-    throw error;
-  }
-
-  if (await waitForRegistryRecordExit(record, timeoutMs)) {
-    await confirmRecordStopped(record, liveSession);
+  if (await sendSignalAndWait(record, liveSession, 'SIGTERM', timeoutMs)) {
     return;
   }
 
-  try {
-    if (liveSession) {
-      liveSession.process.kill?.('SIGKILL');
-    } else {
-      process.kill(record.helperPid, 'SIGKILL');
-    }
-  } catch (error) {
-    if (!(await isSimulatorLaunchOsLogRegistryRecordActive(record))) {
-      await confirmRecordStopped(record, liveSession);
-      return;
-    }
-    throw error;
-  }
-
-  if (await waitForRegistryRecordExit(record, timeoutMs)) {
-    await confirmRecordStopped(record, liveSession);
+  if (await sendSignalAndWait(record, liveSession, 'SIGKILL', timeoutMs)) {
     return;
   }
 
@@ -198,10 +179,9 @@ export async function registerSimulatorLaunchOsLogSession(params: {
     releaseActivity: acquireDaemonActivity('logging.simulator.launch-oslog'),
   };
 
-  const onExit = (): void => handleLocalProcessExit(sessionId, session);
-  const onClose = (): void => handleLocalProcessExit(sessionId, session);
-  session.process.once?.('exit', onExit);
-  session.process.once?.('close', onClose);
+  const onProcessEnd = (): void => handleLocalProcessExit(sessionId, session);
+  session.process.once?.('exit', onProcessEnd);
+  session.process.once?.('close', onProcessEnd);
   activeSimulatorLaunchOsLogSessions.set(sessionId, session);
 
   try {
@@ -233,24 +213,18 @@ export async function listActiveSimulatorLaunchOsLogSessions(): Promise<
   const currentInstanceId = getRuntimeInstance().instanceId;
   return (await listSimulatorLaunchOsLogRegistryRecords())
     .map((record) => toSummary(record, currentInstanceId))
-    .sort(sortSummaries);
+    .sort(compareOsLogSortKeys);
 }
 
 export async function getActiveSimulatorLaunchOsLogSessionCount(): Promise<number> {
-  return (await listSimulatorLaunchOsLogSessionsFromRegistry()).length;
-}
-
-async function listSimulatorLaunchOsLogSessionsFromRegistry(): Promise<
-  SimulatorLaunchOsLogRegistryRecord[]
-> {
-  return listSimulatorLaunchOsLogRegistryRecords();
+  return (await listSimulatorLaunchOsLogRegistryRecords()).length;
 }
 
 async function stopMatchingRecords(
   predicate: (record: SimulatorLaunchOsLogRegistryRecord) => boolean,
   timeoutMs: number,
 ): Promise<{ stoppedSessionCount: number; errorCount: number; errors: string[] }> {
-  const records = (await listSimulatorLaunchOsLogSessionsFromRegistry()).filter(predicate);
+  const records = (await listSimulatorLaunchOsLogRegistryRecords()).filter(predicate);
   const errors: string[] = [];
 
   for (const record of records) {

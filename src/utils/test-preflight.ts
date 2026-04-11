@@ -228,7 +228,7 @@ async function listDirectoryEntries(
 ): Promise<string[]> {
   try {
     const entries = await fileSystemExecutor.readdir(directoryPath);
-    return entries.flatMap((entry) => (typeof entry === 'string' ? [entry] : []));
+    return entries.filter((entry): entry is string => typeof entry === 'string');
   } catch {
     return [];
   }
@@ -322,16 +322,11 @@ async function resolveCandidateDirectories(
 }
 
 function selectorMatches(test: DiscoveredTestCase, selector: TestSelector): boolean {
-  if (selector.target !== test.targetName) {
-    return false;
-  }
-  if (selector.classOrSuite && selector.classOrSuite !== test.typeName) {
-    return false;
-  }
-  if (selector.method && selector.method !== test.methodName) {
-    return false;
-  }
-  return true;
+  return (
+    selector.target === test.targetName &&
+    (!selector.classOrSuite || selector.classOrSuite === test.typeName) &&
+    (!selector.method || selector.method === test.methodName)
+  );
 }
 
 function applySelectors(
@@ -440,7 +435,7 @@ export async function resolveTestPreflight(
 
     if (
       filteredFiles.length === 0 &&
-      selectors.onlyTesting.length + selectors.skipTesting.length > 0
+      (selectors.onlyTesting.length > 0 || selectors.skipTesting.length > 0)
     ) {
       continue;
     }
@@ -498,16 +493,20 @@ export function collectResolvedTestSelectors(preflight: TestPreflightResult): st
 }
 
 export function formatTestSelectionSummary(preflight: TestPreflightResult): string | undefined {
-  const onlyTestingLines = preflight.selectors.onlyTesting.map(
-    (selector) => `     ${selector.raw}`,
-  );
-  const skipTestingLines = preflight.selectors.skipTesting.map(
-    (selector) => `     Skip Testing: ${selector.raw}`,
-  );
+  if (
+    preflight.selectors.onlyTesting.length === 0 &&
+    preflight.selectors.skipTesting.length === 0
+  ) {
+    return undefined;
+  }
 
-  const lines = ['   Selective Testing:', ...onlyTestingLines, ...skipTestingLines];
+  const lines = [
+    '   Selective Testing:',
+    ...preflight.selectors.onlyTesting.map((selector) => `     ${selector.raw}`),
+    ...preflight.selectors.skipTesting.map((selector) => `     Skip Testing: ${selector.raw}`),
+  ];
 
-  return onlyTestingLines.length + skipTestingLines.length > 0 ? lines.join('\n') : undefined;
+  return lines.join('\n');
 }
 
 export function formatTestDiscovery(

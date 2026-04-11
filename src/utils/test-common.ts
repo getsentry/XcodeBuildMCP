@@ -10,6 +10,7 @@
  */
 
 import { log } from './logger.ts';
+import { toErrorMessage } from './errors.ts';
 import type { XcodePlatform } from './xcode.ts';
 import { executeXcodeBuildCommand } from './build/index.ts';
 import { extractTestFailuresFromXcresult } from './xcresult-test-failures.ts';
@@ -109,15 +110,15 @@ export async function handleTestLogic(
       : undefined;
     const discoveryText = options?.preflight ? formatTestDiscovery(options.preflight) : undefined;
 
-    let preflightText = configText;
+    const preflightParts = [selectionText ? configText.trimEnd() : configText];
     if (selectionText) {
-      preflightText = `${configText.trimEnd()}\n${selectionText}\n\n`;
+      preflightParts.push(selectionText);
+      preflightParts.push('');
     }
     if (discoveryText) {
-      preflightText = selectionText
-        ? `${configText.trimEnd()}\n${selectionText}\n\n${discoveryText}`
-        : `${configText}\n${discoveryText}`;
+      preflightParts.push(discoveryText);
     }
+    const preflightText = preflightParts.join('\n');
 
     started = startBuildPipeline({
       operation: 'TEST',
@@ -239,9 +240,8 @@ export async function handleTestLogic(
       durationMs: Date.now() - started.startedAt,
       responseContent: singlePhaseResult.content,
     });
-    return;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = toErrorMessage(error);
     log('error', `Error during test run: ${errorMessage}`);
 
     if (started) {

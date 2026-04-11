@@ -72,19 +72,16 @@ function injectBuildLogIntoTailEvents(
     return tailEvents;
   }
 
-  const detailTreeIndex = tailEvents.findIndex((event) => event.type === 'detail-tree');
-  if (detailTreeIndex !== -1) {
-    const detailTreeEvent = tailEvents[detailTreeIndex];
-    if (detailTreeEvent.type !== 'detail-tree') {
-      return tailEvents;
-    }
-
-    const updatedTailEvents = [...tailEvents];
-    updatedTailEvents[detailTreeIndex] = {
-      ...detailTreeEvent,
-      items: [...detailTreeEvent.items, { label: 'Build Logs', value: logPath }],
-    };
-    return updatedTailEvents;
+  const existingDetailTree = tailEvents.find((event) => event.type === 'detail-tree');
+  if (existingDetailTree) {
+    return tailEvents.map((event) =>
+      event === existingDetailTree
+        ? {
+            ...existingDetailTree,
+            items: [...existingDetailTree.items, { label: 'Build Logs', value: logPath }],
+          }
+        : event,
+    );
   }
 
   const nextStepsIndex = tailEvents.findIndex((event) => event.type === 'next-steps');

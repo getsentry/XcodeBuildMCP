@@ -64,16 +64,11 @@ function extractSnapshotTextContent(result: unknown): string {
 }
 
 function createSnapshotHarnessEnv(overrides: Record<string, string>): Record<string, string> {
-  const { VITEST, NODE_ENV, ...rest } = process.env;
-  void VITEST;
-  void NODE_ENV;
-
-  return {
-    ...Object.fromEntries(
-      Object.entries(rest).filter((entry): entry is [string, string] => entry[1] !== undefined),
-    ),
-    ...overrides,
-  };
+  const { VITEST: _vitest, NODE_ENV: _nodeEnv, ...rest } = process.env;
+  const env = Object.fromEntries(
+    Object.entries(rest).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+  return { ...env, ...overrides };
 }
 
 export async function createMcpSnapshotHarness(
@@ -126,8 +121,6 @@ export async function createMcpSnapshotHarness(
     invoke,
     callTool,
     client,
-    async cleanup(): Promise<void> {
-      await client.close();
-    },
+    cleanup: () => client.close(),
   };
 }

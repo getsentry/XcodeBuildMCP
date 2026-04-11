@@ -1,5 +1,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadManifest } from '../core/manifest/load-manifest.ts';
+import type { ResourceManifestEntry } from '../core/manifest/schema.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
 
 const PROCESS_UPTIME_MS_REGEX = /"uptimeMs"\s*:\s*\d+/g;
@@ -32,8 +34,6 @@ function normalizeResourceOutput(text: string): string {
   normalized = normalized.replace(DEVICE_CONNECTION_STATUS_REGEX, '[<STATUS>]');
   return normalized;
 }
-import { loadManifest } from '../core/manifest/load-manifest.ts';
-import type { ResourceManifestEntry } from '../core/manifest/schema.ts';
 
 export interface ResourceSnapshotResult {
   text: string;

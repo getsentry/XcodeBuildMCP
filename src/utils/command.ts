@@ -55,7 +55,7 @@ async function defaultExecutor(
 
     const spawnOpts: Parameters<typeof spawn>[2] = {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, ...(opts?.env ?? {}) },
+      env: opts?.env ? { ...process.env, ...opts.env } : process.env,
       cwd: opts?.cwd,
     };
 
@@ -262,40 +262,40 @@ const defaultFileSystemExecutor: FileSystemExecutor = {
     await fsPromises.mkdir(path, options);
   },
 
-  async readFile(path: string, encoding: BufferEncoding = 'utf8'): Promise<string> {
-    return await fsPromises.readFile(path, encoding);
+  readFile(path: string, encoding: BufferEncoding = 'utf8'): Promise<string> {
+    return fsPromises.readFile(path, encoding);
   },
 
-  async writeFile(path: string, content: string, encoding: BufferEncoding = 'utf8'): Promise<void> {
-    await fsPromises.writeFile(path, content, encoding);
+  writeFile(path: string, content: string, encoding: BufferEncoding = 'utf8'): Promise<void> {
+    return fsPromises.writeFile(path, content, encoding);
   },
 
   createWriteStream(path: string, options?: { flags?: string }) {
     return createWriteStream(path, options);
   },
 
-  async cp(source: string, destination: string, options?: { recursive?: boolean }): Promise<void> {
-    await fsPromises.cp(source, destination, options);
+  cp(source: string, destination: string, options?: { recursive?: boolean }): Promise<void> {
+    return fsPromises.cp(source, destination, options);
   },
 
-  async readdir(path: string, options?: { withFileTypes?: boolean }): Promise<unknown[]> {
-    return await fsPromises.readdir(path, options as Record<string, unknown>);
+  readdir(path: string, options?: { withFileTypes?: boolean }): Promise<unknown[]> {
+    return fsPromises.readdir(path, options as Record<string, unknown>);
   },
 
-  async rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void> {
-    await fsPromises.rm(path, options);
+  rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void> {
+    return fsPromises.rm(path, options);
   },
 
   existsSync(path: string): boolean {
     return existsSync(path);
   },
 
-  async stat(path: string): Promise<{ isDirectory(): boolean; mtimeMs: number }> {
-    return await fsPromises.stat(path);
+  stat(path: string): Promise<{ isDirectory(): boolean; mtimeMs: number }> {
+    return fsPromises.stat(path);
   },
 
-  async mkdtemp(prefix: string): Promise<string> {
-    return await fsPromises.mkdtemp(prefix);
+  mkdtemp(prefix: string): Promise<string> {
+    return fsPromises.mkdtemp(prefix);
   },
 
   tmpdir(): string {

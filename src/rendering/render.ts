@@ -13,16 +13,21 @@ function isErrorEvent(event: PipelineEvent): boolean {
   );
 }
 
-function createTextRenderSession(): RenderSession {
+interface RenderSessionHooks {
+  onEmit?: (event: PipelineEvent) => void;
+  finalize: (events: readonly PipelineEvent[]) => string;
+}
+
+function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
   const events: PipelineEvent[] = [];
   const attachments: ImageAttachment[] = [];
-  const suppressWarnings = sessionStore.get('suppressWarnings');
   let hasError = false;
 
   return {
     emit(event: PipelineEvent): void {
       events.push(event);
       if (isErrorEvent(event)) hasError = true;
+      hooks.onEmit?.(event);
     },
 
     attach(image: ImageAttachment): void {
@@ -42,81 +47,39 @@ function createTextRenderSession(): RenderSession {
     },
 
     finalize(): string {
-      return renderCliTextTranscript(events, {
-        suppressWarnings: suppressWarnings ?? false,
-      });
+      return hooks.finalize(events);
     },
   };
+}
+
+function createTextRenderSession(): RenderSession {
+  const suppressWarnings = sessionStore.get('suppressWarnings');
+
+  return createBaseRenderSession({
+    finalize: (events) =>
+      renderCliTextTranscript(events, {
+        suppressWarnings: suppressWarnings ?? false,
+      }),
+  });
 }
 
 function createCliTextRenderSession(options: { interactive: boolean }): RenderSession {
-  const events: PipelineEvent[] = [];
-  const attachments: ImageAttachment[] = [];
   const renderer = createCliTextRenderer(options);
-  let hasError = false;
 
-  return {
-    emit(event: PipelineEvent): void {
-      events.push(event);
-      if (isErrorEvent(event)) hasError = true;
-      renderer.onEvent(event);
-    },
-
-    attach(image: ImageAttachment): void {
-      attachments.push(image);
-    },
-
-    getEvents(): readonly PipelineEvent[] {
-      return events;
-    },
-
-    getAttachments(): readonly ImageAttachment[] {
-      return attachments;
-    },
-
-    isError(): boolean {
-      return hasError;
-    },
-
-    finalize(): string {
+  return createBaseRenderSession({
+    onEmit: (event) => renderer.onEvent(event),
+    finalize: () => {
       renderer.finalize();
       return '';
     },
-  };
+  });
 }
 
 function createCliJsonRenderSession(): RenderSession {
-  const events: PipelineEvent[] = [];
-  const attachments: ImageAttachment[] = [];
-  let hasError = false;
-
-  return {
-    emit(event: PipelineEvent): void {
-      events.push(event);
-      if (isErrorEvent(event)) hasError = true;
-      process.stdout.write(JSON.stringify(event) + '\n');
-    },
-
-    attach(image: ImageAttachment): void {
-      attachments.push(image);
-    },
-
-    getEvents(): readonly PipelineEvent[] {
-      return events;
-    },
-
-    getAttachments(): readonly ImageAttachment[] {
-      return attachments;
-    },
-
-    isError(): boolean {
-      return hasError;
-    },
-
-    finalize(): string {
-      return '';
-    },
-  };
+  return createBaseRenderSession({
+    onEmit: (event) => process.stdout.write(JSON.stringify(event) + '\n'),
+    finalize: () => '',
+  });
 }
 
 export interface RenderSessionOptions {

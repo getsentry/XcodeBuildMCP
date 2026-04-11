@@ -176,8 +176,8 @@ export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
     return [];
   }
 
-  let entries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
-  let invalidPaths: string[] = [];
+  const entries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
+  const invalidPaths: string[] = [];
 
   try {
     const dirEntries = await fs.readdir(getRegistryDir(), { withFileTypes: true });
@@ -220,13 +220,12 @@ export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
     }
     stalePaths.push(entry.filePath);
   }
-  entries = activeEntries;
 
   if (stalePaths.length > 0) {
     await removeRegistryPaths(stalePaths);
   }
 
-  return entries.map((entry) => entry.record).sort(sortRecords);
+  return activeEntries.map((entry) => entry.record).sort(compareOsLogSortKeys);
 }
 
 export async function isSimulatorLaunchOsLogRegistryRecordActive(
@@ -235,20 +234,20 @@ export async function isSimulatorLaunchOsLogRegistryRecordActive(
   return isRecordActive(record);
 }
 
-function sortRecords(
-  left: SimulatorLaunchOsLogRegistryRecord,
-  right: SimulatorLaunchOsLogRegistryRecord,
-): number {
-  if (left.simulatorUuid !== right.simulatorUuid) {
-    return left.simulatorUuid.localeCompare(right.simulatorUuid);
-  }
-  if (left.bundleId !== right.bundleId) {
-    return left.bundleId.localeCompare(right.bundleId);
-  }
-  if (left.startedAtMs !== right.startedAtMs) {
-    return left.startedAtMs - right.startedAtMs;
-  }
-  return left.sessionId.localeCompare(right.sessionId);
+interface OsLogSortKey {
+  simulatorUuid: string;
+  bundleId: string;
+  startedAtMs: number;
+  sessionId: string;
+}
+
+export function compareOsLogSortKeys(left: OsLogSortKey, right: OsLogSortKey): number {
+  return (
+    left.simulatorUuid.localeCompare(right.simulatorUuid) ||
+    left.bundleId.localeCompare(right.bundleId) ||
+    left.startedAtMs - right.startedAtMs ||
+    left.sessionId.localeCompare(right.sessionId)
+  );
 }
 
 export async function clearSimulatorLaunchOsLogRegistryForTests(): Promise<void> {

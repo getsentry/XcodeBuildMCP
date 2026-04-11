@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { ensureSimulatorBooted, shutdownAllSimulatorsExcept } from '../harness.ts';
 import { DERIVED_DATA_DIR } from '../../utils/log-paths.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
@@ -161,9 +164,6 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 120_000);
 
       it('error - invalid app', async () => {
-        const fs = await import('node:fs');
-        const os = await import('node:os');
-        const path = await import('node:path');
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-install-'));
         const fakeApp = path.join(tmpDir, 'NotAnApp.app');
         fs.mkdirSync(fakeApp);

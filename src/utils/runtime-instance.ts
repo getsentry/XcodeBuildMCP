@@ -8,11 +8,7 @@ export interface RuntimeInstance {
 let runtimeInstance: RuntimeInstance | null = null;
 
 export function getRuntimeInstance(): RuntimeInstance {
-  if (runtimeInstance) {
-    return runtimeInstance;
-  }
-
-  runtimeInstance = {
+  runtimeInstance ??= {
     instanceId: randomUUID(),
     pid: process.pid,
   };

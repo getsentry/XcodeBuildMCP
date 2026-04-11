@@ -290,12 +290,8 @@ export async function applyWorkflowSelectionFromManifest(
             try {
               const session = createRenderSession('text');
               const ctx: ToolHandlerContext = {
-                emit: (event) => {
-                  session.emit(event);
-                },
-                attach: (image) => {
-                  session.attach(image);
-                },
+                emit: session.emit,
+                attach: session.attach,
               };
               await toolModule.handler(args as Record<string, unknown>, ctx);
 

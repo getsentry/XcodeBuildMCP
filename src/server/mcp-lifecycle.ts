@@ -160,23 +160,23 @@ export function classifyMcpLifecycleAnomalies(
     'uptimeMs' | 'rssBytes' | 'matchingMcpProcessCount' | 'matchingMcpPeerSummary'
   >,
 ): McpLifecycleAnomaly[] {
-  const anomalies = new Set<McpLifecycleAnomaly>();
+  const anomalies: McpLifecycleAnomaly[] = [];
   const peerCount = Math.max(0, (snapshot.matchingMcpProcessCount ?? 0) - 1);
 
   if (peerCount >= PEER_COUNT_HIGH_THRESHOLD) {
-    anomalies.add('peer-count-high');
+    anomalies.push('peer-count-high');
   }
   if (snapshot.matchingMcpPeerSummary.some((peer) => peer.ageSeconds >= PEER_AGE_HIGH_SECONDS)) {
-    anomalies.add('peer-age-high');
+    anomalies.push('peer-age-high');
   }
   if (snapshot.rssBytes >= HIGH_RSS_BYTES) {
-    anomalies.add('high-rss');
+    anomalies.push('high-rss');
   }
   if (snapshot.uptimeMs >= LONG_LIVED_UPTIME_MS && snapshot.rssBytes >= LONG_LIVED_HIGH_RSS_BYTES) {
-    anomalies.add('long-lived-high-rss');
+    anomalies.push('long-lived-high-rss');
   }
 
-  return [...anomalies].sort();
+  return anomalies.sort();
 }
 
 function isLikelyMcpProcessCommand(command: string): boolean {
@@ -250,12 +250,7 @@ async function sampleMcpPeerProcesses(
     const peers = matched
       .filter((entry) => entry.pid !== currentPid)
       .map(({ pid, ageSeconds, rssKb }) => ({ pid, ageSeconds, rssKb }))
-      .sort((left, right) => {
-        if (right.ageSeconds !== left.ageSeconds) {
-          return right.ageSeconds - left.ageSeconds;
-        }
-        return right.rssKb - left.rssKb;
-      })
+      .sort((left, right) => right.ageSeconds - left.ageSeconds || right.rssKb - left.rssKb)
       .slice(0, 5);
 
     return {

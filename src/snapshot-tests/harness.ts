@@ -82,7 +82,7 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
     args: Record<string, unknown>,
   ): Promise<SnapshotResult> {
     const jsonArg = JSON.stringify(args);
-    const { VITEST, NODE_ENV, ...cleanEnv } = process.env;
+    const { VITEST: _vitest, NODE_ENV: _nodeEnv, ...cleanEnv } = process.env;
     const result = spawnSync('node', [CLI_PATH, workflow, cliToolName, '--json', jsonArg], {
       encoding: 'utf8',
       timeout: 120000,
@@ -106,12 +106,8 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
     const toolModule = await importSnapshotToolModule(toolModulePath);
     const session = createRenderSession('text');
     const ctx: ToolHandlerContext = {
-      emit: (event) => {
-        session.emit(event);
-      },
-      attach: (image) => {
-        session.attach(image);
-      },
+      emit: session.emit,
+      attach: session.attach,
     };
     await toolModule.handler(args, ctx);
 
