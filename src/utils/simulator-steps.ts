@@ -50,7 +50,12 @@ export async function findSimulatorById(
   };
 
   for (const runtime in simulatorsData.devices) {
-    for (const device of simulatorsData.devices[runtime]) {
+    const devices = simulatorsData.devices[runtime];
+    if (!Array.isArray(devices)) {
+      continue;
+    }
+
+    for (const device of devices) {
       if (
         typeof device === 'object' &&
         device !== null &&

@@ -9,7 +9,7 @@ import { launchSimulatorAppWithLogging } from '../simulator-steps.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
-  clearAllSimulatorLaunchOsLogSessions,
+  clearAllSimulatorLaunchOsLogSessionsForTests,
   listActiveSimulatorLaunchOsLogSessions,
   setSimulatorLaunchOsLogRegistryDirOverrideForTests,
 } from '../log-capture/simulator-launch-oslog-sessions.ts';
@@ -74,7 +74,7 @@ describe('launchSimulatorAppWithLogging PID resolution', () => {
   });
 
   afterEach(async () => {
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);

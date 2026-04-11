@@ -7,7 +7,7 @@ import {
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import {
-  clearAllSimulatorLaunchOsLogSessions,
+  clearAllSimulatorLaunchOsLogSessionsForTests,
   registerSimulatorLaunchOsLogSession,
   setSimulatorLaunchOsLogRegistryDirOverrideForTests,
 } from '../../../../utils/log-capture/simulator-launch-oslog-sessions.ts';
@@ -73,12 +73,12 @@ describe('stop_app_sim tool', () => {
       return child ? child.exitCode == null : true;
     });
     sessionStore.clear();
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
   });
 
   afterEach(async () => {
     sessionStore.clear();
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);

@@ -5,7 +5,6 @@ import {
   stopLogCapture,
 } from '../log_capture.ts';
 import {
-  listActiveSimulatorLaunchOsLogSessionIds,
   listActiveSimulatorLaunchOsLogSessions,
   stopAllSimulatorLaunchOsLogSessions,
   stopOwnedSimulatorLaunchOsLogSessions,
@@ -20,7 +19,6 @@ export function listActiveSimulatorLogSessionIds(): string[] {
 
 export { startLogCapture, stopLogCapture, stopAllLogCaptures };
 export {
-  listActiveSimulatorLaunchOsLogSessionIds,
   listActiveSimulatorLaunchOsLogSessions,
   stopAllSimulatorLaunchOsLogSessions,
   stopOwnedSimulatorLaunchOsLogSessions,

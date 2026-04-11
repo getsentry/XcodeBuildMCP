@@ -13,7 +13,7 @@ import {
 } from '../mcp-lifecycle.ts';
 import * as shutdownState from '../../utils/shutdown-state.ts';
 import {
-  clearAllSimulatorLaunchOsLogSessions,
+  clearAllSimulatorLaunchOsLogSessionsForTests,
   registerSimulatorLaunchOsLogSession,
   setSimulatorLaunchOsLogRegistryDirOverrideForTests,
 } from '../../utils/log-capture/simulator-launch-oslog-sessions.ts';
@@ -63,12 +63,12 @@ describe('mcp lifecycle coordinator', () => {
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
     setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     vi.restoreAllMocks();
   });
 
   afterEach(async () => {
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);
@@ -181,11 +181,11 @@ describe('mcp lifecycle snapshot', () => {
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
     setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
   });
 
   afterEach(async () => {
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);

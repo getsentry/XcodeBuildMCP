@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
-  clearAllSimulatorLaunchOsLogSessions,
+  clearAllSimulatorLaunchOsLogSessionsForTests,
   listActiveSimulatorLaunchOsLogSessions,
   registerSimulatorLaunchOsLogSession,
   setSimulatorLaunchOsLogRegistryDirOverrideForTests,
@@ -73,7 +73,7 @@ describe('simulator launch OSLog sessions', () => {
   });
 
   afterEach(async () => {
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);

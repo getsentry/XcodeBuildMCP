@@ -167,6 +167,27 @@ async function isRecordActive(record: SimulatorLaunchOsLogRegistryRecord): Promi
   return commandMatchesRecord(commandsByPid.get(record.helperPid), record);
 }
 
+function partitionRecordsByCommandMatch(
+  entries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }>,
+  commandsByPid: Map<number, string>,
+): {
+  activeEntries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }>;
+  stalePaths: string[];
+} {
+  const activeEntries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
+  const stalePaths: string[] = [];
+
+  for (const entry of entries) {
+    if (commandMatchesRecord(commandsByPid.get(entry.record.helperPid), entry.record)) {
+      activeEntries.push(entry);
+      continue;
+    }
+    stalePaths.push(entry.filePath);
+  }
+
+  return { activeEntries, stalePaths };
+}
+
 export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
   SimulatorLaunchOsLogRegistryRecord[]
 > {
@@ -209,6 +230,19 @@ export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
 
   if (entries.length === 0) {
     return [];
+  }
+
+  if (!recordActiveOverrideForTests) {
+    const commandsByPid = await sampleProcessCommands(
+      entries.map((entry) => entry.record.helperPid),
+    );
+    if (commandsByPid !== null) {
+      const { activeEntries, stalePaths } = partitionRecordsByCommandMatch(entries, commandsByPid);
+      if (stalePaths.length > 0) {
+        await removeRegistryPaths(stalePaths);
+      }
+      return activeEntries.map((entry) => entry.record).sort(compareOsLogSortKeys);
+    }
   }
 
   const stalePaths: string[] = [];

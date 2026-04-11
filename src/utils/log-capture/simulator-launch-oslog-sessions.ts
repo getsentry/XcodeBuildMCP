@@ -179,7 +179,14 @@ export async function registerSimulatorLaunchOsLogSession(params: {
     releaseActivity: acquireDaemonActivity('logging.simulator.launch-oslog'),
   };
 
-  const onProcessEnd = (): void => handleLocalProcessExit(sessionId, session);
+  let didHandleProcessEnd = false;
+  const onProcessEnd = (): void => {
+    if (didHandleProcessEnd) {
+      return;
+    }
+    didHandleProcessEnd = true;
+    handleLocalProcessExit(sessionId, session);
+  };
   session.process.once?.('exit', onProcessEnd);
   session.process.once?.('close', onProcessEnd);
   activeSimulatorLaunchOsLogSessions.set(sessionId, session);
@@ -201,10 +208,6 @@ export async function registerSimulatorLaunchOsLogSession(params: {
     finalizeLiveSession(sessionId, session);
     throw error;
   }
-}
-
-export async function listActiveSimulatorLaunchOsLogSessionIds(): Promise<string[]> {
-  return (await listActiveSimulatorLaunchOsLogSessions()).map((session) => session.sessionId);
 }
 
 export async function listActiveSimulatorLaunchOsLogSessions(): Promise<
@@ -267,7 +270,7 @@ export async function stopAllSimulatorLaunchOsLogSessions(
   return stopMatchingRecords(() => true, timeoutMs);
 }
 
-export async function clearAllSimulatorLaunchOsLogSessions(): Promise<void> {
+export async function clearAllSimulatorLaunchOsLogSessionsForTests(): Promise<void> {
   for (const [sessionId, session] of activeSimulatorLaunchOsLogSessions.entries()) {
     finalizeLiveSession(sessionId, session);
   }

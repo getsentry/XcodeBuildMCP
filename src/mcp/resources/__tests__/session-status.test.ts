@@ -10,7 +10,7 @@ import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
 import { activeLogSessions } from '../../../utils/log_capture.ts';
 import { activeDeviceLogSessions } from '../../../utils/log-capture/device-log-sessions.ts';
 import {
-  clearAllSimulatorLaunchOsLogSessions,
+  clearAllSimulatorLaunchOsLogSessionsForTests,
   registerSimulatorLaunchOsLogSession,
   setSimulatorLaunchOsLogRegistryDirOverrideForTests,
 } from '../../../utils/log-capture/simulator-launch-oslog-sessions.ts';
@@ -39,7 +39,7 @@ describe('session-status resource', () => {
     activeLogSessions.clear();
     activeDeviceLogSessions.clear();
     clearAllProcesses();
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     clearDaemonActivityRegistry();
     await getDefaultDebuggerManager().disposeAll();
   });
@@ -48,7 +48,7 @@ describe('session-status resource', () => {
     activeLogSessions.clear();
     activeDeviceLogSessions.clear();
     clearAllProcesses();
-    await clearAllSimulatorLaunchOsLogSessions();
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     clearDaemonActivityRegistry();
     await getDefaultDebuggerManager().disposeAll();
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
