@@ -40,6 +40,14 @@ interface ReferencedTestTarget {
   containerPath?: string;
 }
 
+function normalizeSelectorMethodName(method: string | undefined): string | undefined {
+  if (!method) {
+    return undefined;
+  }
+
+  return method.replace(/\(\)$/, '');
+}
+
 function parseSelector(raw: string): TestSelector | null {
   const parts = raw.split('/').filter(Boolean);
   if (parts.length === 0) {
@@ -50,7 +58,7 @@ function parseSelector(raw: string): TestSelector | null {
     raw,
     target: parts[0],
     classOrSuite: parts[1],
-    method: parts[2],
+    method: normalizeSelectorMethodName(parts[2]),
   };
 }
 
@@ -271,9 +279,11 @@ async function resolveCandidateDirectories(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<string[]> {
   const roots = new Set<string>();
+  const workspacePath = params.workspacePath ? path.resolve(params.workspacePath) : undefined;
+  const projectPath = params.projectPath ? path.resolve(params.projectPath) : undefined;
 
   if (reference.containerPath) {
-    const baseDir = path.dirname(params.workspacePath ?? params.projectPath ?? process.cwd());
+    const baseDir = path.dirname(workspacePath ?? projectPath ?? process.cwd());
     const resolvedContainer = resolveContainerReference(reference.containerPath, baseDir);
 
     if (resolvedContainer.endsWith('.xcodeproj')) {
@@ -286,14 +296,14 @@ async function resolveCandidateDirectories(
     }
   }
 
-  if (params.workspacePath) {
-    const workspaceDir = path.dirname(params.workspacePath);
+  if (workspacePath) {
+    const workspaceDir = path.dirname(workspacePath);
     roots.add(path.join(workspaceDir, reference.name));
     roots.add(path.join(workspaceDir, 'Tests', reference.name));
   }
 
-  if (params.projectPath) {
-    const projectDir = path.dirname(params.projectPath);
+  if (projectPath) {
+    const projectDir = path.dirname(projectPath);
     roots.add(path.join(projectDir, reference.name));
     roots.add(path.join(projectDir, 'Tests', reference.name));
   }
@@ -485,6 +495,19 @@ export function collectResolvedTestSelectors(preflight: TestPreflightResult): st
   return preflight.targets
     .flatMap((target) => target.files.flatMap((file) => file.tests.map((test) => test.displayName)))
     .sort();
+}
+
+export function formatTestSelectionSummary(preflight: TestPreflightResult): string | undefined {
+  const onlyTestingLines = preflight.selectors.onlyTesting.map(
+    (selector) => `     ${selector.raw}`,
+  );
+  const skipTestingLines = preflight.selectors.skipTesting.map(
+    (selector) => `     Skip Testing: ${selector.raw}`,
+  );
+
+  const lines = ['   Selective Testing:', ...onlyTestingLines, ...skipTestingLines];
+
+  return onlyTestingLines.length + skipTestingLines.length > 0 ? lines.join('\n') : undefined;
 }
 
 export function formatTestDiscovery(

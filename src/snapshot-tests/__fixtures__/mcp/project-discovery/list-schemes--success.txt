@@ -1,0 +1,16 @@
+
+🔍 List Schemes
+
+   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+
+✅ Found 2 schemes
+
+Schemes:
+  CalculatorApp
+  CalculatorAppFeature
+
+Next steps:
+1. Build for macOS: build_macos({ workspacePath: "example_projects/iOS_Calculator/CalculatorApp.xcworkspace", scheme: "CalculatorApp" })
+2. Build and run on iOS Simulator (default for run intent): build_run_sim({ workspacePath: "example_projects/iOS_Calculator/CalculatorApp.xcworkspace", scheme: "CalculatorApp", simulatorName: "iPhone 17" })
+3. Build for iOS Simulator (compile-only): build_sim({ workspacePath: "example_projects/iOS_Calculator/CalculatorApp.xcworkspace", scheme: "CalculatorApp", simulatorName: "iPhone 17" })
+4. Show build settings: show_build_settings({ workspacePath: "example_projects/iOS_Calculator/CalculatorApp.xcworkspace", scheme: "CalculatorApp" })

@@ -1,0 +1,6 @@
+
+👆 Swipe
+
+   Simulator: <UUID>
+
+✅ Swipe from (200, 400) to (200, 200) simulated successfully.

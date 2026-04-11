@@ -213,8 +213,24 @@ export function formatHeaderEvent(event: HeaderEvent): string {
   const emoji = OPERATION_EMOJI[event.operation] ?? '\u{2699}\u{FE0F}';
   const lines: string[] = [`${emoji} ${event.operation}`, ''];
 
+  const onlyTestingParams = event.params.filter((param) => param.label === '-only-testing');
+  const skipTestingParams = event.params.filter((param) => param.label === '-skip-testing');
+
   for (const param of event.params) {
+    if (param.label === '-only-testing' || param.label === '-skip-testing') {
+      continue;
+    }
     lines.push(`   ${param.label}: ${param.value}`);
+  }
+
+  if (onlyTestingParams.length > 0 || skipTestingParams.length > 0) {
+    lines.push('   Selective Testing:');
+    for (const param of onlyTestingParams) {
+      lines.push(`     ${param.value}`);
+    }
+    for (const param of skipTestingParams) {
+      lines.push(`     Skip Testing: ${param.value}`);
+    }
   }
 
   if (event.params.length > 0) {
@@ -494,10 +510,27 @@ export function formatSummaryEvent(event: SummaryEvent): string {
   return `${statusEmoji} ${op} ${statusWord}.${durationPart}`;
 }
 
+const TEST_DISCOVERY_PREVIEW_LIMIT = 6;
+
 export function formatTestDiscoveryEvent(event: TestDiscoveryEvent): string {
-  const testList = event.tests.join(', ');
-  const truncation = event.truncated ? ` (and more)` : '';
-  return `Discovered ${event.total} test(s): ${testList}${truncation}`;
+  const visibleTests = event.tests.slice(0, TEST_DISCOVERY_PREVIEW_LIMIT);
+  const lines = [`Discovered ${event.total} test(s):`];
+
+  for (const test of visibleTests) {
+    lines.push(`   ${test}`);
+  }
+
+  const hasMore =
+    event.truncated ||
+    event.tests.length > visibleTests.length ||
+    event.total > visibleTests.length;
+
+  if (hasMore) {
+    const remainingCount = Math.max(event.total - visibleTests.length, 0);
+    lines.push(`   (...and ${remainingCount} more)`);
+  }
+
+  return lines.join('\n');
 }
 
 export function formatNextStepsEvent(event: NextStepsEvent, runtime: 'cli' | 'mcp'): string {

@@ -1,22 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect } from 'vitest';
+import type { FixtureKey, SnapshotRuntime } from './contracts.ts';
 
 const FIXTURES_DIR = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
 
-function shouldUpdateSnapshots(): boolean {
+export interface FixtureMatchOptions {
+  allowUpdate?: boolean;
+}
+
+function shouldUpdateSnapshots(options?: FixtureMatchOptions): boolean {
+  if (options?.allowUpdate === false) {
+    return false;
+  }
+
   return process.env.UPDATE_SNAPSHOTS === '1' || process.env.UPDATE_SNAPSHOTS === 'true';
 }
 
-export function fixturePathFor(testFilePath: string, scenario: string): string {
-  const workflow = path.basename(testFilePath, '.snapshot.test.ts');
-  return path.join(FIXTURES_DIR, workflow, `${scenario}.txt`);
+export function fixturePathFor(key: FixtureKey): string {
+  return path.join(FIXTURES_DIR, key.runtime, key.workflow, `${key.scenario}.txt`);
 }
 
-export function expectMatchesFixture(actual: string, testFilePath: string, scenario: string): void {
-  const fixturePath = fixturePathFor(testFilePath, scenario);
+export function expectMatchesFixture(
+  actual: string,
+  key: FixtureKey,
+  options?: FixtureMatchOptions,
+): void {
+  const fixturePath = fixturePathFor(key);
 
-  if (shouldUpdateSnapshots()) {
+  if (shouldUpdateSnapshots(options)) {
     const dir = path.dirname(fixturePath);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(fixturePath, actual, 'utf8');
@@ -32,4 +44,14 @@ export function expectMatchesFixture(actual: string, testFilePath: string, scena
 
   const expected = fs.readFileSync(fixturePath, 'utf8');
   expect(actual).toBe(expected);
+}
+
+export function createFixtureMatcher(
+  runtime: SnapshotRuntime,
+  workflow: string,
+  options?: FixtureMatchOptions,
+) {
+  return (actual: string, scenario: string): void => {
+    expectMatchesFixture(actual, { runtime, workflow, scenario }, options);
+  };
 }

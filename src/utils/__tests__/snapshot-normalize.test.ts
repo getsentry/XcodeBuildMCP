@@ -21,4 +21,22 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
     expect(result).toContain('~50');
   });
+
+  it('preserves a section break when removing transient progress lines', () => {
+    const input = [
+      'Discovered 2 test(s):',
+      '   ExampleTests/testOne',
+      '› Linking',
+      '› Running tests',
+      '',
+      '✅ 2 tests passed, 0 skipped (⏱️ 1.0s)',
+      '',
+    ].join('\n');
+
+    const result = normalizeSnapshotOutput(input);
+
+    expect(result).toContain(
+      'Discovered 2 test(s):\n   ExampleTests/testOne\n\n✅ 2 tests passed, 0 skipped (⏱️ <DURATION>)\n',
+    );
+  });
 });

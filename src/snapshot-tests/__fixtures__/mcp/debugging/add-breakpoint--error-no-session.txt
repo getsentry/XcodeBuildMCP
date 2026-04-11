@@ -1,0 +1,4 @@
+
+🐛 Add Breakpoint
+
+❌ Failed to add breakpoint: No active debug session. Provide debugSessionId or attach first.

@@ -1,0 +1,6 @@
+
+⚙️ Sync Xcode Defaults
+
+✅ Synced session defaults from Xcode IDE (default profile)
+  ├ scheme: CalculatorApp
+  └ bundleId: io.sentry.calculatorapp

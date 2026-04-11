@@ -1,3 +1,0 @@
-
-❌ Missing required session defaults: scheme is required
-Set with: session-set-defaults { "scheme": "..." }

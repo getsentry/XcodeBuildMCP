@@ -1,0 +1,26 @@
+
+🧪 Test
+
+   Scheme: CalculatorApp
+   Configuration: Debug
+   Platform: iOS Simulator
+   Simulator: iPhone 17
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+
+Discovered 52 test(s):
+   CalculatorAppFeatureTests/CalculatorBasicTests/testClear
+   CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState
+   CalculatorAppFeatureTests/CalculatorBasicTests/testIntentionalFailure
+   CalculatorAppFeatureTests/CalculatorIntegrationTests/testChainCalculations
+   CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation
+   CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay
+   (...and 46 more)
+
+System Failures
+  ✗ xctest encountered an error:
+    - Failed to install or launch the test runner. (Underlying Error: Process spawn via launchd failed. Too many open files. (Underlying Error: The operation couldn’t be completed. (Mach error 24 - (os/kern) memory data moved)))
+  ✗ CalculatorApp encountered an error:
+    - Failed to install or launch the test runner. (Underlying Error: Simulator device failed to launch io.sentry.calculatorapp. The request was denied by service delegate (SBMainWorkspace). (Underlying Error: The request to open "io.sentry.calculatorapp" failed. The request was denied by service delegate (SBMainWorkspace). (Underlying Error: The operation couldn’t be completed. The process failed to launch. (Underlying Error: The operation couldn’t be completed. Launch failed. (Underlying Error: The operation couldn’t be completed. Requestor lacks required entitlement)))))
+
+❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_sim_<TIMESTAMP>_pid<PID>.log

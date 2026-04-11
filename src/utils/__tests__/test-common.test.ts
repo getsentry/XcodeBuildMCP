@@ -239,6 +239,8 @@ describe('handleTestLogic (pipeline)', () => {
     expectPendingTestResponse(result, true);
 
     const renderedText = finalizeAndGetText(result);
+    expect(renderedText).toContain('   Selective Testing:');
+    expect(renderedText).toContain('     AppTests');
     expect(renderedText).toContain('Resolving packages');
     expect(renderedText).toContain('Compiling');
     expect(renderedText).toContain('Running tests');

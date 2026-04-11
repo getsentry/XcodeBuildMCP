@@ -1,0 +1,14 @@
+
+📝 Scaffold iOS Project
+
+   Name: SnapshotTestApp
+   Path: <TMPDIR>/ios
+   Platform: iOS
+
+✅ Project scaffolded successfully
+  └ <TMPDIR>/ios
+
+Next steps:
+1. Important: Before working on the project make sure to read the README.md file in the workspace root directory.
+2. Build for simulator: build_sim({ workspacePath: "<TMPDIR>/ios/SnapshotTestApp.xcworkspace", scheme: "SnapshotTestApp", simulatorName: "iPhone 17" })
+3. Build and run on simulator: build_run_sim({ workspacePath: "<TMPDIR>/ios/SnapshotTestApp.xcworkspace", scheme: "SnapshotTestApp", simulatorName: "iPhone 17" })

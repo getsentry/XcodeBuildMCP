@@ -1,0 +1,11 @@
+
+📦 Install App
+
+   Simulator: <UUID>
+   App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+
+✅ App installed successfully
+
+Next steps:
+1. Open the Simulator app: xcodebuildmcp simulator-management open
+2. Launch the app: xcodebuildmcp simulator launch-app --simulator-id "<UUID>" --bundle-id "io.sentry.calculatorapp"

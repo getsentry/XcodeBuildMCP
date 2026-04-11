@@ -1,9 +1,9 @@
 import type {
   CompilerErrorEvent,
   CompilerWarningEvent,
-  TestFailureEvent,
   PipelineEvent,
   StatusLineEvent,
+  TestFailureEvent,
 } from '../../types/pipeline-events.ts';
 import { createCliProgressReporter } from '../cli-progress-reporter.ts';
 import { formatCliTextLine } from '../terminal-output.ts';
@@ -24,6 +24,7 @@ import {
   formatGroupedTestFailures,
   formatSummaryEvent,
   formatNextStepsEvent,
+  formatTestDiscoveryEvent,
 } from './event-formatting.ts';
 
 function formatCliTextBlock(text: string): string {
@@ -33,9 +34,26 @@ function formatCliTextBlock(text: string): string {
     .join('\n');
 }
 
-export function createCliTextRenderer(options: { interactive: boolean }): PipelineRenderer {
-  const { interactive } = options;
-  const reporter = createCliProgressReporter();
+interface CliTextSink {
+  clearTransient(): void;
+  updateTransient(message: string): void;
+  writeDurable(text: string): void;
+  writeSection(text: string): void;
+}
+
+interface CliTextProcessorOptions {
+  interactive: boolean;
+  sink: CliTextSink;
+  suppressWarnings: boolean;
+}
+
+interface CliTextRendererOptions {
+  interactive: boolean;
+  suppressWarnings?: boolean;
+}
+
+function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRenderer {
+  const { interactive, sink, suppressWarnings } = options;
   const groupedCompilerErrors: CompilerErrorEvent[] = [];
   const groupedWarnings: CompilerWarningEvent[] = [];
   const groupedTestFailures: TestFailureEvent[] = [];
@@ -46,16 +64,16 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
   let lastStatusLineLevel: StatusLineEvent['level'] | null = null;
 
   function writeDurable(text: string): void {
-    reporter.clear();
+    sink.clearTransient();
     pendingTransientRuntimeLine = null;
     hasDurableRuntimeContent = true;
-    process.stdout.write(`${formatCliTextBlock(text)}\n`);
+    sink.writeDurable(text);
   }
 
   function writeSection(text: string): void {
-    reporter.clear();
+    sink.clearTransient();
     pendingTransientRuntimeLine = null;
-    process.stdout.write(`\n${formatCliTextBlock(text)}\n`);
+    sink.writeSection(text);
   }
 
   function flushPendingTransientRuntimeLine(): void {
@@ -78,7 +96,7 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
         case 'build-stage': {
           if (interactive) {
             pendingTransientRuntimeLine = formatBuildStageEvent(event);
-            reporter.update(formatTransientBuildStageEvent(event));
+            sink.updateTransient(formatTransientBuildStageEvent(event));
           } else {
             writeDurable(formatBuildStageEvent(event));
           }
@@ -90,7 +108,7 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
           const transient = interactive ? formatTransientStatusLineEvent(event) : null;
           if (transient) {
             pendingTransientRuntimeLine = formatStatusLineEvent(event);
-            reporter.update(transient);
+            sink.updateTransient(transient);
             break;
           }
 
@@ -138,7 +156,9 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
         }
 
         case 'compiler-warning': {
-          groupedWarnings.push(event);
+          if (!suppressWarnings) {
+            groupedWarnings.push(event);
+          }
           break;
         }
 
@@ -148,6 +168,9 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
         }
 
         case 'test-discovery': {
+          writeDurable(formatTestDiscoveryEvent(event));
+          lastVisibleEventType = 'test-discovery';
+          lastStatusLineLevel = null;
           break;
         }
 
@@ -155,7 +178,7 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
           if (interactive) {
             const failWord = event.failed === 1 ? 'failure' : 'failures';
             pendingTransientRuntimeLine = null;
-            reporter.update(`Running tests (${event.completed}, ${event.failed} ${failWord})`);
+            sink.updateTransient(`Running tests (${event.completed}, ${event.failed} ${failWord})`);
           }
           break;
         }
@@ -214,7 +237,7 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
     },
 
     finalize(): void {
-      reporter.clear();
+      sink.clearTransient();
       pendingTransientRuntimeLine = null;
       diagnosticBaseDir = null;
       hasDurableRuntimeContent = false;
@@ -222,4 +245,55 @@ export function createCliTextRenderer(options: { interactive: boolean }): Pipeli
       lastStatusLineLevel = null;
     },
   };
+}
+
+export function createCliTextRenderer(options: CliTextRendererOptions): PipelineRenderer {
+  const reporter = createCliProgressReporter();
+
+  return createCliTextProcessor({
+    interactive: options.interactive,
+    suppressWarnings: options.suppressWarnings ?? false,
+    sink: {
+      clearTransient(): void {
+        reporter.clear();
+      },
+      updateTransient(message: string): void {
+        reporter.update(message);
+      },
+      writeDurable(text: string): void {
+        process.stdout.write(`${formatCliTextBlock(text)}\n`);
+      },
+      writeSection(text: string): void {
+        process.stdout.write(`\n${formatCliTextBlock(text)}\n`);
+      },
+    },
+  });
+}
+
+export function renderCliTextTranscript(
+  events: readonly PipelineEvent[],
+  options: { suppressWarnings?: boolean } = {},
+): string {
+  let output = '';
+  const renderer = createCliTextProcessor({
+    interactive: false,
+    suppressWarnings: options.suppressWarnings ?? false,
+    sink: {
+      clearTransient(): void {},
+      updateTransient(): void {},
+      writeDurable(text: string): void {
+        output += `${formatCliTextBlock(text)}\n`;
+      },
+      writeSection(text: string): void {
+        output += `\n${formatCliTextBlock(text)}\n`;
+      },
+    },
+  });
+
+  for (const event of events) {
+    renderer.onEvent(event);
+  }
+  renderer.finalize();
+
+  return output;
 }

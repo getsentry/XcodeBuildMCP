@@ -1,0 +1,13 @@
+
+🔍 Get Bundle ID
+
+   App: <TMPDIR>/BundleTest.app
+
+✅ Bundle ID
+  └ com.test.snapshot
+
+Next steps:
+1. Install on simulator: install_app_sim({ simulatorId: "SIMULATOR_UUID", appPath: "<TMPDIR>/BundleTest.app" })
+2. Launch on simulator: launch_app_sim({ simulatorId: "SIMULATOR_UUID", bundleId: "com.test.snapshot" })
+3. Install on device: install_app_device({ deviceId: "DEVICE_UDID", appPath: "<TMPDIR>/BundleTest.app" })
+4. Launch on device: launch_app_device({ deviceId: "DEVICE_UDID", bundleId: "com.test.snapshot" })

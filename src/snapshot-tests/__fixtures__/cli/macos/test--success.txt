@@ -1,0 +1,17 @@
+
+🧪 Test
+
+   Scheme: MCPTest
+   Configuration: Debug
+   Platform: macOS
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Selective Testing:
+     MCPTestTests/MCPTestTests/appNameIsCorrect()
+     MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
+
+Discovered 2 test(s):
+   MCPTestTests/MCPTestTests/appNameIsCorrect
+   MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
+
+✅ 2 tests passed, 0 skipped (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
 import { STAGE_RANK } from '../../types/pipeline-events.ts';
 import type { PipelineEvent } from '../../types/pipeline-events.ts';
@@ -150,6 +150,56 @@ describe('xcodebuild-pipeline', () => {
 
     const discoveryEvents = emittedEvents.filter((e) => e.type === 'test-discovery');
     expect(discoveryEvents).toHaveLength(1);
+
+    const text = renderEvents(emittedEvents, 'text');
+    expect(text).toContain(
+      'Discovered 3 test(s):\n   testA\n   testB\n   testC\n\n✅ Test succeeded.',
+    );
+  });
+
+  it('renders test discovery in cli-text mode', () => {
+    const emittedEvents: PipelineEvent[] = [
+      {
+        type: 'test-discovery',
+        timestamp: '2025-01-01T00:00:00.000Z',
+        operation: 'TEST',
+        total: 8,
+        tests: ['testA', 'testB', 'testC', 'testD', 'testE', 'testF', 'testG', 'testH'],
+        truncated: false,
+      },
+      {
+        type: 'summary',
+        timestamp: '2025-01-01T00:00:01.000Z',
+        operation: 'TEST',
+        status: 'SUCCEEDED',
+        totalTests: 8,
+        passedTests: 8,
+        failedTests: 0,
+        skippedTests: 0,
+        durationMs: 100,
+      },
+    ];
+
+    const writes: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: string | Uint8Array,
+    ) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write);
+
+    try {
+      renderEvents(emittedEvents, 'cli-text');
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    const output = writes.join('');
+    expect(output).toContain('Discovered 8 test(s):');
+    expect(output).toContain('   testA\n');
+    expect(output).toContain('   testF\n');
+    expect(output).not.toContain('   testG\n');
+    expect(output).toContain('   (...and 2 more)');
   });
 
   it('produces JSONL output in CLI json mode', () => {

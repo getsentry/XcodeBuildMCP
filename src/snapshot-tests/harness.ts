@@ -11,54 +11,13 @@ import { createToolCatalog } from '../runtime/tool-catalog.ts';
 import type { ToolDefinition } from '../runtime/types.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
+import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
 
-export interface SnapshotHarness {
-  invoke(
-    workflow: string,
-    cliToolName: string,
-    args: Record<string, unknown>,
-  ): Promise<SnapshotResult>;
-  cleanup(): void;
-}
-
-export interface SnapshotResult {
-  text: string;
-  rawText: string;
-  isError: boolean;
-}
-
-function resolveToolManifest(
-  workflowId: string,
-  cliToolName: string,
-): {
-  toolModulePath: string;
-  isMcpOnly: boolean;
-  isStateful: boolean;
-  manifestEntry: ToolManifestEntry;
-} | null {
-  const manifest = loadManifest();
-  const workflow = manifest.workflows.get(workflowId);
-  if (!workflow) return null;
-
-  const isMcpOnly = !workflow.availability.cli;
-
-  for (const toolId of workflow.tools) {
-    const tool = manifest.tools.get(toolId);
-    if (!tool) continue;
-    if (getEffectiveCliName(tool) === cliToolName) {
-      return {
-        toolModulePath: tool.module,
-        isMcpOnly,
-        isStateful: tool.routing?.stateful === true,
-        manifestEntry: tool,
-      };
-    }
-  }
-
-  return null;
-}
+export type SnapshotHarness = WorkflowSnapshotHarness;
+export type { SnapshotResult };
 
 function buildMinimalToolCatalog(
   manifestEntry: ToolManifestEntry,
@@ -104,9 +63,13 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
     cliToolName: string,
     args: Record<string, unknown>,
   ): Promise<SnapshotResult> {
-    const resolved = resolveToolManifest(workflow, cliToolName);
+    const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
 
-    if (resolved?.isMcpOnly || resolved?.isStateful) {
+    if (!resolved) {
+      throw new Error(`Tool '${cliToolName}' not found in workflow '${workflow}'`);
+    }
+
+    if (resolved.isMcpOnly || resolved.isStateful) {
       return invokeDirect(resolved.toolModulePath, resolved.manifestEntry, args);
     }
 
@@ -173,7 +136,7 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
     };
   }
 
-  function cleanup(): void {}
+  async function cleanup(): Promise<void> {}
 
   return { invoke, cleanup };
 }

@@ -19,6 +19,7 @@ import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
 import {
   formatTestDiscovery,
+  formatTestSelectionSummary,
   collectResolvedTestSelectors,
   type TestPreflightResult,
 } from './test-preflight.ts';
@@ -102,9 +103,20 @@ export async function handleTestLogic(
       deviceName,
     });
 
+    const selectionText = options?.preflight
+      ? formatTestSelectionSummary(options.preflight)
+      : undefined;
     const discoveryText = options?.preflight ? formatTestDiscovery(options.preflight) : undefined;
 
-    const preflightText = discoveryText ? `${configText}\n${discoveryText}` : configText;
+    let preflightText = configText;
+    if (selectionText) {
+      preflightText = `${configText.trimEnd()}\n${selectionText}\n\n`;
+    }
+    if (discoveryText) {
+      preflightText = selectionText
+        ? `${configText.trimEnd()}\n${selectionText}\n\n${discoveryText}`
+        : `${configText}\n${discoveryText}`;
+    }
 
     const started = startBuildPipeline({
       operation: 'TEST',
@@ -116,6 +128,8 @@ export async function handleTestLogic(
         simulatorName: params.simulatorName,
         simulatorId: params.simulatorId,
         deviceId: params.deviceId,
+        onlyTesting: options?.preflight?.selectors.onlyTesting.map((selector) => selector.raw),
+        skipTesting: options?.preflight?.selectors.skipTesting.map((selector) => selector.raw),
         preflight: preflightText,
       },
       message: preflightText,

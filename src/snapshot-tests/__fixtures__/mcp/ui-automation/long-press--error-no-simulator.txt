@@ -1,0 +1,9 @@
+
+👆 Long Press
+
+   Simulator: <UUID>
+
+❌ Failed to simulate long press at (100, 400): axe command 'touch' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

@@ -1,0 +1,13 @@
+
+📊 Coverage Report
+
+   xcresult: <TMPDIR>/TestResults.xcresult
+   Target Filter: CalculatorAppTests
+
+ℹ️ Overall: 94.9% (371/391 lines)
+
+Targets
+  CalculatorAppTests.xctest: 94.9% (371/391 lines)
+
+Next steps:
+1. View file-level coverage: get_file_coverage({ xcresultPath: "<TMPDIR>/TestResults.xcresult" })

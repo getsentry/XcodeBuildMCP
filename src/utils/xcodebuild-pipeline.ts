@@ -118,6 +118,10 @@ function buildHeaderParams(
     file: 'File',
     targetFilter: 'Target Filter',
   };
+  const arrayLabelMap: Record<string, string> = {
+    onlyTesting: '-only-testing',
+    skipTesting: '-skip-testing',
+  };
 
   const pathKeys = new Set(['workspacePath', 'projectPath', 'derivedDataPath', 'xcresultPath']);
 
@@ -139,6 +143,19 @@ function buildHeaderParams(
         displayValue = value;
       }
       result.push({ label, value: displayValue });
+    }
+  }
+
+  for (const [key, label] of Object.entries(arrayLabelMap)) {
+    const value = params[key];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+
+    for (const entry of value) {
+      if (typeof entry === 'string' && entry.length > 0) {
+        result.push({ label, value: entry });
+      }
     }
   }
 

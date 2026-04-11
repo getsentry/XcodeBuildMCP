@@ -1,0 +1,7 @@
+
+📱 Open Simulator
+
+✅ Simulator opened successfully
+
+Next steps:
+1. Boot a simulator for manual workflows: boot_sim({ simulatorId: "UUID_FROM_LIST_SIMS" })

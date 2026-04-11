@@ -60,6 +60,20 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+function getForceExposedToolAliases(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  const value = env.XCODEBUILDMCP_TEST_FORCE_TOOL_EXPOSURE;
+  if (!value) {
+    return new Set();
+  }
+
+  return new Set(
+    value
+      .split(',')
+      .map((alias) => alias.trim().toLowerCase())
+      .filter((alias) => alias.length > 0),
+  );
+}
+
 function buildToolAliasMap(manifest: ResolvedManifest): Map<string, string> {
   const toolIdByAlias = new Map<string, string>();
   for (const tool of manifest.tools.values()) {
@@ -218,6 +232,7 @@ export async function applyWorkflowSelectionFromManifest(
   const desiredWorkflows = new Set<string>();
   const catalogTools: ToolDefinition[] = [];
   const moduleCache = new Map<string, Awaited<ReturnType<typeof importToolModule>>>();
+  const forceExposedToolAliases = getForceExposedToolAliases();
 
   for (const workflow of selectedWorkflows) {
     desiredWorkflows.add(workflow.id);
@@ -226,7 +241,11 @@ export async function applyWorkflowSelectionFromManifest(
       const toolManifest = manifest.tools.get(toolId);
       if (!toolManifest) continue;
 
-      if (!isToolExposedForRuntime(toolManifest, ctx)) {
+      const isForceExposed =
+        forceExposedToolAliases.has(normalizeName(toolManifest.id)) ||
+        forceExposedToolAliases.has(normalizeName(toolManifest.names.mcp));
+
+      if (!isForceExposed && !isToolExposedForRuntime(toolManifest, ctx)) {
         continue;
       }
 

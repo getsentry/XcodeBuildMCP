@@ -1,0 +1,10 @@
+MCP error -32602: Input validation error: Invalid arguments for tool build_sim: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "scheme"
+    ],
+    "message": "Invalid input: expected string, received undefined"
+  }
+]

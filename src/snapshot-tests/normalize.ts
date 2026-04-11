@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex, no-regex-spaces */
 import os from 'node:os';
 import path from 'node:path';
 
@@ -23,8 +24,10 @@ const LLDB_LOWER_FRAMES_REGEX = /(  frame #\d+: (?:<FUNC> at [^\n]*|<ADDR>(?: at
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
 const LLDB_BREAKPOINT_LOCATIONS_REGEX = /locations = .+$/gm;
 const LLDB_BREAKPOINT_SUB_LOCATION_REGEX = /^\s+\d+\.\d+: where = [^\n]+\n?/gm;
+const LLDB_RUNTIME_ROOT_FRAME_REGEX =
+  /^\s*frame #(?:\d+|<N>): .*\/Library\/Developer\/CoreSimulator\/Volumes\/[^`\n]+`[^\n]*\n?/gm;
 const DERIVED_DATA_HASH_REGEX = /(DerivedData\/[A-Za-z0-9_]+)-[a-z]{28}\b/g;
-const PROGRESS_LINE_REGEX = /^›.*\n*/gm;
+const PROGRESS_LINE_REGEX = /^›.*$/gm;
 const WARNINGS_BLOCK_REGEX = /Warnings \(\d+\):\n(?:\n? *⚠[^\n]*\n?)*/g;
 const XCODE_INFRA_ERRORS_REGEX =
   /Compiler Errors \(\d+\):\n(?:\n? *✗ (?:unable to rename temporary|failed to emit precompiled|accessing build database)[^\n]*\n?(?:\n? {4}[^\n]*\n?)*)*/g;
@@ -126,6 +129,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(LLDB_FRAME_NUMBER_REGEX, '  frame #<N>:');
   normalized = normalized.replace(LLDB_BREAKPOINT_LOCATIONS_REGEX, 'locations = <LOCATIONS>');
   normalized = normalized.replace(LLDB_BREAKPOINT_SUB_LOCATION_REGEX, '');
+  normalized = normalized.replace(LLDB_RUNTIME_ROOT_FRAME_REGEX, '');
   normalized = normalized.replace(RESULT_BUNDLE_LINE_REGEX, '<RESULT_BUNDLE_ERROR>');
   normalized = normalized.replace(PROGRESS_LINE_REGEX, '');
   normalized = normalized.replace(WARNINGS_BLOCK_REGEX, '');
@@ -157,7 +161,7 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(
     /("(?:x|y|width|height)"\s*:\s*)(\d+\.\d{2,})/g,
-    (_, prefix, num) => `${prefix}${parseFloat(num).toFixed(1)}`,
+    (_match: string, prefix: string, num: string) => `${prefix}${parseFloat(num).toFixed(1)}`,
   );
 
   normalized = sortLinesInBlock(normalized, /^[◇✔✘] Test "/);
@@ -204,6 +208,7 @@ export function normalizeSnapshotOutput(text: string): string {
   // Sanitize the entire PATH section (volatile across environments)
   normalized = normalized.replace(/\nPATH\n(?:  [^\n]+\n)*/g, '\nPATH\n  <PATH_ENTRIES>\n');
 
+  normalized = normalized.replace(/(  <LOWER_FRAMES>\n){2,}/g, '  <LOWER_FRAMES>\n');
   normalized = normalized.replace(/\n{3,}/g, '\n\n');
   normalized = normalized.replace(TRAILING_WHITESPACE_REGEX, '');
   normalized = normalized.replace(/\n*$/, '\n');

@@ -1,0 +1,34 @@
+
+📱 List Devices
+
+iOS Devices:
+
+  📱 [✓] Cameron’s iPhone 16 Pro Max
+    OS: 26.3.1 (a)
+    UDID: <UUID>
+
+  📱 [✗] iPhone
+    OS: 26.1
+    UDID: <UUID>
+
+watchOS Devices:
+
+  ⌚️ [✗] Cameron’s Apple Watch
+    OS: 10.6.1
+    UDID: <UUID>
+
+  ⌚️ [✓] Cameron’s Apple Watch
+    OS: 26.3
+    UDID: <UUID>
+
+✅ 4 physical devices discovered (2 iOS, 2 watchOS).
+
+Hints
+  Use the device ID/UDID from above when required by other tools.
+  Save a default device with session-set-defaults { deviceId: 'DEVICE_UDID' }.
+  Before running build/run/test/UI automation tools, set the desired device identifier in session defaults.
+
+Next steps:
+1. Build for device: xcodebuildmcp device build --scheme "YOUR_SCHEME" --device-id "UUID_FROM_ABOVE"
+2. Run tests on device: xcodebuildmcp device test
+3. Get app path: xcodebuildmcp device get-app-path

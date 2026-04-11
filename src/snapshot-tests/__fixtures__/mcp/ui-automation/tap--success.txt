@@ -1,0 +1,6 @@
+
+👆 Tap
+
+   Simulator: <UUID>
+
+✅ Tap at (100, 400) simulated successfully.

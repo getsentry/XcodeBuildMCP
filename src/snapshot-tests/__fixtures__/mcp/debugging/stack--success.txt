@@ -1,0 +1,11 @@
+
+🐛 Stack Trace
+
+✅ Stack trace retrieved
+
+Frames:
+  Thread <THREAD_ID> (Thread 1)
+  <LOWER_FRAMES>
+  frame #<N>: static CalculatorApp.$main() at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>
+  frame #<N>: main at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>
+  <LOWER_FRAMES>

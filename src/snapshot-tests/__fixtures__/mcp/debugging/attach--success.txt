@@ -1,0 +1,12 @@
+
+🐛 Attach Debugger
+
+✅ Attached DAP debugger to simulator process <PID> (<UUID>)
+  ├ Debug session ID: <UUID>
+  ├ Status: This session is now the current debug session.
+  └ Execution: Execution is paused. Use debug_continue to resume before UI automation.
+
+Next steps:
+1. Add a breakpoint: debug_breakpoint_add({ debugSessionId: "<UUID>", file: "...", line: 123 })
+2. Continue execution: debug_continue({ debugSessionId: "<UUID>" })
+3. Show call stack: debug_stack({ debugSessionId: "<UUID>" })

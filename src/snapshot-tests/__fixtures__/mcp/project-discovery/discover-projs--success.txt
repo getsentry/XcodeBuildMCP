@@ -1,0 +1,18 @@
+
+🔍 Discover Projects
+
+   Workspace root: <PATH>
+   Scan path: <PATH>
+   Max depth: 3
+
+✅ Found 1 project and 1 workspace
+
+Projects:
+  example_projects/iOS_Calculator/CalculatorApp.xcodeproj
+
+Workspaces:
+  example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+
+Next steps:
+1. Save discovered project/workspace as session defaults: session_set_defaults()
+2. Build and run once defaults are set: build_run_sim()

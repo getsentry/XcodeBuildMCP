@@ -26,6 +26,33 @@ describe('event formatting', () => {
     ).toBe('\u{1F680} Build & Run\n\n   Scheme: MyApp\n');
   });
 
+  it('groups test selection params with human-readable labels in header output', () => {
+    expect(
+      formatHeaderEvent({
+        type: 'header',
+        timestamp: '2026-03-20T12:00:00.000Z',
+        operation: 'Test',
+        params: [
+          { label: 'Scheme', value: 'MyApp' },
+          { label: '-only-testing', value: 'MyAppTests/MyAppTests/testLaunch' },
+          { label: '-skip-testing', value: 'MyAppTests/MyAppTests/testFlaky' },
+          { label: 'Derived Data', value: '~/Library/Developer/XcodeBuildMCP/DerivedData' },
+        ],
+      }),
+    ).toBe(
+      [
+        '\u{1F9EA} Test',
+        '',
+        '   Scheme: MyApp',
+        '   Derived Data: ~/Library/Developer/XcodeBuildMCP/DerivedData',
+        '   Selective Testing:',
+        '     MyAppTests/MyAppTests/testLaunch',
+        '     Skip Testing: MyAppTests/MyAppTests/testFlaky',
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('formats build-stage events as durable phase lines', () => {
     expect(
       formatBuildStageEvent({
