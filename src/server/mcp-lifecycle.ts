@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
 import { activeLogSessions } from '../utils/log_capture.ts';
 import { activeDeviceLogSessions } from '../utils/log-capture/device-log-sessions.ts';
+import { listActiveSimulatorLaunchOsLogSessions } from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
 import { activeProcesses } from '../mcp/tools/swift-package/active-processes.ts';
 import { getDaemonActivitySnapshot } from '../daemon/activity-registry.ts';
 import { listActiveVideoCaptureSessionIds } from '../utils/video_capture.ts';
@@ -61,6 +62,8 @@ export interface McpLifecycleSnapshot {
   activeOperationByCategory: Record<string, number>;
   debuggerSessionCount: number;
   simulatorLogSessionCount: number;
+  simulatorLaunchOsLogSessionCount: number;
+  ownedSimulatorLaunchOsLogSessionCount: number;
   deviceLogSessionCount: number;
   videoCaptureSessionCount: number;
   swiftPackageProcessCount: number;
@@ -287,6 +290,7 @@ export async function buildMcpLifecycleSnapshot(options: {
     options.commandExecutor ?? getDefaultCommandExecutor(),
     process.pid,
   );
+  const simulatorLaunchOsLogSessions = await listActiveSimulatorLaunchOsLogSessions();
 
   const snapshotWithoutAnomalies = {
     pid: process.pid,
@@ -303,6 +307,10 @@ export async function buildMcpLifecycleSnapshot(options: {
     activeOperationByCategory: activitySnapshot.byCategory,
     debuggerSessionCount: getDefaultDebuggerManager().listSessions().length,
     simulatorLogSessionCount: activeLogSessions.size,
+    simulatorLaunchOsLogSessionCount: simulatorLaunchOsLogSessions.length,
+    ownedSimulatorLaunchOsLogSessionCount: simulatorLaunchOsLogSessions.filter(
+      (session) => session.ownedByCurrentProcess,
+    ).length,
     deviceLogSessionCount: activeDeviceLogSessions.size,
     videoCaptureSessionCount: listActiveVideoCaptureSessionIds().length,
     swiftPackageProcessCount: activeProcesses.size,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as z from 'zod';
 import {
   createMockExecutor,
@@ -6,12 +6,84 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import {
+  clearAllSimulatorLaunchOsLogSessions,
+  registerSimulatorLaunchOsLogSession,
+  setSimulatorLaunchOsLogRegistryDirOverrideForTests,
+} from '../../../../utils/log-capture/simulator-launch-oslog-sessions.ts';
+import { setSimulatorLaunchOsLogRecordActiveOverrideForTests } from '../../../../utils/log-capture/simulator-launch-oslog-registry.ts';
 import { schema, handler, stop_app_simLogic } from '../stop_app_sim.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { EventEmitter } from 'node:events';
+import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
+import type { ChildProcess } from 'node:child_process';
+import { setRuntimeInstanceForTests } from '../../../../utils/runtime-instance.ts';
+
+function createTrackedChild(options?: {
+  pid?: number;
+  killImplementation?: (signal?: NodeJS.Signals | number) => boolean;
+}): ChildProcess {
+  const emitter = new EventEmitter();
+  const child = emitter as ChildProcess;
+  let exitCode: number | null = null;
+  const pid = options?.pid ?? nextPid++;
+
+  Object.defineProperty(child, 'pid', { value: pid, configurable: true });
+  Object.defineProperty(child, 'exitCode', {
+    configurable: true,
+    get: () => exitCode,
+    set: (value: number | null) => {
+      exitCode = value;
+    },
+  });
+
+  trackedChildren.set(pid, child);
+
+  child.kill = vi.fn((signal?: NodeJS.Signals | number) => {
+    if (options?.killImplementation) {
+      return options.killImplementation(signal);
+    }
+    exitCode = 0;
+    queueMicrotask(() => {
+      emitter.emit('exit', 0, signal);
+      emitter.emit('close', 0, signal);
+    });
+    return true;
+  }) as ChildProcess['kill'];
+
+  return child;
+}
+
+let registryDir: string;
+let nextPid = 1234;
+const trackedChildren = new Map<number, ChildProcess>();
 
 describe('stop_app_sim tool', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    nextPid = 1234;
+    trackedChildren.clear();
+    registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-stop-app-sim-'));
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
+    setRuntimeInstanceForTests({ instanceId: 'stop-app-sim-test', pid: process.pid });
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(async (record) => {
+      const child = trackedChildren.get(record.helperPid);
+      return child ? child.exitCode == null : true;
+    });
     sessionStore.clear();
+    await clearAllSimulatorLaunchOsLogSessions();
+  });
+
+  afterEach(async () => {
+    sessionStore.clear();
+    await clearAllSimulatorLaunchOsLogSessions();
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
+    setRuntimeInstanceForTests(null);
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);
+    trackedChildren.clear();
+    await rm(registryDir, { recursive: true, force: true });
   });
 
   describe('Export Field Validation (Literal)', () => {
@@ -89,6 +161,32 @@ describe('stop_app_sim tool', () => {
       expect(text).toContain('test-uuid');
     });
 
+    it('stops tracked OSLog sessions alongside the app', async () => {
+      const mockExecutor = createMockExecutor({ success: true, output: '' });
+      const child = createTrackedChild();
+      await registerSimulatorLaunchOsLogSession({
+        process: child,
+        simulatorUuid: 'test-uuid',
+        bundleId: 'io.sentry.App',
+        logFilePath: '/tmp/app.log',
+      });
+
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'test-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
+      );
+
+      const text = allText(result);
+      expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(text).toContain('stopped successfully');
+      expect(text).not.toContain('Tracked OSLog sessions cleaned up');
+    });
+
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: '' });
 
@@ -117,6 +215,13 @@ describe('stop_app_sim tool', () => {
         error: 'Simulator not found',
       });
 
+      await registerSimulatorLaunchOsLogSession({
+        process: createTrackedChild(),
+        simulatorUuid: 'invalid-uuid',
+        bundleId: 'io.sentry.App',
+        logFilePath: '/tmp/app.log',
+      });
+
       const result = await runLogic(() =>
         stop_app_simLogic(
           {
@@ -130,6 +235,35 @@ describe('stop_app_sim tool', () => {
       const text = allText(result);
       expect(text).toContain('Stop app in simulator operation failed');
       expect(text).toContain('Simulator not found');
+      expect(result.isError).toBe(true);
+    });
+
+    it('should report cleanup failures even when terminate succeeds', async () => {
+      const mockExecutor = createMockExecutor({ success: true, output: '' });
+      await registerSimulatorLaunchOsLogSession({
+        process: createTrackedChild({
+          killImplementation: () => {
+            throw new Error('cleanup boom');
+          },
+        }),
+        simulatorUuid: 'test-uuid',
+        bundleId: 'io.sentry.App',
+        logFilePath: '/tmp/app.log',
+      });
+
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorId: 'test-uuid',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
+      );
+
+      const text = allText(result);
+      expect(text).toContain('OSLog cleanup failed');
+      expect(text).toContain('cleanup boom');
       expect(result.isError).toBe(true);
     });
 

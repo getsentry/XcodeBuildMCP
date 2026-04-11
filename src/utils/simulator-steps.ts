@@ -5,6 +5,10 @@ import { log } from './logging/index.ts';
 import type { CommandExecutor } from './CommandExecutor.ts';
 import { normalizeSimctlChildEnv } from './environment.ts';
 import { LOG_DIR } from './log-paths.ts';
+import {
+  registerSimulatorLaunchOsLogSession,
+  stopSimulatorLaunchOsLogSessionsForApp,
+} from './log-capture/simulator-launch-oslog-sessions.ts';
 
 export interface StepResult {
   success: boolean;
@@ -202,9 +206,13 @@ export async function launchSimulatorAppWithLogging(
     const processId = await resolveAppPidViaLaunch(simulatorUuid, bundleId, executor);
 
     // Start OSLog stream as a separate detached process writing to its own file
-    const osLogPath = startOsLogStream(simulatorUuid, bundleId, logsDir, spawner);
+    const osLogPath = await startTrackedOsLogStream(simulatorUuid, bundleId, logsDir, spawner);
 
-    log('info', `Simulator app launched with logging: ${logFilePath}`);
+    if (osLogPath) {
+      log('info', `Simulator app launched with logging: ${logFilePath}`);
+    } else {
+      log('warn', `Simulator app launched, but OSLog capture did not start: ${logFilePath}`);
+    }
     return { success: true, processId, logFilePath, osLogPath };
   } catch (error) {
     if (fd !== undefined) {
@@ -248,17 +256,30 @@ function readLogFileSafe(filePath: string): string {
   }
 }
 
-function startOsLogStream(
+async function startTrackedOsLogStream(
   simulatorUuid: string,
   bundleId: string,
   logsDir: string,
   spawner: ProcessSpawner,
-): string | undefined {
+): Promise<string | undefined> {
   const ts = new Date().toISOString().replace(/:/g, '-').replace('.', '-').slice(0, -1) + 'Z';
   const osLogFilePath = path.join(logsDir, `${bundleId}_oslog_${ts}_pid${process.pid}.log`);
 
   let fd: number | undefined;
   try {
+    const cleanupResult = await stopSimulatorLaunchOsLogSessionsForApp(
+      simulatorUuid,
+      bundleId,
+      1000,
+    );
+    if (cleanupResult.errorCount > 0) {
+      log(
+        'warn',
+        `Skipping OSLog stream start after cleanup failure: ${cleanupResult.errors.join('; ')}`,
+      );
+      return undefined;
+    }
+
     fd = fs.openSync(osLogFilePath, 'w');
 
     const child = spawner(
@@ -278,8 +299,26 @@ function startOsLogStream(
         detached: true,
       },
     );
+
+    try {
+      await registerSimulatorLaunchOsLogSession({
+        process: child,
+        simulatorUuid,
+        bundleId,
+        logFilePath: osLogFilePath,
+      });
+    } catch (error) {
+      try {
+        child.kill?.('SIGTERM');
+      } catch {
+        // Best-effort cleanup after failed durable registration.
+      }
+      throw error;
+    }
+
     child.unref();
     fs.closeSync(fd);
+    fd = undefined;
     return osLogFilePath;
   } catch (error) {
     if (fd !== undefined) {

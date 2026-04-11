@@ -9,6 +9,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
 import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { stopSimulatorLaunchOsLogSessionsForApp } from '../../../utils/log-capture/index.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -57,10 +58,25 @@ export async function stop_app_simLogic(
     async () => {
       const command = ['xcrun', 'simctl', 'terminate', simulatorId, params.bundleId];
       const result = await executor(command, 'Stop App in Simulator', false);
+      const cleanupResult = await stopSimulatorLaunchOsLogSessionsForApp(
+        simulatorId,
+        params.bundleId,
+        1000,
+      );
 
-      if (!result.success) {
+      if (!result.success || cleanupResult.errorCount > 0) {
+        const details: string[] = [];
+        if (!result.success) {
+          details.push(result.error ?? 'Unknown simulator terminate error');
+        }
+        if (cleanupResult.errorCount > 0) {
+          details.push(`OSLog cleanup failed: ${cleanupResult.errors.join('; ')}`);
+        }
+
         ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Stop app in simulator operation failed: ${result.error}`));
+        ctx.emit(
+          statusLine('error', `Stop app in simulator operation failed: ${details.join(' | ')}`),
+        );
         return;
       }
 

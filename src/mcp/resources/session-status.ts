@@ -10,7 +10,7 @@ import { getSessionRuntimeStatusSnapshot } from '../../utils/session-status.ts';
 export async function sessionStatusResourceLogic(): Promise<{ contents: Array<{ text: string }> }> {
   try {
     log('info', 'Processing session status resource request');
-    const status = getSessionRuntimeStatusSnapshot();
+    const status = await getSessionRuntimeStatusSnapshot();
 
     return {
       contents: [

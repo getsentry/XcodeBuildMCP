@@ -1,5 +1,8 @@
 import { getDefaultDebuggerManager } from './debugger/index.ts';
-import { listActiveSimulatorLogSessionIds } from './log-capture/index.ts';
+import {
+  listActiveSimulatorLaunchOsLogSessions,
+  listActiveSimulatorLogSessionIds,
+} from './log-capture/index.ts';
 import { activeDeviceLogSessions } from './log-capture/device-log-sessions.ts';
 import { getDaemonActivitySnapshot } from '../daemon/activity-registry.ts';
 import { activeProcesses } from '../mcp/tools/swift-package/active-processes.ts';
@@ -8,7 +11,18 @@ import { getWatchedPath, isWatcherRunning } from './xcode-state-watcher.ts';
 
 export type SessionRuntimeStatusSnapshot = {
   logging: {
-    simulator: { activeSessionIds: string[] };
+    simulator: {
+      activeSessionIds: string[];
+      activeLaunchOsLogSessions: Array<{
+        sessionId: string;
+        simulatorUuid: string;
+        bundleId: string;
+        pid: number | null;
+        logFilePath: string;
+        startedAtMs: number;
+        ownedByCurrentProcess: boolean;
+      }>;
+    };
     device: { activeSessionIds: string[] };
   };
   debug: {
@@ -37,7 +51,7 @@ export type SessionRuntimeStatusSnapshot = {
   };
 };
 
-export function getSessionRuntimeStatusSnapshot(): SessionRuntimeStatusSnapshot {
+export async function getSessionRuntimeStatusSnapshot(): Promise<SessionRuntimeStatusSnapshot> {
   const debuggerManager = getDefaultDebuggerManager();
   const activitySnapshot = getDaemonActivitySnapshot();
   const sessionIds = debuggerManager
@@ -50,6 +64,7 @@ export function getSessionRuntimeStatusSnapshot(): SessionRuntimeStatusSnapshot 
     logging: {
       simulator: {
         activeSessionIds: listActiveSimulatorLogSessionIds(),
+        activeLaunchOsLogSessions: await listActiveSimulatorLaunchOsLogSessions(),
       },
       device: {
         activeSessionIds: Array.from(activeDeviceLogSessions.keys()).sort(),
