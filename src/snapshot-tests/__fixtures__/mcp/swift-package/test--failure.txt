@@ -16,5 +16,6 @@ CalculatorAppTests
       - Expectation failed: Bool(false)
 Test failed
         SimpleTests.swift:57
+
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log

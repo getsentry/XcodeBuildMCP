@@ -1,26 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import fs from 'node:fs';
-import { execSync } from 'node:child_process';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import {
+  extractAppPathFromSnapshotOutput,
+  extractProcessIdFromSnapshotOutput,
+} from '../output-parsers.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
 const BUNDLE_ID = 'io.sentry.calculatorapp';
 const DEVICE_ID = process.env.DEVICE_ID;
 
-interface DeviceCtlLaunchResult {
-  result?: {
-    process?: {
-      processIdentifier?: number;
-    };
-  };
-}
-
 export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
   const expectFixture = createWorkflowFixtureMatcher(runtime, 'device');
-  const expectCanonicalFixture = createWorkflowFixtureMatcher(runtime, 'device', {
-    fixtureRuntime: 'cli',
-  });
 
   describe(`${runtime} device workflow`, () => {
     let harness: WorkflowSnapshotHarness;
@@ -50,7 +41,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'build--success');
+        expectFixture(text, 'build--success');
       });
 
       it('error - wrong scheme', async () => {
@@ -59,7 +50,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'build--error-wrong-scheme');
+        expectFixture(text, 'build--error-wrong-scheme');
       });
     });
 
@@ -71,7 +62,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'get-app-path--success');
+        expectFixture(text, 'get-app-path--success');
       });
 
       it('error - wrong scheme', async () => {
@@ -80,7 +71,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'get-app-path--error-wrong-scheme');
+        expectFixture(text, 'get-app-path--error-wrong-scheme');
       });
     });
 
@@ -127,28 +118,29 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'build-and-run--success');
+        expectFixture(text, 'build-and-run--success');
+      });
+
+      it('error - wrong scheme', async () => {
+        const { text, isError } = await harness.invoke('device', 'build-and-run', {
+          workspacePath: WORKSPACE,
+          scheme: 'NONEXISTENT',
+          deviceId: DEVICE_ID,
+        });
+        expect(isError).toBe(true);
+        expectFixture(text, 'build-and-run--error-wrong-scheme');
       });
     });
 
     describe.runIf(DEVICE_ID)('install (requires device)', () => {
       it('success', async () => {
-        const appPathOutput = execSync(
-          [
-            'xcodebuild -workspace',
-            WORKSPACE,
-            '-scheme CalculatorApp',
-            `-destination 'id=${DEVICE_ID}'`,
-            '-showBuildSettings',
-          ].join(' '),
-          { encoding: 'utf8', timeout: 30_000, stdio: 'pipe' },
-        );
-        const builtProductsDir = appPathOutput
-          .split('\n')
-          .find((line) => line.includes('BUILT_PRODUCTS_DIR'))
-          ?.split('=')[1]
-          ?.trim();
-        const appPath = `${builtProductsDir}/CalculatorApp.app`;
+        const appPathResult = await harness.invoke('device', 'get-app-path', {
+          workspacePath: WORKSPACE,
+          scheme: 'CalculatorApp',
+        });
+        expect(appPathResult.isError).toBe(false);
+
+        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
 
         const { text, isError } = await harness.invoke('device', 'install', {
           deviceId: DEVICE_ID,
@@ -172,14 +164,13 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
 
     describe.runIf(DEVICE_ID)('stop (requires device)', () => {
       it('success', async () => {
-        const tmpJson = `/tmp/devicectl-launch-${Date.now()}.json`;
-        execSync(
-          `xcrun devicectl device process launch --device ${DEVICE_ID} ${BUNDLE_ID} --json-output ${tmpJson}`,
-          { encoding: 'utf8', timeout: 30_000, stdio: 'pipe' },
-        );
-        const launchData = JSON.parse(fs.readFileSync(tmpJson, 'utf8')) as DeviceCtlLaunchResult;
-        fs.unlinkSync(tmpJson);
-        const pid = launchData?.result?.process?.processIdentifier;
+        const launchResult = await harness.invoke('device', 'launch', {
+          deviceId: DEVICE_ID,
+          bundleId: BUNDLE_ID,
+        });
+        expect(launchResult.isError).toBe(false);
+
+        const pid = extractProcessIdFromSnapshotOutput(launchResult.rawText);
         expect(pid).toBeGreaterThan(0);
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -203,7 +194,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'test--success');
+        expectFixture(text, 'test--success');
       }, 300_000);
 
       it('failure - intentional test failure', async () => {
@@ -214,7 +205,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(true);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'test--failure');
+        expectFixture(text, 'test--failure');
       }, 300_000);
     });
   });

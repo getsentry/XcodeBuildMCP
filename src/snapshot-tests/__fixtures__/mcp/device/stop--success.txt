@@ -1,0 +1,7 @@
+
+🛑 Stop App
+
+   Device: <DEVICE> (<UUID>)
+   PID: <PID>
+
+✅ App stopped successfully

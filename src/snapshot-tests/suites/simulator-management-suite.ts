@@ -1,8 +1,16 @@
-import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { ensureSimulatorBooted } from '../harness.ts';
+import {
+  createTemporarySimulator,
+  deleteSimulator,
+  ensureSimulatorBooted,
+  shutdownSimulator,
+} from '../harness.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+
+const PRIMARY_SIMULATOR_NAME = 'iPhone 17';
+const THROWAWAY_SIMULATOR_NAME = 'iPhone 17 Pro';
+const IOS_26_4_RUNTIME_IDENTIFIER = 'com.apple.CoreSimulator.SimRuntime.iOS-26-4';
 
 export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntime): void {
   const expectFixture = createWorkflowFixtureMatcher(runtime, 'simulator-management');
@@ -12,7 +20,7 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     let simulatorUdid: string;
 
     beforeAll(async () => {
-      simulatorUdid = await ensureSimulatorBooted('iPhone 17');
+      simulatorUdid = await ensureSimulatorBooted(PRIMARY_SIMULATOR_NAME);
       harness = await createHarnessForRuntime(runtime);
     });
 
@@ -30,6 +38,27 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     });
 
     describe('boot', () => {
+      it('success', async () => {
+        const throwawaySimulatorUdid = await createTemporarySimulator(
+          THROWAWAY_SIMULATOR_NAME,
+          IOS_26_4_RUNTIME_IDENTIFIER,
+        );
+
+        try {
+          const { text, isError } = await harness.invoke('simulator-management', 'boot', {
+            simulatorId: throwawaySimulatorUdid,
+          });
+          expect(isError).toBe(false);
+          expectFixture(text, 'boot--success');
+        } finally {
+          await shutdownSimulator(throwawaySimulatorUdid);
+          await harness.invoke('simulator-management', 'erase', {
+            simulatorId: throwawaySimulatorUdid,
+          });
+          await deleteSimulator(throwawaySimulatorUdid);
+        }
+      }, 60_000);
+
       it('error - invalid id', async () => {
         const { text } = await harness.invoke('simulator-management', 'boot', {
           simulatorId: '00000000-0000-0000-0000-000000000000',
@@ -136,22 +165,26 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
       });
 
       it('success', async () => {
-        const throwawayUdid = execSync('xcrun simctl create "SnapshotTestThrowaway" "iPhone 16"', {
-          encoding: 'utf8',
-        }).trim();
+        const throwawaySimulatorUdid = await createTemporarySimulator(
+          THROWAWAY_SIMULATOR_NAME,
+          IOS_26_4_RUNTIME_IDENTIFIER,
+        );
 
         try {
+          const bootResult = await harness.invoke('simulator-management', 'boot', {
+            simulatorId: throwawaySimulatorUdid,
+          });
+          expect(bootResult.isError).toBe(false);
+
+          await shutdownSimulator(throwawaySimulatorUdid);
+
           const { text, isError } = await harness.invoke('simulator-management', 'erase', {
-            simulatorId: throwawayUdid,
+            simulatorId: throwawaySimulatorUdid,
           });
           expect(isError).toBe(false);
           expectFixture(text, 'erase--success');
         } finally {
-          try {
-            execSync(`xcrun simctl delete ${throwawayUdid}`);
-          } catch {
-            // Simulator may already be deleted
-          }
+          await deleteSimulator(throwawaySimulatorUdid);
         }
       }, 60_000);
     });

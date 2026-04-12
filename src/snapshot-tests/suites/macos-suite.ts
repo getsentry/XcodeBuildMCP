@@ -1,19 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DERIVED_DATA_DIR } from '../../utils/log-paths.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const PROJECT = 'example_projects/macOS/MCPTest.xcodeproj';
 
 export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
   const expectFixture = createWorkflowFixtureMatcher(runtime, 'macos');
-  const expectCanonicalFixture = createWorkflowFixtureMatcher(runtime, 'macos', {
-    fixtureRuntime: 'cli',
-  });
 
   describe(`${runtime} macos workflow`, () => {
     let harness: WorkflowSnapshotHarness;
@@ -61,7 +57,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'build--success');
+        expectFixture(text, 'build--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
@@ -70,7 +66,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'build--error-wrong-scheme');
+        expectFixture(text, 'build--error-wrong-scheme');
       });
     });
 
@@ -82,7 +78,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'build-and-run--success');
+        expectFixture(text, 'build-and-run--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
@@ -91,7 +87,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'build-and-run--error-wrong-scheme');
+        expectFixture(text, 'build-and-run--error-wrong-scheme');
       });
     });
 
@@ -107,7 +103,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'test--success');
+        expectFixture(text, 'test--success');
       });
 
       it('failure - intentional test failure', { timeout: 120000 }, async () => {
@@ -117,7 +113,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(true);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'test--failure');
+        expectFixture(text, 'test--failure');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
@@ -126,7 +122,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'test--error-wrong-scheme');
+        expectFixture(text, 'test--error-wrong-scheme');
       });
     });
 
@@ -138,7 +134,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectCanonicalFixture(text, 'get-app-path--success');
+        expectFixture(text, 'get-app-path--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
@@ -147,18 +143,19 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           scheme: 'NONEXISTENT',
         });
         expect(isError).toBe(true);
-        expectCanonicalFixture(text, 'get-app-path--error-wrong-scheme');
+        expectFixture(text, 'get-app-path--error-wrong-scheme');
       });
     });
 
     describe('launch', () => {
       it('success', { timeout: 120000 }, async () => {
-        const settingsOutput = execSync(
-          `xcodebuild -project ${PROJECT} -scheme MCPTest -showBuildSettings -derivedDataPath '${DERIVED_DATA_DIR}' 2>/dev/null`,
-          { encoding: 'utf8' },
-        );
-        const match = settingsOutput.match(/BUILT_PRODUCTS_DIR = (.+)/);
-        const appPath = `${match![1]!.trim()}/MCPTest.app`;
+        const appPathResult = await harness.invoke('macos', 'get-app-path', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+        });
+        expect(appPathResult.isError).toBe(false);
+
+        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
 
         const { text, isError } = await harness.invoke('macos', 'launch', {
           appPath,
@@ -180,12 +177,13 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
 
     describe('stop', () => {
       it('success', { timeout: 120000 }, async () => {
-        const settingsOutput = execSync(
-          `xcodebuild -project ${PROJECT} -scheme MCPTest -showBuildSettings -derivedDataPath '${DERIVED_DATA_DIR}' 2>/dev/null`,
-          { encoding: 'utf8' },
-        );
-        const match = settingsOutput.match(/BUILT_PRODUCTS_DIR = (.+)/);
-        const appPath = `${match![1]!.trim()}/MCPTest.app`;
+        const appPathResult = await harness.invoke('macos', 'get-app-path', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+        });
+        expect(appPathResult.isError).toBe(false);
+
+        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
 
         await harness.invoke('macos', 'launch', { appPath });
 

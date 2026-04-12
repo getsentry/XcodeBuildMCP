@@ -5,10 +5,10 @@ iOS Simulators:
 
   iOS 26.4:
 
-    📱 [✗] iPhone 17 Pro (Shutdown)
+    📱 [✓] iPhone 17 Pro (Booted)
       UDID: <UUID>
 
-    📱 [✗] iPhone 17 Pro Max (Shutdown)
+    📱 [✓] iPhone 17 Pro Max (Booted)
       UDID: <UUID>
 
     📱 [✗] iPhone 17e (Shutdown)
@@ -46,7 +46,7 @@ Hints
   Before running boot/build/run tools, set the desired simulator identifier in session defaults.
 
 Next steps:
-1. Boot a simulator: xcodebuildmcp simulator-management boot --simulator-id "UUID_FROM_ABOVE"
-2. Open the simulator UI: xcodebuildmcp simulator-management open
-3. Build for simulator: xcodebuildmcp simulator build --scheme "YOUR_SCHEME" --simulator-id "UUID_FROM_ABOVE"
-4. Get app path: xcodebuildmcp simulator get-app-path --scheme "YOUR_SCHEME" --platform "iOS Simulator" --simulator-id "UUID_FROM_ABOVE"
+1. Boot a simulator: boot_sim({ simulatorId: "UUID_FROM_ABOVE" })
+2. Open the simulator UI: open_sim()
+3. Build for simulator: build_sim({ scheme: "YOUR_SCHEME", simulatorId: "UUID_FROM_ABOVE" })
+4. Get app path: get_sim_app_path({ scheme: "YOUR_SCHEME", platform: "iOS Simulator", simulatorId: "UUID_FROM_ABOVE" })

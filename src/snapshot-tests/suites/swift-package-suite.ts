@@ -108,6 +108,13 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
     });
 
     describe('list', () => {
+      it('no processes', async () => {
+        clearAllProcesses();
+        const { text, isError } = await harness.invoke('swift-package', 'list', {});
+        expect(isError).toBe(false);
+        expectFixture(text, 'list--no-processes');
+      });
+
       it('success', async () => {
         await harness.invoke('swift-package', 'run', {
           packagePath: PACKAGE_PATH,

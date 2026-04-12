@@ -122,4 +122,5 @@ Troubleshooting Tips
   If incremental build support is not available, install xcodemake (https://github.com/cameroncooke/xcodemake) and ensure it is executable and available in your PATH
   To enable xcodemake, set environment variable: export INCREMENTAL_BUILDS_ENABLED=1
   For mise integration, follow instructions in the README.md file
+
 ✅ Doctor diagnostics complete

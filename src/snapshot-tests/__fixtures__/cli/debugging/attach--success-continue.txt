@@ -7,6 +7,6 @@
   └ Execution: Execution is running. App is responsive to UI interaction.
 
 Next steps:
-1. Add a breakpoint: debug_breakpoint_add({ debugSessionId: "<UUID>", file: "...", line: 123 })
-2. Continue execution: debug_continue({ debugSessionId: "<UUID>" })
-3. Show call stack: debug_stack({ debugSessionId: "<UUID>" })
+1. Add a breakpoint: xcodebuildmcp debugging add-breakpoint --debug-session-id "<UUID>" --file "..." --line "123"
+2. Continue execution: xcodebuildmcp debugging continue --debug-session-id "<UUID>"
+3. Show call stack: xcodebuildmcp debugging stack --debug-session-id "<UUID>"

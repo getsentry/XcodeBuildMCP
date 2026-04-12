@@ -95,21 +95,12 @@ export function registerDebuggingSnapshotSuite(runtime: SnapshotRuntime): void {
           /* ignore if none running */
         }
 
-        execSync(
-          [
-            'xcodebuild build',
-            `-workspace ${WORKSPACE}`,
-            '-scheme CalculatorApp',
-            `-destination 'platform=iOS Simulator,id=${simulatorUdid}'`,
-            '-quiet',
-          ].join(' '),
-          { encoding: 'utf8', timeout: 120_000, stdio: 'pipe' },
-        );
-
-        execSync(`xcrun simctl launch --terminate-running-process ${simulatorUdid} ${BUNDLE_ID}`, {
-          encoding: 'utf8',
-          stdio: 'pipe',
+        const buildRunResult = await harness.invoke('simulator', 'build-and-run', {
+          workspacePath: WORKSPACE,
+          scheme: 'CalculatorApp',
+          simulatorId: simulatorUdid,
         });
+        expect(buildRunResult.isError).toBe(false);
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }, 120_000);
@@ -190,10 +181,11 @@ export function registerDebuggingSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 30_000);
 
       it('attach - success (continue on attach)', async () => {
-        execSync(`xcrun simctl launch --terminate-running-process ${simulatorUdid} ${BUNDLE_ID}`, {
-          encoding: 'utf8',
-          stdio: 'pipe',
+        const launchResult = await harness.invoke('simulator', 'launch-app', {
+          simulatorId: simulatorUdid,
+          bundleId: BUNDLE_ID,
         });
+        expect(launchResult.isError).toBe(false);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const { text, isError } = await harness.invoke('debugging', 'attach', {

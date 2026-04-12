@@ -18,7 +18,7 @@ Accessibility Hierarchy
       "height" : 874
     },
     "role_description" : "application",
-    "AXLabel" : "Calculator",
+    "AXLabel" : " ",
     "content_required" : false,
     "type" : "Application",
     "title" : null,
@@ -31,51 +31,26 @@ Accessibility Hierarchy
     "role" : "AXApplication",
     "children" : [
       {
-        "AXFrame" : "{{344, 250.5}, {34, 67}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{28.333333333333371, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Fitness",
         "frame" : {
-          "y" : 250.5,
-          "x" : 344,
-          "width" : 34,
-          "height" : 67
-        },
-        "role_description" : "text",
-        "AXLabel" : "0",
-        "content_required" : false,
-        "type" : "StaticText",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXStaticText",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{19.5, 357.5}, {82.666664123535156, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 357.5,
-          "x" : 19.5,
-          "width" : 82.7,
-          "height" : 81
+          "y" : 88,
+          "x" : 28.3,
+          "width" : 68,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "C",
+        "AXLabel" : "Fitness",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -85,24 +60,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{113.16666412353516, 357.5}, {82.333335876464844, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{120.66666666666674, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Watch",
         "frame" : {
-          "y" : 357.5,
-          "x" : 113.2,
-          "width" : 82.3,
-          "height" : 81
+          "y" : 88,
+          "x" : 120.7,
+          "width" : 68,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "±",
+        "AXLabel" : "Watch",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -112,24 +89,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{206.5, 357.5}, {82.666656494140625, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{211.33333333333326, 88}, {72.333333333333314, 90.666666666666657}}",
+        "AXUniqueId" : "Contacts",
         "frame" : {
-          "y" : 357.5,
-          "x" : 206.5,
-          "width" : 82.7,
-          "height" : 81
+          "y" : 88,
+          "x" : 211.3,
+          "width" : 72.3,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "%",
+        "AXLabel" : "Contacts",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -139,24 +118,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{300.16665649414062, 357.5}, {82.333343505859375, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{306, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Files",
         "frame" : {
-          "y" : 357.5,
-          "x" : 300.2,
-          "width" : 82.3,
-          "height" : 81
+          "y" : 88,
+          "x" : 306,
+          "width" : 68,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "÷",
+        "AXLabel" : "Files",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -166,24 +147,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{19.5, 449.5}, {82.666664123535156, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{28.333333333333371, 188.33333333333334}, {68, 90.666666666666714}}",
+        "AXUniqueId" : "Preview",
         "frame" : {
-          "y" : 449.5,
-          "x" : 19.5,
-          "width" : 82.7,
-          "height" : 81
+          "y" : 188.3,
+          "x" : 28.3,
+          "width" : 68,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "7",
+        "AXLabel" : "Preview",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -193,24 +176,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{113.16666412353516, 449.5}, {82.333335876464844, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{120.66666666666674, 188.33333333333334}, {68, 90.666666666666714}}",
+        "AXUniqueId" : "Utilities",
         "frame" : {
-          "y" : 449.5,
-          "x" : 113.2,
-          "width" : 82.3,
-          "height" : 81
+          "y" : 188.3,
+          "x" : 120.7,
+          "width" : 68,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "8",
+        "AXLabel" : "Utilities folder",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "2 apps",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -220,24 +205,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{206.5, 449.5}, {82.666656494140625, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{207.66666666666663, 188.33333333333334}, {79.333333333333314, 90.666666666666714}}",
+        "AXUniqueId" : "Calculator",
         "frame" : {
-          "y" : 449.5,
-          "x" : 206.5,
-          "width" : 82.7,
-          "height" : 81
+          "y" : 188.3,
+          "x" : 207.7,
+          "width" : 79.3,
+          "height" : 90.7
         },
         "role_description" : "button",
-        "AXLabel" : "9",
+        "AXLabel" : "Calculator",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -247,24 +234,53 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{300.16665649414062, 449.5}, {82.333343505859375, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{162, 703.66666666666674}, {78, 30}}",
+        "AXUniqueId" : "spotlight-pill",
         "frame" : {
-          "y" : 449.5,
-          "x" : 300.2,
-          "width" : 82.3,
-          "height" : 81
+          "y" : 703.7,
+          "x" : 162,
+          "width" : 78,
+          "height" : 30
         },
-        "role_description" : "button",
-        "AXLabel" : "×",
+        "role_description" : "slider",
+        "AXLabel" : "Search",
         "content_required" : false,
-        "type" : "Button",
+        "type" : "Slider",
         "title" : null,
-        "help" : null,
+        "help" : "Activate to open Spotlight.",
         "custom_actions" : [
 
         ],
-        "AXValue" : null,
+        "AXValue" : "Page 2 of 2",
+        "enabled" : true,
+        "role" : "AXSlider",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{123, 771.33333333333326}, {68, 68}}",
+        "AXUniqueId" : "Safari",
+        "frame" : {
+          "y" : 771.3,
+          "x" : 123,
+          "width" : 68,
+          "height" : 68
+        },
+        "role_description" : "button",
+        "AXLabel" : "Safari",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [
@@ -274,294 +290,26 @@ Accessibility Hierarchy
         "pid" : <PID>
       },
       {
-        "AXFrame" : "{{19.5, 541.5}, {82.666664123535156, 81}}",
-        "AXUniqueId" : null,
+        "AXFrame" : "{{211, 771.33333333333326}, {68, 68}}",
+        "AXUniqueId" : "Messages",
         "frame" : {
-          "y" : 541.5,
-          "x" : 19.5,
-          "width" : 82.7,
-          "height" : 81
+          "y" : 771.3,
+          "x" : 211,
+          "width" : 68,
+          "height" : 68
         },
         "role_description" : "button",
-        "AXLabel" : "4",
+        "AXLabel" : "Messages",
         "content_required" : false,
         "type" : "Button",
         "title" : null,
-        "help" : null,
+        "help" : "Double-tap to open",
         "custom_actions" : [
-
+          "Edit mode",
+          "Today",
+          "App Library"
         ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{113.16666412353516, 541.5}, {82.333335876464844, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 541.5,
-          "x" : 113.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "5",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{206.5, 541.5}, {82.666656494140625, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 541.5,
-          "x" : 206.5,
-          "width" : 82.7,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "6",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{300.16665649414062, 541.5}, {82.333343505859375, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 541.5,
-          "x" : 300.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "-",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{19.5, 633.5}, {82.666664123535156, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 633.5,
-          "x" : 19.5,
-          "width" : 82.7,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "1",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{113.16666412353516, 633.5}, {82.333335876464844, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 633.5,
-          "x" : 113.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "2",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{206.5, 633.5}, {82.666656494140625, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 633.5,
-          "x" : 206.5,
-          "width" : 82.7,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "3",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{300.16665649414062, 633.5}, {82.333343505859375, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 633.5,
-          "x" : 300.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "+",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{113.16666412353516, 725.5}, {82.333335876464844, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 725.5,
-          "x" : 113.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "0",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{206.5, 725.5}, {82.666656494140625, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 725.5,
-          "x" : 206.5,
-          "width" : 82.7,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : ".",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
-        "enabled" : true,
-        "role" : "AXButton",
-        "children" : [
-
-        ],
-        "subrole" : null,
-        "pid" : <PID>
-      },
-      {
-        "AXFrame" : "{{300.16665649414062, 725.5}, {82.333343505859375, 81}}",
-        "AXUniqueId" : null,
-        "frame" : {
-          "y" : 725.5,
-          "x" : 300.2,
-          "width" : 82.3,
-          "height" : 81
-        },
-        "role_description" : "button",
-        "AXLabel" : "=",
-        "content_required" : false,
-        "type" : "Button",
-        "title" : null,
-        "help" : null,
-        "custom_actions" : [
-
-        ],
-        "AXValue" : null,
+        "AXValue" : "",
         "enabled" : true,
         "role" : "AXButton",
         "children" : [

@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -31,26 +30,13 @@ export function registerCoverageSnapshotSuite(runtime: SnapshotRuntime): void {
       invalidXcresultPath = path.join(tmpDir, 'invalid.xcresult');
       fs.mkdirSync(invalidXcresultPath);
 
-      // Uses a fresh derived data path to ensure a fully clean build so coverage
-      // targets are deterministic. The Calculator example app has an intentionally
-      // failing test, so xcodebuild exits non-zero but the xcresult is still produced.
-      try {
-        execSync(
-          [
-            'xcodebuild test',
-            `-workspace ${WORKSPACE}`,
-            '-scheme CalculatorApp',
-            "-destination 'platform=iOS Simulator,name=iPhone 17'",
-            '-enableCodeCoverage YES',
-            `-derivedDataPath ${derivedDataPath}`,
-            `-resultBundlePath ${xcresultPath}`,
-            '-quiet',
-          ].join(' '),
-          { encoding: 'utf8', timeout: 120_000, stdio: 'pipe' },
-        );
-      } catch {
-        // Expected: test suite has an intentional failure
-      }
+      await harness.invoke('simulator', 'test', {
+        workspacePath: WORKSPACE,
+        scheme: 'CalculatorApp',
+        simulatorName: 'iPhone 17',
+        derivedDataPath,
+        extraArgs: ['-enableCodeCoverage', 'YES', '-resultBundlePath', xcresultPath],
+      });
 
       if (!fs.existsSync(xcresultPath)) {
         throw new Error(`Failed to generate xcresult at ${xcresultPath}`);

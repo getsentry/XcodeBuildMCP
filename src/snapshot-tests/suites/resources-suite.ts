@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { invokeResource } from '../resource-harness.ts';
 import { createWorkflowFixtureMatcher } from './helpers.ts';
-import { ensureSimulatorBooted, shutdownAllSimulatorsExcept } from '../harness.ts';
+import { ensureSimulatorBooted } from '../harness.ts';
 export function registerResourcesSnapshotSuite(): void {
   const expectFixture = createWorkflowFixtureMatcher('mcp', 'resources');
 
   describe('mcp resources', () => {
-    let simulatorUdid: string;
-
     beforeAll(async () => {
-      simulatorUdid = await ensureSimulatorBooted('iPhone 17');
-      shutdownAllSimulatorsExcept([simulatorUdid]);
+      await ensureSimulatorBooted('iPhone 17');
     }, 30_000);
     describe('devices', () => {
       it('success', async () => {

@@ -14,6 +14,7 @@ const PID_JSON_REGEX = /"pid"\s*:\s*\d+/g;
 const PROCESS_ID_REGEX = /Process ID: \d+/g;
 const PROCESS_INLINE_PID_REGEX = /process \d+/g;
 const CLI_PROCESS_ID_ARG_REGEX = /--process-id "\d+"/g;
+const MCP_PROCESS_ID_ARG_REGEX = /(processId:\s*)\d+/g;
 const THREAD_ID_REGEX = /Thread \d{5,}/g;
 const HEX_ADDRESS_REGEX = /0x[0-9a-fA-F]{8,}/g;
 
@@ -50,6 +51,7 @@ const CODEX_WORKTREE_NODE_MODULES_REGEX =
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
+const ACTIVE_LAUNCH_OSLOG_SESSIONS_REGEX = /("activeLaunchOsLogSessions"\s*:\s*)\[[\s\S]*?\]/g;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
 
 function sortLinesInBlock(text: string, marker: RegExp): string {
@@ -120,6 +122,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(PROCESS_ID_REGEX, 'Process ID: <PID>');
   normalized = normalized.replace(PROCESS_INLINE_PID_REGEX, 'process <PID>');
   normalized = normalized.replace(CLI_PROCESS_ID_ARG_REGEX, '--process-id "<PID>"');
+  normalized = normalized.replace(MCP_PROCESS_ID_ARG_REGEX, '$1<PID>');
   normalized = normalized.replace(UPTIME_REGEX, 'Uptime: <UPTIME>');
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
@@ -144,6 +147,7 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(TARGET_DEVICE_IDENTIFIER_REGEX, '$1<UUID>');
   normalized = normalized.replace(BUILD_SETTINGS_PATH_REGEX, '$1<PATH>');
+  normalized = normalized.replace(ACTIVE_LAUNCH_OSLOG_SESSIONS_REGEX, '$1[]');
   normalized = normalized.replace(CODEX_ARG0_PATH_REGEX, '<HOME>/.codex/tmp/arg0/codex-arg0<ARG0>');
   normalized = normalized.replace(ACQUIRED_USAGE_ASSERTION_TIME_REGEX, '$1<TIME>$2');
   normalized = normalized.replace(

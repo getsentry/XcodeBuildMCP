@@ -5,10 +5,10 @@ iOS Simulators:
 
   iOS 26.4:
 
-    📱 [✗] iPhone 17 Pro (Shutdown)
+    📱 [✓] iPhone 17 Pro (Booted)
       UDID: <UUID>
 
-    📱 [✗] iPhone 17 Pro Max (Shutdown)
+    📱 [✓] iPhone 17 Pro Max (Booted)
       UDID: <UUID>
 
     📱 [✗] iPhone 17e (Shutdown)

@@ -5,16 +5,16 @@ iOS Simulators:
 
   iOS 26.4:
 
-    📱 [<STATUS>] iPhone 17 Pro (Shutdown)
+    📱 [<STATUS>] iPhone 17 Pro (Booted)
       UDID: <UUID>
 
-    📱 [<STATUS>] iPhone 17 Pro Max (Shutdown)
+    📱 [<STATUS>] iPhone 17 Pro Max (Booted)
       UDID: <UUID>
 
-    📱 [<STATUS>] iPhone 17e (Shutdown)
+    📱 [<STATUS>] iPhone 17e (Booted)
       UDID: <UUID>
 
-    📱 [<STATUS>] iPhone Air (Shutdown)
+    📱 [<STATUS>] iPhone Air (Booted)
       UDID: <UUID>
 
     📱 [<STATUS>] iPhone 17 (Booted)
@@ -37,6 +37,7 @@ iOS Simulators:
 
     📱 [<STATUS>] iPad (A16) (Shutdown)
       UDID: <UUID>
+
 ✅ 11 simulators available (11 iOS).
 
 Hints
