@@ -246,6 +246,74 @@ describe('handleTestLogic (pipeline)', () => {
     expect(renderedText).toContain('Running tests');
   });
 
+  it('passes -resultBundlePath only to test-without-building during simulator two-phase execution', async () => {
+    const commands: string[][] = [];
+    const executor = async (
+      command: string[],
+      _description?: string,
+      _useShell?: boolean,
+      _opts?: {
+        cwd?: string;
+        onStdout?: (chunk: string) => void;
+        onStderr?: (chunk: string) => void;
+      },
+    ) => {
+      commands.push(command);
+      return createMockCommandResponse({
+        success: true,
+        output: 'OK',
+        error: '',
+      });
+    };
+
+    await runToolLogic(() =>
+      handleTestLogic(
+        {
+          projectPath: '/tmp/App.xcodeproj',
+          scheme: 'App',
+          configuration: 'Debug',
+          platform: XcodePlatform.iOSSimulator,
+          simulatorId: 'SIM-UUID',
+          extraArgs: [
+            '-enableCodeCoverage',
+            'YES',
+            '-resultBundlePath',
+            '/tmp/TestResults.xcresult',
+          ],
+          progress: true,
+        },
+        executor,
+        {
+          preflight: {
+            scheme: 'App',
+            configuration: 'Debug',
+            destinationName: 'iPhone 17 Pro',
+            projectPath: '/tmp/App.xcodeproj',
+            selectors: { onlyTesting: [], skipTesting: [] },
+            targets: [],
+            warnings: [],
+            totalTests: 1,
+            completeness: 'complete',
+          },
+          toolName: 'test_sim',
+        },
+      ),
+    );
+
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toContain('build-for-testing');
+    expect(commands[0]).toContain('-enableCodeCoverage');
+    expect(commands[0]).toContain('YES');
+    expect(commands[0]).not.toContain('-resultBundlePath');
+    expect(commands[0]).not.toContain('/tmp/TestResults.xcresult');
+
+    expect(commands[1]).toContain('test-without-building');
+    expect(commands[1]).toContain('-enableCodeCoverage');
+    expect(commands[1]).toContain('YES');
+    expect(commands[1]).toContain('-resultBundlePath');
+    expect(commands[1]).toContain('/tmp/TestResults.xcresult');
+  });
+
   it('finalizes the pipeline when the executor throws after startup', async () => {
     const executor = async () => {
       throw new Error('spawn blew up');

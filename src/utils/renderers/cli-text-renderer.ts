@@ -228,7 +228,9 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
         }
 
         case 'next-steps': {
-          writeSection(formatNextStepsEvent(event, 'cli'));
+          const nextStepRuntime =
+            event.runtime === 'mcp' || event.runtime === 'daemon' ? 'mcp' : 'cli';
+          writeSection(formatNextStepsEvent(event, nextStepRuntime));
           lastVisibleEventType = 'next-steps';
           lastStatusLineLevel = null;
           break;

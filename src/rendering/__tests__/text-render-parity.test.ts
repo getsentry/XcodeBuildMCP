@@ -103,7 +103,7 @@ describe('text render parity', () => {
     expect(renderEvents(events, 'text')).toBe(captureCliText(events));
   });
 
-  it('renders next steps in canonical cli format for text transcripts', () => {
+  it('renders next steps in MCP tool-call syntax for MCP runtime text transcripts', () => {
     const events: PipelineEvent[] = [
       {
         type: 'summary',
@@ -132,7 +132,40 @@ describe('text render parity', () => {
 
     const output = renderEvents(events, 'text');
     expect(output).toBe(captureCliText(events));
-    expect(output).toContain('xcodebuildmcp macos get-app-path');
+    expect(output).toContain('get_mac_app_path({ scheme: "MCPTest" })');
+    expect(output).not.toContain('xcodebuildmcp macos get-app-path');
+  });
+
+  it('renders next steps in CLI syntax for CLI runtime text transcripts', () => {
+    const events: PipelineEvent[] = [
+      {
+        type: 'summary',
+        timestamp: '2026-04-10T22:50:05.000Z',
+        operation: 'BUILD',
+        status: 'SUCCEEDED',
+        durationMs: 7100,
+      },
+      {
+        type: 'next-steps',
+        timestamp: '2026-04-10T22:50:06.000Z',
+        runtime: 'cli',
+        steps: [
+          {
+            label: 'Get built macOS app path',
+            tool: 'get_mac_app_path',
+            cliTool: 'get-app-path',
+            workflow: 'macos',
+            params: {
+              scheme: 'MCPTest',
+            },
+          },
+        ],
+      },
+    ];
+
+    const output = renderEvents(events, 'text');
+    expect(output).toBe(captureCliText(events));
+    expect(output).toContain('xcodebuildmcp macos get-app-path --scheme "MCPTest"');
     expect(output).not.toContain('get_mac_app_path({');
   });
 });
