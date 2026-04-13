@@ -4,20 +4,14 @@
   "didError": false,
   "error": null,
   "data": {
-    "scopes": [
-      {
-        "scope": "locals",
-        "displayName": "Locals",
+    "scopes": {
+      "locals": {
         "variables": []
       },
-      {
-        "scope": "globals",
-        "displayName": "Globals",
+      "globals": {
         "variables": []
       },
-      {
-        "scope": "registers",
-        "displayName": "Registers",
+      "registers": {
         "groups": [
           {
             "name": "General Purpose Registers",
@@ -41,6 +35,6 @@
           }
         ]
       }
-    ]
+    }
   }
 }

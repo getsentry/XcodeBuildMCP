@@ -16,10 +16,6 @@
       "deviceId": "<UUID>",
       "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_device_<TIMESTAMP>_pid<PID>.log"
     },
-    "output": {
-      "stdout": [],
-      "stderr": []
-    },
     "diagnostics": {
       "warnings": [],
       "errors": []

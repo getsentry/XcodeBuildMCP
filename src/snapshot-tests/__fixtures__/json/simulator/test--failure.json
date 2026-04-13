@@ -27,8 +27,7 @@
           "CalculatorAppFeatureTests/CalculatorIntegrationTests/testChainCalculations",
           "CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation",
           "CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay"
-        ],
-        "remainingCount": 46
+        ]
       }
     },
     "diagnostics": {
