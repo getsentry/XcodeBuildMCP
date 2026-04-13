@@ -10,6 +10,10 @@
     "artifacts": {
       "simulatorId": "<UUID>",
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
     }
   }
 }

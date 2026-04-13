@@ -13,6 +13,10 @@
       "processId": "<PID>",
       "runtimeLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/io.sentry.calculatorapp_<TIMESTAMP>_pid<PID>.log",
       "osLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
     }
   }
 }

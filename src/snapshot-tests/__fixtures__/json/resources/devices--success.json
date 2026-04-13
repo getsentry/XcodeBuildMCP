@@ -6,32 +6,36 @@
   "data": {
     "devices": [
       {
-        "name": "Cameron’s iPhone 16 Pro Max",
+        "name": "Cameron's iPhone 16 Pro Max",
         "deviceId": "<UUID>",
         "platform": "iOS",
         "osVersion": "26.3.1 (a)",
-        "state": "<STATUS>"
+        "state": "<STATUS>",
+        "isAvailable": true
       },
       {
         "name": "iPhone",
         "deviceId": "<UUID>",
         "platform": "iOS",
         "osVersion": "26.1",
-        "state": "<STATUS>"
+        "state": "<STATUS>",
+        "isAvailable": false
       },
       {
-        "name": "Cameron’s Apple Watch",
+        "name": "Cameron's Apple Watch",
         "deviceId": "<UUID>",
         "platform": "watchOS",
         "osVersion": "10.6.1",
-        "state": "<STATUS>"
+        "state": "<STATUS>",
+        "isAvailable": false
       },
       {
-        "name": "Cameron’s Apple Watch",
+        "name": "Cameron's Apple Watch",
         "deviceId": "<UUID>",
         "platform": "watchOS",
         "osVersion": "26.3",
-        "state": "<STATUS>"
+        "state": "<STATUS>",
+        "isAvailable": true
       }
     ]
   }
