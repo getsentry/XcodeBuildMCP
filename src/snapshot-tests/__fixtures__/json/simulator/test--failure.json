@@ -2,15 +2,17 @@
   "schema": "xcodebuildmcp.output.test-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Test failed",
+  "error": "Tests failed",
   "data": {
     "summary": {
       "status": "FAILED",
+      "durationMs": "<DURATION>",
       "counts": {
-        "failed": "<FAIL_COUNT>",
         "passed": "<PASS_COUNT>",
+        "failed": "<FAIL_COUNT>",
         "skipped": "<SKIP_COUNT>"
-      }
+      },
+      "target": "simulator"
     },
     "artifacts": {
       "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_sim_<TIMESTAMP>_pid<PID>.log"

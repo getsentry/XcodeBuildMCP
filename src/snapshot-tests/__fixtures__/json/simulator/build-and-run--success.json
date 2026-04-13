@@ -5,7 +5,9 @@
   "error": null,
   "data": {
     "summary": {
-      "status": "SUCCEEDED"
+      "status": "SUCCEEDED",
+      "durationMs": "<DURATION>",
+      "target": "simulator"
     },
     "artifacts": {
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
