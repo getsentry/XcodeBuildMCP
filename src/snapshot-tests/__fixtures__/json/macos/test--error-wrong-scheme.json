@@ -2,11 +2,11 @@
   "schema": "xcodebuildmcp.output.test-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Test failed",
+  "error": "Tests failed",
   "data": {
     "summary": {
       "status": "FAILED",
-      "durationMs": "<DURATION>",
+      "durationMs": 1234,
       "target": "macos"
     },
     "artifacts": {

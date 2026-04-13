@@ -6,7 +6,7 @@
   "data": {
     "summary": {
       "status": "SUCCEEDED",
-      "durationMs": "<DURATION>",
+      "durationMs": 1234,
       "target": "swift-package"
     },
     "artifacts": {

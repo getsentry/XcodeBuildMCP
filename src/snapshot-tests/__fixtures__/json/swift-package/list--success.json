@@ -10,8 +10,8 @@
     "processes": [
       {
         "name": "spm",
-        "processId": "<PID>",
-        "uptime": "<UPTIME>",
+        "processId": 99999,
+        "uptimeSeconds": 3600,
         "artifacts": {
           "packagePath": "<ROOT>/example_projects/spm"
         }

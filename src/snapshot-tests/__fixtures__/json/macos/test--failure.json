@@ -6,11 +6,11 @@
   "data": {
     "summary": {
       "status": "FAILED",
-      "durationMs": "<DURATION>",
+      "durationMs": 1234,
       "counts": {
-        "passed": "<PASS_COUNT>",
-        "failed": "<FAIL_COUNT>",
-        "skipped": "<SKIP_COUNT>"
+        "passed": 2,
+        "failed": 2,
+        "skipped": 0
       },
       "target": "macos"
     },

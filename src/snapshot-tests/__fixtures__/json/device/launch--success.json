@@ -10,7 +10,7 @@
     "artifacts": {
       "bundleId": "io.sentry.calculatorapp",
       "deviceId": "<UUID>",
-      "processId": "<PID>"
+      "processId": 99999
     },
     "diagnostics": {
       "warnings": [],

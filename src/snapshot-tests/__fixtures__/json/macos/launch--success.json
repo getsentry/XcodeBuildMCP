@@ -10,7 +10,7 @@
     "artifacts": {
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app",
       "bundleId": "io.sentry.MCPTest.macOS",
-      "processId": "<PID>"
+      "processId": 99999
     },
     "diagnostics": {
       "warnings": [],

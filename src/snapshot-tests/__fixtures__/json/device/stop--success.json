@@ -9,7 +9,7 @@
     },
     "artifacts": {
       "deviceId": "<UUID>",
-      "processId": "<PID>"
+      "processId": 99999
     },
     "diagnostics": {
       "warnings": [],

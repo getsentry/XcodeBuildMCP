@@ -6,7 +6,7 @@
   "data": {
     "summary": {
       "status": "FAILED",
-      "durationMs": "<DURATION>",
+      "durationMs": 1234,
       "target": "device"
     },
     "artifacts": {

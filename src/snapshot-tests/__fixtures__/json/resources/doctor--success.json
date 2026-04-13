@@ -18,8 +18,8 @@
       "tempDirectory": "<TMPDIR>",
       "nodeVersion": "<NODE_VERSION>",
       "cwd": "<CWD>",
-      "processId": "<PID>",
-      "parentProcessId": "<PID>"
+      "processId": 99999,
+      "parentProcessId": 99998
     },
     "tooling": {
       "xcodeVersion": "<XCODE_VERSION>",
@@ -31,31 +31,31 @@
     },
     "capabilities": {
       "uiAutomationAvailable": true,
-      "simulatorVideoCaptureSupported": "<AVAILABLE>",
+      "simulatorVideoCaptureSupported": true,
       "incrementalBuildsEnabled": false,
       "incrementalBuildBinaryAvailable": true,
       "lldbDapAvailable": true,
       "selectedDebuggerBackend": "dap"
     },
     "manifestInventory": {
-      "totalUniqueTools": "<COUNT>",
-      "workflowCount": "<COUNT>",
+      "totalUniqueTools": 42,
+      "workflowCount": 15,
       "workflows": {
-        "coverage": "<N>",
-        "debugging": "<N>",
-        "device": "<N>",
-        "doctor": "<N>",
-        "macos": "<N>",
-        "project-discovery": "<N>",
-        "project-scaffolding": "<N>",
-        "session-management": "<N>",
-        "simulator-management": "<N>",
-        "simulator": "<N>",
-        "swift-package": "<N>",
-        "ui-automation": "<N>",
-        "utilities": "<N>",
-        "workflow-discovery": "<N>",
-        "xcode-ide": "<N>"
+        "coverage": 1,
+        "debugging": 5,
+        "device": 4,
+        "doctor": 1,
+        "macos": 4,
+        "project-discovery": 3,
+        "project-scaffolding": 1,
+        "session-management": 2,
+        "simulator-management": 8,
+        "simulator": 7,
+        "swift-package": 5,
+        "ui-automation": 8,
+        "utilities": 2,
+        "workflow-discovery": 1,
+        "xcode-ide": 2
       }
     },
     "diagnostics": {

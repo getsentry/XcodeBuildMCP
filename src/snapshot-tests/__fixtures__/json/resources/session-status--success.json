@@ -32,10 +32,10 @@
       "byCategory": {}
     },
     "process": {
-      "pid": "<PID>",
-      "uptimeMs": "<UPTIME>",
-      "rssBytes": "<BYTES>",
-      "heapUsedBytes": "<BYTES>"
+      "pid": 99999,
+      "uptimeMs": 123456,
+      "rssBytes": 52428800,
+      "heapUsedBytes": 26214400
     }
   }
 }

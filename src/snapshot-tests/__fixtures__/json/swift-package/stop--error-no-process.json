@@ -8,7 +8,7 @@
       "status": "FAILED"
     },
     "artifacts": {
-      "processId": "<PID>"
+      "processId": 99999
     },
     "diagnostics": {
       "warnings": [],

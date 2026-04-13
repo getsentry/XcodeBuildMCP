@@ -12,7 +12,7 @@
     },
     "artifacts": {
       "simulatorId": "<UUID>",
-      "processId": "<PID>"
+      "processId": 99999
     }
   }
 }

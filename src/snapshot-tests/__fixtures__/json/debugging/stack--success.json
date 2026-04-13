@@ -6,17 +6,17 @@
   "data": {
     "threads": [
       {
-        "threadId": "<THREAD_ID>",
+        "threadId": 1,
         "name": "Thread 1",
         "truncated": true,
         "frames": [
           {
-            "index": "<N>",
+            "index": 0,
             "symbol": "static CalculatorApp.$main()",
             "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>"
           },
           {
-            "index": "<N>",
+            "index": 1,
             "symbol": "main",
             "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>"
           }
