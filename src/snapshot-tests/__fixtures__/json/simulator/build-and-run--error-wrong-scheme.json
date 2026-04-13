@@ -5,7 +5,9 @@
   "error": "Build failed",
   "data": {
     "summary": {
-      "status": "FAILED"
+      "status": "FAILED",
+      "durationMs": "<DURATION>",
+      "target": "simulator"
     },
     "artifacts": {
       "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_sim_<TIMESTAMP>_pid<PID>.log"
