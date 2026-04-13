@@ -1,0 +1,25 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "swipe",
+      "from": {
+        "x": 200,
+        "y": 400
+      },
+      "to": {
+        "x": 200,
+        "y": 200
+      }
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

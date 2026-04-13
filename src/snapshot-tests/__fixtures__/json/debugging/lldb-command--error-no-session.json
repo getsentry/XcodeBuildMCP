@@ -1,0 +1,10 @@
+{
+  "schema": "xcodebuildmcp.output.debug-command-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to run LLDB command: No active debug session. Provide debugSessionId or attach first.",
+  "data": {
+    "command": "breakpoint list",
+    "outputLines": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to get app path",
+  "data": {
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "The workspace named \"CalculatorApp\" does not contain a scheme named \"NONEXISTENT\". The \"-list\" option can be used to find the names of the schemes in the workspace."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema": "xcodebuildmcp.output.doctor-report",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "generatedAt": "<TIMESTAMP>",
+      "serverVersion": "<VERSION>",
+      "outputMode": "Redacted (default)"
+    },
+    "environment": {
+      "platform": "darwin",
+      "release": "<OS_RELEASE>",
+      "architecture": "arm64",
+      "homeDirectory": "<HOME>",
+      "tempDirectory": "<TMPDIR>",
+      "nodeVersion": "<NODE_VERSION>",
+      "cwd": "<CWD>",
+      "processId": "<PID>",
+      "parentProcessId": "<PID>"
+    },
+    "tooling": {
+      "xcodeVersion": "<XCODE_VERSION>",
+      "xcodePath": "<XCODE_PATH>",
+      "selectedXcodePath": "<XCODE_PATH>",
+      "xcrunVersion": "<VERSION>",
+      "axeVersion": "<VERSION>",
+      "miseVersion": "<VERSION>"
+    },
+    "capabilities": {
+      "uiAutomationAvailable": true,
+      "simulatorVideoCaptureSupported": "<AVAILABLE>",
+      "incrementalBuildsEnabled": false,
+      "incrementalBuildBinaryAvailable": true,
+      "lldbDapAvailable": true,
+      "selectedDebuggerBackend": "dap"
+    },
+    "manifestInventory": {
+      "totalUniqueTools": "<COUNT>",
+      "workflowCount": "<COUNT>",
+      "workflows": {
+        "coverage": "<N>",
+        "debugging": "<N>",
+        "device": "<N>",
+        "doctor": "<N>",
+        "macos": "<N>",
+        "project-discovery": "<N>",
+        "project-scaffolding": "<N>",
+        "session-management": "<N>",
+        "simulator-management": "<N>",
+        "simulator": "<N>",
+        "swift-package": "<N>",
+        "ui-automation": "<N>",
+        "utilities": "<N>",
+        "workflow-discovery": "<N>",
+        "xcode-ide": "<N>"
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

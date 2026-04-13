@@ -1,0 +1,29 @@
+{
+  "schema": "xcodebuildmcp.output.install-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Install app in simulator operation failed: Missing bundle ID.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "appPath": "<TMPDIR>/NotAnApp.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Simulator device failed to install the application."
+        },
+        {
+          "message": "Failed to get bundle ID from <TMPDIR>/NotAnApp.app"
+        },
+        {
+          "message": "Missing bundle ID."
+        }
+      ]
+    }
+  }
+}

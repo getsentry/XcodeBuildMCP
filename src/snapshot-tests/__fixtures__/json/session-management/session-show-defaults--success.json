@@ -1,0 +1,47 @@
+{
+  "schema": "xcodebuildmcp.output.session-defaults",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "currentProfile": "(default)",
+    "profiles": {
+      "(default)": {
+        "projectPath": null,
+        "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+        "scheme": "CalculatorApp",
+        "configuration": null,
+        "simulatorName": null,
+        "simulatorId": null,
+        "simulatorPlatform": null,
+        "deviceId": null,
+        "useLatestOS": null,
+        "arch": null,
+        "suppressWarnings": null,
+        "derivedDataPath": null,
+        "preferXcodebuild": null,
+        "platform": null,
+        "bundleId": null,
+        "env": null
+      },
+      "MyCustomProfile": {
+        "projectPath": null,
+        "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+        "scheme": "CalculatorApp",
+        "configuration": null,
+        "simulatorName": null,
+        "simulatorId": null,
+        "simulatorPlatform": null,
+        "deviceId": null,
+        "useLatestOS": null,
+        "arch": null,
+        "suppressWarnings": null,
+        "derivedDataPath": null,
+        "preferXcodebuild": null,
+        "platform": null,
+        "bundleId": null,
+        "env": null
+      }
+    }
+  }
+}

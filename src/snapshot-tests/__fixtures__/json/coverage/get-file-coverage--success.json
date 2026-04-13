@@ -1,0 +1,56 @@
+{
+  "schema": "xcodebuildmcp.output.coverage-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "coveragePct": 77.8,
+      "coveredLines": 147,
+      "executableLines": 189
+    },
+    "coverageScope": "file",
+    "artifacts": {
+      "xcresultPath": "<TMPDIR>/TestResults.xcresult",
+      "file": "CalculatorService.swift",
+      "sourceFilePath": "example_projects/iOS_Calculator/CalculatorAppPackage/Sources/CalculatorAppFeature/CalculatorService.swift"
+    },
+    "functions": {
+      "notCovered": [
+        {
+          "line": 159,
+          "name": "CalculatorService.deleteLastDigit()",
+          "coveredLines": 0,
+          "executableLines": 16
+        },
+        {
+          "line": 178,
+          "name": "CalculatorService.setError(_:)",
+          "coveredLines": 0,
+          "executableLines": 5
+        }
+      ],
+      "partialCoverage": [
+        {
+          "line": 63,
+          "name": "CalculatorService.inputDecimal()",
+          "coveragePct": 71.4,
+          "coveredLines": 10,
+          "executableLines": 14
+        },
+        {
+          "line": 93,
+          "name": "CalculatorService.calculate()",
+          "coveragePct": 84.2,
+          "coveredLines": 32,
+          "executableLines": 38
+        }
+      ],
+      "fullCoverageCount": 27,
+      "notCoveredFunctionCount": 8,
+      "notCoveredLineCount": 27,
+      "partialCoverageFunctionCount": 4
+    }
+  }
+}

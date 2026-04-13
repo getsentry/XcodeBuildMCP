@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.coverage-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to get coverage report: Failed to load result bundle",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "coverageScope": "report",
+    "artifacts": {
+      "xcresultPath": "<TMPDIR>/invalid.xcresult"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Error Domain=XCCovErrorDomain Code=0 \"Failed to load result bundle\""
+        }
+      ]
+    }
+  }
+}

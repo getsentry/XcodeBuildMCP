@@ -1,0 +1,24 @@
+{
+  "schema": "xcodebuildmcp.output.coverage-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to get file coverage: Failed to load result bundle",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "coverageScope": "file",
+    "artifacts": {
+      "xcresultPath": "<TMPDIR>/invalid.xcresult",
+      "file": "SomeFile.swift"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Error Domain=XCCovErrorDomain Code=0 \"Failed to load result bundle\""
+        }
+      ]
+    }
+  }
+}

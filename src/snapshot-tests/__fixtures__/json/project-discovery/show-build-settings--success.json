@@ -1,0 +1,62 @@
+{
+  "schema": "xcodebuildmcp.output.build-settings",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "scheme": "CalculatorApp"
+    },
+    "entries": [
+      {
+        "key": "ACTION",
+        "value": "build"
+      },
+      {
+        "key": "CONFIGURATION",
+        "value": "Debug"
+      },
+      {
+        "key": "SDKROOT",
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk"
+      },
+      {
+        "key": "PRODUCT_NAME",
+        "value": "CalculatorApp"
+      },
+      {
+        "key": "PRODUCT_BUNDLE_IDENTIFIER",
+        "value": "io.sentry.calculatorapp"
+      },
+      {
+        "key": "TARGET_NAME",
+        "value": "CalculatorApp"
+      },
+      {
+        "key": "WORKSPACE_DIR",
+        "value": "<ROOT>/example_projects/iOS_Calculator"
+      },
+      {
+        "key": "PROJECT_DIR",
+        "value": "<ROOT>/example_projects/iOS_Calculator"
+      },
+      {
+        "key": "SWIFT_VERSION",
+        "value": "5.0"
+      },
+      {
+        "key": "IPHONEOS_DEPLOYMENT_TARGET",
+        "value": "17.0"
+      },
+      {
+        "key": "TARGET_DEVICE_IDENTIFIER",
+        "value": "<UUID>"
+      },
+      {
+        "key": "PATH",
+        "value": "<PATH>"
+      }
+    ]
+  }
+}

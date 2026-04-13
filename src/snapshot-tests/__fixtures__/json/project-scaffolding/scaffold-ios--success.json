@@ -1,0 +1,17 @@
+{
+  "schema": "xcodebuildmcp.output.scaffold-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "platform": "iOS"
+    },
+    "artifacts": {
+      "projectName": "SnapshotTestApp",
+      "outputPath": "<TMPDIR>/ios",
+      "workspacePath": "<TMPDIR>/ios/SnapshotTestApp.xcworkspace"
+    }
+  }
+}

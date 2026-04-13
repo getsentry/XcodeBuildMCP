@@ -1,0 +1,9 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to resume debugger: No active debug session. Provide debugSessionId or attach first.",
+  "data": {
+    "action": "continue"
+  }
+}

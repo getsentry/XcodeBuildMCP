@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "bundleId": "com.nonexistent.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "App is not installed on the simulator."
+        }
+      ]
+    }
+  }
+}

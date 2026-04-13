@@ -1,0 +1,11 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app"
+    }
+  }
+}

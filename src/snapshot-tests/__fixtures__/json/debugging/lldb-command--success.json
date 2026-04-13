@@ -1,0 +1,15 @@
+{
+  "schema": "xcodebuildmcp.output.debug-command-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "command": "breakpoint list",
+    "outputLines": [
+      "Current breakpoints:",
+      "1: file = 'ContentView.swift', line = 42, exact_match = 0, locations = <LOCATIONS>",
+      "  Names:",
+      "    dap"
+    ]
+  }
+}

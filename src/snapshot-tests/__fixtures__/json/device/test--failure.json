@@ -1,0 +1,54 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Tests failed",
+  "data": {
+    "summary": {
+      "status": "FAILED",
+      "durationMs": "<DURATION>",
+      "counts": {
+        "passed": "<PASS_COUNT>",
+        "failed": "<FAIL_COUNT>",
+        "skipped": "<SKIP_COUNT>"
+      },
+      "target": "device"
+    },
+    "artifacts": {
+      "deviceId": "<UUID>",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_device_<TIMESTAMP>_pid<PID>.log"
+    },
+    "tests": {
+      "discovered": {
+        "total": 52,
+        "items": [
+          "CalculatorAppFeatureTests/CalculatorBasicTests/testClear",
+          "CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState",
+          "CalculatorAppFeatureTests/CalculatorBasicTests/testIntentionalFailure",
+          "CalculatorAppFeatureTests/CalculatorIntegrationTests/testChainCalculations",
+          "CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation",
+          "CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay"
+        ],
+        "remainingCount": 46
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [],
+      "testFailures": [
+        {
+          "suite": "CalculatorAppTests",
+          "test": "testCalculatorServiceFailure",
+          "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
+          "location": "example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:52"
+        },
+        {
+          "suite": "IntentionalFailureTests",
+          "test": "test",
+          "message": "XCTAssertTrue failed - This test should fail to verify error reporting",
+          "location": "example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286"
+        }
+      ]
+    }
+  }
+}

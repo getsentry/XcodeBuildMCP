@@ -1,0 +1,14 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "continue",
+    "session": {
+      "debugSessionId": "<UUID>",
+      "connectionState": "attached",
+      "executionState": "running"
+    }
+  }
+}

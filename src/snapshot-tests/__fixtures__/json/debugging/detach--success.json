@@ -1,0 +1,13 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "detach",
+    "session": {
+      "debugSessionId": "<UUID>",
+      "connectionState": "detached"
+    }
+  }
+}

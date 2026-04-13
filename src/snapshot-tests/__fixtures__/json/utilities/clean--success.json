@@ -1,0 +1,21 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "scheme": "CalculatorApp",
+      "configuration": "Debug",
+      "platform": "iOS"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

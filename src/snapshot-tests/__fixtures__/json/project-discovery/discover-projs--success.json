@@ -1,0 +1,28 @@
+{
+  "schema": "xcodebuildmcp.output.project-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "projectCount": 1,
+      "workspaceCount": 1,
+      "maxDepth": 3
+    },
+    "artifacts": {
+      "workspaceRoot": "<PATH>",
+      "scanPath": "<PATH>"
+    },
+    "projects": [
+      {
+        "path": "example_projects/iOS_Calculator/CalculatorApp.xcodeproj"
+      }
+    ],
+    "workspaces": [
+      {
+        "path": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "xcodebuildmcp.output.debug-breakpoint-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to add breakpoint: No active debug session. Provide debugSessionId or attach first.",
+  "data": {
+    "action": "add",
+    "breakpoint": {
+      "kind": "file-line",
+      "file": "ContentView.swift",
+      "line": 42
+    }
+  }
+}

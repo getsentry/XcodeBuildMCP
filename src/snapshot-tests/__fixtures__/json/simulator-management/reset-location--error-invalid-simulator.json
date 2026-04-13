@@ -1,0 +1,25 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to reset simulator location: Invalid device: <UUID>",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "reset-location"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Invalid device: <UUID>"
+        }
+      ]
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

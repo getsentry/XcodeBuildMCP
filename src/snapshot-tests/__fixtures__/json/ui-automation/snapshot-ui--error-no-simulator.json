@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.capture-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to get accessibility hierarchy: axe command 'describe-ui' failed.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
+        }
+      ]
+    }
+  }
+}
