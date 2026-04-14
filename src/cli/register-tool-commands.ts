@@ -8,12 +8,14 @@ import type { OutputFormat } from './output.ts';
 import { groupToolsByWorkflow } from '../runtime/tool-catalog.ts';
 import { getWorkflowMetadataFromManifest } from '../core/manifest/load-manifest.ts';
 import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
+import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
 import {
   getCliSessionDefaultsForTool,
   isKnownCliSessionDefaultsProfile,
   mergeCliSessionDefaults,
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
+import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -64,6 +66,40 @@ function setEnvScoped(key: string, value: string): () => void {
       process.env[key] = previous;
     }
   };
+}
+
+function createBufferedHandlerContext(session: RenderSession): ToolHandlerContext {
+  return {
+    emit: (event) => {
+      session.emit(event);
+    },
+    attach: (image) => {
+      session.attach(image);
+    },
+  };
+}
+
+function writeJsonOutput(session: RenderSession, handlerContext: ToolHandlerContext): void {
+  const structuredOutput = handlerContext.structuredOutput;
+
+  if (structuredOutput) {
+    process.stdout.write(
+      JSON.stringify(
+        toStructuredEnvelope(
+          structuredOutput.result,
+          structuredOutput.schema,
+          structuredOutput.schemaVersion,
+        ),
+        null,
+        2,
+      ) + '\n',
+    );
+    return;
+  }
+
+  for (const event of session.getEvents()) {
+    process.stdout.write(JSON.stringify(event) + '\n');
+  }
 }
 
 /**
@@ -296,21 +332,33 @@ function registerToolSubcommand(
       try {
         const session =
           outputFormat === 'json'
-            ? createRenderSession('cli-json')
+            ? createRenderSession('text')
             : outputFormat === 'raw'
               ? createRenderSession('text')
               : createRenderSession('cli-text', {
                   interactive: process.stdout.isTTY === true,
                 });
+        const handlerContext =
+          outputFormat === 'json' ? createBufferedHandlerContext(session) : undefined;
 
         await invoker.invokeDirect(tool, args, {
           runtime: 'cli',
           renderSession: session,
+          handlerContext,
           cliExposedWorkflowIds,
           socketPath,
           workspaceRoot: opts.workspaceRoot,
           logLevel,
         });
+
+        if (outputFormat === 'json' && handlerContext) {
+          writeJsonOutput(session, handlerContext);
+
+          if (session.isError() || handlerContext.structuredOutput?.result.didError) {
+            process.exitCode = 1;
+          }
+          return;
+        }
 
         session.finalize();
 

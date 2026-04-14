@@ -24,7 +24,7 @@ export async function simulatorsResourceLogic(
 
   try {
     log('info', 'Processing simulators resource request');
-    await handlerContextStorage.run(ctx, () => list_simsLogic({}, executor));
+    await handlerContextStorage.run(ctx, () => list_simsLogic({ enabled: true }, executor));
     const text = session.finalize();
     if (session.isError()) {
       throw new Error(text || 'Failed to retrieve simulator data');

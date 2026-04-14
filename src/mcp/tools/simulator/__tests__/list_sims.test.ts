@@ -1,12 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { DefaultToolExecutionContext } from '../../../../utils/execution/index.ts';
 
-import { schema, handler, list_simsLogic, listSimulators } from '../list_sims.ts';
+import {
+  createListSimsExecutor,
+  schema,
+  handler,
+  list_simsLogic,
+  listSimulators,
+} from '../list_sims.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 
 async function runListSimsLogic(params: { enabled?: boolean }, executor: CommandExecutor) {
@@ -16,6 +23,7 @@ async function runListSimsLogic(params: { enabled?: boolean }, executor: Command
     content: [{ type: 'text' as const, text: result.text() }],
     isError: result.isError() || undefined,
     nextStepParams: ctx.nextStepParams,
+    structuredOutput: ctx.structuredOutput,
   };
 }
 
@@ -74,6 +82,7 @@ describe('list_sims tool', () => {
           name: 'iPhone 15',
           udid: 'test-uuid-123',
           state: 'Shutdown',
+          isAvailable: true,
         },
       ]);
     });
@@ -125,6 +134,24 @@ describe('list_sims tool', () => {
       expect(text).toContain('iPhone 15');
       expect(text).toContain('test-uuid-123');
       expect(text).toContain('Shutdown');
+      expect(result.structuredOutput).toEqual({
+        schema: 'xcodebuildmcp.output.simulator-list',
+        schemaVersion: '1',
+        result: {
+          kind: 'simulator-list',
+          didError: false,
+          error: null,
+          simulators: [
+            {
+              name: 'iPhone 15',
+              simulatorId: 'test-uuid-123',
+              state: 'Shutdown',
+              isAvailable: true,
+              runtime: 'iOS 17.0',
+            },
+          ],
+        },
+      });
       expect(result.nextStepParams).toEqual({
         boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
         open_sim: {},
@@ -188,6 +215,16 @@ describe('list_sims tool', () => {
       const text = result.content.map((c) => c.text).join('\n');
       expect(text).toContain('Failed to list simulators');
       expect(text).toContain('Command failed');
+      expect(result.structuredOutput).toEqual({
+        schema: 'xcodebuildmcp.output.simulator-list',
+        schemaVersion: '1',
+        result: {
+          kind: 'simulator-list',
+          didError: true,
+          error: 'Failed to list simulators: Command failed',
+          simulators: [],
+        },
+      });
     });
 
     it('should handle JSON parse failure', async () => {
@@ -221,6 +258,64 @@ describe('list_sims tool', () => {
       const text = result.content.map((c) => c.text).join('\n');
       expect(text).toContain('Failed to list simulators');
       expect(text).toContain('String error');
+    });
+
+    it('returns a domain result and progress events from the executor', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: JSON.stringify({
+          devices: {
+            'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
+              {
+                name: 'iPhone 15',
+                udid: 'test-uuid-123',
+                isAvailable: true,
+                state: 'Shutdown',
+              },
+            ],
+          },
+        }),
+        error: undefined,
+      });
+      const ctx = new DefaultToolExecutionContext();
+      const executeListSims = createListSimsExecutor(mockExecutor);
+
+      const result = await executeListSims({}, ctx);
+
+      expect(ctx.getProgressEvents()).toEqual([
+        {
+          type: 'status',
+          level: 'info',
+          message: 'Querying simulators',
+        },
+        {
+          type: 'table',
+          name: 'simulators',
+          columns: ['name', 'runtime', 'state', 'isAvailable'],
+          rows: [
+            {
+              name: 'iPhone 15',
+              runtime: 'iOS 17.0',
+              state: 'Shutdown',
+              isAvailable: 'true',
+            },
+          ],
+        },
+      ]);
+      expect(result).toEqual({
+        kind: 'simulator-list',
+        didError: false,
+        error: null,
+        simulators: [
+          {
+            name: 'iPhone 15',
+            simulatorId: 'test-uuid-123',
+            state: 'Shutdown',
+            isAvailable: true,
+            runtime: 'iOS 17.0',
+          },
+        ],
+      });
     });
   });
 });

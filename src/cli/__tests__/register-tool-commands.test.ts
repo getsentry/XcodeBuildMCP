@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 import type { ToolCatalog, ToolDefinition } from '../../runtime/types.ts';
 import { DefaultToolInvoker } from '../../runtime/tool-invoker.ts';
-import { createTextContent } from '../../types/common.ts';
 import type { ResolvedRuntimeConfig } from '../../utils/config-store.ts';
 import { registerToolCommands } from '../register-tool-commands.ts';
 
@@ -82,6 +81,23 @@ function createApp(catalog: ToolCatalog, runtimeConfig: ResolvedRuntimeConfig = 
   });
 
   return app;
+}
+
+function mockInvokeDirectThroughHandler() {
+  return vi
+    .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
+    .mockImplementation(async (tool, args, opts) => {
+      const handlerContext = opts.handlerContext ?? {
+        emit: (event) => {
+          opts.renderSession?.emit(event);
+        },
+        attach: (image) => {
+          opts.renderSession?.attach(image);
+        },
+      };
+
+      await tool.handler(args, handlerContext);
+    });
 }
 
 describe('registerToolCommands', () => {
@@ -349,5 +365,109 @@ describe('registerToolCommands', () => {
     );
 
     stdoutWrite.mockRestore();
+  });
+
+  it('writes a structured envelope for tools that provide structured output', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        ctx?.emit({
+          type: 'status-line',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          level: 'info',
+          message: 'legacy event',
+        });
+
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.simulator-list',
+            schemaVersion: '1',
+            result: {
+              kind: 'simulator-list',
+              didError: false,
+              error: null,
+              simulators: [
+                {
+                  name: 'iPhone 15',
+                  simulatorId: 'test-uuid-123',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                  runtime: 'iOS 17.0',
+                },
+              ],
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify(
+        {
+          schema: 'xcodebuildmcp.output.simulator-list',
+          schemaVersion: '1',
+          didError: false,
+          error: null,
+          data: {
+            simulators: [
+              {
+                name: 'iPhone 15',
+                simulatorId: 'test-uuid-123',
+                state: 'Shutdown',
+                isAvailable: true,
+                runtime: 'iOS 17.0',
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
+
+  it('falls back to NDJSON events when no structured output is available', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        ctx?.emit({
+          type: 'status-line',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          level: 'info',
+          message: 'legacy event',
+        });
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify({
+        type: 'status-line',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        level: 'info',
+        message: 'legacy event',
+      })}\n`,
+    );
   });
 });
