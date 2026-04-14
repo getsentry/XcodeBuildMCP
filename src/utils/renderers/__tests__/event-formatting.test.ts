@@ -12,6 +12,7 @@ import {
   formatStatusLineEvent,
   formatDetailTreeEvent,
   formatTransientStatusLineEvent,
+  formatTestCaseResults,
 } from '../event-formatting.ts';
 
 describe('event formatting', () => {
@@ -276,5 +277,35 @@ describe('event formatting', () => {
     expect(rendered).toContain('  ✗ testAdd:');
     expect(rendered).toContain('      - XCTAssertEqual failed');
     expect(rendered).toContain('      - Expected 4, got 5');
+  });
+
+  it('formats per-test case results with status icons and durations', () => {
+    const rendered = formatTestCaseResults([
+      {
+        type: 'test-case-result',
+        timestamp: '',
+        operation: 'TEST',
+        suite: 'MathTests',
+        test: 'testAdd',
+        status: 'passed',
+        durationMs: 1234,
+      },
+      {
+        type: 'test-case-result',
+        timestamp: '',
+        operation: 'TEST',
+        test: 'testOrphan',
+        status: 'skipped',
+      },
+    ]);
+
+    expect(rendered).toContain('Test Results:');
+    expect(rendered).toContain('\u{2705} MathTests/testAdd (1.234s)');
+    expect(rendered).toContain('\u{23ED}\u{FE0F} testOrphan');
+    expect(rendered).not.toContain('testOrphan (');
+  });
+
+  it('returns empty string for no test case results', () => {
+    expect(formatTestCaseResults([])).toBe('');
   });
 });

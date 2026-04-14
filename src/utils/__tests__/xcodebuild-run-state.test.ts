@@ -404,4 +404,32 @@ describe('xcodebuild-run-state', () => {
     expect(forwarded[0].type).toBe('header');
     expect(forwarded[1].type).toBe('next-steps');
   });
+
+  it('collects test-case-result events', () => {
+    const state = createXcodebuildRunState({ operation: 'TEST' });
+
+    state.push({
+      type: 'test-case-result',
+      timestamp: ts(),
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      status: 'passed',
+      durationMs: 100,
+    });
+    state.push({
+      type: 'test-case-result',
+      timestamp: ts(),
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testB',
+      status: 'failed',
+      durationMs: 200,
+    });
+
+    const snap = state.snapshot();
+    expect(snap.testCaseResults).toHaveLength(2);
+    expect(snap.testCaseResults[0]).toMatchObject({ test: 'testA', status: 'passed' });
+    expect(snap.testCaseResults[1]).toMatchObject({ test: 'testB', status: 'failed' });
+  });
 });

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PipelineEvent } from '../../types/pipeline-events.ts';
 import { renderEvents } from '../render.ts';
 import { createCliTextRenderer } from '../../utils/renderers/cli-text-renderer.ts';
+import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
 
 function captureCliText(events: readonly PipelineEvent[]): string {
   const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -167,5 +168,38 @@ describe('text render parity', () => {
     expect(output).toBe(captureCliText(events));
     expect(output).toContain('xcodebuildmcp macos get-app-path --scheme "MCPTest"');
     expect(output).not.toContain('get_mac_app_path({');
+  });
+
+  it('omits per-test results by default and includes them when showTestResults is true', () => {
+    const events: PipelineEvent[] = [
+      {
+        type: 'test-case-result',
+        timestamp: '2026-04-14T00:00:00.000Z',
+        operation: 'TEST',
+        suite: 'Suite',
+        test: 'testA',
+        status: 'passed',
+        durationMs: 100,
+      },
+      {
+        type: 'summary',
+        timestamp: '2026-04-14T00:00:01.000Z',
+        operation: 'TEST',
+        status: 'SUCCEEDED',
+        totalTests: 1,
+        passedTests: 1,
+        skippedTests: 0,
+        durationMs: 100,
+      },
+    ];
+
+    const withoutFlag = renderCliTextTranscript(events);
+    expect(withoutFlag).not.toContain('Test Results:');
+    expect(withoutFlag).toContain('1 test passed');
+
+    const withFlag = renderCliTextTranscript(events, { showTestResults: true });
+    expect(withFlag).toContain('Test Results:');
+    expect(withFlag).toContain('Suite/testA (0.100s)');
+    expect(withFlag).toContain('1 test passed');
   });
 });

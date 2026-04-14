@@ -304,4 +304,34 @@ describe('xcodebuild-event-parser', () => {
     const statusEvents = events.filter((e) => e.type === 'build-stage');
     expect(statusEvents.length).toBeLessThanOrEqual(1);
   });
+
+  it('emits test-case-result events with per-test timing for all statuses', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.002 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testC]' skipped (0.000 seconds)\n" },
+    ]);
+
+    const results = events.filter((e) => e.type === 'test-case-result');
+    expect(results).toHaveLength(3);
+    expect(results[0]).toMatchObject({
+      type: 'test-case-result',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      status: 'passed',
+      durationMs: 1,
+    });
+    expect(results[1]).toMatchObject({ test: 'testB', status: 'failed', durationMs: 2 });
+    expect(results[2]).toMatchObject({ test: 'testC', status: 'skipped', durationMs: 0 });
+  });
+
+  it('does not emit test-case-result for BUILD operations', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+    ]);
+
+    const results = events.filter((e) => e.type === 'test-case-result');
+    expect(results).toHaveLength(0);
+  });
 });
