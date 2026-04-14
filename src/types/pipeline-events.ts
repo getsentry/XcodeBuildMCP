@@ -127,6 +127,15 @@ export interface TestProgressEvent extends BaseEvent {
   skipped: number;
 }
 
+export interface TestCaseResultEvent extends BaseEvent {
+  type: 'test-case-result';
+  operation: 'TEST';
+  suite?: string;
+  test: string;
+  status: 'passed' | 'failed' | 'skipped';
+  durationMs?: number;
+}
+
 export interface TestFailureEvent extends BaseEvent {
   type: 'test-failure';
   operation: 'TEST';
@@ -158,6 +167,7 @@ export type BuildTestPipelineEvent =
   | CompilerErrorEvent
   | TestDiscoveryEvent
   | TestProgressEvent
+  | TestCaseResultEvent
   | TestFailureEvent;
 
 export type PipelineEvent = CommonPipelineEvent | BuildTestPipelineEvent;

@@ -71,6 +71,26 @@ export function createSwiftTestingEventParser(
     });
   }
 
+  function emitTestCaseResult(testCase: {
+    suiteName?: string;
+    testName?: string;
+    status: string;
+    durationText?: string;
+  }): void {
+    if (!testCase.testName) {
+      return;
+    }
+    onEvent({
+      type: 'test-case-result',
+      timestamp: now(),
+      operation: 'TEST',
+      suite: testCase.suiteName,
+      test: testCase.testName,
+      status: testCase.status as 'passed' | 'failed' | 'skipped',
+      durationMs: parseDurationMs(testCase.durationText),
+    });
+  }
+
   function processLine(rawLine: string): void {
     const line = rawLine.trim();
     if (!line) {
@@ -103,6 +123,7 @@ export function createSwiftTestingEventParser(
       const increment = stResult.caseCount ?? 1;
       completedCount += increment;
       failedCount += increment;
+      emitTestCaseResult(stResult);
       emitTestProgress();
       return;
     }
@@ -131,6 +152,7 @@ export function createSwiftTestingEventParser(
       if (stResult.status === 'skipped') {
         skippedCount += increment;
       }
+      emitTestCaseResult(stResult);
       emitTestProgress();
       return;
     }
@@ -155,6 +177,7 @@ export function createSwiftTestingEventParser(
       if (xcTestCase.status === 'skipped') {
         skippedCount += xcIncrement;
       }
+      emitTestCaseResult(xcTestCase);
       emitTestProgress();
       return;
     }

@@ -247,6 +247,17 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     if (testCase.status === 'skipped') {
       skippedCount += increment;
     }
+    if (operation === 'TEST' && testCase.testName) {
+      onEvent({
+        type: 'test-case-result',
+        timestamp: now(),
+        operation: 'TEST',
+        suite: testCase.suiteName,
+        test: testCase.testName,
+        status: testCase.status as 'passed' | 'failed' | 'skipped',
+        durationMs: parseDurationMs(testCase.durationText),
+      });
+    }
     emitTestProgress();
   }
 
