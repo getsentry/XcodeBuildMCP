@@ -6,8 +6,11 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { TestResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
-import { handleTestLogic } from '../../../utils/test/index.ts';
+import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
   getDefaultCommandExecutor,
@@ -18,7 +21,13 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { resolveTestPreflight } from '../../../utils/test-preflight.ts';
+import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
+import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
+import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
+import { createPipelineCompatExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -54,6 +63,7 @@ const testDeviceSchema = z.preprocess(
 );
 
 export type TestDeviceParams = z.infer<typeof testDeviceSchema>;
+type TestDeviceResult = TestResultDomainResult;
 
 const publicSchemaObject = baseSchemaObject.omit({
   projectPath: true,
@@ -66,14 +76,19 @@ const publicSchemaObject = baseSchemaObject.omit({
   platform: true,
 } as const);
 
-export async function testDeviceLogic(
+interface PreparedTestDeviceExecution {
+  configuration: string;
+  platform: XcodePlatform;
+  preflight?: TestPreflightResult;
+  headerParams: Record<string, unknown>;
+}
+
+async function prepareTestDeviceExecution(
   params: TestDeviceParams,
-  executor: CommandExecutor = getDefaultCommandExecutor(),
-  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): Promise<void> {
+  fileSystemExecutor: FileSystemExecutor,
+): Promise<PreparedTestDeviceExecution> {
   const configuration = params.configuration ?? 'Debug';
   const platform = (params.platform as XcodePlatform) || XcodePlatform.iOS;
-
   const preflight = await resolveTestPreflight(
     {
       projectPath: params.projectPath,
@@ -86,27 +101,79 @@ export async function testDeviceLogic(
     fileSystemExecutor,
   );
 
-  await handleTestLogic(
-    {
-      projectPath: params.projectPath,
-      workspacePath: params.workspacePath,
+  return {
+    configuration,
+    platform,
+    preflight: preflight ?? undefined,
+    headerParams: {
       scheme: params.scheme,
-      deviceId: params.deviceId,
       configuration,
-      derivedDataPath: params.derivedDataPath,
-      extraArgs: params.extraArgs,
-      preferXcodebuild: params.preferXcodebuild ?? false,
-      platform,
-      useLatestOS: false,
-      testRunnerEnv: params.testRunnerEnv,
-      progress: params.progress,
+      platform: String(platform),
+      deviceId: params.deviceId,
+      deviceName: resolveDeviceName(params.deviceId),
+      onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
+      skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
     },
-    executor,
-    {
-      preflight: preflight ?? undefined,
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: TestDeviceResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createTestDeviceExecutor(
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+  prepared?: PreparedTestDeviceExecution,
+): ToolExecutor<TestDeviceParams, TestDeviceResult> {
+  return async (params, ctx) => {
+    const resolved = prepared ?? (await prepareTestDeviceExecution(params, fileSystemExecutor));
+    const executeTest = createTestExecutor(executor, {
+      preflight: resolved.preflight,
       toolName: 'test_device',
-    },
-  );
+      target: 'device',
+    });
+
+    return executeTest(
+      {
+        projectPath: params.projectPath,
+        workspacePath: params.workspacePath,
+        scheme: params.scheme,
+        deviceId: params.deviceId,
+        configuration: resolved.configuration,
+        derivedDataPath: params.derivedDataPath,
+        extraArgs: params.extraArgs,
+        preferXcodebuild: params.preferXcodebuild ?? false,
+        platform: resolved.platform,
+        useLatestOS: false,
+        testRunnerEnv: params.testRunnerEnv,
+        progress: params.progress,
+      },
+      ctx,
+    );
+  };
+}
+
+export async function testDeviceLogic(
+  params: TestDeviceParams,
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const prepared = await prepareTestDeviceExecution(params, fileSystemExecutor);
+
+  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
+
+  const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+  const executeTestDevice = createTestDeviceExecutor(executor, fileSystemExecutor, prepared);
+  const result = await executeTestDevice(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

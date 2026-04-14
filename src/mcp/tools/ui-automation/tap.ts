@@ -1,12 +1,13 @@
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
 import type { DebuggerManager } from '../../../utils/debugger/debugger-manager.ts';
 import { guardUiAutomationAgainstStoppedDebugger } from '../../../utils/debugger/ui-automation-guard.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../utils/axe-helpers.ts';
-import { DependencyError, AxeError, SystemError } from '../../../utils/errors.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -16,8 +17,14 @@ import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
+import {
+  createUiActionFailureResult,
+  createUiActionSuccessResult,
+  mapAxeCommandError,
+  setUiActionStructuredOutput,
+} from './shared/domain-result.ts';
 
 const baseTapSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -98,10 +105,92 @@ const tapSchema = baseTapSchema.superRefine((values, ctx) => {
 });
 
 type TapParams = z.infer<typeof tapSchema>;
+type TapResult = UiActionResultDomainResult;
 
 const publicSchemaObject = z.strictObject(baseTapSchema.omit({ simulatorId: true } as const).shape);
 
 const LOG_PREFIX = '[AXe]';
+
+export function createTapExecutor(
+  executor: CommandExecutor,
+  axeHelpers: AxeHelpers = defaultAxeHelpers,
+  debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+): ToolExecutor<TapParams, TapResult> {
+  return async (params) => {
+    const toolName = 'tap';
+    const { simulatorId, x, y, id, label, preDelay, postDelay } = params;
+    const action =
+      x !== undefined && y !== undefined
+        ? { type: 'tap' as const, x, y }
+        : id !== undefined
+          ? { type: 'tap' as const, id }
+          : label !== undefined
+            ? { type: 'tap' as const, label }
+            : { type: 'tap' as const };
+
+    const guard = await guardUiAutomationAgainstStoppedDebugger({
+      debugger: debuggerManager,
+      simulatorId,
+      toolName,
+    });
+    if (guard.blockedMessage) {
+      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+    }
+
+    let targetDescription = '';
+    let actionDescription = '';
+    let usesCoordinates = false;
+    const commandArgs = ['tap'];
+
+    if (x !== undefined && y !== undefined) {
+      usesCoordinates = true;
+      targetDescription = `(${x}, ${y})`;
+      actionDescription = `Tap at ${targetDescription}`;
+      commandArgs.push('-x', String(x), '-y', String(y));
+    } else if (id !== undefined) {
+      targetDescription = `element id "${id}"`;
+      actionDescription = `Tap on ${targetDescription}`;
+      commandArgs.push('--id', id);
+    } else if (label !== undefined) {
+      targetDescription = `element label "${label}"`;
+      actionDescription = `Tap on ${targetDescription}`;
+      commandArgs.push('--label', label);
+    } else {
+      return createUiActionFailureResult(
+        action,
+        simulatorId,
+        'Parameter validation failed: Missing tap target',
+      );
+    }
+
+    if (preDelay !== undefined) {
+      commandArgs.push('--pre-delay', String(preDelay));
+    }
+    if (postDelay !== undefined) {
+      commandArgs.push('--post-delay', String(postDelay));
+    }
+
+    log('info', `${LOG_PREFIX}/${toolName}: Starting for ${targetDescription} on ${simulatorId}`);
+
+    try {
+      await executeAxeCommand(commandArgs, simulatorId, 'tap', executor, axeHelpers);
+      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      return createUiActionSuccessResult(action, simulatorId, [
+        guard.warningText,
+        usesCoordinates ? getSnapshotUiWarning(simulatorId) : null,
+      ]);
+    } catch (error) {
+      const failure = mapAxeCommandError(error, {
+        axeFailureMessage: (axeError) =>
+          `Failed to simulate ${actionDescription.toLowerCase()}: ${axeError.message}`,
+      });
+      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+      return createUiActionFailureResult(action, simulatorId, failure.message, {
+        details: failure.diagnostics?.errors.map((entry) => entry.message),
+      });
+    }
+  };
+}
 
 export async function tapLogic(
   params: TapParams,
@@ -109,103 +198,16 @@ export async function tapLogic(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
-  const toolName = 'tap';
-  const { simulatorId, x, y, id, label, preDelay, postDelay } = params;
-
-  const headerEvent = header('Tap', [{ label: 'Simulator', value: simulatorId }]);
-
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeTap = createTapExecutor(executor, axeHelpers, debuggerManager);
+  const result = await executeTap(params, executionContext);
 
-  const guard = await guardUiAutomationAgainstStoppedDebugger({
-    debugger: debuggerManager,
-    simulatorId,
-    toolName,
-  });
-  if (guard.blockedMessage) {
-    ctx.emit(headerEvent);
-    ctx.emit(statusLine('error', guard.blockedMessage));
-    return;
+  setUiActionStructuredOutput(ctx, result);
+
+  for (const event of executionContext.emitResult(result)) {
+    ctx.emit(event);
   }
-
-  let targetDescription = '';
-  let actionDescription = '';
-  let usesCoordinates = false;
-  const commandArgs = ['tap'];
-
-  if (x !== undefined && y !== undefined) {
-    usesCoordinates = true;
-    targetDescription = `(${x}, ${y})`;
-    actionDescription = `Tap at ${targetDescription}`;
-    commandArgs.push('-x', String(x), '-y', String(y));
-  } else if (id !== undefined) {
-    targetDescription = `element id "${id}"`;
-    actionDescription = `Tap on ${targetDescription}`;
-    commandArgs.push('--id', id);
-  } else if (label !== undefined) {
-    targetDescription = `element label "${label}"`;
-    actionDescription = `Tap on ${targetDescription}`;
-    commandArgs.push('--label', label);
-  } else {
-    ctx.emit(headerEvent);
-    ctx.emit(statusLine('error', 'Parameter validation failed: Missing tap target'));
-    return;
-  }
-
-  if (preDelay !== undefined) {
-    commandArgs.push('--pre-delay', String(preDelay));
-  }
-  if (postDelay !== undefined) {
-    commandArgs.push('--post-delay', String(postDelay));
-  }
-
-  log('info', `${LOG_PREFIX}/${toolName}: Starting for ${targetDescription} on ${simulatorId}`);
-
-  return withErrorHandling(
-    ctx,
-    async () => {
-      await executeAxeCommand(commandArgs, simulatorId, 'tap', executor, axeHelpers);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-
-      const coordinateWarning = usesCoordinates ? getSnapshotUiWarning(simulatorId) : null;
-      const warnings = [guard.warningText, coordinateWarning].filter(
-        (w): w is string => typeof w === 'string' && w.length > 0,
-      );
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `${actionDescription} simulated successfully.`));
-      for (const w of warnings) {
-        ctx.emit(statusLine('warning', w));
-      }
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `An unexpected error occurred: ${message}`,
-      logMessage: ({ message }) => `${LOG_PREFIX}/${toolName}: Failed - ${message}`,
-      mapError: ({ error, headerEvent: hdr, emit }) => {
-        if (error instanceof DependencyError) {
-          emit?.(hdr);
-          emit?.(statusLine('error', AXE_NOT_AVAILABLE_MESSAGE));
-          return;
-        } else if (error instanceof AxeError) {
-          emit?.(hdr);
-          emit?.(
-            statusLine(
-              'error',
-              `Failed to simulate ${actionDescription.toLowerCase()}: ${error.message}`,
-            ),
-          );
-          if (error.axeOutput) emit?.(section('Details', [error.axeOutput]));
-          return;
-        } else if (error instanceof SystemError) {
-          emit?.(hdr);
-          emit?.(statusLine('error', `System error executing axe: ${error.message}`));
-          if (error.originalError?.stack)
-            emit?.(section('Stack Trace', [error.originalError.stack]));
-          return;
-        }
-        return undefined;
-      },
-    },
-  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

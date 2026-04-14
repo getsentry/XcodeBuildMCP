@@ -106,7 +106,8 @@ describe('adaptDomainResultToPipelineEvents', () => {
     expect(
       events.some((event) => event.type === 'section' && event.title === 'Test Failures'),
     ).toBe(true);
-    expect(events.at(-1)).toMatchObject({
+    expect(events.some((event) => event.type === 'summary')).toBe(true);
+    expect(events.find((event) => event.type === 'summary')).toMatchObject({
       type: 'summary',
       status: 'FAILED',
       totalTests: 1,
@@ -115,6 +116,10 @@ describe('adaptDomainResultToPipelineEvents', () => {
       skippedTests: 0,
       durationMs: 1250,
       operation: 'TEST',
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: 'detail-tree',
+      items: [{ label: 'Build Logs', value: '/tmp/build.log' }],
     });
   });
 });

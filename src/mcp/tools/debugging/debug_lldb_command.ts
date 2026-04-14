@@ -1,5 +1,9 @@
 import * as z from 'zod';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { DebugCommandResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
@@ -20,34 +24,89 @@ const baseSchemaObject = z.object({
 const debugLldbCommandSchema = z.preprocess(nullifyEmptyStrings, baseSchemaObject);
 
 export type DebugLldbCommandParams = z.infer<typeof debugLldbCommandSchema>;
+type DebugLldbCommandResult = DebugCommandResultDomainResult;
+
+function createDebugCommandResult(params: {
+  command: string;
+  didError: boolean;
+  error?: string;
+  outputLines?: string[];
+}): DebugLldbCommandResult {
+  return {
+    kind: 'debug-command-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    command: params.command,
+    outputLines: params.outputLines ?? [],
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: DebugLldbCommandResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.debug-command-result',
+    schemaVersion: '1',
+  };
+}
+
+function splitOutputLines(output: string): string[] {
+  const trimmed = output.trim();
+  return trimmed.length > 0 ? trimmed.split('\n') : [];
+}
+
+export function createDebugLldbCommandExecutor(
+  debuggerManager: DebuggerToolContext['debugger'],
+): ToolExecutor<DebugLldbCommandParams, DebugLldbCommandResult> {
+  return async (params, ctx) => {
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: `Running LLDB command: ${params.command}`,
+    });
+
+    try {
+      const output = await debuggerManager.runCommand(params.debugSessionId, params.command, {
+        timeoutMs: params.timeoutMs,
+      });
+
+      return createDebugCommandResult({
+        command: params.command,
+        didError: false,
+        outputLines: splitOutputLines(output),
+      });
+    } catch (error) {
+      return createDebugCommandResult({
+        command: params.command,
+        didError: true,
+        error: `Failed to run LLDB command: ${toErrorMessage(error)}`,
+      });
+    }
+  };
+}
 
 export async function debug_lldb_commandLogic(
   params: DebugLldbCommandParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
   const headerEvent = header('LLDB Command', [{ label: 'Command', value: params.command }]);
-
   const handlerCtx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
+  const result = await executeDebugLldbCommand(params, executionContext);
 
-  return withErrorHandling(
-    handlerCtx,
-    async () => {
-      const output = await ctx.debugger.runCommand(params.debugSessionId, params.command, {
-        timeoutMs: params.timeoutMs,
-      });
-      const trimmed = output.trim();
+  setStructuredOutput(handlerCtx, result);
+  executionContext.emitResult(result);
 
-      handlerCtx.emit(headerEvent);
-      handlerCtx.emit(statusLine('success', 'Command executed'));
-      if (trimmed) {
-        handlerCtx.emit(section('Output:', trimmed.split('\n')));
-      }
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to run LLDB command: ${message}`,
-    },
-  );
+  handlerCtx.emit(headerEvent);
+  if (result.didError) {
+    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to run LLDB command'));
+    return;
+  }
+
+  handlerCtx.emit(statusLine('success', 'Command executed'));
+  if (result.outputLines.length > 0) {
+    handlerCtx.emit(section('Output:', result.outputLines));
+  }
 }
 
 export const schema = baseSchemaObject.shape;

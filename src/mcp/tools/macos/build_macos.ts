@@ -1,4 +1,7 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
@@ -10,11 +13,15 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { startBuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
-import { finalizeInlineXcodebuild } from '../../../utils/xcodebuild-output.ts';
-import { formatToolPreflight } from '../../../utils/build-preflight.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
-import { detailTree } from '../../../utils/tool-event-builders.ts';
+import {
+  createBuildDomainResult,
+  createPipelineCompatExecutionContext,
+  createProgressStreamingPipeline,
+} from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -52,116 +59,123 @@ const buildMacOSSchema = z.preprocess(
 );
 
 export type BuildMacOSParams = z.infer<typeof buildMacOSSchema>;
+type BuildMacOSResult = BuildResultDomainResult;
+
+function getFallbackErrorMessages(
+  started: ReturnType<typeof createProgressStreamingPipeline>,
+  responseContent?: Array<{ type: 'text'; text: string }>,
+): string[] {
+  return [...started.stderrLines, ...(responseContent ?? []).map((item) => item.text)];
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: BuildMacOSResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createBuildMacOSExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<BuildMacOSParams, BuildMacOSResult> {
+  return async (params, ctx) => {
+    const configuration = params.configuration ?? 'Debug';
+    const started = createProgressStreamingPipeline('build_macos', 'BUILD', ctx);
+    const buildResult = await executeXcodeBuildCommand(
+      { ...params, configuration },
+      {
+        platform: XcodePlatform.macOS,
+        arch: params.arch,
+        logPrefix: 'macOS Build',
+      },
+      params.preferXcodebuild ?? false,
+      'build',
+      executor,
+      undefined,
+      started.pipeline,
+    );
+
+    let bundleId: string | undefined;
+    if (!buildResult.isError) {
+      try {
+        const appPath = await resolveAppPathFromBuildSettings(
+          {
+            projectPath: params.projectPath,
+            workspacePath: params.workspacePath,
+            scheme: params.scheme,
+            configuration,
+            platform: XcodePlatform.macOS,
+            derivedDataPath: params.derivedDataPath,
+            extraArgs: params.extraArgs,
+          },
+          executor,
+        );
+
+        const plistResult = await executor(
+          ['/bin/sh', '-c', `defaults read "${appPath}/Contents/Info" CFBundleIdentifier`],
+          'Extract Bundle ID',
+          false,
+        );
+        if (plistResult.success && plistResult.output) {
+          bundleId = plistResult.output.trim();
+        }
+      } catch {
+        // bundle ID is informational only
+      }
+    }
+
+    return createBuildDomainResult({
+      started,
+      succeeded: !buildResult.isError,
+      target: 'macos',
+      artifacts: {
+        ...(bundleId ? { bundleId } : {}),
+        buildLogPath: started.pipeline.logPath,
+      },
+      responseContent: buildResult.content,
+      fallbackErrorMessages: getFallbackErrorMessages(started, buildResult.content),
+      errorFallbackPolicy: 'if-no-structured-diagnostics',
+    });
+  };
+}
 
 export async function buildMacOSLogic(
   params: BuildMacOSParams,
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const configuration = params.configuration ?? 'Debug';
+
   log('info', `Starting macOS build for scheme ${params.scheme}`);
-
-  const processedParams = {
-    ...params,
-    configuration: params.configuration ?? 'Debug',
-    preferXcodebuild: params.preferXcodebuild ?? false,
-  };
-
-  const platformOptions = {
-    platform: XcodePlatform.macOS,
-    arch: params.arch,
-    logPrefix: 'macOS Build',
-  };
-
-  const preflightText = formatToolPreflight({
-    operation: 'Build',
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration: processedParams.configuration,
-    platform: 'macOS',
-    arch: params.arch,
-  });
-
-  const pipelineParams = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration: processedParams.configuration,
-    platform: 'macOS',
-    preflight: preflightText,
-  };
-
-  const started = startBuildPipeline({
-    operation: 'BUILD',
-    toolName: 'build_macos',
-    params: pipelineParams,
-    message: preflightText,
-  });
-
-  const buildResult = await executeXcodeBuildCommand(
-    processedParams,
-    platformOptions,
-    processedParams.preferXcodebuild,
-    'build',
-    executor,
-    undefined,
-    started.pipeline,
+  ctx.emit(
+    createBuildHeaderEvent(
+      {
+        scheme: params.scheme,
+        workspacePath: params.workspacePath,
+        projectPath: params.projectPath,
+        configuration,
+        platform: 'macOS',
+        arch: params.arch,
+      },
+      'Build',
+    ),
   );
 
-  if (buildResult.isError) {
-    finalizeInlineXcodebuild({
-      started,
-      emit: ctx.emit,
-      succeeded: false,
-      durationMs: Date.now() - started.startedAt,
-      responseContent: buildResult.content,
-    });
-    return;
-  }
+  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executeBuildMacOS = createBuildMacOSExecutor(executor);
+  const result = await executeBuildMacOS(params, executionContext);
 
-  let bundleId: string | undefined;
-  try {
-    const appPath = await resolveAppPathFromBuildSettings(
-      {
-        projectPath: params.projectPath,
-        workspacePath: params.workspacePath,
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
+
+  if (!result.didError) {
+    ctx.nextStepParams = {
+      get_mac_app_path: {
         scheme: params.scheme,
-        configuration: processedParams.configuration,
-        platform: XcodePlatform.macOS,
-        derivedDataPath: params.derivedDataPath,
-        extraArgs: params.extraArgs,
       },
-      executor,
-    );
-
-    const plistResult = await executor(
-      ['/bin/sh', '-c', `defaults read "${appPath}/Contents/Info" CFBundleIdentifier`],
-      'Extract Bundle ID',
-      false,
-    );
-    if (plistResult.success && plistResult.output) {
-      bundleId = plistResult.output.trim();
-    }
-  } catch {
-    // non-fatal: bundle ID is informational
+    };
   }
-
-  const tailEvents = bundleId ? [detailTree([{ label: 'Bundle ID', value: bundleId }])] : [];
-
-  finalizeInlineXcodebuild({
-    started,
-    emit: ctx.emit,
-    succeeded: true,
-    durationMs: Date.now() - started.startedAt,
-    responseContent: buildResult.content,
-    tailEvents,
-  });
-
-  ctx.nextStepParams = {
-    get_mac_app_path: {
-      scheme: params.scheme,
-    },
-  };
 }
 
 export const schema = getSessionAwareToolSchemaShape({

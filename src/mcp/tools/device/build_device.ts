@@ -6,6 +6,9 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -16,11 +19,15 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { startBuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
-import { finalizeInlineXcodebuild } from '../../../utils/xcodebuild-output.ts';
-import { formatToolPreflight } from '../../../utils/build-preflight.ts';
+import {
+  createBuildDomainResult,
+  createPipelineCompatExecutionContext,
+  createProgressStreamingPipeline,
+} from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
 
-// Unified schema: XOR between projectPath and workspacePath
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
+
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
@@ -43,6 +50,7 @@ const buildDeviceSchema = z.preprocess(
 );
 
 export type BuildDeviceParams = z.infer<typeof buildDeviceSchema>;
+type BuildDeviceResult = BuildResultDomainResult;
 
 const publicSchemaObject = baseSchemaObject.omit({
   projectPath: true,
@@ -53,69 +61,86 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
-/**
- * Business logic for building device project or workspace.
- * Exported for direct testing and reuse.
- */
+function getFallbackErrorMessages(
+  started: ReturnType<typeof createProgressStreamingPipeline>,
+  responseContent?: Array<{ type: 'text'; text: string }>,
+): string[] {
+  return [...started.stderrLines, ...(responseContent ?? []).map((item) => item.text)];
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: BuildDeviceResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createBuildDeviceExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<BuildDeviceParams, BuildDeviceResult> {
+  return async (params, ctx) => {
+    const processedParams = {
+      ...params,
+      configuration: params.configuration ?? 'Debug',
+    };
+    const started = createProgressStreamingPipeline('build_device', 'BUILD', ctx);
+
+    const buildResult = await executeXcodeBuildCommand(
+      processedParams,
+      {
+        platform: XcodePlatform.iOS,
+        logPrefix: 'iOS Device Build',
+      },
+      params.preferXcodebuild ?? false,
+      'build',
+      executor,
+      undefined,
+      started.pipeline,
+    );
+
+    return createBuildDomainResult({
+      started,
+      succeeded: !buildResult.isError,
+      target: 'device',
+      artifacts: {
+        buildLogPath: started.pipeline.logPath,
+      },
+      responseContent: buildResult.content,
+      fallbackErrorMessages: getFallbackErrorMessages(started, buildResult.content),
+      errorFallbackPolicy: 'if-no-structured-diagnostics',
+    });
+  };
+}
+
 export async function buildDeviceLogic(
   params: BuildDeviceParams,
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const processedParams = {
-    ...params,
-    configuration: params.configuration ?? 'Debug',
-  };
+  const configuration = params.configuration ?? 'Debug';
 
-  const platformOptions = {
-    platform: XcodePlatform.iOS,
-    logPrefix: 'iOS Device Build',
-  };
-
-  const preflightText = formatToolPreflight({
-    operation: 'Build',
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration: processedParams.configuration,
-    platform: 'iOS',
-  });
-
-  const pipelineParams = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration: processedParams.configuration,
-    platform: 'iOS',
-    preflight: preflightText,
-  };
-
-  const started = startBuildPipeline({
-    operation: 'BUILD',
-    toolName: 'build_device',
-    params: pipelineParams,
-    message: preflightText,
-  });
-
-  const buildResult = await executeXcodeBuildCommand(
-    processedParams,
-    platformOptions,
-    params.preferXcodebuild ?? false,
-    'build',
-    executor,
-    undefined,
-    started.pipeline,
+  ctx.emit(
+    createBuildHeaderEvent(
+      {
+        scheme: params.scheme,
+        workspacePath: params.workspacePath,
+        projectPath: params.projectPath,
+        configuration,
+        platform: 'iOS',
+      },
+      'Build',
+    ),
   );
 
-  finalizeInlineXcodebuild({
-    started,
-    emit: ctx.emit,
-    succeeded: !buildResult.isError,
-    durationMs: Date.now() - started.startedAt,
-    responseContent: buildResult.content,
-  });
+  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executeBuildDevice = createBuildDeviceExecutor(executor);
+  const result = await executeBuildDevice(params, executionContext);
 
-  if (!buildResult.isError) {
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
+
+  if (!result.didError) {
     ctx.nextStepParams = {
       get_device_app_path: {
         scheme: params.scheme,

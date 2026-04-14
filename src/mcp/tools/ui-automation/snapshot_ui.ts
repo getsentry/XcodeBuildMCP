@@ -1,12 +1,13 @@
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
-import { DependencyError, AxeError, SystemError } from '../../../utils/errors.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
 import type { DebuggerManager } from '../../../utils/debugger/debugger-manager.ts';
 import { guardUiAutomationAgainstStoppedDebugger } from '../../../utils/debugger/ui-automation-guard.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../utils/axe-helpers.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -15,47 +16,71 @@ import {
 import { recordSnapshotUiCall } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
+import type {
+  AccessibilityNode,
+  CaptureResultDomainResult,
+} from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import {
+  createCaptureFailureResult,
+  createCaptureSuccessResult,
+  mapAxeCommandError,
+  setCaptureStructuredOutput,
+} from './shared/domain-result.ts';
 
 const snapshotUiSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
 });
 
 type SnapshotUiParams = z.infer<typeof snapshotUiSchema>;
+type SnapshotUiResult = CaptureResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
 
-export async function snapshot_uiLogic(
-  params: SnapshotUiParams,
+function parseUiHierarchy(responseText: string): AccessibilityNode[] | undefined {
+  try {
+    const parsed = JSON.parse(responseText) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed as AccessibilityNode[];
+    }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'elements' in parsed &&
+      Array.isArray((parsed as { elements?: unknown }).elements)
+    ) {
+      return (parsed as { elements: AccessibilityNode[] }).elements;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+export function createSnapshotUiExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): Promise<void> {
-  const toolName = 'snapshot_ui';
-  const { simulatorId } = params;
-  const commandArgs = ['describe-ui'];
+  options: { onRawHierarchy?: (responseText: string) => void } = {},
+): ToolExecutor<SnapshotUiParams, SnapshotUiResult> {
+  return async (params) => {
+    const toolName = 'snapshot_ui';
+    const { simulatorId } = params;
+    const commandArgs = ['describe-ui'];
 
-  const headerEvent = header('Snapshot UI', [{ label: 'Simulator', value: simulatorId }]);
+    const guard = await guardUiAutomationAgainstStoppedDebugger({
+      debugger: debuggerManager,
+      simulatorId,
+      toolName,
+    });
+    if (guard.blockedMessage) {
+      return createCaptureFailureResult(simulatorId, guard.blockedMessage);
+    }
 
-  const ctx = getHandlerContext();
+    log('info', `${LOG_PREFIX}/${toolName}: Starting for ${simulatorId}`);
 
-  const guard = await guardUiAutomationAgainstStoppedDebugger({
-    debugger: debuggerManager,
-    simulatorId,
-    toolName,
-  });
-  if (guard.blockedMessage) {
-    ctx.emit(headerEvent);
-    ctx.emit(statusLine('error', guard.blockedMessage));
-    return;
-  }
-
-  log('info', `${LOG_PREFIX}/${toolName}: Starting for ${simulatorId}`);
-
-  return withErrorHandling(
-    ctx,
-    async () => {
+    try {
       const responseText = await executeAxeCommand(
         commandArgs,
         simulatorId,
@@ -64,53 +89,90 @@ export async function snapshot_uiLogic(
         axeHelpers,
       );
 
+      options.onRawHierarchy?.(responseText);
       recordSnapshotUiCall(simulatorId);
-
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Accessibility hierarchy retrieved successfully.'));
-      ctx.emit(section('Accessibility Hierarchy', ['```json', responseText, '```']));
+
+      const uiHierarchy = parseUiHierarchy(responseText);
+      return createCaptureSuccessResult(simulatorId, {
+        capture: uiHierarchy
+          ? {
+              type: 'ui-hierarchy',
+              uiHierarchy,
+            }
+          : undefined,
+        warnings: [guard.warningText],
+      });
+    } catch (error) {
+      const failure = mapAxeCommandError(error, {
+        axeFailureMessage: (axeError) =>
+          `Failed to get accessibility hierarchy: ${axeError.message}`,
+      });
+      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+      return createCaptureFailureResult(simulatorId, failure.message, {
+        details: failure.diagnostics?.errors.map((entry) => entry.message),
+      });
+    }
+  };
+}
+
+export async function snapshot_uiLogic(
+  params: SnapshotUiParams,
+  executor: CommandExecutor,
+  axeHelpers: AxeHelpers = defaultAxeHelpers,
+  debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  let rawHierarchyText = '';
+  const executeSnapshotUi = createSnapshotUiExecutor(executor, axeHelpers, debuggerManager, {
+    onRawHierarchy: (responseText) => {
+      rawHierarchyText = responseText;
+    },
+  });
+  const result = await executeSnapshotUi(params, executionContext);
+
+  setCaptureStructuredOutput(ctx, result);
+
+  const headerEvent = header('Snapshot UI', [{ label: 'Simulator', value: params.simulatorId }]);
+  ctx.emit(headerEvent);
+
+  if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Failed to get accessibility hierarchy.'));
+    const details = result.diagnostics?.errors ?? [];
+    if (details.length > 0) {
       ctx.emit(
-        section('Tips', [
-          '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
-          '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
-          '- Screenshots are for visual verification only',
-        ]),
+        section(
+          'Details',
+          details.map((entry) => `Error: ${entry.message}`),
+        ),
       );
-      if (guard.warningText) {
-        ctx.emit(statusLine('warning', guard.warningText));
-      }
-      ctx.nextStepParams = {
-        snapshot_ui: { simulatorId },
-        tap: { simulatorId, x: 0, y: 0 },
-        screenshot: { simulatorId },
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `An unexpected error occurred: ${message}`,
-      logMessage: ({ error }) => `${LOG_PREFIX}/${toolName}: Failed - ${error}`,
-      mapError: ({ error, headerEvent: hdr, emit }) => {
-        if (error instanceof DependencyError) {
-          emit?.(hdr);
-          emit?.(statusLine('error', AXE_NOT_AVAILABLE_MESSAGE));
-          return;
-        } else if (error instanceof AxeError) {
-          emit?.(hdr);
-          emit?.(statusLine('error', `Failed to get accessibility hierarchy: ${error.message}`));
-          if (error.axeOutput) emit?.(section('Details', [error.axeOutput]));
-          return;
-        } else if (error instanceof SystemError) {
-          emit?.(hdr);
-          emit?.(statusLine('error', `System error executing axe: ${error.message}`));
-          if (error.originalError?.stack)
-            emit?.(section('Stack Trace', [error.originalError.stack]));
-          return;
-        }
-        return undefined;
-      },
-    },
+    }
+    return;
+  }
+
+  ctx.emit(statusLine('success', 'Accessibility hierarchy retrieved successfully.'));
+  if (rawHierarchyText.length > 0) {
+    ctx.emit(section('Accessibility Hierarchy', ['```json', rawHierarchyText, '```']));
+  }
+  ctx.emit(
+    section('Tips', [
+      '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
+      '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
+      '- Screenshots are for visual verification only',
+    ]),
   );
+
+  const warnings = result.diagnostics?.warnings ?? [];
+  for (const warning of warnings) {
+    ctx.emit(statusLine('warning', warning.message));
+  }
+
+  ctx.nextStepParams = {
+    snapshot_ui: { simulatorId: params.simulatorId },
+    tap: { simulatorId: params.simulatorId, x: 0, y: 0 },
+    screenshot: { simulatorId: params.simulatorId },
+  };
 }
 
 const publicSchemaObject = z.strictObject(

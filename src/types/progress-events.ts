@@ -1,6 +1,6 @@
 export interface StatusProgressEvent {
   type: 'status';
-  level: 'info' | 'warning' | 'error';
+  level: 'info' | 'warning' | 'error' | 'success';
   message: string;
 }
 export interface XcodebuildLineProgressEvent {

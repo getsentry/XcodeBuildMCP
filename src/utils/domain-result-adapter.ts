@@ -9,6 +9,7 @@ import type {
   SectionEvent,
   SummaryEvent,
   TableEvent,
+  TestDiscoveryEvent,
   XcodebuildOperation,
 } from '../types/pipeline-events.js';
 import type {
@@ -18,7 +19,8 @@ import type {
   TableProgressEvent,
   XcodebuildLineProgressEvent,
 } from '../types/progress-events.js';
-import { fileRef, header, section, statusLine, table } from './tool-event-builders.js';
+import { detailTree, fileRef, header, section, statusLine, table } from './tool-event-builders.js';
+import { displayPath } from './build-preflight.js';
 import {
   createXcodebuildEventParser,
   type XcodebuildEventParser,
@@ -261,6 +263,191 @@ function createDiagnosticSections(result: ToolDomainResult): SectionEvent[] {
   return sections;
 }
 
+function createTestDiscoveryEvent(
+  result: Extract<ToolDomainResult, { kind: 'test-result' }>,
+): TestDiscoveryEvent | null {
+  const discovered = result.tests?.discovered;
+  if (!discovered || discovered.total === 0) {
+    return null;
+  }
+
+  return {
+    type: 'test-discovery',
+    timestamp: now(),
+    operation: 'TEST',
+    total: discovered.total,
+    tests: discovered.items,
+    truncated: discovered.items.length < discovered.total,
+  };
+}
+
+function createBuildLikeTailEvents(result: ToolDomainResult): PipelineEvent[] {
+  switch (result.kind) {
+    case 'build-result': {
+      if (!('artifacts' in result) || !result.artifacts) {
+        return [];
+      }
+
+      const items: Array<{ label: string; value: string }> = [];
+      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
+        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+      }
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+      }
+
+      return items.length > 0 ? [detailTree(items)] : [];
+    }
+
+    case 'build-run-result': {
+      const items: Array<{ label: string; value: string }> = [];
+      if ('appPath' in result.artifacts && typeof result.artifacts.appPath === 'string') {
+        items.push({ label: 'App Path', value: displayPath(result.artifacts.appPath) });
+      }
+      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
+        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+      }
+      if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
+        items.push({ label: 'Process ID', value: String(result.artifacts.processId) });
+      }
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+      }
+      if (
+        'runtimeLogPath' in result.artifacts &&
+        typeof result.artifacts.runtimeLogPath === 'string'
+      ) {
+        items.push({ label: 'Runtime Logs', value: displayPath(result.artifacts.runtimeLogPath) });
+      }
+      if ('osLogPath' in result.artifacts && typeof result.artifacts.osLogPath === 'string') {
+        items.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
+      }
+
+      if (items.length === 0) {
+        return [];
+      }
+
+      return [
+        ...(!result.didError ? [statusLine('success', 'Build & Run complete')] : []),
+        detailTree(items),
+      ];
+    }
+
+    case 'test-result': {
+      if (!('artifacts' in result) || !result.artifacts) {
+        return [];
+      }
+
+      const items: Array<{ label: string; value: string }> = [];
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+      }
+
+      return items.length > 0 ? [detailTree(items)] : [];
+    }
+
+    default:
+      return [];
+  }
+}
+
+function createUiActionResultEvents(
+  result: Extract<ToolDomainResult, { kind: 'ui-action-result' }>,
+): PipelineEvent[] {
+  const headerTitleMap: Record<typeof result.action.type, string> = {
+    tap: 'Tap',
+    swipe: 'Swipe',
+    touch: 'Touch',
+    'long-press': 'Long Press',
+    button: 'Button',
+    gesture: 'Gesture',
+    'type-text': 'Type Text',
+    'key-press': 'Key Press',
+    'key-sequence': 'Key Sequence',
+  };
+
+  const headerEvent = header(headerTitleMap[result.action.type], [
+    { label: 'Simulator', value: result.artifacts.simulatorId },
+  ]);
+
+  const details = result.diagnostics?.errors ?? [];
+  const warnings = result.diagnostics?.warnings ?? [];
+  const events: PipelineEvent[] = [headerEvent];
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? 'UI action failed.'));
+    if (details.length > 0) {
+      events.push(
+        section(
+          'Details',
+          details.map((entry) => `Error: ${entry.message}`),
+        ),
+      );
+    }
+    return events;
+  }
+
+  let successMessage = 'UI action completed successfully.';
+  switch (result.action.type) {
+    case 'tap':
+      if (typeof result.action.x === 'number' && typeof result.action.y === 'number') {
+        successMessage = `Tap at (${result.action.x}, ${result.action.y}) simulated successfully.`;
+      } else if (result.action.id) {
+        successMessage = `Tap on element id "${result.action.id}" simulated successfully.`;
+      } else if (result.action.label) {
+        successMessage = `Tap on element label "${result.action.label}" simulated successfully.`;
+      }
+      break;
+    case 'swipe': {
+      const from = result.action.from;
+      const to = result.action.to;
+      const durationText =
+        typeof result.action.durationSeconds === 'number'
+          ? ` duration=${result.action.durationSeconds}s`
+          : '';
+      if (from && to) {
+        successMessage =
+          `Swipe from (${from.x}, ${from.y}) to (${to.x}, ${to.y})` +
+          `${durationText} simulated successfully.`;
+      }
+      break;
+    }
+    case 'touch':
+      if (typeof result.action.x === 'number' && typeof result.action.y === 'number') {
+        successMessage =
+          `Touch event (${result.action.event ?? 'touch'}) at (${result.action.x}, ` +
+          `${result.action.y}) executed successfully.`;
+      }
+      break;
+    case 'long-press':
+      successMessage =
+        `Long press at (${result.action.x}, ${result.action.y}) for ${result.action.durationMs}ms ` +
+        'simulated successfully.';
+      break;
+    case 'button':
+      successMessage = `Hardware button '${result.action.button}' pressed successfully.`;
+      break;
+    case 'gesture':
+      successMessage = `Gesture '${result.action.gesture}' executed successfully.`;
+      break;
+    case 'type-text':
+      successMessage = 'Text typing simulated successfully.';
+      break;
+    case 'key-press':
+      successMessage = `Key press (code: ${result.action.keyCode}) simulated successfully.`;
+      break;
+    case 'key-sequence':
+      successMessage = `Key sequence [${result.action.keyCodes.join(',')}] executed successfully.`;
+      break;
+  }
+
+  events.push(statusLine('success', successMessage));
+  for (const warning of warnings) {
+    events.push(statusLine('warning', warning.message));
+  }
+  return events;
+}
+
 export class DomainResultPipelineEventAdapter {
   private readonly fallbackOperation?: XcodebuildOperation;
   private readonly bufferedEvents: PipelineEvent[] = [];
@@ -296,6 +483,9 @@ export class DomainResultPipelineEventAdapter {
     if (result.kind === 'simulator-list') {
       return createSimulatorListEvents(result);
     }
+    if (result.kind === 'ui-action-result') {
+      return createUiActionResultEvents(result);
+    }
 
     const operation = this.fallbackOperation ?? inferXcodebuildOperation(result);
     if (operation && !this.parser) {
@@ -303,12 +493,22 @@ export class DomainResultPipelineEventAdapter {
     }
 
     const events = [...this.flushXcodebuildEvents()];
+
+    if (result.kind === 'test-result') {
+      const discoveryEvent = createTestDiscoveryEvent(result);
+      if (discoveryEvent) {
+        events.push(discoveryEvent);
+      }
+    }
+
     events.push(...createDiagnosticSections(result));
 
     const summaryEvent = createSummaryEvent(result);
     if (summaryEvent) {
       events.push(summaryEvent);
     }
+
+    events.push(...createBuildLikeTailEvents(result));
 
     return events;
   }

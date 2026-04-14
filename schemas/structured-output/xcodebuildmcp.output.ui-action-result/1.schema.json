@@ -45,6 +45,12 @@
                 },
                 "y": {
                   "type": "number"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -63,6 +69,10 @@
                 },
                 "to": {
                   "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/point"
+                },
+                "durationSeconds": {
+                  "type": "number",
+                  "minimum": 0
                 }
               },
               "required": [

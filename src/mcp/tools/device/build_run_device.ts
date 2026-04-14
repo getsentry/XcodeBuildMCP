@@ -5,8 +5,10 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SharedBuildParams, NextStepParamsMap } from '../../../types/common.ts';
-import type { PipelineEvent } from '../../../types/pipeline-events.ts';
+import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -22,19 +24,17 @@ import {
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 import { mapDevicePlatform } from './build-settings.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
-import { startBuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
-import { formatToolPreflight } from '../../../utils/build-preflight.ts';
-import {
-  createBuildRunResultEvents,
-  emitPipelineError,
-  emitPipelineNotice,
-  finalizeInlineXcodebuild,
-} from '../../../utils/xcodebuild-output.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { installAppOnDevice, launchAppOnDevice } from '../../../utils/device-steps.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+import {
+  createBuildRunDomainResult,
+  createPipelineCompatExecutionContext,
+  createProgressStreamingPipeline,
+} from '../../../utils/xcodebuild-domain-results.ts';
+
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-run-result';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -64,238 +64,196 @@ const buildRunDeviceSchema = z.preprocess(
 );
 
 export type BuildRunDeviceParams = z.infer<typeof buildRunDeviceSchema>;
+type BuildRunDeviceResult = BuildRunResultDomainResult;
 
-function bailWithError(
-  started: ReturnType<typeof startBuildPipeline>,
-  emit: (event: PipelineEvent) => void,
-  logMessage: string,
-  pipelineMessage: string,
+function emitStepProgress(
+  ctx: Parameters<ToolExecutor<BuildRunDeviceParams, BuildRunDeviceResult>>[1],
+  message: string,
+  level: 'info' | 'warning' | 'error' = 'info',
 ): void {
-  log('error', logMessage);
-  emitPipelineError(started, 'BUILD', pipelineMessage);
-  finalizeInlineXcodebuild({
-    started,
-    emit,
-    succeeded: false,
-    durationMs: Date.now() - started.startedAt,
-  });
+  ctx.emitProgress({ type: 'status', level, message });
 }
 
-export async function build_run_deviceLogic(
-  params: BuildRunDeviceParams,
+function setStructuredOutput(ctx: ToolHandlerContext, result: BuildRunDeviceResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+function getFallbackErrorMessages(
+  started: ReturnType<typeof createProgressStreamingPipeline>,
+  extraMessages: string[] = [],
+  responseContent?: Array<{ type: 'text'; text: string }>,
+): string[] {
+  return [
+    ...started.stderrLines,
+    ...extraMessages,
+    ...(responseContent ?? []).map((item) => item.text),
+  ];
+}
+
+export function createBuildRunDeviceExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): Promise<void> {
-  const ctx = getHandlerContext();
-  const platform = mapDevicePlatform(params.platform);
+): ToolExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
+  return async (params, ctx) => {
+    const platform = mapDevicePlatform(params.platform);
+    const configuration = params.configuration ?? 'Debug';
+    const sharedBuildParams: SharedBuildParams = {
+      projectPath: params.projectPath,
+      workspacePath: params.workspacePath,
+      scheme: params.scheme,
+      configuration,
+      derivedDataPath: params.derivedDataPath,
+      extraArgs: params.extraArgs,
+    };
+    const started = createProgressStreamingPipeline('build_run_device', 'BUILD', ctx);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const configuration = params.configuration ?? 'Debug';
-
-      const sharedBuildParams: SharedBuildParams = {
-        projectPath: params.projectPath,
-        workspacePath: params.workspacePath,
-        scheme: params.scheme,
-        configuration,
-        derivedDataPath: params.derivedDataPath,
-        extraArgs: params.extraArgs,
-      };
-
-      const platformOptions = {
+    const buildResult = await executeXcodeBuildCommand(
+      sharedBuildParams,
+      {
         platform,
         logPrefix: `${platform} Device Build`,
-      };
+      },
+      params.preferXcodebuild ?? false,
+      'build',
+      executor,
+      undefined,
+      started.pipeline,
+    );
 
-      const deviceName = resolveDeviceName(params.deviceId);
-
-      const preflightText = formatToolPreflight({
-        operation: 'Build & Run',
-        scheme: params.scheme,
-        workspacePath: params.workspacePath,
-        projectPath: params.projectPath,
-        configuration,
-        platform: String(platform),
-        deviceId: params.deviceId,
-        deviceName,
-      });
-
-      const started = startBuildPipeline({
-        operation: 'BUILD',
-        toolName: 'build_run_device',
-        params: {
-          scheme: params.scheme,
-          workspacePath: params.workspacePath,
-          projectPath: params.projectPath,
-          configuration,
-          platform: String(platform),
-          deviceId: params.deviceId,
-          preflight: preflightText,
-        },
-        message: preflightText,
-      });
-
-      // Build
-      const buildResult = await executeXcodeBuildCommand(
-        sharedBuildParams,
-        platformOptions,
-        params.preferXcodebuild ?? false,
-        'build',
-        executor,
-        undefined,
-        started.pipeline,
-      );
-
-      if (buildResult.isError) {
-        finalizeInlineXcodebuild({
-          started,
-          emit: ctx.emit,
-          succeeded: false,
-          durationMs: Date.now() - started.startedAt,
-          responseContent: buildResult.content,
-          errorFallbackPolicy: 'if-no-structured-diagnostics',
-        });
-        return;
-      }
-
-      // Resolve app path
-      emitPipelineNotice(started, 'BUILD', 'Resolving app path', 'info', {
-        code: 'build-run-step',
-        data: { step: 'resolve-app-path', status: 'started' },
-      });
-
-      let appPath: string;
-      try {
-        appPath = await resolveAppPathFromBuildSettings(
-          {
-            projectPath: params.projectPath,
-            workspacePath: params.workspacePath,
-            scheme: params.scheme,
-            configuration: params.configuration,
-            platform,
-            derivedDataPath: params.derivedDataPath,
-            extraArgs: params.extraArgs,
-          },
-          executor,
-        );
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return bailWithError(
-          started,
-          ctx.emit,
-          'Build succeeded, but failed to get app path to launch.',
-          `Failed to get app path to launch: ${errorMessage}`,
-        );
-      }
-
-      log('info', `App path determined as: ${appPath}`);
-      emitPipelineNotice(started, 'BUILD', 'App path resolved', 'success', {
-        code: 'build-run-step',
-        data: { step: 'resolve-app-path', status: 'succeeded', appPath },
-      });
-
-      // Extract bundle ID
-      let bundleId: string;
-      try {
-        bundleId = (await extractBundleIdFromAppPath(appPath, executor)).trim();
-        if (bundleId.length === 0) {
-          throw new Error('Empty bundle ID returned');
-        }
-        log('info', `Bundle ID for run: ${bundleId}`);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return bailWithError(
-          started,
-          ctx.emit,
-          `Failed to extract bundle ID: ${errorMessage}`,
-          `Failed to extract bundle ID: ${errorMessage}`,
-        );
-      }
-
-      // Install app on device
-      emitPipelineNotice(started, 'BUILD', 'Installing app', 'info', {
-        code: 'build-run-step',
-        data: { step: 'install-app', status: 'started' },
-      });
-
-      const installResult = await installAppOnDevice(params.deviceId, appPath, executor);
-      if (!installResult.success) {
-        const errorMessage = installResult.error ?? 'Failed to install app';
-        return bailWithError(
-          started,
-          ctx.emit,
-          `Failed to install app on device: ${errorMessage}`,
-          `Failed to install app on device: ${errorMessage}`,
-        );
-      }
-
-      emitPipelineNotice(started, 'BUILD', 'App installed', 'success', {
-        code: 'build-run-step',
-        data: { step: 'install-app', status: 'succeeded' },
-      });
-
-      // Launch app on device
-      emitPipelineNotice(started, 'BUILD', 'Launching app', 'info', {
-        code: 'build-run-step',
-        data: { step: 'launch-app', status: 'started', appPath },
-      });
-
-      const launchResult = await launchAppOnDevice(
-        params.deviceId,
-        bundleId,
-        executor,
-        fileSystemExecutor,
-        { env: params.env },
-      );
-      if (!launchResult.success) {
-        const errorMessage = launchResult.error ?? 'Failed to launch app';
-        return bailWithError(
-          started,
-          ctx.emit,
-          `Failed to launch app on device: ${errorMessage}`,
-          `Failed to launch app on device: ${errorMessage}`,
-        );
-      }
-
-      const processId = launchResult.processId;
-
-      log('info', `Device build and run succeeded for scheme ${params.scheme}.`);
-
-      const nextStepParams: NextStepParamsMap = {};
-
-      if (processId !== undefined) {
-        nextStepParams.stop_app_device = {
-          deviceId: params.deviceId,
-          processId,
-        };
-      }
-
-      finalizeInlineXcodebuild({
+    if (buildResult.isError) {
+      return createBuildRunDomainResult({
         started,
-        emit: ctx.emit,
-        succeeded: true,
-        durationMs: Date.now() - started.startedAt,
-        tailEvents: createBuildRunResultEvents({
-          scheme: params.scheme,
-          platform: String(platform),
-          target: `${platform} Device`,
-          appPath,
-          bundleId,
-          processId,
-          launchState: 'requested',
+        succeeded: false,
+        target: 'device',
+        artifacts: {
+          deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
-        }),
-        includeBuildLogFileRef: false,
+        },
+        responseContent: buildResult.content,
+        fallbackErrorMessages: getFallbackErrorMessages(started, [], buildResult.content),
+        errorFallbackPolicy: 'if-no-structured-diagnostics',
       });
-      ctx.nextStepParams = nextStepParams;
-    },
-    {
-      header: header('Build & Run Device'),
-      errorMessage: ({ message }) => `Error during device build and run: ${message}`,
-      logMessage: ({ message }) => `Error during device build & run logic: ${message}`,
-    },
-  );
+    }
+
+    emitStepProgress(ctx, 'Resolving app path');
+
+    let appPath: string;
+    try {
+      appPath = await resolveAppPathFromBuildSettings(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme,
+          configuration,
+          platform,
+          derivedDataPath: params.derivedDataPath,
+          extraArgs: params.extraArgs,
+        },
+        executor,
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return createBuildRunDomainResult({
+        started,
+        succeeded: false,
+        target: 'device',
+        artifacts: {
+          deviceId: params.deviceId,
+          buildLogPath: started.pipeline.logPath,
+        },
+        fallbackErrorMessages: getFallbackErrorMessages(started, [
+          `Failed to get app path to launch: ${errorMessage}`,
+        ]),
+      });
+    }
+
+    ctx.emitProgress({ type: 'status', level: 'success', message: 'Resolving app path' });
+
+    let bundleId: string;
+    try {
+      bundleId = (await extractBundleIdFromAppPath(appPath, executor)).trim();
+      if (bundleId.length === 0) {
+        throw new Error('Empty bundle ID returned');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return createBuildRunDomainResult({
+        started,
+        succeeded: false,
+        target: 'device',
+        artifacts: {
+          deviceId: params.deviceId,
+          buildLogPath: started.pipeline.logPath,
+        },
+        fallbackErrorMessages: getFallbackErrorMessages(started, [
+          `Failed to extract bundle ID: ${errorMessage}`,
+        ]),
+      });
+    }
+
+    emitStepProgress(ctx, 'Installing app');
+    const installResult = await installAppOnDevice(params.deviceId, appPath, executor);
+    if (!installResult.success) {
+      const errorMessage = installResult.error ?? 'Failed to install app';
+      return createBuildRunDomainResult({
+        started,
+        succeeded: false,
+        target: 'device',
+        artifacts: {
+          deviceId: params.deviceId,
+          buildLogPath: started.pipeline.logPath,
+        },
+        fallbackErrorMessages: getFallbackErrorMessages(started, [
+          `Failed to install app on device: ${errorMessage}`,
+        ]),
+      });
+    }
+    ctx.emitProgress({ type: 'status', level: 'success', message: 'Installing app' });
+
+    emitStepProgress(ctx, 'Launching app');
+    const launchResult = await launchAppOnDevice(
+      params.deviceId,
+      bundleId,
+      executor,
+      fileSystemExecutor,
+      { env: params.env },
+    );
+    if (!launchResult.success) {
+      const errorMessage = launchResult.error ?? 'Failed to launch app';
+      return createBuildRunDomainResult({
+        started,
+        succeeded: false,
+        target: 'device',
+        artifacts: {
+          deviceId: params.deviceId,
+          buildLogPath: started.pipeline.logPath,
+        },
+        fallbackErrorMessages: getFallbackErrorMessages(started, [
+          `Failed to launch app on device: ${errorMessage}`,
+        ]),
+      });
+    }
+
+    const processId = launchResult.processId;
+    log('info', `Device build and run succeeded for scheme ${params.scheme}.`);
+
+    return createBuildRunDomainResult({
+      started,
+      succeeded: true,
+      target: 'device',
+      artifacts: {
+        appPath,
+        bundleId,
+        ...(processId !== undefined ? { processId } : {}),
+        deviceId: params.deviceId,
+        buildLogPath: started.pipeline.logPath,
+      },
+    });
+  };
 }
 
 const publicSchemaObject = baseSchemaObject.omit({
@@ -308,6 +266,52 @@ const publicSchemaObject = baseSchemaObject.omit({
   derivedDataPath: true,
   preferXcodebuild: true,
 } as const);
+
+export async function build_run_deviceLogic(
+  params: BuildRunDeviceParams,
+  executor: CommandExecutor,
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const platform = mapDevicePlatform(params.platform);
+  const configuration = params.configuration ?? 'Debug';
+  const deviceName = resolveDeviceName(params.deviceId);
+
+  ctx.emit(
+    createBuildHeaderEvent(
+      {
+        scheme: params.scheme,
+        workspacePath: params.workspacePath,
+        projectPath: params.projectPath,
+        configuration,
+        platform: String(platform),
+        deviceId: params.deviceId,
+        deviceName,
+      },
+      'Build & Run',
+    ),
+  );
+
+  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executeBuildRunDevice = createBuildRunDeviceExecutor(executor, fileSystemExecutor);
+  const result = await executeBuildRunDevice(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
+
+  if (!result.didError) {
+    const nextStepParams: NextStepParamsMap = {};
+    if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
+      nextStepParams.stop_app_device = {
+        deviceId: params.deviceId,
+        processId: result.artifacts.processId,
+      };
+    }
+    if (Object.keys(nextStepParams).length > 0) {
+      ctx.nextStepParams = nextStepParams;
+    }
+  }
+}
 
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,

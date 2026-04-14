@@ -164,6 +164,21 @@ function buildHeaderParams(
   return result;
 }
 
+export function createBuildHeaderEvent(
+  params: Record<string, unknown>,
+  message: string,
+): PipelineEvent {
+  return {
+    type: 'header',
+    timestamp: new Date().toISOString(),
+    operation: message
+      .replace(/^[^\p{L}]+/u, '')
+      .split('\n')[0]
+      .trim(),
+    params: buildHeaderParams(params),
+  };
+}
+
 /**
  * Creates a pipeline, emits the initial header event, and captures the start
  * timestamp. This consolidates the repeated create-then-emit-start pattern used
@@ -182,16 +197,7 @@ export function startBuildPipeline(
       }
     })();
   const pipeline = createXcodebuildPipeline({ ...options, emit });
-
-  pipeline.emitEvent({
-    type: 'header',
-    timestamp: new Date().toISOString(),
-    operation: options.message
-      .replace(/^[^\p{L}]+/u, '')
-      .split('\n')[0]
-      .trim(),
-    params: buildHeaderParams(options.params),
-  });
+  pipeline.emitEvent(createBuildHeaderEvent(options.params, options.message));
 
   return { pipeline, startedAt: Date.now() };
 }

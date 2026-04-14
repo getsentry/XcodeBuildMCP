@@ -284,11 +284,14 @@ export interface UiActionTap {
   type: 'tap';
   x?: number;
   y?: number;
+  id?: string;
+  label?: string;
 }
 export interface UiActionSwipe {
   type: 'swipe';
   from?: Point;
   to?: Point;
+  durationSeconds?: number;
 }
 export interface UiActionTouch {
   type: 'touch';

@@ -6,8 +6,11 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { TestResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
-import { handleTestLogic } from '../../../utils/test/index.ts';
+import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
   getDefaultCommandExecutor,
@@ -18,7 +21,12 @@ import {
   getSessionAwareToolSchemaShape,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { resolveTestPreflight } from '../../../utils/test-preflight.ts';
+import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
+import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
+import { createPipelineCompatExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -61,14 +69,19 @@ const testMacosSchema = z.preprocess(
 );
 
 export type TestMacosParams = z.infer<typeof testMacosSchema>;
+type TestMacosResult = TestResultDomainResult;
 
-export async function testMacosLogic(
+interface PreparedTestMacosExecution {
+  configuration: string;
+  preflight?: TestPreflightResult;
+  headerParams: Record<string, unknown>;
+}
+
+async function prepareTestMacosExecution(
   params: TestMacosParams,
-  executor: CommandExecutor = getDefaultCommandExecutor(),
-  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): Promise<void> {
+  fileSystemExecutor: FileSystemExecutor,
+): Promise<PreparedTestMacosExecution> {
   const configuration = params.configuration ?? 'Debug';
-
   const preflight = await resolveTestPreflight(
     {
       projectPath: params.projectPath,
@@ -81,25 +94,74 @@ export async function testMacosLogic(
     fileSystemExecutor,
   );
 
-  await handleTestLogic(
-    {
-      projectPath: params.projectPath,
-      workspacePath: params.workspacePath,
+  return {
+    configuration,
+    preflight: preflight ?? undefined,
+    headerParams: {
       scheme: params.scheme,
       configuration,
-      derivedDataPath: params.derivedDataPath,
-      extraArgs: params.extraArgs,
-      preferXcodebuild: params.preferXcodebuild ?? false,
-      platform: XcodePlatform.macOS,
-      testRunnerEnv: params.testRunnerEnv,
-      progress: params.progress,
+      platform: 'macOS',
+      onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
+      skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
     },
-    executor,
-    {
-      preflight: preflight ?? undefined,
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: TestMacosResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createTestMacOSExecutor(
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+  prepared?: PreparedTestMacosExecution,
+): ToolExecutor<TestMacosParams, TestMacosResult> {
+  return async (params, ctx) => {
+    const resolved = prepared ?? (await prepareTestMacosExecution(params, fileSystemExecutor));
+    const executeTest = createTestExecutor(executor, {
+      preflight: resolved.preflight,
       toolName: 'test_macos',
-    },
-  );
+      target: 'macos',
+    });
+
+    return executeTest(
+      {
+        projectPath: params.projectPath,
+        workspacePath: params.workspacePath,
+        scheme: params.scheme,
+        configuration: resolved.configuration,
+        derivedDataPath: params.derivedDataPath,
+        extraArgs: params.extraArgs,
+        preferXcodebuild: params.preferXcodebuild ?? false,
+        platform: XcodePlatform.macOS,
+        testRunnerEnv: params.testRunnerEnv,
+        progress: params.progress,
+      },
+      ctx,
+    );
+  };
+}
+
+export async function testMacosLogic(
+  params: TestMacosParams,
+  executor: CommandExecutor = getDefaultCommandExecutor(),
+  fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const prepared = await prepareTestMacosExecution(params, fileSystemExecutor);
+
+  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
+
+  const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+  const executeTestMacOS = createTestMacOSExecutor(executor, fileSystemExecutor, prepared);
+  const result = await executeTestMacOS(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({
