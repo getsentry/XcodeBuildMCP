@@ -27,7 +27,9 @@ export async function stop_mac_appLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeStopMacApp = createStopMacAppExecutor(executor);
   const result = await executeStopMacApp(params, executionContext);
 

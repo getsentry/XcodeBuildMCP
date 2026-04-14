@@ -90,7 +90,9 @@ export async function debug_lldb_commandLogic(
 ): Promise<void> {
   const headerEvent = header('LLDB Command', [{ label: 'Command', value: params.command }]);
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
   const result = await executeDebugLldbCommand(params, executionContext);
 

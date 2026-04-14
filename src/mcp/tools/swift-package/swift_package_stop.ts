@@ -48,7 +48,9 @@ export async function swift_package_stopLogic(
   timeout: number = 5000,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeSwiftPackageStop = createSwiftPackageStopExecutor(processManager, timeout);
   const result = await executeSwiftPackageStop(params, executionContext);
 

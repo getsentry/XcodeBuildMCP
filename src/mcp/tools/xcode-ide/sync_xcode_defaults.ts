@@ -172,7 +172,9 @@ export async function syncXcodeDefaultsLogic(
   context: SyncXcodeDefaultsContext,
 ): Promise<void> {
   const handlerContext = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerContext.emitProgress,
+  });
   const executeSyncXcodeDefaults = createSyncXcodeDefaultsExecutor(context);
   const result = await executeSyncXcodeDefaults(params, executionContext);
 

@@ -96,7 +96,15 @@ function mockInvokeDirectThroughHandler() {
         },
       };
 
+      if (opts.onProgress) {
+        handlerContext.emitProgress = opts.onProgress;
+      }
+
       await tool.handler(args, handlerContext);
+
+      if (handlerContext.structuredOutput && opts.onStructuredOutput) {
+        opts.onStructuredOutput(handlerContext.structuredOutput);
+      }
     });
 }
 
@@ -437,13 +445,55 @@ describe('registerToolCommands', () => {
     );
   });
 
-  it('falls back to NDJSON events when no structured output is available', async () => {
+  it('writes one NDJSON line per progress event for jsonl output and omits the final envelope', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
       stdoutChunks.push(String(chunk));
       return true;
     });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        ctx?.emitProgress?.({
+          type: 'status',
+          level: 'info',
+          message: 'Starting work',
+        });
+        ctx?.emitProgress?.({
+          type: 'artifact',
+          name: 'Build Log',
+          path: '/tmp/build.log',
+        });
+
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.simulator-list',
+            schemaVersion: '1',
+            result: {
+              kind: 'simulator-list',
+              didError: false,
+              error: null,
+              simulators: [],
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'jsonl']),
+    ).resolves.toBeDefined();
+
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify({ type: 'status', level: 'info', message: 'Starting work' })}\n` +
+        `${JSON.stringify({ type: 'artifact', name: 'Build Log', path: '/tmp/build.log' })}\n`,
+    );
+  });
+
+  it('throws when no structured output is available for json mode', async () => {
+    mockInvokeDirectThroughHandler();
 
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
@@ -457,17 +507,44 @@ describe('registerToolCommands', () => {
     });
     const app = createApp(createCatalog([tool]));
 
-    await expect(
-      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
-    ).resolves.toBeDefined();
-
-    expect(stdoutChunks.join('')).toBe(
-      `${JSON.stringify({
-        type: 'status-line',
-        timestamp: '2026-01-01T00:00:00.000Z',
-        level: 'info',
-        message: 'legacy event',
-      })}\n`,
+    await expect(app.parseAsync(['simulator', 'run-tool', '--output', 'json'])).rejects.toThrow(
+      'Tool did not produce structured output',
     );
+  });
+
+  it('rejects json and jsonl output for xcode-ide tools', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tool = createTool({ workflow: 'xcode-ide' });
+    const app = yargs()
+      .scriptName('xcodebuildmcp')
+      .exitProcess(false)
+      .fail((message, error) => {
+        throw error ?? new Error(message);
+      });
+
+    registerToolCommands(app, createCatalog([tool]), {
+      workspaceRoot: '/repo',
+      runtimeConfig: baseRuntimeConfig,
+      cliExposedWorkflowIds: ['xcode-ide'],
+      workflowNames: ['xcode-ide'],
+    });
+
+    await expect(
+      app.parseAsync(['xcode-ide', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+    expect(consoleError).toHaveBeenLastCalledWith(
+      'Error: --output json is not supported for xcode-ide tools yet',
+    );
+    expect(process.exitCode).toBe(1);
+
+    process.exitCode = undefined;
+
+    await expect(
+      app.parseAsync(['xcode-ide', 'run-tool', '--output', 'jsonl']),
+    ).resolves.toBeDefined();
+    expect(consoleError).toHaveBeenLastCalledWith(
+      'Error: --output jsonl is not supported for xcode-ide tools yet',
+    );
+    expect(process.exitCode).toBe(1);
   });
 });

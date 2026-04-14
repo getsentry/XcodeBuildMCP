@@ -250,7 +250,9 @@ export async function debug_attach_simLogic(
 ): Promise<void> {
   const headerEvent = header('Attach Debugger');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugAttachSim = createDebugAttachSimExecutor(ctx);
   const result = await executeDebugAttachSim(params, executionContext);
 

@@ -75,13 +75,6 @@ function createCliTextRenderSession(options: { interactive: boolean }): RenderSe
   });
 }
 
-function createCliJsonRenderSession(): RenderSession {
-  return createBaseRenderSession({
-    onEmit: (event) => process.stdout.write(JSON.stringify(event) + '\n'),
-    finalize: () => '',
-  });
-}
-
 export interface RenderSessionOptions {
   interactive?: boolean;
 }
@@ -95,8 +88,6 @@ export function createRenderSession(
       return createTextRenderSession();
     case 'cli-text':
       return createCliTextRenderSession({ interactive: options?.interactive ?? false });
-    case 'cli-json':
-      return createCliJsonRenderSession();
   }
 }
 

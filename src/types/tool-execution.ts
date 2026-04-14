@@ -13,6 +13,3 @@ export type ToolExecutor<TArgs, TResult extends ToolDomainResult> = (
   args: TArgs,
   ctx: ToolExecutionContext,
 ) => Promise<TResult>;
-export type DaemonToolMessage =
-  | { kind: 'progress'; event: ProgressEvent }
-  | { kind: 'result'; result: ToolDomainResult };

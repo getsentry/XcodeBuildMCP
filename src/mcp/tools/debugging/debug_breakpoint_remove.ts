@@ -78,7 +78,9 @@ export async function debug_breakpoint_removeLogic(
 ): Promise<void> {
   const headerEvent = header('Remove Breakpoint');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugBreakpointRemove = createDebugBreakpointRemoveExecutor(ctx.debugger);
   const result = await executeDebugBreakpointRemove(params, executionContext);
 

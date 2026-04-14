@@ -268,7 +268,9 @@ export async function debug_variablesLogic(
 ): Promise<void> {
   const headerEvent = header('Variables');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugVariables = createDebugVariablesExecutor(ctx.debugger);
   const result = await executeDebugVariables(params, executionContext);
 

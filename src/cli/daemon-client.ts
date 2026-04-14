@@ -9,6 +9,7 @@ import {
   type DaemonToolResult,
   type ToolInvokeParams,
   type ToolInvokeResult,
+  type ToolInvokeProgressFrame,
   type DaemonStatusResult,
   type ToolListItem,
   type XcodeIdeListParams,
@@ -18,6 +19,7 @@ import {
   type XcodeIdeInvokeResult,
 } from '../daemon/protocol.ts';
 import { getSocketPath } from '../daemon/socket-path.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 
 export class DaemonVersionMismatchError extends Error {
   constructor(message: string) {
@@ -29,6 +31,10 @@ export class DaemonVersionMismatchError extends Error {
 export interface DaemonClientOptions {
   socketPath?: string;
   timeout?: number;
+}
+
+export interface InvokeToolOptions {
+  onProgress?: (event: ProgressEvent) => void;
 }
 
 export class DaemonClient {
@@ -138,12 +144,154 @@ export class DaemonClient {
   /**
    * Invoke a tool.
    */
-  async invokeTool(tool: string, args: Record<string, unknown>): Promise<DaemonToolResult> {
-    const result = await this.request<ToolInvokeResult>('tool.invoke', {
-      tool,
-      args,
-    } satisfies ToolInvokeParams);
-    return result.result;
+  async invokeTool(
+    tool: string,
+    args: Record<string, unknown>,
+    options: InvokeToolOptions = {},
+  ): Promise<ToolInvokeResult> {
+    const id = randomUUID();
+    const req: DaemonRequest<ToolInvokeParams> = {
+      v: DAEMON_PROTOCOL_VERSION,
+      id,
+      method: 'tool.invoke',
+      params: {
+        tool,
+        args,
+      },
+    };
+
+    return new Promise<ToolInvokeResult>((resolve, reject) => {
+      const socket = net.createConnection(this.socketPath);
+      let settled = false;
+      let terminalResult: ToolInvokeResult | undefined;
+      let receivedTerminalResult = false;
+      let timeoutId: NodeJS.Timeout;
+
+      const failWithTransportError = (err: Error): void => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          socket.destroy();
+          reject(err);
+        }
+      };
+
+      const scheduleTimeout = (): void => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          failWithTransportError(new Error(`Daemon request timed out after ${this.timeout}ms`));
+        }, this.timeout);
+      };
+
+      const resolveTerminalResult = (): void => {
+        queueMicrotask(() => {
+          if (settled || terminalResult === undefined) {
+            return;
+          }
+
+          settled = true;
+          clearTimeout(timeoutId);
+          socket.end();
+          resolve(terminalResult);
+        });
+      };
+
+      scheduleTimeout();
+
+      socket.on('error', (err) => {
+        if (settled) {
+          return;
+        }
+
+        if (err.message.includes('ECONNREFUSED') || err.message.includes('ENOENT')) {
+          failWithTransportError(
+            new Error('Daemon is not running. Start it with: xcodebuildmcp daemon start'),
+          );
+        } else {
+          failWithTransportError(err);
+        }
+      });
+
+      socket.on('close', () => {
+        if (!settled) {
+          failWithTransportError(new Error('Daemon connection closed before terminal tool result'));
+        }
+      });
+
+      const onData = createFrameReader(
+        (msg) => {
+          const frame = msg as
+            | ToolInvokeProgressFrame
+            | DaemonResponse<ToolInvokeResult>
+            | Record<string, unknown>;
+
+          if (frame.id !== id) {
+            return;
+          }
+
+          scheduleTimeout();
+
+          if ('stream' in frame && frame.stream) {
+            if (receivedTerminalResult) {
+              failWithTransportError(
+                new Error('Daemon protocol error: received progress after terminal result'),
+              );
+              return;
+            }
+
+            const progressFrame = frame as ToolInvokeProgressFrame;
+            if (progressFrame.stream.kind !== 'progress') {
+              failWithTransportError(
+                new Error(
+                  `Daemon protocol error: unknown stream kind '${progressFrame.stream.kind}'`,
+                ),
+              );
+              return;
+            }
+
+            options.onProgress?.(progressFrame.stream.event);
+            return;
+          }
+
+          const res = frame as DaemonResponse<ToolInvokeResult>;
+          if (res.error) {
+            if (
+              res.error.code === 'BAD_REQUEST' &&
+              res.error.message.startsWith('Unsupported protocol version')
+            ) {
+              failWithTransportError(new DaemonVersionMismatchError(res.error.message));
+            } else {
+              failWithTransportError(new Error(`${res.error.code}: ${res.error.message}`));
+            }
+            return;
+          }
+
+          if (receivedTerminalResult) {
+            failWithTransportError(
+              new Error('Daemon protocol error: received duplicate terminal result'),
+            );
+            return;
+          }
+
+          if (res.result === undefined) {
+            failWithTransportError(new Error('Daemon protocol error: missing terminal result'));
+            return;
+          }
+
+          receivedTerminalResult = true;
+          terminalResult = res.result;
+          resolveTerminalResult();
+        },
+        (err) => {
+          failWithTransportError(err);
+        },
+      );
+
+      socket.on('data', onData);
+      socket.on('connect', () => {
+        writeFrame(socket, req);
+      });
+    });
   }
 
   /**

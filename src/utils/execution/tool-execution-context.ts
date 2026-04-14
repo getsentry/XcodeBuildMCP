@@ -8,16 +8,20 @@ import { DomainResultPipelineEventAdapter } from '../domain-result-adapter.js';
 export interface DefaultToolExecutionContextOptions {
   renderSession?: RenderSession;
   xcodebuildOperation?: XcodebuildOperation;
+  progressSink?: (event: ProgressEvent) => void;
 }
 
 export class DefaultToolExecutionContext implements ToolExecutionContext {
   private readonly progressEvents: ProgressEvent[] = [];
   private readonly attachments: ToolAttachment[] = [];
   private readonly renderSession?: RenderSession;
+  private readonly progressSink?: (event: ProgressEvent) => void;
   private readonly adapter: DomainResultPipelineEventAdapter;
+  private result?: ToolDomainResult;
 
   constructor(options: DefaultToolExecutionContextOptions = {}) {
     this.renderSession = options.renderSession;
+    this.progressSink = options.progressSink;
     this.adapter = new DomainResultPipelineEventAdapter({
       xcodebuildOperation: options.xcodebuildOperation,
     });
@@ -25,6 +29,7 @@ export class DefaultToolExecutionContext implements ToolExecutionContext {
 
   emitProgress(event: ProgressEvent): void {
     this.progressEvents.push(event);
+    this.progressSink?.(event);
 
     if (!this.renderSession) {
       return;
@@ -40,6 +45,8 @@ export class DefaultToolExecutionContext implements ToolExecutionContext {
   }
 
   emitResult(result: ToolDomainResult): PipelineEvent[] {
+    this.result = result;
+
     const pipelineEvents = this.adapter.adaptResult(result);
 
     if (this.renderSession) {
@@ -57,5 +64,9 @@ export class DefaultToolExecutionContext implements ToolExecutionContext {
 
   getAttachments(): readonly ToolAttachment[] {
     return [...this.attachments];
+  }
+
+  getResult(): ToolDomainResult | undefined {
+    return this.result;
   }
 }

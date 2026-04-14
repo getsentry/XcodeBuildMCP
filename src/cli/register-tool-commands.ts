@@ -79,27 +79,24 @@ function createBufferedHandlerContext(session: RenderSession): ToolHandlerContex
   };
 }
 
-function writeJsonOutput(session: RenderSession, handlerContext: ToolHandlerContext): void {
+function writeJsonOutput(handlerContext: ToolHandlerContext): void {
   const structuredOutput = handlerContext.structuredOutput;
 
-  if (structuredOutput) {
-    process.stdout.write(
-      JSON.stringify(
-        toStructuredEnvelope(
-          structuredOutput.result,
-          structuredOutput.schema,
-          structuredOutput.schemaVersion,
-        ),
-        null,
-        2,
-      ) + '\n',
-    );
-    return;
+  if (!structuredOutput) {
+    throw new Error('Tool did not produce structured output for --output json');
   }
 
-  for (const event of session.getEvents()) {
-    process.stdout.write(JSON.stringify(event) + '\n');
-  }
+  process.stdout.write(
+    JSON.stringify(
+      toStructuredEnvelope(
+        structuredOutput.result,
+        structuredOutput.schema,
+        structuredOutput.schemaVersion,
+      ),
+      null,
+      2,
+    ) + '\n',
+  );
 }
 
 /**
@@ -218,7 +215,7 @@ function registerToolSubcommand(
       // Add --output option for format control
       subYargs.option('output', {
         type: 'string',
-        choices: ['text', 'json', 'raw'] as const,
+        choices: ['text', 'json', 'jsonl', 'raw'] as const,
         default: 'text',
         describe: 'Output format',
       });
@@ -258,6 +255,12 @@ function registerToolSubcommand(
       const outputFormat = (argv.output as OutputFormat) ?? 'text';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
+
+      if (tool.workflow === 'xcode-ide' && (outputFormat === 'json' || outputFormat === 'jsonl')) {
+        console.error(`Error: --output ${outputFormat} is not supported for xcode-ide tools yet`);
+        process.exitCode = 1;
+        return;
+      }
 
       if (
         profileOverride &&
@@ -331,30 +334,46 @@ function registerToolSubcommand(
 
       try {
         const session =
-          outputFormat === 'json'
-            ? createRenderSession('text')
+          outputFormat === 'text'
+            ? createRenderSession('cli-text', {
+                interactive: process.stdout.isTTY === true,
+              })
             : outputFormat === 'raw'
               ? createRenderSession('text')
-              : createRenderSession('cli-text', {
-                  interactive: process.stdout.isTTY === true,
-                });
-        const handlerContext =
-          outputFormat === 'json' ? createBufferedHandlerContext(session) : undefined;
+              : createRenderSession('text');
+        const handlerContext = createBufferedHandlerContext(session);
+
+        if (outputFormat === 'jsonl') {
+          handlerContext.emitProgress = (event) => {
+            process.stdout.write(JSON.stringify(event) + '\n');
+          };
+        }
 
         await invoker.invokeDirect(tool, args, {
           runtime: 'cli',
           renderSession: session,
           handlerContext,
+          onProgress: handlerContext.emitProgress,
+          onStructuredOutput: (structuredOutput) => {
+            handlerContext.structuredOutput = structuredOutput;
+          },
           cliExposedWorkflowIds,
           socketPath,
           workspaceRoot: opts.workspaceRoot,
           logLevel,
         });
 
-        if (outputFormat === 'json' && handlerContext) {
-          writeJsonOutput(session, handlerContext);
+        if (outputFormat === 'json') {
+          writeJsonOutput(handlerContext);
 
-          if (session.isError() || handlerContext.structuredOutput?.result.didError) {
+          if (handlerContext.structuredOutput?.result.didError) {
+            process.exitCode = 1;
+          }
+          return;
+        }
+
+        if (outputFormat === 'jsonl') {
+          if (handlerContext.structuredOutput?.result.didError ?? session.isError()) {
             process.exitCode = 1;
           }
           return;

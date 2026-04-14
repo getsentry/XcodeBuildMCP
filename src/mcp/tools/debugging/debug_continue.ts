@@ -84,7 +84,9 @@ export async function debug_continueLogic(
 ): Promise<void> {
   const headerEvent = header('Continue');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugContinue = createDebugContinueExecutor(ctx.debugger);
   const result = await executeDebugContinue(params, executionContext);
 

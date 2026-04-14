@@ -1,4 +1,4 @@
-export type OutputFormat = 'text' | 'json' | 'raw';
+export type OutputFormat = 'text' | 'json' | 'jsonl' | 'raw';
 
 export function formatToolList(
   tools: Array<{ cliName: string; workflow: string; description?: string; stateful: boolean }>,

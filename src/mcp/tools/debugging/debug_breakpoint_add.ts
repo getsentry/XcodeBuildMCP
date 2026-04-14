@@ -145,7 +145,9 @@ export async function debug_breakpoint_addLogic(
 ): Promise<void> {
   const headerEvent = header('Add Breakpoint');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugBreakpointAdd = createDebugBreakpointAddExecutor(ctx.debugger);
   const result = await executeDebugBreakpointAdd(params, executionContext);
 

@@ -30,7 +30,9 @@ export async function launch_mac_appLogic(
   fileSystem?: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeLaunchMacApp = createLaunchMacAppExecutor(executor, fileSystem);
   const result = await executeLaunchMacApp(params, executionContext);
 

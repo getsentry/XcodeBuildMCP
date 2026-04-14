@@ -7,6 +7,7 @@ export function createPipelineCompatExecutionContext(
   xcodebuildOperation?: XcodebuildOperation,
 ): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
     renderSession: {
       emit: ctx.emit,
       attach: () => {},

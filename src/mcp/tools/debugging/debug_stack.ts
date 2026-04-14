@@ -189,7 +189,9 @@ export async function debug_stackLogic(
 ): Promise<void> {
   const headerEvent = header('Stack Trace');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugStack = createDebugStackExecutor(ctx.debugger);
   const result = await executeDebugStack(params, executionContext);
 

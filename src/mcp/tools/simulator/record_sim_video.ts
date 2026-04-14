@@ -103,6 +103,7 @@ function createPipelineCompatExecutionContext(
   ctx: ToolHandlerContext,
 ): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
     renderSession: {
       emit: ctx.emit,
       attach: () => {},

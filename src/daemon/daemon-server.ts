@@ -8,6 +8,8 @@ import type {
   DaemonResponse,
   DaemonToolResult,
   ToolInvokeParams,
+  ToolInvokeProgressFrame,
+  ToolInvokeResultFrame,
   DaemonStatusResult,
   ToolListItem,
   XcodeIdeListParams,
@@ -17,7 +19,6 @@ import type {
 } from './protocol.ts';
 import { DAEMON_PROTOCOL_VERSION } from './protocol.ts';
 import { DefaultToolInvoker } from '../runtime/tool-invoker.ts';
-import { createRenderSession } from '../rendering/render.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
 import { statusLine } from '../utils/tool-event-builders.ts';
 import { log } from '../utils/logger.ts';
@@ -144,27 +145,65 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                 });
               }
 
+              const resolved = ctx.catalog.resolve(params.tool);
+              if (resolved.ambiguous) {
+                return writeFrame(socket, {
+                  ...base,
+                  error: {
+                    code: 'AMBIGUOUS_TOOL',
+                    message: `Ambiguous tool '${params.tool}'`,
+                    data: { matches: resolved.ambiguous },
+                  },
+                });
+              }
+
+              if (resolved.notFound || !resolved.tool) {
+                return writeFrame(socket, {
+                  ...base,
+                  error: {
+                    code: 'NOT_FOUND',
+                    message: `Unknown tool '${params.tool}'`,
+                  },
+                });
+              }
+
               log('info', `[Daemon] Invoking tool: ${params.tool}`);
-              const session = createRenderSession('text');
+              const emittedEvents: PipelineEvent[] = [];
               const handlerContext: ToolHandlerContext = {
-                emit: (event) => session.emit(event),
-                attach: (image) => session.attach(image),
+                emit: (event) => {
+                  emittedEvents.push(event);
+                },
+                attach: () => {},
+                emitProgress: (event) => {
+                  const frame: ToolInvokeProgressFrame = {
+                    v: DAEMON_PROTOCOL_VERSION,
+                    id: base.id,
+                    stream: {
+                      kind: 'progress',
+                      event,
+                    },
+                  };
+                  writeFrame(socket, frame);
+                },
               };
-              await invoker.invoke(params.tool, params.args ?? {}, {
+
+              await invoker.invokeDirect(resolved.tool, params.args ?? {}, {
                 runtime: 'daemon',
-                renderSession: session,
                 handlerContext,
                 enabledWorkflows: ctx.enabledWorkflows,
               });
 
-              const daemonResult: DaemonToolResult = {
-                events: [...session.getEvents()],
-                isError: session.isError(),
-                nextStepParams: handlerContext.nextStepParams,
-                nextSteps: handlerContext.nextSteps,
+              const resultFrame: ToolInvokeResultFrame = {
+                v: DAEMON_PROTOCOL_VERSION,
+                id: base.id,
+                result: {
+                  structuredOutput: handlerContext.structuredOutput ?? null,
+                  nextStepParams: handlerContext.nextStepParams,
+                  nextSteps: handlerContext.nextSteps,
+                  ...(emittedEvents.length > 0 ? { events: emittedEvents } : {}),
+                },
               };
-
-              return writeFrame(socket, { ...base, result: { result: daemonResult } });
+              return writeFrame(socket, resultFrame);
             }
 
             case 'xcode-ide.list': {

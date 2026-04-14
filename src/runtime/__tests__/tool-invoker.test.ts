@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { ToolResponse } from '../../types/common.ts';
 import type { PipelineEvent } from '../../types/pipeline-events.ts';
-import type { DaemonToolResult } from '../../daemon/protocol.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { DaemonToolResult, ToolInvokeResult } from '../../daemon/protocol.ts';
 import type { ToolDefinition } from '../types.ts';
 import { createToolCatalog } from '../tool-catalog.ts';
 import { DefaultToolInvoker } from '../tool-invoker.ts';
@@ -14,7 +15,14 @@ const daemonClientMock = {
   isRunning: vi.fn<() => Promise<boolean>>(),
   invokeXcodeIdeTool:
     vi.fn<(name: string, args: Record<string, unknown>) => Promise<DaemonToolResult>>(),
-  invokeTool: vi.fn<(name: string, args: Record<string, unknown>) => Promise<DaemonToolResult>>(),
+  invokeTool:
+    vi.fn<
+      (
+        name: string,
+        args: Record<string, unknown>,
+        options?: { onProgress?: (event: ProgressEvent) => void },
+      ) => Promise<ToolInvokeResult>
+    >(),
   listTools: vi.fn<() => Promise<Array<{ name: string }>>>(),
 };
 
@@ -48,6 +56,22 @@ function daemonResult(text: string, opts?: Partial<DaemonToolResult>): DaemonToo
       },
     ],
     isError: false,
+    ...opts,
+  };
+}
+
+function streamedToolResult(opts: Partial<ToolInvokeResult> = {}): ToolInvokeResult {
+  return {
+    structuredOutput: {
+      schema: 'xcodebuildmcp.output.simulator-list',
+      schemaVersion: '1',
+      result: {
+        kind: 'simulator-list',
+        didError: false,
+        error: null,
+        simulators: [],
+      },
+    },
     ...opts,
   };
 }
@@ -139,7 +163,10 @@ describe('DefaultToolInvoker CLI routing', () => {
     vi.clearAllMocks();
     daemonClientMock.isRunning.mockResolvedValue(true);
     daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(daemonResult('daemon-xcode-ide-result'));
-    daemonClientMock.invokeTool.mockResolvedValue(daemonResult('daemon-result'));
+    daemonClientMock.invokeTool.mockImplementation(async (_name, _args, options) => {
+      options?.onProgress?.({ type: 'status', level: 'info', message: 'daemon-result' });
+      return streamedToolResult();
+    });
     daemonClientMock.listTools.mockResolvedValue([]);
   });
 
@@ -177,6 +204,58 @@ describe('DefaultToolInvoker CLI routing', () => {
     expect(response.content[0].text).toContain('direct-result');
   });
 
+  it('injects direct invocation progress and structured output hooks into the handler context', async () => {
+    const progressEvents: Array<{ type: string }> = [];
+    const structuredOutputs: string[] = [];
+    const handler = vi.fn(async (_params, ctx) => {
+      ctx.emitProgress?.({ type: 'status', level: 'info', message: 'Working' });
+      ctx.structuredOutput = {
+        schema: 'xcodebuildmcp.output.simulator-list',
+        schemaVersion: '1',
+        result: {
+          kind: 'simulator-list',
+          didError: false,
+          error: null,
+          simulators: [],
+        },
+      };
+    });
+
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'list-sims',
+        workflow: 'simulator',
+        stateful: false,
+        handler,
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    await invoker.invokeDirect(
+      catalog.tools[0],
+      {},
+      {
+        runtime: 'cli',
+        renderSession: createRenderSession('text'),
+        onProgress: (event) => {
+          progressEvents.push({ type: event.type });
+        },
+        onStructuredOutput: (output) => {
+          structuredOutputs.push(output.schema);
+        },
+      },
+    );
+
+    expect(handler).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        emitProgress: expect.any(Function),
+      }),
+    );
+    expect(progressEvents).toEqual([{ type: 'status' }]);
+    expect(structuredOutputs).toEqual(['xcodebuildmcp.output.simulator-list']);
+  });
+
   it('routes stateful tools through daemon and auto-starts when needed', async () => {
     daemonClientMock.isRunning.mockResolvedValue(false);
     const directHandler = emitHandler('direct-result');
@@ -208,11 +287,48 @@ describe('DefaultToolInvoker CLI routing', () => {
         env: undefined,
       }),
     );
-    expect(daemonClientMock.invokeTool).toHaveBeenCalledWith('start_sim_log_cap', {
-      value: 'hello',
-    });
+    expect(daemonClientMock.invokeTool).toHaveBeenCalledWith(
+      'start_sim_log_cap',
+      {
+        value: 'hello',
+      },
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+      }),
+    );
     expect(directHandler).not.toHaveBeenCalled();
     expect(response.content[0].text).toContain('daemon-result');
+  });
+
+  it('replays daemon-provided pipeline events when present for stateful tools', async () => {
+    daemonClientMock.invokeTool.mockResolvedValue(
+      streamedToolResult({
+        events: [statusLine('success', 'daemon-event-result')],
+      }),
+    );
+    const directHandler = emitHandler('direct-result');
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'start-sim-log-cap',
+        workflow: 'logging',
+        stateful: true,
+        handler: directHandler,
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    const response = await invokeAndFinalize(
+      invoker,
+      'start-sim-log-cap',
+      { value: 'hello' },
+      {
+        runtime: 'cli',
+        socketPath: '/tmp/xcodebuildmcp.sock',
+        workspaceRoot: '/repo',
+      },
+    );
+
+    expect(response.content[0].text).toContain('daemon-event-result');
   });
 });
 
@@ -221,7 +337,7 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     vi.clearAllMocks();
     daemonClientMock.isRunning.mockResolvedValue(true);
     daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(daemonResult('daemon-result'));
-    daemonClientMock.invokeTool.mockResolvedValue(daemonResult('daemon-generic'));
+    daemonClientMock.invokeTool.mockResolvedValue(streamedToolResult());
     daemonClientMock.listTools.mockResolvedValue([]);
   });
 
@@ -478,7 +594,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
 
   it('preserves daemon-provided next-step params when nextStepParams are already consumed', async () => {
     daemonClientMock.invokeTool.mockResolvedValue(
-      daemonResult('ok', {
+      streamedToolResult({
         nextSteps: [
           {
             tool: 'stop_sim_log_cap',

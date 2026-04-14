@@ -207,7 +207,9 @@ export async function get_mac_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
   const result = await executeGetMacAppPath(params, executionContext);
 

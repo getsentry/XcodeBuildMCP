@@ -1,8 +1,9 @@
 import type { PipelineEvent } from '../types/pipeline-events.ts';
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 import type { ToolDomainResult } from '../types/domain-results.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 
-export type RenderStrategy = 'text' | 'cli-text' | 'cli-json';
+export type RenderStrategy = 'text' | 'cli-text';
 
 export interface ImageAttachment {
   data: string;
@@ -27,6 +28,7 @@ export interface StructuredToolOutput {
 export interface ToolHandlerContext {
   emit: (event: PipelineEvent) => void;
   attach: (image: ImageAttachment) => void;
+  emitProgress?: (event: ProgressEvent) => void;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;

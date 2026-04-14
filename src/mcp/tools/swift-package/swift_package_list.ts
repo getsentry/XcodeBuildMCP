@@ -105,7 +105,9 @@ export async function swift_package_listLogic(
   dependencies?: ProcessListDependencies,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeSwiftPackageList = createSwiftPackageListExecutor(dependencies);
   const result = await executeSwiftPackageList(
     (params ?? {}) as SwiftPackageListParams,

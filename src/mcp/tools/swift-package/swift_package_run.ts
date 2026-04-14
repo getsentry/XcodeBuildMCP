@@ -80,7 +80,9 @@ export async function swift_package_runLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress,
+  });
   const executeSwiftPackageRun = createSwiftPackageRunExecutor(executor);
   const result = await executeSwiftPackageRun(params, executionContext);
 

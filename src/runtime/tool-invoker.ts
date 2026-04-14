@@ -1,6 +1,6 @@
 import type { ToolCatalog, ToolDefinition, ToolInvoker, InvokeOptions } from './types.ts';
 import type { NextStep, NextStepParams, NextStepParamsMap } from '../types/common.ts';
-import type { DaemonToolResult } from '../daemon/protocol.ts';
+import type { DaemonToolResult, ToolInvokeResult } from '../daemon/protocol.ts';
 import { statusLine } from '../utils/tool-event-builders.ts';
 import { DaemonClient, DaemonVersionMismatchError } from '../cli/daemon-client.ts';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../utils/sentry.ts';
 import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
+import { DomainResultPipelineEventAdapter } from '../utils/domain-result-adapter.ts';
 
 type BuiltTemplateNextStep = {
   step: NextStep;
@@ -290,14 +291,15 @@ export class DefaultToolInvoker implements ToolInvoker {
     return this.executeTool(tool, args, { ...opts, renderSession: session });
   }
 
-  private async invokeViaDaemon(
+  private async invokeViaDaemon<TResult>(
     opts: InvokeOptions,
-    invoke: (client: DaemonClient) => Promise<DaemonToolResult>,
+    invoke: (client: DaemonClient) => Promise<TResult>,
     context: {
       label: string;
       errorTitle: string;
       captureInfraErrorMetric: (error: unknown) => void;
       captureInvocationMetric: (outcome: SentryToolInvocationOutcome) => void;
+      consumeResult: (result: TResult) => void;
       postProcessParams: {
         tool: ToolDefinition;
         catalog: ToolCatalog;
@@ -349,29 +351,10 @@ export class DefaultToolInvoker implements ToolInvoker {
       }
     }
 
-    const consumeResult = (daemonResult: DaemonToolResult): void => {
-      for (const event of daemonResult.events) {
-        session.emit(event);
-      }
-
-      const ctx: ToolHandlerContext = {
-        emit: (event) => session.emit(event),
-        attach: (image) => session.attach(image),
-        nextStepParams: daemonResult.nextStepParams,
-        nextSteps: daemonResult.nextSteps,
-      };
-
-      postProcessSession({
-        ...context.postProcessParams,
-        session,
-        ctx,
-      });
-    };
-
     try {
       const daemonResult = await invoke(client);
       context.captureInvocationMetric('completed');
-      consumeResult(daemonResult);
+      context.consumeResult(daemonResult);
     } catch (error) {
       if (error instanceof DaemonVersionMismatchError) {
         log('info', `[infra/tool-invoker] ${context.label} daemon protocol mismatch, restarting`);
@@ -386,7 +369,7 @@ export class DefaultToolInvoker implements ToolInvoker {
           const retryClient = new DaemonClient({ socketPath });
           const daemonResult = await invoke(retryClient);
           context.captureInvocationMetric('completed');
-          consumeResult(daemonResult);
+          context.consumeResult(daemonResult);
           return;
         } catch (retryError) {
           log(
@@ -464,20 +447,89 @@ export class DefaultToolInvoker implements ToolInvoker {
           errorTitle: 'Xcode IDE invocation failed',
           captureInfraErrorMetric,
           captureInvocationMetric,
+          consumeResult: (daemonResult: DaemonToolResult) => {
+            for (const event of daemonResult.events) {
+              opts.renderSession!.emit(event);
+            }
+
+            const ctx: ToolHandlerContext = {
+              emit: (event) => opts.renderSession!.emit(event),
+              attach: (image) => opts.renderSession!.attach(image),
+              nextStepParams: daemonResult.nextStepParams,
+              nextSteps: daemonResult.nextSteps,
+            };
+
+            postProcessSession({
+              ...postProcessParams,
+              session: opts.renderSession!,
+              ctx,
+            });
+          },
           postProcessParams,
         },
       );
     }
 
     if (opts.runtime === 'cli' && tool.stateful) {
+      const session = opts.renderSession!;
+      const pipelineAdapter =
+        opts.onProgress === undefined ? new DomainResultPipelineEventAdapter() : undefined;
+
       transport = 'daemon';
-      return this.invokeViaDaemon(opts, (client) => client.invokeTool(tool.mcpName, args), {
-        label: `daemon/${tool.mcpName}`,
-        errorTitle: 'Daemon invocation failed',
-        captureInfraErrorMetric,
-        captureInvocationMetric,
-        postProcessParams,
-      });
+      return this.invokeViaDaemon(
+        opts,
+        (client) =>
+          client.invokeTool(tool.mcpName, args, {
+            onProgress: (event) => {
+              if (opts.onProgress) {
+                opts.onProgress(event);
+                return;
+              }
+
+              for (const pipelineEvent of pipelineAdapter?.adaptProgressEvent(event) ?? []) {
+                session.emit(pipelineEvent);
+              }
+            },
+          }),
+        {
+          label: `daemon/${tool.mcpName}`,
+          errorTitle: 'Daemon invocation failed',
+          captureInfraErrorMetric,
+          captureInvocationMetric,
+          consumeResult: (daemonResult: ToolInvokeResult) => {
+            if (daemonResult.structuredOutput) {
+              opts.onStructuredOutput?.(daemonResult.structuredOutput);
+            }
+
+            if (daemonResult.events && daemonResult.events.length > 0) {
+              for (const event of daemonResult.events) {
+                session.emit(event);
+              }
+            } else if (daemonResult.structuredOutput) {
+              for (const pipelineEvent of pipelineAdapter?.adaptResult(
+                daemonResult.structuredOutput.result,
+              ) ?? []) {
+                session.emit(pipelineEvent);
+              }
+            }
+
+            const ctx: ToolHandlerContext = {
+              emit: (event) => session.emit(event),
+              attach: (image) => session.attach(image),
+              nextStepParams: daemonResult.nextStepParams,
+              nextSteps: daemonResult.nextSteps,
+              structuredOutput: daemonResult.structuredOutput ?? undefined,
+            };
+
+            postProcessSession({
+              ...postProcessParams,
+              session,
+              ctx,
+            });
+          },
+          postProcessParams,
+        },
+      );
     }
 
     // Direct invocation (CLI stateless or daemon internal)
@@ -491,7 +543,16 @@ export class DefaultToolInvoker implements ToolInvoker {
           session.attach(image);
         },
       };
+
+      if (opts.onProgress) {
+        ctx.emitProgress = opts.onProgress;
+      }
+
       await tool.handler(args, ctx);
+
+      if (ctx.structuredOutput) {
+        opts.onStructuredOutput?.(ctx.structuredOutput);
+      }
 
       captureInvocationMetric('completed');
 
@@ -510,6 +571,9 @@ export class DefaultToolInvoker implements ToolInvoker {
       );
       captureInfraErrorMetric(error);
       captureInvocationMetric('infra_error');
+      if (opts.runtime === 'daemon') {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
       const message = error instanceof Error ? error.message : String(error);
       session.emit(statusLine('error', `Tool execution failed: ${message}`));
     }

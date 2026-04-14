@@ -83,7 +83,9 @@ export async function debug_detachLogic(
 ): Promise<void> {
   const headerEvent = header('Detach');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: handlerCtx.emitProgress,
+  });
   const executeDebugDetach = createDebugDetachExecutor(ctx.debugger);
   const result = await executeDebugDetach(params, executionContext);
 

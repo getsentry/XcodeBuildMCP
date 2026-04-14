@@ -1,6 +1,11 @@
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolSchemaShape } from '../core/plugin-types.ts';
-import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
+import type {
+  RenderSession,
+  StructuredToolOutput,
+  ToolHandlerContext,
+} from '../rendering/types.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 
 export interface NextStepTemplate {
   label: string;
@@ -83,6 +88,8 @@ export interface ToolCatalog {
 export interface InvokeOptions {
   runtime: RuntimeKind;
   renderSession?: RenderSession;
+  onProgress?: (event: ProgressEvent) => void;
+  onStructuredOutput?: (output: StructuredToolOutput) => void;
   /** Pre-created handler context; if provided, executeTool uses it instead of creating a new one. */
   handlerContext?: ToolHandlerContext;
   /** CLI-exposed workflow IDs used for daemon environment overrides */

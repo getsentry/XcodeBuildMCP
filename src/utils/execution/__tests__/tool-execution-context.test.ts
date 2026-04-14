@@ -4,8 +4,9 @@ import type { PipelineEvent } from '../../../types/pipeline-events.ts';
 import { DefaultToolExecutionContext } from '../tool-execution-context.ts';
 
 describe('DefaultToolExecutionContext', () => {
-  it('collects progress and attachments and forwards adapted pipeline events to a render session', () => {
+  it('collects progress and attachments, calls the progress sink, stores the result, and forwards adapted pipeline events to a render session', () => {
     const emitted: PipelineEvent[] = [];
+    const sinkEvents: Array<{ type: string }> = [];
     const renderSession: RenderSession = {
       emit(event): void {
         emitted.push(event);
@@ -27,6 +28,9 @@ describe('DefaultToolExecutionContext', () => {
     const context = new DefaultToolExecutionContext({
       renderSession,
       xcodebuildOperation: 'BUILD',
+      progressSink: (event) => {
+        sinkEvents.push({ type: event.type });
+      },
     });
 
     context.emitProgress({ type: 'status', level: 'info', message: 'Starting build' });
@@ -48,6 +52,11 @@ describe('DefaultToolExecutionContext', () => {
     });
 
     expect(context.getProgressEvents()).toHaveLength(3);
+    expect(sinkEvents).toEqual([
+      { type: 'status' },
+      { type: 'xcodebuild-line' },
+      { type: 'artifact' },
+    ]);
     expect(context.getAttachments()).toEqual([
       { path: '/tmp/screenshot.png', mimeType: 'image/png' },
     ]);
@@ -63,5 +72,13 @@ describe('DefaultToolExecutionContext', () => {
     expect(
       resultEvents.some((e) => e.type === 'summary' && 'status' in e && e.status === 'SUCCEEDED'),
     ).toBe(true);
+    expect(context.getResult()).toEqual({
+      kind: 'build-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED', durationMs: 500 },
+      artifacts: { buildLogPath: '/tmp/build.log' },
+      diagnostics: { warnings: [], errors: [] },
+    });
   });
 });
