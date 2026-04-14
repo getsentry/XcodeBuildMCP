@@ -14,6 +14,7 @@ export const sessionDefaultKeys = [
   'useLatestOS',
   'arch',
   'suppressWarnings',
+  'showTestResults',
   'derivedDataPath',
   'preferXcodebuild',
   'platform',
@@ -40,6 +41,10 @@ export const sessionDefaultsSchema = z.object({
   useLatestOS: z.boolean().optional(),
   arch: z.enum(['arm64', 'x86_64']).optional(),
   suppressWarnings: z.boolean().optional(),
+  showTestResults: z
+    .boolean()
+    .optional()
+    .describe('Show per-test timing breakdown in test output.'),
   derivedDataPath: nonEmptyString
     .optional()
     .describe('Default DerivedData path for Xcode build/test/clean tools.'),

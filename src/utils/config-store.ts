@@ -265,6 +265,7 @@ function readEnvSessionDefaults(env: NodeJS.ProcessEnv): Partial<SessionDefaults
   setString('bundleId', env.XCODEBUILDMCP_BUNDLE_ID);
   setBool('useLatestOS', env.XCODEBUILDMCP_USE_LATEST_OS);
   setBool('suppressWarnings', env.XCODEBUILDMCP_SUPPRESS_WARNINGS);
+  setBool('showTestResults', env.XCODEBUILDMCP_SHOW_TEST_RESULTS);
   setBool('preferXcodebuild', env.XCODEBUILDMCP_PREFER_XCODEBUILD);
 
   const simulatorPlatform = env.XCODEBUILDMCP_SIMULATOR_PLATFORM;

@@ -54,11 +54,13 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
 function createTextRenderSession(): RenderSession {
   const suppressWarnings = sessionStore.get('suppressWarnings');
+  const showTestResults = sessionStore.get('showTestResults');
 
   return createBaseRenderSession({
     finalize: (events) =>
       renderCliTextTranscript(events, {
         suppressWarnings: suppressWarnings ?? false,
+        showTestResults: showTestResults ?? false,
       }),
   });
 }

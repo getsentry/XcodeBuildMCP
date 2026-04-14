@@ -58,6 +58,7 @@ const PARAM_LABEL_MAP: Record<string, string> = {
   useLatestOS: 'Use Latest OS',
   arch: 'Architecture',
   suppressWarnings: 'Suppress Warnings',
+  showTestResults: 'Show Test Results',
   derivedDataPath: 'Derived Data Path',
   preferXcodebuild: 'Prefer xcodebuild',
   platform: 'Platform',

@@ -47,15 +47,17 @@ interface CliTextProcessorOptions {
   interactive: boolean;
   sink: CliTextSink;
   suppressWarnings: boolean;
+  showTestResults: boolean;
 }
 
 interface CliTextRendererOptions {
   interactive: boolean;
   suppressWarnings?: boolean;
+  showTestResults?: boolean;
 }
 
 function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRenderer {
-  const { interactive, sink, suppressWarnings } = options;
+  const { interactive, sink, suppressWarnings, showTestResults } = options;
   const groupedCompilerErrors: CompilerErrorEvent[] = [];
   const groupedWarnings: CompilerWarningEvent[] = [];
   const groupedTestFailures: TestFailureEvent[] = [];
@@ -229,7 +231,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
             flushPendingTransientRuntimeLine();
           }
 
-          if (collectedTestCaseResults.length > 0) {
+          if (showTestResults && collectedTestCaseResults.length > 0) {
             const testResultsBlock = formatTestCaseResults(collectedTestCaseResults);
             if (testResultsBlock) {
               writeSection(testResultsBlock);
@@ -271,6 +273,7 @@ export function createCliTextRenderer(options: CliTextRendererOptions): Pipeline
   return createCliTextProcessor({
     interactive: options.interactive,
     suppressWarnings: options.suppressWarnings ?? false,
+    showTestResults: options.showTestResults ?? false,
     sink: {
       clearTransient(): void {
         reporter.clear();
@@ -290,12 +293,13 @@ export function createCliTextRenderer(options: CliTextRendererOptions): Pipeline
 
 export function renderCliTextTranscript(
   events: readonly PipelineEvent[],
-  options: { suppressWarnings?: boolean } = {},
+  options: { suppressWarnings?: boolean; showTestResults?: boolean } = {},
 ): string {
   let output = '';
   const renderer = createCliTextProcessor({
     interactive: false,
     suppressWarnings: options.suppressWarnings ?? false,
+    showTestResults: options.showTestResults ?? false,
     sink: {
       clearTransient(): void {},
       updateTransient(): void {},
