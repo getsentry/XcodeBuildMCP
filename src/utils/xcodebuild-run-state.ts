@@ -5,6 +5,7 @@ import type {
   BuildStageEvent,
   CompilerWarningEvent,
   CompilerErrorEvent,
+  TestCaseResultEvent,
   TestFailureEvent,
 } from '../types/pipeline-events.ts';
 import { STAGE_RANK } from '../types/pipeline-events.ts';
@@ -15,6 +16,7 @@ export interface XcodebuildRunState {
   milestones: BuildStageEvent[];
   warnings: CompilerWarningEvent[];
   errors: CompilerErrorEvent[];
+  testCaseResults: TestCaseResultEvent[];
   testFailures: TestFailureEvent[];
   completedTests: number;
   failedTests: number;
@@ -83,6 +85,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
     milestones: [],
     warnings: [],
     errors: [],
+    testCaseResults: [],
     testFailures: [],
     completedTests: 0,
     failedTests: 0,
@@ -145,6 +148,12 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
           }
           seenDiagnostics.add(key);
           state.testFailures.push(event);
+          accept(event);
+          break;
+        }
+
+        case 'test-case-result': {
+          state.testCaseResults.push(event);
           accept(event);
           break;
         }
@@ -235,6 +244,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         milestones: [...state.milestones],
         warnings: [...state.warnings],
         errors: [...state.errors],
+        testCaseResults: [...state.testCaseResults],
         testFailures: [...state.testFailures],
       };
     },
@@ -246,6 +256,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         milestones: [...state.milestones],
         warnings: [...state.warnings],
         errors: [...state.errors],
+        testCaseResults: [...state.testCaseResults],
         testFailures: [...state.testFailures],
       };
     },
