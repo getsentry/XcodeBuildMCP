@@ -1,5 +1,8 @@
 name: Publish Schemas
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -20,9 +23,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fail if deploy key is missing
+        env:
+          DEPLOY_KEY: ${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}" ]; then
+          if [ -z "$DEPLOY_KEY" ]; then
             echo "XCODEBUILDMCP_WEBSITE_DEPLOY_KEY is required to publish schemas." >&2
             exit 1
           fi
