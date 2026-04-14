@@ -1,15 +1,20 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { BuildSettingsDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -29,6 +34,7 @@ const showBuildSettingsSchema = z.preprocess(
 );
 
 export type ShowBuildSettingsParams = z.infer<typeof showBuildSettingsSchema>;
+type ShowBuildSettingsResult = BuildSettingsDomainResult;
 
 function stripXcodebuildPreamble(output: string): string {
   const lines = output.split('\n');
@@ -39,27 +45,98 @@ function stripXcodebuildPreamble(output: string): string {
   return lines.slice(startIndex).join('\n');
 }
 
-export async function showBuildSettingsLogic(
-  params: ShowBuildSettingsParams,
+function parseBuildSettingsEntries(output: string): Array<{ key: string; value: string }> {
+  return output
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const match = line.match(/^\s*([^=]+?)\s*=\s*(.*)$/);
+      if (match) {
+        return {
+          key: match[1].trim(),
+          value: match[2].trim(),
+        };
+      }
+
+      return {
+        key: line.trim(),
+        value: '',
+      };
+    });
+}
+
+function createPipelineCompatExecutionContext(
+  ctx: ToolHandlerContext,
+): DefaultToolExecutionContext {
+  return new DefaultToolExecutionContext({
+    renderSession: {
+      emit: ctx.emit,
+      attach: () => {},
+      getEvents: () => [],
+      getAttachments: () => [],
+      isError: () => false,
+      finalize: () => '',
+    },
+  });
+}
+
+function createShowBuildSettingsResult(
+  pathValue: string,
+  scheme: string,
+  settingsOutput: string,
+): ShowBuildSettingsResult {
+  return {
+    kind: 'build-settings',
+    didError: false,
+    error: null,
+    artifacts: {
+      workspacePath: pathValue,
+      scheme,
+    },
+    entries: parseBuildSettingsEntries(settingsOutput),
+  };
+}
+
+function createShowBuildSettingsErrorResult(
+  pathValue: string,
+  scheme: string,
+  message: string,
+): ShowBuildSettingsResult {
+  return {
+    kind: 'build-settings',
+    didError: true,
+    error: message,
+    artifacts: {
+      workspacePath: pathValue,
+      scheme,
+    },
+    entries: [],
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: ShowBuildSettingsResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.build-settings',
+    schemaVersion: '1',
+  };
+}
+
+export function createShowBuildSettingsExecutor(
   executor: CommandExecutor,
-): Promise<void> {
-  log('info', `Showing build settings for scheme ${params.scheme}`);
+): ToolExecutor<ShowBuildSettingsParams, ShowBuildSettingsResult> {
+  return async (params, ctx) => {
+    const hasProjectPath = typeof params.projectPath === 'string';
+    const pathValue = hasProjectPath ? params.projectPath! : params.workspacePath!;
 
-  const hasProjectPath = typeof params.projectPath === 'string';
-  const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: `Showing build settings for scheme ${params.scheme}`,
+    });
 
-  const headerEvent = header('Show Build Settings', [
-    { label: 'Scheme', value: params.scheme },
-    ...(hasProjectPath
-      ? [{ label: 'Project', value: params.projectPath! }]
-      : [{ label: 'Workspace', value: params.workspacePath! }]),
-  ]);
-
-  const ctx = getHandlerContext();
-
-  return withErrorHandling(
-    ctx,
-    async () => {
+    try {
       const command = ['xcodebuild', '-showBuildSettings'];
 
       if (hasProjectPath) {
@@ -71,36 +148,85 @@ export async function showBuildSettingsLogic(
       command.push('-scheme', params.scheme);
 
       const result = await executor(command, 'Show Build Settings', false);
-
       if (!result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', result.error || 'Unknown error'));
-        return;
+        const errorResult = createShowBuildSettingsErrorResult(
+          pathValue,
+          params.scheme,
+          result.error || 'Unknown error',
+        );
+        ctx.emitProgress({
+          type: 'status',
+          level: 'error',
+          message: errorResult.error ?? 'Failed to show build settings',
+        });
+        return errorResult;
       }
 
       const settingsOutput = stripXcodebuildPreamble(
         result.output || 'Build settings retrieved successfully.',
       );
 
-      const pathKey = hasProjectPath ? 'projectPath' : 'workspacePath';
-      ctx.nextStepParams = {
-        build_macos: { [pathKey]: pathValue!, scheme: params.scheme },
-        build_sim: { [pathKey]: pathValue!, scheme: params.scheme, simulatorName: 'iPhone 17' },
-        list_schemes: { [pathKey]: pathValue! },
-      };
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'Build settings retrieved',
+      });
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: settingsOutput,
+      });
 
-      const settingsLines = settingsOutput.split('\n').filter((l) => l.trim());
+      return createShowBuildSettingsResult(pathValue, params.scheme, settingsOutput);
+    } catch (error) {
+      const errorResult = createShowBuildSettingsErrorResult(
+        pathValue,
+        params.scheme,
+        toErrorMessage(error),
+      );
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: errorResult.error ?? 'Failed to show build settings',
+      });
+      return errorResult;
+    }
+  };
+}
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Build settings retrieved'));
-      ctx.emit(section('Settings', settingsLines));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => message,
-      logMessage: ({ message }) => `Error showing build settings: ${message}`,
-    },
-  );
+export async function showBuildSettingsLogic(
+  params: ShowBuildSettingsParams,
+  executor: CommandExecutor,
+): Promise<void> {
+  log('info', `Showing build settings for scheme ${params.scheme}`);
+
+  const hasProjectPath = typeof params.projectPath === 'string';
+  const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
+
+  const ctx = getHandlerContext();
+  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
+  const result = await executeShowBuildSettings(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+
+  if (result.didError) {
+    log('error', `Error showing build settings: ${result.error ?? 'Unknown error'}`);
+  }
+
+  const events = executionContext.emitResult(result);
+  for (const event of events) {
+    ctx.emit(event);
+  }
+
+  if (!result.didError) {
+    const pathKey = hasProjectPath ? 'projectPath' : 'workspacePath';
+    ctx.nextStepParams = {
+      build_macos: { [pathKey]: pathValue!, scheme: params.scheme },
+      build_sim: { [pathKey]: pathValue!, scheme: params.scheme, simulatorName: 'iPhone 17' },
+      list_schemes: { [pathKey]: pathValue! },
+    };
+  }
 }
 
 const publicSchemaObject = baseSchemaObject.omit({

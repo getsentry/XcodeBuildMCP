@@ -1,13 +1,19 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
@@ -31,6 +37,7 @@ const internalSchemaObject = z.object({
 });
 
 type BootSimParams = z.infer<typeof internalSchemaObject>;
+type BootSimResult = SimulatorActionResultDomainResult;
 
 const publicSchemaObject = z.strictObject(
   baseSchemaObject.omit({
@@ -39,42 +46,127 @@ const publicSchemaObject = z.strictObject(
   } as const).shape,
 );
 
+function createDiagnostics(message: string) {
+  return {
+    warnings: [],
+    errors: message
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((entry) => ({ message: entry })),
+  };
+}
+
+function createBootSimResult(params: {
+  simulatorId: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): BootSimResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'boot',
+    },
+    artifacts: {
+      simulatorId: params.simulatorId,
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
+      : {}),
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: BootSimResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createBootSimExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<BootSimParams, BootSimResult> {
+  return async (params, ctx) => {
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: `Booting simulator ${params.simulatorId}`,
+    });
+
+    try {
+      const result = await executor(
+        ['xcrun', 'simctl', 'boot', params.simulatorId],
+        'Boot Simulator',
+        false,
+      );
+
+      if (!result.success) {
+        const diagnosticMessage = result.error ?? 'Unknown error';
+        return createBootSimResult({
+          simulatorId: params.simulatorId,
+          didError: true,
+          error: `Boot simulator operation failed: ${diagnosticMessage}`,
+          diagnosticMessage,
+        });
+      }
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'Simulator booted successfully',
+      });
+      return createBootSimResult({
+        simulatorId: params.simulatorId,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createBootSimResult({
+        simulatorId: params.simulatorId,
+        didError: true,
+        error: `Boot simulator operation failed: ${diagnosticMessage}`,
+        diagnosticMessage,
+      });
+    }
+  };
+}
+
 export async function boot_simLogic(
   params: BootSimParams,
   executor: CommandExecutor,
 ): Promise<void> {
   log('info', `Starting xcrun simctl boot request for simulator ${params.simulatorId}`);
 
-  const headerEvent = header('Boot Simulator', [{ label: 'Simulator', value: params.simulatorId }]);
-
   const ctx = getHandlerContext();
+  const headerEvent = header('Boot Simulator', [{ label: 'Simulator', value: params.simulatorId }]);
+  const executionContext = new DefaultToolExecutionContext();
+  const executeBootSim = createBootSimExecutor(executor);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const command = ['xcrun', 'simctl', 'boot', params.simulatorId];
-      const result = await executor(command, 'Boot Simulator', false);
+  ctx.emit(headerEvent);
 
-      if (!result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Boot simulator operation failed: ${result.error}`));
-        return;
-      }
+  const result = await executeBootSim(params, executionContext);
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Simulator booted successfully'));
-      ctx.nextStepParams = {
-        open_sim: {},
-        install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
-        launch_app_sim: { simulatorId: params.simulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Boot simulator operation failed: ${message}`,
-      logMessage: ({ message }) => `Error during boot simulator operation: ${message}`,
-    },
-  );
+  if (result.didError) {
+    log('error', `Error during boot simulator operation: ${result.error ?? 'Unknown error'}`);
+    ctx.emit(statusLine('error', result.error ?? 'Boot simulator operation failed'));
+    return;
+  }
+
+  ctx.emit(statusLine('success', 'Simulator booted successfully'));
+  ctx.nextStepParams = {
+    open_sim: {},
+    install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
+    launch_app_sim: { simulatorId: params.simulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
+  };
 }
 
 export const schema = getSessionAwareToolSchemaShape({

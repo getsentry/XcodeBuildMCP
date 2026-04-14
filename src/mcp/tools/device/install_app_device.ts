@@ -6,17 +6,23 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { InstallResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
+import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnDevice } from '../../../utils/device-steps.ts';
 
 const installAppDeviceSchema = z.object({
@@ -30,41 +36,136 @@ const installAppDeviceSchema = z.object({
 const publicSchemaObject = installAppDeviceSchema.omit({ deviceId: true } as const);
 
 type InstallAppDeviceParams = z.infer<typeof installAppDeviceSchema>;
+type InstallAppDeviceResult = InstallResultDomainResult;
+
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.install-result';
 
 export async function install_app_deviceLogic(
   params: InstallAppDeviceParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  const { deviceId, appPath } = params;
-  const headerEvent = header('Install App', [
-    { label: 'Device', value: formatDeviceId(deviceId) },
-    { label: 'App', value: appPath },
-  ]);
-
-  log('info', `Installing app on device ${deviceId}`);
-
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeInstallAppDevice = createInstallAppDeviceExecutor(executor);
+  const result = await executeInstallAppDevice(params, executionContext);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const installResult = await installAppOnDevice(deviceId, appPath, executor);
+  setStructuredOutput(ctx, result);
+
+  const adapter = new DomainResultPipelineEventAdapter();
+  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
+    ctx.emit(event);
+  }
+  for (const event of executionContext.emitResult(result)) {
+    ctx.emit(event);
+  }
+
+  if (result.didError) {
+    log('error', `Error installing app on device: ${result.error ?? 'Unknown error'}`);
+  }
+}
+
+function createInstallAppDeviceResult(params: InstallAppDeviceParams): InstallAppDeviceResult {
+  return {
+    kind: 'install-result',
+    didError: false,
+    error: null,
+    summary: { status: 'SUCCEEDED' },
+    artifacts: {
+      appPath: params.appPath,
+      deviceId: params.deviceId,
+    },
+    diagnostics: {
+      warnings: [],
+      errors: [],
+    },
+  };
+}
+
+function createInstallAppDeviceErrorResult(
+  params: InstallAppDeviceParams,
+  message: string,
+): InstallAppDeviceResult {
+  return {
+    kind: 'install-result',
+    didError: true,
+    error: message,
+    summary: { status: 'FAILED' },
+    artifacts: {
+      appPath: params.appPath,
+      deviceId: params.deviceId,
+    },
+    diagnostics: {
+      warnings: [],
+      errors: [],
+    },
+  };
+}
+
+function emitInstallAppDeviceProgress(
+  ctx: Parameters<ToolExecutor<InstallAppDeviceParams, InstallAppDeviceResult>>[1],
+  params: InstallAppDeviceParams,
+): void {
+  ctx.emitProgress({
+    type: 'status',
+    level: 'info',
+    message: 'Install App',
+  });
+  ctx.emitProgress({
+    type: 'table',
+    name: 'Parameters',
+    columns: ['label', 'value'],
+    rows: [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'App', value: params.appPath },
+    ],
+  });
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: InstallAppDeviceResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createInstallAppDeviceExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<InstallAppDeviceParams, InstallAppDeviceResult> {
+  return async (params, ctx) => {
+    emitInstallAppDeviceProgress(ctx, params);
+    log('info', `Installing app on device ${params.deviceId}`);
+
+    try {
+      const installResult = await installAppOnDevice(params.deviceId, params.appPath, executor);
 
       if (!installResult.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Failed to install app: ${installResult.error}`));
-        return;
+        const message = `Failed to install app: ${installResult.error}`;
+        ctx.emitProgress({
+          type: 'status',
+          level: 'error',
+          message,
+        });
+        return createInstallAppDeviceErrorResult(params, message);
       }
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'App installed successfully.'));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to install app on device: ${message}`,
-      logMessage: ({ message }) => `Error installing app on device: ${message}`,
-    },
-  );
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'App installed successfully.',
+      });
+
+      return createInstallAppDeviceResult(params);
+    } catch (error) {
+      const message = `Failed to install app on device: ${toErrorMessage(error)}`;
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message,
+      });
+      return createInstallAppDeviceErrorResult(params, message);
+    }
+  };
 }
 
 export const schema = getSessionAwareToolSchemaShape({

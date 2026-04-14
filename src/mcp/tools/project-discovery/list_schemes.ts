@@ -1,15 +1,20 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SchemeListDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -28,6 +33,7 @@ const listSchemesSchema = z.preprocess(
 );
 
 export type ListSchemesParams = z.infer<typeof listSchemesSchema>;
+type ListSchemesResult = SchemeListDomainResult;
 
 export function parseSchemesFromXcodebuildListOutput(output: string): string[] {
   const schemesMatch = output.match(/Schemes:([\s\S]*?)(?=\n\n|$)/);
@@ -62,6 +68,100 @@ export async function listSchemes(
   return parseSchemesFromXcodebuildListOutput(result.output);
 }
 
+function createPipelineCompatExecutionContext(
+  ctx: ToolHandlerContext,
+): DefaultToolExecutionContext {
+  return new DefaultToolExecutionContext({
+    renderSession: {
+      emit: ctx.emit,
+      attach: () => {},
+      getEvents: () => [],
+      getAttachments: () => [],
+      isError: () => false,
+      finalize: () => '',
+    },
+  });
+}
+
+function createListSchemesResult(pathValue: string, schemes: string[]): ListSchemesResult {
+  return {
+    kind: 'scheme-list',
+    didError: false,
+    error: null,
+    artifacts: {
+      workspacePath: pathValue,
+    },
+    schemes,
+  };
+}
+
+function createListSchemesErrorResult(pathValue: string, message: string): ListSchemesResult {
+  const normalizedMessage = message.startsWith('Failed to list schemes: ')
+    ? message.slice('Failed to list schemes: '.length)
+    : message;
+
+  return {
+    kind: 'scheme-list',
+    didError: true,
+    error: normalizedMessage,
+    artifacts: {
+      workspacePath: pathValue,
+    },
+    schemes: [],
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: ListSchemesResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.scheme-list',
+    schemaVersion: '1',
+  };
+}
+
+export function createListSchemesExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<ListSchemesParams, ListSchemesResult> {
+  return async (params, ctx) => {
+    const pathValue = params.projectPath ?? params.workspacePath ?? '';
+
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: 'Listing schemes',
+    });
+
+    try {
+      const schemes = await listSchemes(params, executor);
+
+      if (schemes.length > 0) {
+        ctx.emitProgress({
+          type: 'table',
+          name: 'schemes',
+          columns: ['scheme'],
+          rows: schemes.map((scheme) => ({ scheme })),
+        });
+      } else {
+        ctx.emitProgress({
+          type: 'status',
+          level: 'info',
+          message: '(none)',
+        });
+      }
+
+      return createListSchemesResult(pathValue, schemes);
+    } catch (error) {
+      const result = createListSchemesErrorResult(pathValue, toErrorMessage(error));
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: result.error ?? 'Failed to list schemes',
+      });
+      return result;
+    }
+  };
+}
+
 export async function listSchemesLogic(
   params: ListSchemesParams,
   executor: CommandExecutor,
@@ -72,57 +172,40 @@ export async function listSchemesLogic(
   const projectOrWorkspace = hasProjectPath ? 'project' : 'workspace';
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
-  const headerEvent = header(
-    'List Schemes',
-    hasProjectPath
-      ? [{ label: 'Project', value: pathValue! }]
-      : [{ label: 'Workspace', value: pathValue! }],
-  );
-
   const ctx = getHandlerContext();
+  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executeListSchemes = createListSchemesExecutor(executor);
+  const result = await executeListSchemes(params, executionContext);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const schemes = await listSchemes(params, executor);
+  setStructuredOutput(ctx, result);
 
-      if (schemes.length > 0) {
-        const firstScheme = schemes[0];
+  if (result.didError) {
+    log('error', `Error listing schemes: ${result.error ?? 'Unknown error'}`);
+  }
 
-        ctx.nextStepParams = {
-          build_macos: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
-          build_run_sim: {
-            [`${projectOrWorkspace}Path`]: pathValue!,
-            scheme: firstScheme,
-            simulatorName: 'iPhone 17',
-          },
-          build_sim: {
-            [`${projectOrWorkspace}Path`]: pathValue!,
-            scheme: firstScheme,
-            simulatorName: 'iPhone 17',
-          },
-          show_build_settings: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
-        };
-      }
+  const events = executionContext.emitResult(result);
+  for (const event of events) {
+    ctx.emit(event);
+  }
 
-      const schemeItems = schemes.length > 0 ? schemes : ['(none)'];
-      const schemeWord = schemes.length === 1 ? 'scheme' : 'schemes';
+  if (result.schemes.length > 0 && !result.didError) {
+    const firstScheme = result.schemes[0];
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `Found ${schemes.length} ${schemeWord}`));
-      ctx.emit(section('Schemes:', schemeItems));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => {
-        const rawError = message.startsWith('Failed to list schemes: ')
-          ? message.slice('Failed to list schemes: '.length)
-          : message;
-        return rawError;
+    ctx.nextStepParams = {
+      build_macos: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
+      build_run_sim: {
+        [`${projectOrWorkspace}Path`]: pathValue!,
+        scheme: firstScheme,
+        simulatorName: 'iPhone 17',
       },
-      logMessage: ({ message }) => `Error listing schemes: ${message}`,
-    },
-  );
+      build_sim: {
+        [`${projectOrWorkspace}Path`]: pathValue!,
+        scheme: firstScheme,
+        simulatorName: 'iPhone 17',
+      },
+      show_build_settings: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
+    };
+  }
 }
 
 export const schema = getSessionAwareToolSchemaShape({

@@ -1,8 +1,15 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import { XcodePlatform } from '../../../types/common.ts';
+import type { AppPathDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
+import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -11,10 +18,7 @@ import {
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, detailTree, section } from '../../../utils/tool-event-builders.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
-import type { PipelineEvent } from '../../../types/pipeline-events.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
@@ -54,90 +58,184 @@ const getMacosAppPathSchema = z.preprocess(
 
 type GetMacosAppPathParams = z.infer<typeof getMacosAppPathSchema>;
 
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.app-path';
+
+function getErrorMessages(rawMessage: string): string[] {
+  const messages = extractQueryErrorMessages(rawMessage);
+  return messages.length > 0 ? messages : [rawMessage];
+}
+
+function createAppPathResult(appPath: string): AppPathDomainResult {
+  return {
+    kind: 'app-path',
+    didError: false,
+    error: null,
+    artifacts: { appPath },
+  };
+}
+
+function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
+  const messages = getErrorMessages(rawMessage);
+
+  return {
+    kind: 'app-path',
+    didError: true,
+    error: `Failed to get app path: ${messages[0]}`,
+    diagnostics: {
+      warnings: [],
+      errors: messages.map((message) => ({ message })),
+    },
+  };
+}
+
+function emitAppPathProgress(
+  ctx: Parameters<ToolExecutor<GetMacosAppPathParams, AppPathDomainResult>>[1],
+  headerParams: Array<{ label: string; value: string }>,
+): void {
+  ctx.emitProgress({
+    type: 'status',
+    level: 'info',
+    message: 'Get App Path',
+  });
+  ctx.emitProgress({
+    type: 'table',
+    name: 'Parameters',
+    columns: ['label', 'value'],
+    rows: headerParams.map((param) => ({
+      label: param.label,
+      value: param.value,
+    })),
+  });
+}
+
+function getAppPath(result: AppPathDomainResult): string | null {
+  if ('artifacts' in result && result.artifacts && 'appPath' in result.artifacts) {
+    return result.artifacts.appPath;
+  }
+
+  return null;
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: AppPathDomainResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createGetMacAppPathExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<GetMacosAppPathParams, AppPathDomainResult> {
+  return async (params, ctx) => {
+    const configuration = params.configuration ?? 'Debug';
+
+    const headerParams: Array<{ label: string; value: string }> = [
+      { label: 'Scheme', value: params.scheme },
+    ];
+    if (params.workspacePath) {
+      headerParams.push({ label: 'Workspace', value: params.workspacePath });
+    } else if (params.projectPath) {
+      headerParams.push({ label: 'Project', value: params.projectPath });
+    }
+    headerParams.push({ label: 'Configuration', value: configuration });
+    headerParams.push({ label: 'Platform', value: 'macOS' });
+    if (params.arch) {
+      headerParams.push({ label: 'Architecture', value: params.arch });
+    }
+
+    log('info', `Getting app path for scheme ${params.scheme} on platform macOS`);
+    emitAppPathProgress(ctx, headerParams);
+
+    try {
+      const destination = params.arch ? `platform=macOS,arch=${params.arch}` : undefined;
+
+      const appPath = await resolveAppPathFromBuildSettings(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme,
+          configuration,
+          platform: XcodePlatform.macOS,
+          destination,
+          derivedDataPath: params.derivedDataPath,
+          extraArgs: params.extraArgs,
+        },
+        executor,
+      );
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'Success',
+      });
+      ctx.emitProgress({
+        type: 'artifact',
+        name: 'App Path',
+        path: appPath,
+      });
+
+      return createAppPathResult(appPath);
+    } catch (error) {
+      const messages = getErrorMessages(toErrorMessage(error));
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: `Errors (${messages.length}):`,
+      });
+      for (const message of messages) {
+        ctx.emitProgress({
+          type: 'status',
+          level: 'info',
+          message: `✗ ${message}`,
+        });
+      }
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: 'Query failed.',
+      });
+
+      return createAppPathErrorResult(toErrorMessage(error));
+    }
+  };
+}
+
 export async function get_mac_app_pathLogic(
   params: GetMacosAppPathParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  const configuration = params.configuration ?? 'Debug';
-
-  const headerParams: Array<{ label: string; value: string }> = [
-    { label: 'Scheme', value: params.scheme },
-  ];
-  if (params.workspacePath) {
-    headerParams.push({ label: 'Workspace', value: params.workspacePath });
-  } else if (params.projectPath) {
-    headerParams.push({ label: 'Project', value: params.projectPath });
-  }
-  headerParams.push({ label: 'Configuration', value: configuration });
-  headerParams.push({ label: 'Platform', value: 'macOS' });
-  if (params.arch) {
-    headerParams.push({ label: 'Architecture', value: params.arch });
-  }
-
-  const headerEvent = header('Get App Path', headerParams);
-
-  function buildErrorEvents(rawOutput: string): PipelineEvent[] {
-    const messages = extractQueryErrorMessages(rawOutput);
-    return [
-      headerEvent,
-      section(`Errors (${messages.length}):`, [...messages.map((m) => `\u{2717} ${m}`), ''], {
-        blankLineAfterTitle: true,
-      }),
-      statusLine('error', 'Query failed.'),
-    ];
-  }
-
-  log('info', `Getting app path for scheme ${params.scheme} on platform macOS`);
-
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
+  const result = await executeGetMacAppPath(params, executionContext);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const destination = params.arch ? `platform=macOS,arch=${params.arch}` : undefined;
+  setStructuredOutput(ctx, result);
 
-      let appPath: string;
-      try {
-        appPath = await resolveAppPathFromBuildSettings(
-          {
-            projectPath: params.projectPath,
-            workspacePath: params.workspacePath,
-            scheme: params.scheme,
-            configuration,
-            platform: XcodePlatform.macOS,
-            destination,
-            derivedDataPath: params.derivedDataPath,
-            extraArgs: params.extraArgs,
-          },
-          executor,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        for (const event of buildErrorEvents(message)) {
-          ctx.emit(event);
-        }
-        return;
-      }
+  const adapter = new DomainResultPipelineEventAdapter();
+  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
+    ctx.emit(event);
+  }
+  for (const event of executionContext.emitResult(result)) {
+    ctx.emit(event);
+  }
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Success'));
-      ctx.emit(detailTree([{ label: 'App Path', value: displayPath(appPath) }]));
-      ctx.nextStepParams = {
-        get_mac_bundle_id: { appPath },
-        launch_mac_app: { appPath },
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Error retrieving app path: ${message}`,
-      logMessage: ({ message }) => `Error retrieving app path: ${message}`,
-      mapError: ({ message, emit }) => {
-        for (const event of buildErrorEvents(message)) {
-          emit?.(event);
-        }
-      },
-    },
-  );
+  if (result.didError) {
+    log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  const appPath = getAppPath(result);
+  if (!appPath) {
+    log('error', 'Error retrieving app path: missing appPath artifact in successful result');
+    return;
+  }
+
+  ctx.nextStepParams = {
+    get_mac_bundle_id: { appPath },
+    launch_mac_app: { appPath },
+  };
 }
 
 export const schema = getSessionAwareToolSchemaShape({

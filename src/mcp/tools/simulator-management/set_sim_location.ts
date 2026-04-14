@@ -1,13 +1,19 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const setSimulatorLocationSchema = z.object({
@@ -17,6 +23,135 @@ const setSimulatorLocationSchema = z.object({
 });
 
 type SetSimulatorLocationParams = z.infer<typeof setSimulatorLocationSchema>;
+type SetSimulatorLocationResult = SimulatorActionResultDomainResult;
+
+function createDiagnostics(message: string) {
+  return {
+    warnings: [],
+    errors: message
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((entry) => ({ message: entry })),
+  };
+}
+
+function createSetSimulatorLocationResult(params: {
+  simulatorId: string;
+  latitude: number;
+  longitude: number;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): SetSimulatorLocationResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'set-location',
+      coordinates: {
+        latitude: params.latitude,
+        longitude: params.longitude,
+      },
+    },
+    artifacts: {
+      simulatorId: params.simulatorId,
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
+      : {}),
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: SetSimulatorLocationResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createSetSimulatorLocationExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<SetSimulatorLocationParams, SetSimulatorLocationResult> {
+  return async (params, ctx) => {
+    const coords = `${params.latitude},${params.longitude}`;
+
+    if (params.latitude < -90 || params.latitude > 90) {
+      return createSetSimulatorLocationResult({
+        simulatorId: params.simulatorId,
+        latitude: params.latitude,
+        longitude: params.longitude,
+        didError: true,
+        error: 'Latitude must be between -90 and 90 degrees',
+        diagnosticMessage: 'Latitude must be between -90 and 90 degrees',
+      });
+    }
+
+    if (params.longitude < -180 || params.longitude > 180) {
+      return createSetSimulatorLocationResult({
+        simulatorId: params.simulatorId,
+        latitude: params.latitude,
+        longitude: params.longitude,
+        didError: true,
+        error: 'Longitude must be between -180 and 180 degrees',
+        diagnosticMessage: 'Longitude must be between -180 and 180 degrees',
+      });
+    }
+
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: `Setting simulator ${params.simulatorId} location to ${coords}`,
+    });
+
+    try {
+      const result = await executor(
+        ['xcrun', 'simctl', 'location', params.simulatorId, 'set', coords],
+        'Set Simulator Location',
+        false,
+      );
+
+      if (!result.success) {
+        const diagnosticMessage = result.error ?? 'Unknown error';
+        return createSetSimulatorLocationResult({
+          simulatorId: params.simulatorId,
+          latitude: params.latitude,
+          longitude: params.longitude,
+          didError: true,
+          error: `Failed to set simulator location: ${diagnosticMessage}`,
+          diagnosticMessage,
+        });
+      }
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'Location set successfully',
+      });
+      return createSetSimulatorLocationResult({
+        simulatorId: params.simulatorId,
+        latitude: params.latitude,
+        longitude: params.longitude,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createSetSimulatorLocationResult({
+        simulatorId: params.simulatorId,
+        latitude: params.latitude,
+        longitude: params.longitude,
+        didError: true,
+        error: `Failed to set simulator location: ${diagnosticMessage}`,
+        diagnosticMessage,
+      });
+    }
+  };
+}
 
 export async function set_sim_locationLogic(
   params: SetSimulatorLocationParams,
@@ -29,47 +164,28 @@ export async function set_sim_locationLogic(
   ]);
 
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeSetSimulatorLocation = createSetSimulatorLocationExecutor(executor);
 
-  if (params.latitude < -90 || params.latitude > 90) {
-    ctx.emit(headerEvent);
-    ctx.emit(statusLine('error', 'Latitude must be between -90 and 90 degrees'));
+  ctx.emit(headerEvent);
+
+  const result = await executeSetSimulatorLocation(params, executionContext);
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
+
+  if (result.didError) {
+    if (result.error?.startsWith('Failed to set simulator location:')) {
+      log(
+        'error',
+        `Error during set simulator location for simulator ${params.simulatorId}: ${result.error}`,
+      );
+    }
+    ctx.emit(statusLine('error', result.error ?? 'Failed to set simulator location'));
     return;
   }
-  if (params.longitude < -180 || params.longitude > 180) {
-    ctx.emit(headerEvent);
-    ctx.emit(statusLine('error', 'Longitude must be between -180 and 180 degrees'));
-    return;
-  }
 
-  log('info', `Setting simulator ${params.simulatorId} location to ${coords}`);
-
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const command = ['xcrun', 'simctl', 'location', params.simulatorId, 'set', coords];
-      const result = await executor(command, 'Set Simulator Location', false);
-
-      if (!result.success) {
-        log(
-          'error',
-          `Failed to set simulator location: ${result.error} (simulator: ${params.simulatorId})`,
-        );
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Failed to set simulator location: ${result.error}`));
-        return;
-      }
-
-      log('info', `Set simulator ${params.simulatorId} location to ${coords}`);
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Location set successfully'));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to set simulator location: ${message}`,
-      logMessage: ({ message }) =>
-        `Error during set simulator location for simulator ${params.simulatorId}: ${message}`,
-    },
-  );
+  log('info', `Set simulator ${params.simulatorId} location to ${coords}`);
+  ctx.emit(statusLine('success', 'Location set successfully'));
 }
 
 const publicSchemaObject = z.strictObject(

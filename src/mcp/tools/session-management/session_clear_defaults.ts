@@ -1,4 +1,11 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type {
+  SessionDefaultsDomainResult,
+  SessionDefaultsProfile,
+} from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import { sessionDefaultKeys } from '../../../utils/session-defaults-schema.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
@@ -25,17 +32,121 @@ const schemaObj = z.object({
 
 type Params = z.infer<typeof schemaObj>;
 
-export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
-  const ctx = getHandlerContext();
+function createSessionDefaultsProfile(profile: Record<string, unknown>): SessionDefaultsProfile {
+  return {
+    projectPath: (profile.projectPath as string | undefined) ?? null,
+    workspacePath: (profile.workspacePath as string | undefined) ?? null,
+    scheme: (profile.scheme as string | undefined) ?? null,
+    configuration: (profile.configuration as string | undefined) ?? null,
+    simulatorName: (profile.simulatorName as string | undefined) ?? null,
+    simulatorId: (profile.simulatorId as string | undefined) ?? null,
+    simulatorPlatform:
+      (profile.simulatorPlatform as SessionDefaultsProfile['simulatorPlatform'] | undefined) ??
+      null,
+    deviceId: (profile.deviceId as string | undefined) ?? null,
+    useLatestOS: (profile.useLatestOS as boolean | undefined) ?? null,
+    arch: (profile.arch as SessionDefaultsProfile['arch'] | undefined) ?? null,
+    suppressWarnings: (profile.suppressWarnings as boolean | undefined) ?? null,
+    derivedDataPath: (profile.derivedDataPath as string | undefined) ?? null,
+    preferXcodebuild: (profile.preferXcodebuild as boolean | undefined) ?? null,
+    platform: (profile.platform as string | undefined) ?? null,
+    bundleId: (profile.bundleId as string | undefined) ?? null,
+    env: (profile.env as Record<string, string> | undefined) ?? null,
+  };
+}
 
-  if (params.all) {
-    if (params.profile !== undefined || params.keys !== undefined) {
-      ctx.emit(header('Clear Defaults'));
-      ctx.emit(statusLine('error', 'all=true cannot be combined with profile or keys.'));
-      return;
+function createSessionDefaultsResult(error?: string): SessionDefaultsDomainResult {
+  const profiles: SessionDefaultsDomainResult['profiles'] = {
+    '(default)': createSessionDefaultsProfile(sessionStore.getAllForProfile(null)),
+  };
+
+  for (const profile of sessionStore.listProfiles()) {
+    profiles[profile] = createSessionDefaultsProfile(sessionStore.getAllForProfile(profile));
+  }
+
+  return {
+    kind: 'session-defaults',
+    didError: typeof error === 'string',
+    error: error ?? null,
+    currentProfile: formatProfileLabel(sessionStore.getActiveProfile()),
+    profiles,
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDomainResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.session-defaults',
+    schemaVersion: '1',
+  };
+}
+
+export function createSessionClearDefaultsExecutor(): ToolExecutor<
+  Params,
+  SessionDefaultsDomainResult
+> {
+  return async (params, ctx) => {
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: 'Updating session defaults',
+    });
+
+    if (params.all) {
+      if (params.profile !== undefined || params.keys !== undefined) {
+        return createSessionDefaultsResult('all=true cannot be combined with profile or keys.');
+      }
+
+      sessionStore.clearAll();
+      return createSessionDefaultsResult();
     }
 
-    sessionStore.clearAll();
+    const profile = params.profile?.trim();
+    if (profile !== undefined) {
+      if (profile.length === 0) {
+        return createSessionDefaultsResult('Profile name cannot be empty.');
+      }
+
+      if (!sessionStore.listProfiles().includes(profile)) {
+        return createSessionDefaultsResult(`Profile "${profile}" does not exist.`);
+      }
+
+      if (params.keys) {
+        sessionStore.clearForProfile(profile, params.keys);
+      } else {
+        sessionStore.clearForProfile(profile);
+      }
+
+      return createSessionDefaultsResult();
+    }
+
+    if (params.keys) {
+      sessionStore.clear(params.keys);
+    } else {
+      sessionStore.clear();
+    }
+
+    return createSessionDefaultsResult();
+  };
+}
+
+export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
+  const ctx = getHandlerContext();
+  const activeProfileBefore = sessionStore.getActiveProfile();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeSessionClearDefaults = createSessionClearDefaultsExecutor();
+  const result = await executeSessionClearDefaults(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
+
+  if (result.didError) {
+    ctx.emit(header('Clear Defaults'));
+    ctx.emit(statusLine('error', result.error ?? 'Failed to clear session defaults.'));
+    return;
+  }
+
+  if (params.all) {
     ctx.emit(header('Clear Defaults'));
     ctx.emit(statusLine('success', 'All session defaults cleared.'));
     return;
@@ -43,41 +154,15 @@ export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
 
   const profile = params.profile?.trim();
   if (profile !== undefined) {
-    if (profile.length === 0) {
-      ctx.emit(header('Clear Defaults'));
-      ctx.emit(statusLine('error', 'Profile name cannot be empty.'));
-      return;
-    }
-
-    if (!sessionStore.listProfiles().includes(profile)) {
-      ctx.emit(header('Clear Defaults'));
-      ctx.emit(statusLine('error', `Profile "${profile}" does not exist.`));
-      return;
-    }
-
-    if (params.keys) {
-      sessionStore.clearForProfile(profile, params.keys);
-    } else {
-      sessionStore.clearForProfile(profile);
-    }
-
     ctx.emit(header('Clear Defaults', [{ label: 'Profile', value: profile }]));
     ctx.emit(statusLine('success', `Session defaults cleared for profile "${profile}".`));
     return;
   }
 
-  const currentActiveProfile = sessionStore.getActiveProfile();
-
-  if (params.keys) {
-    sessionStore.clear(params.keys);
-  } else {
-    sessionStore.clear();
-  }
-
-  const profileAnnotation = formatProfileAnnotation(currentActiveProfile);
+  const profileAnnotation = formatProfileAnnotation(activeProfileBefore);
   ctx.emit(
     header('Clear Defaults', [
-      { label: 'Profile', value: formatProfileLabel(currentActiveProfile) },
+      { label: 'Profile', value: formatProfileLabel(activeProfileBefore) },
     ]),
   );
   ctx.emit(statusLine('success', `Session defaults cleared ${profileAnnotation}`));

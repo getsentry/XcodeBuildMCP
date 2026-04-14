@@ -6,17 +6,23 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { StopResultDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
+import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 const stopAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -24,26 +30,108 @@ const stopAppDeviceSchema = z.object({
 });
 
 type StopAppDeviceParams = z.infer<typeof stopAppDeviceSchema>;
+type StopAppDeviceResult = StopResultDomainResult;
 
 const publicSchemaObject = stopAppDeviceSchema.omit({ deviceId: true } as const);
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.stop-result';
 
 export async function stop_app_deviceLogic(
   params: StopAppDeviceParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  const { deviceId, processId } = params;
-  const headerEvent = header('Stop App', [
-    { label: 'Device', value: formatDeviceId(deviceId) },
-    { label: 'PID', value: processId.toString() },
-  ]);
-
-  log('info', `Stopping app with PID ${processId} on device ${deviceId}`);
-
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeStopAppDevice = createStopAppDeviceExecutor(executor);
+  const result = await executeStopAppDevice(params, executionContext);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
+  setStructuredOutput(ctx, result);
+
+  const adapter = new DomainResultPipelineEventAdapter();
+  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
+    ctx.emit(event);
+  }
+  for (const event of executionContext.emitResult(result)) {
+    ctx.emit(event);
+  }
+
+  if (result.didError) {
+    log('error', `Error stopping app on device: ${result.error ?? 'Unknown error'}`);
+  }
+}
+
+function createStopAppDeviceResult(params: StopAppDeviceParams): StopAppDeviceResult {
+  return {
+    kind: 'stop-result',
+    didError: false,
+    error: null,
+    summary: { status: 'SUCCEEDED' },
+    artifacts: {
+      deviceId: params.deviceId,
+      processId: params.processId,
+    },
+    diagnostics: {
+      warnings: [],
+      errors: [],
+    },
+  };
+}
+
+function createStopAppDeviceErrorResult(
+  params: StopAppDeviceParams,
+  message: string,
+): StopAppDeviceResult {
+  return {
+    kind: 'stop-result',
+    didError: true,
+    error: message,
+    summary: { status: 'FAILED' },
+    artifacts: {
+      deviceId: params.deviceId,
+      processId: params.processId,
+    },
+    diagnostics: {
+      warnings: [],
+      errors: [],
+    },
+  };
+}
+
+function emitStopAppDeviceProgress(
+  ctx: Parameters<ToolExecutor<StopAppDeviceParams, StopAppDeviceResult>>[1],
+  params: StopAppDeviceParams,
+): void {
+  ctx.emitProgress({
+    type: 'status',
+    level: 'info',
+    message: 'Stop App',
+  });
+  ctx.emitProgress({
+    type: 'table',
+    name: 'Parameters',
+    columns: ['label', 'value'],
+    rows: [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'PID', value: params.processId.toString() },
+    ],
+  });
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: StopAppDeviceResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createStopAppDeviceExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<StopAppDeviceParams, StopAppDeviceResult> {
+  return async (params, ctx) => {
+    emitStopAppDeviceProgress(ctx, params);
+    log('info', `Stopping app with PID ${params.processId} on device ${params.deviceId}`);
+
+    try {
       const result = await executor(
         [
           'xcrun',
@@ -52,29 +140,41 @@ export async function stop_app_deviceLogic(
           'process',
           'terminate',
           '--device',
-          deviceId,
+          params.deviceId,
           '--pid',
-          processId.toString(),
+          params.processId.toString(),
         ],
         'Stop app on device',
         false,
       );
 
       if (!result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Failed to stop app: ${result.error}`));
-        return;
+        const message = `Failed to stop app: ${result.error}`;
+        ctx.emitProgress({
+          type: 'status',
+          level: 'error',
+          message,
+        });
+        return createStopAppDeviceErrorResult(params, message);
       }
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'App stopped successfully'));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to stop app on device: ${message}`,
-      logMessage: ({ message }) => `Error stopping app on device: ${message}`,
-    },
-  );
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'App stopped successfully',
+      });
+
+      return createStopAppDeviceResult(params);
+    } catch (error) {
+      const message = `Failed to stop app on device: ${toErrorMessage(error)}`;
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message,
+      });
+      return createStopAppDeviceErrorResult(params, message);
+    }
+  };
 }
 
 export const schema = getSessionAwareToolSchemaShape({

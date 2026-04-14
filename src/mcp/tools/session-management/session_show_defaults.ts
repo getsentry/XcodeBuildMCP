@@ -1,4 +1,11 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type {
+  SessionDefaultsDomainResult,
+  SessionDefaultsProfile,
+} from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import { header, section } from '../../../utils/tool-event-builders.ts';
 import {
@@ -12,18 +19,86 @@ import {
 } from './session-format-helpers.ts';
 
 const schemaObject = z.object({});
+type SessionShowDefaultsParams = z.infer<typeof schemaObject>;
+
+function createSessionDefaultsProfile(profile: Record<string, unknown>): SessionDefaultsProfile {
+  return {
+    projectPath: (profile.projectPath as string | undefined) ?? null,
+    workspacePath: (profile.workspacePath as string | undefined) ?? null,
+    scheme: (profile.scheme as string | undefined) ?? null,
+    configuration: (profile.configuration as string | undefined) ?? null,
+    simulatorName: (profile.simulatorName as string | undefined) ?? null,
+    simulatorId: (profile.simulatorId as string | undefined) ?? null,
+    simulatorPlatform:
+      (profile.simulatorPlatform as SessionDefaultsProfile['simulatorPlatform'] | undefined) ??
+      null,
+    deviceId: (profile.deviceId as string | undefined) ?? null,
+    useLatestOS: (profile.useLatestOS as boolean | undefined) ?? null,
+    arch: (profile.arch as SessionDefaultsProfile['arch'] | undefined) ?? null,
+    suppressWarnings: (profile.suppressWarnings as boolean | undefined) ?? null,
+    derivedDataPath: (profile.derivedDataPath as string | undefined) ?? null,
+    preferXcodebuild: (profile.preferXcodebuild as boolean | undefined) ?? null,
+    platform: (profile.platform as string | undefined) ?? null,
+    bundleId: (profile.bundleId as string | undefined) ?? null,
+    env: (profile.env as Record<string, string> | undefined) ?? null,
+  };
+}
+
+function createSessionDefaultsResult(): SessionDefaultsDomainResult {
+  const profiles: SessionDefaultsDomainResult['profiles'] = {
+    '(default)': createSessionDefaultsProfile(sessionStore.getAllForProfile(null)),
+  };
+
+  for (const profile of sessionStore.listProfiles()) {
+    profiles[profile] = createSessionDefaultsProfile(sessionStore.getAllForProfile(profile));
+  }
+
+  return {
+    kind: 'session-defaults',
+    didError: false,
+    error: null,
+    currentProfile: formatProfileLabel(sessionStore.getActiveProfile()),
+    profiles,
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDomainResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.session-defaults',
+    schemaVersion: '1',
+  };
+}
+
+export function createSessionShowDefaultsExecutor(): ToolExecutor<
+  SessionShowDefaultsParams,
+  SessionDefaultsDomainResult
+> {
+  return async (_params, ctx) => {
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: 'Reading session defaults',
+    });
+    return createSessionDefaultsResult();
+  };
+}
 
 export async function sessionShowDefaultsLogic(): Promise<void> {
   const ctx = getHandlerContext();
-  const namedProfiles = sessionStore.listProfiles();
-  const profileKeys: Array<string | null> = [null, ...namedProfiles];
+  const executionContext = new DefaultToolExecutionContext();
+  const executeSessionShowDefaults = createSessionShowDefaultsExecutor();
+  const result = await executeSessionShowDefaults({}, executionContext);
 
+  setStructuredOutput(ctx, result);
+  executionContext.emitResult(result);
   ctx.emit(header('Show Defaults'));
 
-  for (const profileKey of profileKeys) {
-    const defaults = sessionStore.getAllForProfile(profileKey);
-    const label = `\u{1F4C1} ${formatProfileLabel(profileKey)}`;
-    const items = buildFullDetailTree(defaults);
+  for (const [profileKey, defaults] of Object.entries(result.profiles)) {
+    const label = `\u{1F4C1} ${profileKey}`;
+    const items = buildFullDetailTree(
+      Object.fromEntries(Object.entries(defaults).filter(([, value]) => value !== null)),
+    );
     ctx.emit(section(label, formatDetailLines(items)));
   }
 }

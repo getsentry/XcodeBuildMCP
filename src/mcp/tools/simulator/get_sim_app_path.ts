@@ -7,12 +7,18 @@
  */
 
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { AppPathDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import {
+  DefaultToolExecutionContext,
+  getDefaultCommandExecutor,
+} from '../../../utils/execution/index.ts';
+import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { constructDestinationString } from '../../../utils/xcode.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -21,9 +27,7 @@ import {
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine, detailTree, section } from '../../../utils/tool-event-builders.ts';
-import type { PipelineEvent } from '../../../types/pipeline-events.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 const SIMULATOR_PLATFORMS = [
   XcodePlatform.iOSSimulator,
@@ -83,6 +87,166 @@ const getSimulatorAppPathSchema = z.preprocess(
 
 type GetSimulatorAppPathParams = z.infer<typeof getSimulatorAppPathSchema>;
 
+const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.app-path';
+
+function getErrorMessages(rawMessage: string): string[] {
+  const messages = extractQueryErrorMessages(rawMessage);
+  return messages.length > 0 ? messages : [rawMessage];
+}
+
+function createAppPathResult(appPath: string): AppPathDomainResult {
+  return {
+    kind: 'app-path',
+    didError: false,
+    error: null,
+    artifacts: { appPath },
+  };
+}
+
+function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
+  const messages = getErrorMessages(rawMessage);
+
+  return {
+    kind: 'app-path',
+    didError: true,
+    error: `Failed to get app path: ${messages[0]}`,
+    diagnostics: {
+      warnings: [],
+      errors: messages.map((message) => ({ message })),
+    },
+  };
+}
+
+function emitAppPathProgress(
+  ctx: Parameters<ToolExecutor<GetSimulatorAppPathParams, AppPathDomainResult>>[1],
+  headerParams: Array<{ label: string; value: string }>,
+): void {
+  ctx.emitProgress({
+    type: 'status',
+    level: 'info',
+    message: 'Get App Path',
+  });
+  ctx.emitProgress({
+    type: 'table',
+    name: 'Parameters',
+    columns: ['label', 'value'],
+    rows: headerParams.map((param) => ({
+      label: param.label,
+      value: param.value,
+    })),
+  });
+}
+
+function getAppPath(result: AppPathDomainResult): string | null {
+  if ('artifacts' in result && result.artifacts && 'appPath' in result.artifacts) {
+    return result.artifacts.appPath;
+  }
+
+  return null;
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: AppPathDomainResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: STRUCTURED_OUTPUT_SCHEMA,
+    schemaVersion: '1',
+  };
+}
+
+export function createGetSimAppPathExecutor(
+  executor: CommandExecutor,
+): ToolExecutor<GetSimulatorAppPathParams, AppPathDomainResult> {
+  return async (params, ctx) => {
+    const configuration = params.configuration ?? 'Debug';
+    const useLatestOS = params.useLatestOS ?? true;
+
+    if (params.simulatorId && params.useLatestOS !== undefined) {
+      log(
+        'warn',
+        `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
+      );
+    }
+
+    log('info', `Getting app path for scheme ${params.scheme} on platform ${params.platform}`);
+
+    const headerParams: Array<{ label: string; value: string }> = [
+      { label: 'Scheme', value: params.scheme },
+    ];
+    if (params.workspacePath) {
+      headerParams.push({ label: 'Workspace', value: params.workspacePath });
+    } else if (params.projectPath) {
+      headerParams.push({ label: 'Project', value: params.projectPath });
+    }
+    headerParams.push({ label: 'Configuration', value: configuration });
+    headerParams.push({ label: 'Platform', value: params.platform });
+    if (params.simulatorName) {
+      headerParams.push({ label: 'Simulator', value: params.simulatorName });
+    } else if (params.simulatorId) {
+      headerParams.push({ label: 'Simulator', value: params.simulatorId });
+    }
+
+    emitAppPathProgress(ctx, headerParams);
+
+    const startedAt = Date.now();
+
+    try {
+      const destination = params.simulatorId
+        ? constructDestinationString(params.platform, undefined, params.simulatorId)
+        : constructDestinationString(params.platform, params.simulatorName, undefined, useLatestOS);
+
+      const appPath = await resolveAppPathFromBuildSettings(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme,
+          configuration,
+          platform: params.platform,
+          destination,
+        },
+        executor,
+      );
+
+      const durationMs = Date.now() - startedAt;
+      const durationStr = (durationMs / 1000).toFixed(1);
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: `Get app path successful (⏱️ ${durationStr}s)`,
+      });
+      ctx.emitProgress({
+        type: 'artifact',
+        name: 'App Path',
+        path: appPath,
+      });
+
+      return createAppPathResult(appPath);
+    } catch (error) {
+      const messages = getErrorMessages(toErrorMessage(error));
+
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: `Errors (${messages.length}):`,
+      });
+      for (const message of messages) {
+        ctx.emitProgress({
+          type: 'status',
+          level: 'info',
+          message: `✗ ${message}`,
+        });
+      }
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: 'Failed to get app path',
+      });
+
+      return createAppPathErrorResult(toErrorMessage(error));
+    }
+  };
+}
+
 /**
  * Exported business logic function for getting app path
  */
@@ -90,103 +254,38 @@ export async function get_sim_app_pathLogic(
   params: GetSimulatorAppPathParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  const configuration = params.configuration ?? 'Debug';
-  const useLatestOS = params.useLatestOS ?? true;
-
-  if (params.simulatorId && params.useLatestOS !== undefined) {
-    log(
-      'warn',
-      `useLatestOS parameter is ignored when using simulatorId (UUID implies exact device/OS)`,
-    );
-  }
-
-  log('info', `Getting app path for scheme ${params.scheme} on platform ${params.platform}`);
-
-  const headerParams: Array<{ label: string; value: string }> = [
-    { label: 'Scheme', value: params.scheme },
-  ];
-  if (params.workspacePath) {
-    headerParams.push({ label: 'Workspace', value: params.workspacePath });
-  } else if (params.projectPath) {
-    headerParams.push({ label: 'Project', value: params.projectPath });
-  }
-  headerParams.push({ label: 'Configuration', value: configuration });
-  headerParams.push({ label: 'Platform', value: params.platform });
-  if (params.simulatorName) {
-    headerParams.push({ label: 'Simulator', value: params.simulatorName });
-  } else if (params.simulatorId) {
-    headerParams.push({ label: 'Simulator', value: params.simulatorId });
-  }
-
-  const headerEvent = header('Get App Path', headerParams);
-
-  function buildErrorEvents(rawOutput: string): PipelineEvent[] {
-    const messages = extractQueryErrorMessages(rawOutput);
-    return [
-      headerEvent,
-      section(`Errors (${messages.length}):`, [...messages.map((m) => `\u{2717} ${m}`), ''], {
-        blankLineAfterTitle: true,
-      }),
-      statusLine('error', 'Failed to get app path'),
-    ];
-  }
-
-  const startedAt = Date.now();
-
   const ctx = getHandlerContext();
+  const executionContext = new DefaultToolExecutionContext();
+  const executeGetSimAppPath = createGetSimAppPathExecutor(executor);
+  const result = await executeGetSimAppPath(params, executionContext);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const destination = params.simulatorId
-        ? constructDestinationString(params.platform, undefined, params.simulatorId)
-        : constructDestinationString(params.platform, params.simulatorName, undefined, useLatestOS);
+  setStructuredOutput(ctx, result);
 
-      let appPath: string;
-      try {
-        appPath = await resolveAppPathFromBuildSettings(
-          {
-            projectPath: params.projectPath,
-            workspacePath: params.workspacePath,
-            scheme: params.scheme,
-            configuration,
-            platform: params.platform,
-            destination,
-          },
-          executor,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        for (const event of buildErrorEvents(message)) {
-          ctx.emit(event);
-        }
-        return;
-      }
+  const adapter = new DomainResultPipelineEventAdapter();
+  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
+    ctx.emit(event);
+  }
+  for (const event of executionContext.emitResult(result)) {
+    ctx.emit(event);
+  }
 
-      const durationMs = Date.now() - startedAt;
-      const durationStr = (durationMs / 1000).toFixed(1);
+  if (result.didError) {
+    log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `Get app path successful (\u{23F1}\u{FE0F} ${durationStr}s)`));
-      ctx.emit(detailTree([{ label: 'App Path', value: displayPath(appPath) }]));
-      ctx.nextStepParams = {
-        get_app_bundle_id: { appPath },
-        boot_sim: { simulatorId: 'SIMULATOR_UUID' },
-        install_app_sim: { simulatorId: 'SIMULATOR_UUID', appPath },
-        launch_app_sim: { simulatorId: 'SIMULATOR_UUID', bundleId: 'BUNDLE_ID' },
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Error retrieving app path: ${message}`,
-      logMessage: ({ message }) => `Error retrieving app path: ${message}`,
-      mapError: ({ message, emit }) => {
-        for (const event of buildErrorEvents(message)) {
-          emit?.(event);
-        }
-      },
-    },
-  );
+  const appPath = getAppPath(result);
+  if (!appPath) {
+    log('error', 'Error retrieving app path: missing appPath artifact in successful result');
+    return;
+  }
+
+  ctx.nextStepParams = {
+    get_app_bundle_id: { appPath },
+    boot_sim: { simulatorId: 'SIMULATOR_UUID' },
+    install_app_sim: { simulatorId: 'SIMULATOR_UUID', appPath },
+    launch_app_sim: { simulatorId: 'SIMULATOR_UUID', bundleId: 'BUNDLE_ID' },
+  };
 }
 
 const publicSchemaObject = baseGetSimulatorAppPathSchema.omit({

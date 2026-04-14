@@ -1,11 +1,14 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { BundleIdDomainResult } from '../../../types/domain-results.ts';
+import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
+import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
   const result = await executor(['/bin/sh', '-c', command], 'macOS Bundle ID Extraction');
@@ -20,32 +23,76 @@ const getMacBundleIdSchema = z.object({
 });
 
 type GetMacBundleIdParams = z.infer<typeof getMacBundleIdSchema>;
+type GetMacBundleIdResult = BundleIdDomainResult;
 
-export async function get_mac_bundle_idLogic(
-  params: GetMacBundleIdParams,
+function createPipelineCompatExecutionContext(
+  ctx: ToolHandlerContext,
+): DefaultToolExecutionContext {
+  return new DefaultToolExecutionContext({
+    renderSession: {
+      emit: ctx.emit,
+      attach: () => {},
+      getEvents: () => [],
+      getAttachments: () => [],
+      isError: () => false,
+      finalize: () => '',
+    },
+  });
+}
+
+function createBundleIdResult(
+  appPath: string,
+  bundleId?: string,
+  error?: string,
+): GetMacBundleIdResult {
+  return {
+    kind: 'bundle-id',
+    didError: typeof error === 'string',
+    error: error ?? null,
+    artifacts: {
+      appPath,
+      ...(bundleId ? { bundleId } : {}),
+    },
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: GetMacBundleIdResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.bundle-id',
+    schemaVersion: '1',
+  };
+}
+
+export function createGetMacBundleIdExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
-): Promise<void> {
-  const appPath = params.appPath;
-  const headerEvent = header('Get macOS Bundle ID', [{ label: 'App', value: appPath }]);
+): ToolExecutor<GetMacBundleIdParams, GetMacBundleIdResult> {
+  return async (params, ctx) => {
+    const appPath = params.appPath;
 
-  if (!fileSystemExecutor.existsSync(appPath)) {
-    const ctx = getHandlerContext();
-    ctx.emit(headerEvent);
-    ctx.emit(
-      statusLine('error', `File not found: '${appPath}'. Please check the path and try again.`),
-    );
-    return;
-  }
+    if (!fileSystemExecutor.existsSync(appPath)) {
+      const result = createBundleIdResult(
+        appPath,
+        undefined,
+        `File not found: '${appPath}'. Please check the path and try again.`,
+      );
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: result.error ?? 'Bundle ID extraction failed',
+      });
+      return result;
+    }
 
-  log('info', `Starting bundle ID extraction for macOS app: ${appPath}`);
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: `Reading bundle identifier from ${appPath}`,
+    });
 
-  const ctx = getHandlerContext();
-
-  return withErrorHandling(
-    ctx,
-    async () => {
-      let bundleId;
+    try {
+      let bundleId: string;
 
       try {
         bundleId = await executeSyncCommand(
@@ -65,31 +112,62 @@ export async function get_mac_bundle_idLogic(
         }
       }
 
-      log('info', `Extracted macOS bundle ID: ${bundleId}`);
+      const trimmedBundleId = bundleId.trim();
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: `Bundle ID\n  \u2514 ${trimmedBundleId}`,
+      });
+      return createBundleIdResult(appPath, trimmedBundleId);
+    } catch (error) {
+      const result = createBundleIdResult(appPath, undefined, toErrorMessage(error));
+      ctx.emitProgress({
+        type: 'status',
+        level: 'error',
+        message: result.error ?? 'Bundle ID extraction failed',
+      });
+      ctx.emitProgress({
+        type: 'status',
+        level: 'info',
+        message: 'Make sure the path points to a valid macOS app bundle (.app directory).',
+      });
+      return result;
+    }
+  };
+}
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `Bundle ID\n  \u2514 ${bundleId.trim()}`));
-      ctx.nextStepParams = {
-        launch_mac_app: { appPath },
-        build_macos: { scheme: 'SCHEME_NAME' },
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => message,
-      logMessage: ({ message }) => `Error extracting macOS bundle ID: ${message}`,
-      mapError: ({ message, headerEvent: hdr, emit }) => {
-        emit?.(hdr);
-        emit?.(statusLine('error', message));
-        emit?.(
-          statusLine(
-            'info',
-            'Make sure the path points to a valid macOS app bundle (.app directory).',
-          ),
-        );
-      },
-    },
-  );
+export async function get_mac_bundle_idLogic(
+  params: GetMacBundleIdParams,
+  executor: CommandExecutor,
+  fileSystemExecutor: FileSystemExecutor,
+): Promise<void> {
+  const appPath = params.appPath;
+  log('info', `Starting bundle ID extraction for macOS app: ${appPath}`);
+
+  const ctx = getHandlerContext();
+  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executeGetMacBundleId = createGetMacBundleIdExecutor(executor, fileSystemExecutor);
+  const result = await executeGetMacBundleId(params, executionContext);
+
+  setStructuredOutput(ctx, result);
+
+  if (result.didError) {
+    log('error', `Error extracting macOS bundle ID: ${result.error ?? 'Unknown error'}`);
+  } else if (result.artifacts.bundleId) {
+    log('info', `Extracted macOS bundle ID: ${result.artifacts.bundleId}`);
+  }
+
+  const events = executionContext.emitResult(result);
+  for (const event of events) {
+    ctx.emit(event);
+  }
+
+  if (!result.didError && result.artifacts.bundleId) {
+    ctx.nextStepParams = {
+      launch_mac_app: { appPath },
+      build_macos: { scheme: 'SCHEME_NAME' },
+    };
+  }
 }
 
 export const schema = getMacBundleIdSchema.shape;
