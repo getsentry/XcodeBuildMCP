@@ -1,14 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PipelineEvent } from '../../types/pipeline-events.ts';
-import { renderEvents } from '../render.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { StructuredToolOutput } from '../types.ts';
+import { renderTranscript } from '../render.ts';
 import { createCliTextRenderer } from '../../utils/renderers/cli-text-renderer.ts';
+import type { NextStep } from '../../types/common.ts';
 
-function captureCliText(events: readonly PipelineEvent[]): string {
+interface TranscriptFixture {
+  progressEvents: ProgressEvent[];
+  structuredOutput?: StructuredToolOutput;
+  nextSteps?: NextStep[];
+  nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
+}
+
+function captureCliText(fixture: TranscriptFixture): string {
   const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   const renderer = createCliTextRenderer({ interactive: false });
 
-  for (const event of events) {
-    renderer.onEvent(event);
+  for (const event of fixture.progressEvents) {
+    renderer.onProgress(event);
+  }
+  if (fixture.structuredOutput) {
+    renderer.setStructuredOutput(fixture.structuredOutput);
+  }
+  if (fixture.nextSteps) {
+    renderer.setNextSteps(fixture.nextSteps, fixture.nextStepsRuntime ?? 'cli');
   }
   renderer.finalize();
 
@@ -21,150 +36,206 @@ describe('text render parity', () => {
   });
 
   it('matches non-interactive cli text for discovery and summary output', () => {
-    const events: PipelineEvent[] = [
-      {
-        type: 'header',
-        timestamp: '2026-04-10T22:50:00.000Z',
-        operation: 'Test',
-        params: [
-          { label: 'Scheme', value: 'CalculatorApp' },
-          { label: 'Configuration', value: 'Debug' },
-          { label: 'Platform', value: 'iOS Simulator' },
-        ],
+    const fixture: TranscriptFixture = {
+      progressEvents: [
+        {
+          type: 'header',
+          operation: 'Test',
+          params: [
+            { label: 'Scheme', value: 'CalculatorApp' },
+            { label: 'Configuration', value: 'Debug' },
+            { label: 'Platform', value: 'iOS Simulator' },
+          ],
+        },
+        {
+          type: 'test-discovery',
+          operation: 'TEST',
+          total: 1,
+          tests: ['CalculatorAppTests/CalculatorAppTests/testAddition'],
+          truncated: false,
+        },
+      ],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'test-result',
+          didError: false,
+          error: null,
+          summary: {
+            status: 'SUCCEEDED',
+            durationMs: 1500,
+            counts: { passed: 1, failed: 0, skipped: 0 },
+          },
+          artifacts: { deviceId: 'SIMULATOR-1' },
+          diagnostics: { warnings: [], errors: [], testFailures: [] },
+        },
       },
-      {
-        type: 'test-discovery',
-        timestamp: '2026-04-10T22:50:01.000Z',
-        operation: 'TEST',
-        total: 1,
-        tests: ['CalculatorAppTests/CalculatorAppTests/testAddition'],
-        truncated: false,
-      },
-      {
-        type: 'summary',
-        timestamp: '2026-04-10T22:50:02.000Z',
-        operation: 'TEST',
-        status: 'SUCCEEDED',
-        totalTests: 1,
-        passedTests: 1,
-        skippedTests: 0,
-        durationMs: 1500,
-      },
-    ];
+    };
 
-    expect(renderEvents(events, 'text')).toBe(captureCliText(events));
+    expect(
+      renderTranscript(
+        {
+          items: fixture.progressEvents,
+          structuredOutput: fixture.structuredOutput,
+          nextSteps: fixture.nextSteps,
+          nextStepsRuntime: fixture.nextStepsRuntime,
+        },
+        'text',
+      ),
+    ).toBe(captureCliText(fixture));
   });
 
   it('matches non-interactive cli text for failure diagnostics and summary spacing', () => {
-    const events: PipelineEvent[] = [
-      {
-        type: 'header',
-        timestamp: '2026-04-10T22:50:00.000Z',
-        operation: 'Test',
-        params: [
-          { label: 'Scheme', value: 'MCPTest' },
-          { label: 'Configuration', value: 'Debug' },
-          { label: 'Platform', value: 'macOS' },
-        ],
+    const fixture: TranscriptFixture = {
+      progressEvents: [
+        {
+          type: 'header',
+          operation: 'Test',
+          params: [
+            { label: 'Scheme', value: 'MCPTest' },
+            { label: 'Configuration', value: 'Debug' },
+            { label: 'Platform', value: 'macOS' },
+          ],
+        },
+        {
+          type: 'test-discovery',
+          operation: 'TEST',
+          total: 2,
+          tests: [
+            'MCPTestTests/MCPTestTests/appNameIsCorrect',
+            'MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
+          ],
+          truncated: false,
+        },
+        {
+          type: 'test-failure',
+          operation: 'TEST',
+          suite: 'MCPTestsXCTests',
+          test: 'testDeliberateFailure()',
+          message: 'XCTAssertTrue failed',
+          location: 'MCPTestsXCTests.swift:11',
+        },
+      ],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'test-result',
+          didError: true,
+          error: null,
+          summary: {
+            status: 'FAILED',
+            durationMs: 2200,
+            counts: { passed: 1, failed: 1, skipped: 0 },
+          },
+          artifacts: { deviceId: 'MAC-1' },
+          diagnostics: { warnings: [], errors: [], testFailures: [] },
+        },
       },
-      {
-        type: 'test-discovery',
-        timestamp: '2026-04-10T22:50:01.000Z',
-        operation: 'TEST',
-        total: 2,
-        tests: [
-          'MCPTestTests/MCPTestTests/appNameIsCorrect',
-          'MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
-        ],
-        truncated: false,
-      },
-      {
-        type: 'test-failure',
-        timestamp: '2026-04-10T22:50:02.000Z',
-        operation: 'TEST',
-        suite: 'MCPTestsXCTests',
-        test: 'testDeliberateFailure()',
-        message: 'XCTAssertTrue failed',
-        location: 'MCPTestsXCTests.swift:11',
-      },
-      {
-        type: 'summary',
-        timestamp: '2026-04-10T22:50:03.000Z',
-        operation: 'TEST',
-        status: 'FAILED',
-        totalTests: 2,
-        passedTests: 1,
-        failedTests: 1,
-        skippedTests: 0,
-        durationMs: 2200,
-      },
-    ];
+    };
 
-    expect(renderEvents(events, 'text')).toBe(captureCliText(events));
+    expect(
+      renderTranscript(
+        {
+          items: fixture.progressEvents,
+          structuredOutput: fixture.structuredOutput,
+          nextSteps: fixture.nextSteps,
+          nextStepsRuntime: fixture.nextStepsRuntime,
+        },
+        'text',
+      ),
+    ).toBe(captureCliText(fixture));
   });
 
   it('renders next steps in MCP tool-call syntax for MCP runtime text transcripts', () => {
-    const events: PipelineEvent[] = [
-      {
-        type: 'summary',
-        timestamp: '2026-04-10T22:50:05.000Z',
-        operation: 'BUILD',
-        status: 'SUCCEEDED',
-        durationMs: 7100,
-      },
-      {
-        type: 'next-steps',
-        timestamp: '2026-04-10T22:50:06.000Z',
-        runtime: 'mcp',
-        steps: [
-          {
-            label: 'Get built macOS app path',
-            tool: 'get_mac_app_path',
-            cliTool: 'get-app-path',
-            workflow: 'macos',
-            params: {
-              scheme: 'MCPTest',
-            },
+    const fixture: TranscriptFixture = {
+      progressEvents: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-result',
+          didError: false,
+          error: null,
+          summary: {
+            status: 'SUCCEEDED',
+            durationMs: 7100,
           },
-        ],
+          artifacts: { scheme: 'MCPTest' },
+          diagnostics: { warnings: [], errors: [] },
+        },
       },
-    ];
+      nextStepsRuntime: 'mcp',
+      nextSteps: [
+        {
+          label: 'Get built macOS app path',
+          tool: 'get_mac_app_path',
+          cliTool: 'get-app-path',
+          workflow: 'macos',
+          params: {
+            scheme: 'MCPTest',
+          },
+        },
+      ],
+    };
 
-    const output = renderEvents(events, 'text');
-    expect(output).toBe(captureCliText(events));
+    const output = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+        nextSteps: fixture.nextSteps,
+        nextStepsRuntime: fixture.nextStepsRuntime,
+      },
+      'text',
+    );
+    expect(output).toBe(captureCliText(fixture));
     expect(output).toContain('get_mac_app_path({ scheme: "MCPTest" })');
     expect(output).not.toContain('xcodebuildmcp macos get-app-path');
   });
 
   it('renders next steps in CLI syntax for CLI runtime text transcripts', () => {
-    const events: PipelineEvent[] = [
-      {
-        type: 'summary',
-        timestamp: '2026-04-10T22:50:05.000Z',
-        operation: 'BUILD',
-        status: 'SUCCEEDED',
-        durationMs: 7100,
-      },
-      {
-        type: 'next-steps',
-        timestamp: '2026-04-10T22:50:06.000Z',
-        runtime: 'cli',
-        steps: [
-          {
-            label: 'Get built macOS app path',
-            tool: 'get_mac_app_path',
-            cliTool: 'get-app-path',
-            workflow: 'macos',
-            params: {
-              scheme: 'MCPTest',
-            },
+    const fixture: TranscriptFixture = {
+      progressEvents: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-result',
+          didError: false,
+          error: null,
+          summary: {
+            status: 'SUCCEEDED',
+            durationMs: 7100,
           },
-        ],
+          artifacts: { scheme: 'MCPTest' },
+          diagnostics: { warnings: [], errors: [] },
+        },
       },
-    ];
+      nextStepsRuntime: 'cli',
+      nextSteps: [
+        {
+          label: 'Get built macOS app path',
+          tool: 'get_mac_app_path',
+          cliTool: 'get-app-path',
+          workflow: 'macos',
+          params: {
+            scheme: 'MCPTest',
+          },
+        },
+      ],
+    };
 
-    const output = renderEvents(events, 'text');
-    expect(output).toBe(captureCliText(events));
+    const output = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+        nextSteps: fixture.nextSteps,
+        nextStepsRuntime: fixture.nextStepsRuntime,
+      },
+      'text',
+    );
+    expect(output).toBe(captureCliText(fixture));
     expect(output).toContain('xcodebuildmcp macos get-app-path --scheme "MCPTest"');
     expect(output).not.toContain('get_mac_app_path({');
   });

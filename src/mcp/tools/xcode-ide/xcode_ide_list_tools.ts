@@ -33,7 +33,9 @@ export async function xcodeIdeListToolsLogic(params: Params): Promise<void> {
   log('info', 'Starting Xcode IDE bridge tool listing request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext();
+  const executionContext = new BridgeToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeListTools = createXcodeIdeListToolsExecutor();
   const result = await executeListTools(params, executionContext);
 

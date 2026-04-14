@@ -3,12 +3,11 @@ import type {
   BuildRunStepNoticeData,
   NoticeCode,
   NoticeLevel,
-  PipelineEvent,
+  ProgressEvent,
   XcodebuildOperation,
-} from '../types/pipeline-events.ts';
+} from '../types/progress-events.ts';
 import type { PipelineResult, StartedPipeline } from './xcodebuild-pipeline.ts';
 import { displayPath } from './build-preflight.ts';
-import { statusLine } from './tool-event-builders.ts';
 
 export type ErrorFallbackPolicy = 'always' | 'if-no-structured-diagnostics';
 
@@ -17,21 +16,17 @@ interface FinalizeInlineXcodebuildOptions {
   succeeded: boolean;
   durationMs: number;
   responseContent?: Array<{ type: 'text'; text: string }>;
-  emit?: (event: PipelineEvent) => void;
-  emitSummary?: boolean;
-  tailEvents?: PipelineEvent[];
+  emit?: (event: ProgressEvent) => void;
   errorFallbackPolicy?: ErrorFallbackPolicy;
-  includeBuildLogFileRef?: boolean;
   includeParserDebugFileRef?: boolean;
 }
 
 function createStructuredErrorEvent(
   operation: XcodebuildOperation,
   message: string,
-): PipelineEvent {
+): ProgressEvent {
   return {
     type: 'compiler-error',
-    timestamp: new Date().toISOString(),
     operation,
     message,
     rawLine: message,
@@ -77,13 +72,12 @@ export function createNoticeEvent(
       | BuildRunStepNoticeData
       | BuildRunResultNoticeData;
   } = {},
-): PipelineEvent {
+): ProgressEvent {
   if (options.code === 'build-run-step' && options.data && typeof options.data === 'object') {
     const data = options.data as BuildRunStepNoticeData;
     const stepLabel = formatBuildRunStepLabel(data.step);
     return {
-      type: 'status-line',
-      timestamp: new Date().toISOString(),
+      type: 'status',
       level: data.status === 'succeeded' ? 'success' : 'info',
       message: stepLabel,
     };
@@ -92,19 +86,17 @@ export function createNoticeEvent(
   const statusLevel = level === 'success' || level === 'warning' ? level : 'info';
 
   return {
-    type: 'status-line',
-    timestamp: new Date().toISOString(),
+    type: 'status',
     level: statusLevel,
     message,
   };
 }
 
-export function createBuildRunResultEvents(data: BuildRunResultNoticeData): PipelineEvent[] {
-  const events: PipelineEvent[] = [];
+export function createBuildRunResultEvents(data: BuildRunResultNoticeData): ProgressEvent[] {
+  const events: ProgressEvent[] = [];
 
   events.push({
-    type: 'status-line',
-    timestamp: new Date().toISOString(),
+    type: 'status',
     level: 'success',
     message: 'Build & Run complete',
   });
@@ -143,7 +135,6 @@ export function createBuildRunResultEvents(data: BuildRunResultNoticeData): Pipe
 
   events.push({
     type: 'detail-tree',
-    timestamp: new Date().toISOString(),
     items,
   });
 
@@ -194,9 +185,6 @@ export function isPendingXcodebuildResponse(response: {
 
 export function finalizeInlineXcodebuild(options: FinalizeInlineXcodebuildOptions): PipelineResult {
   const pipelineResult = options.started.pipeline.finalize(options.succeeded, options.durationMs, {
-    emitSummary: options.emitSummary,
-    tailEvents: options.tailEvents,
-    includeBuildLogFileRef: options.includeBuildLogFileRef,
     includeParserDebugFileRef: options.includeParserDebugFileRef ?? false,
   });
 
@@ -213,13 +201,12 @@ export function finalizeInlineXcodebuild(options: FinalizeInlineXcodebuildOption
     return pipelineResult;
   }
 
-  const fallbackEvents = fallbackContent.map((item) => statusLine('error', item.text));
+  const fallbackEvents = fallbackContent.map(
+    (item): ProgressEvent => ({ type: 'status', level: 'error', message: item.text }),
+  );
   for (const event of fallbackEvents) {
     options.emit?.(event);
   }
 
-  return {
-    ...pipelineResult,
-    events: [...pipelineResult.events, ...fallbackEvents],
-  };
+  return pipelineResult;
 }

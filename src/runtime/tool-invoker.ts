@@ -1,7 +1,7 @@
 import type { ToolCatalog, ToolDefinition, ToolInvoker, InvokeOptions } from './types.ts';
 import type { NextStep, NextStepParams, NextStepParamsMap } from '../types/common.ts';
 import type { DaemonToolResult, ToolInvokeResult } from '../daemon/protocol.ts';
-import { statusLine } from '../utils/tool-event-builders.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 import { DaemonClient, DaemonVersionMismatchError } from '../cli/daemon-client.ts';
 import {
   ensureDaemonRunning,
@@ -18,12 +18,22 @@ import {
 } from '../utils/sentry.ts';
 import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
-import { DomainResultPipelineEventAdapter } from '../utils/domain-result-adapter.ts';
 
 type BuiltTemplateNextStep = {
   step: NextStep;
   templateToolId?: string;
 };
+
+function createStatusEvent(
+  level: Extract<ProgressEvent, { type: 'status' }>['level'],
+  message: string,
+): Extract<ProgressEvent, { type: 'status' }> {
+  return {
+    type: 'status',
+    level,
+    message,
+  };
+}
 
 function buildTemplateNextSteps(
   tool: ToolDefinition,
@@ -137,14 +147,16 @@ function normalizeNextSteps(steps: NextStep[], catalog: ToolCatalog): NextStep[]
 }
 
 function isStructuredXcodebuildFailureSession(session: RenderSession): boolean {
-  const events = session.getEvents();
+  const structuredOutput = session.getStructuredOutput?.();
+  if (!structuredOutput?.result.didError) {
+    return false;
+  }
 
-  const hasFailedSummary = events.some(
-    (event) => event.type === 'summary' && event.status === 'FAILED',
+  return (
+    structuredOutput.result.kind === 'build-result' ||
+    structuredOutput.result.kind === 'build-run-result' ||
+    structuredOutput.result.kind === 'test-result'
   );
-  const hasHeader = events.some((event) => event.type === 'header');
-
-  return hasFailedSummary && hasHeader;
 }
 
 function buildEffectiveNextStepParams(
@@ -220,12 +232,7 @@ export function postProcessSession(params: {
   const normalized = normalizeNextSteps(finalSteps, catalog);
 
   if (normalized.length > 0) {
-    session.emit({
-      type: 'next-steps',
-      timestamp: new Date().toISOString(),
-      steps: normalized,
-      runtime,
-    });
+    session.setNextSteps?.(normalized, runtime);
   }
 }
 
@@ -261,7 +268,7 @@ export class DefaultToolInvoker implements ToolInvoker {
 
     if (resolved.ambiguous) {
       session.emit(
-        statusLine(
+        createStatusEvent(
           'error',
           `Ambiguous tool name: Multiple tools match '${toolName}'. Use one of:\n- ${resolved.ambiguous.join('\n- ')}`,
         ),
@@ -271,7 +278,7 @@ export class DefaultToolInvoker implements ToolInvoker {
 
     if (resolved.notFound || !resolved.tool) {
       session.emit(
-        statusLine(
+        createStatusEvent(
           'error',
           `Tool not found: Unknown tool '${toolName}'. Run 'xcodebuildmcp tools' to see available tools.`,
         ),
@@ -314,7 +321,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
       session.emit(
-        statusLine(
+        createStatusEvent(
           'error',
           'Socket path required: No socket path configured for daemon communication.',
         ),
@@ -342,7 +349,7 @@ export class DefaultToolInvoker implements ToolInvoker {
         context.captureInfraErrorMetric(error);
         context.captureInvocationMetric('infra_error');
         session.emit(
-          statusLine(
+          createStatusEvent(
             'error',
             `Daemon auto-start failed: ${error instanceof Error ? error.message : String(error)}\n\nYou can try starting the daemon manually:\n  xcodebuildmcp daemon start`,
           ),
@@ -380,7 +387,7 @@ export class DefaultToolInvoker implements ToolInvoker {
           context.captureInfraErrorMetric(retryError);
           context.captureInvocationMetric('infra_error');
           session.emit(
-            statusLine(
+            createStatusEvent(
               'error',
               `Daemon restart failed after protocol mismatch: ${retryError instanceof Error ? retryError.message : String(retryError)}\n\nTry restarting manually:\n  xcodebuildmcp daemon stop && xcodebuildmcp daemon start`,
             ),
@@ -397,7 +404,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
       session.emit(
-        statusLine(
+        createStatusEvent(
           'error',
           `${context.errorTitle}: ${error instanceof Error ? error.message : String(error)}`,
         ),
@@ -448,13 +455,16 @@ export class DefaultToolInvoker implements ToolInvoker {
           captureInfraErrorMetric,
           captureInvocationMetric,
           consumeResult: (daemonResult: DaemonToolResult) => {
-            for (const event of daemonResult.events) {
+            for (const event of daemonResult.progress ?? []) {
               opts.renderSession!.emit(event);
             }
 
             const ctx: ToolHandlerContext = {
-              emit: (event) => opts.renderSession!.emit(event),
+              emit: (event) => {
+                opts.renderSession!.emit(event);
+              },
               attach: (image) => opts.renderSession!.attach(image),
+              emitProgress: (event) => opts.renderSession!.emit(event),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
             };
@@ -472,8 +482,6 @@ export class DefaultToolInvoker implements ToolInvoker {
 
     if (opts.runtime === 'cli' && tool.stateful) {
       const session = opts.renderSession!;
-      const pipelineAdapter =
-        opts.onProgress === undefined ? new DomainResultPipelineEventAdapter() : undefined;
 
       transport = 'daemon';
       return this.invokeViaDaemon(
@@ -485,10 +493,7 @@ export class DefaultToolInvoker implements ToolInvoker {
                 opts.onProgress(event);
                 return;
               }
-
-              for (const pipelineEvent of pipelineAdapter?.adaptProgressEvent(event) ?? []) {
-                session.emit(pipelineEvent);
-              }
+              session.emit(event);
             },
           }),
         {
@@ -498,24 +503,16 @@ export class DefaultToolInvoker implements ToolInvoker {
           captureInvocationMetric,
           consumeResult: (daemonResult: ToolInvokeResult) => {
             if (daemonResult.structuredOutput) {
+              session.setStructuredOutput?.(daemonResult.structuredOutput);
               opts.onStructuredOutput?.(daemonResult.structuredOutput);
             }
 
-            if (daemonResult.events && daemonResult.events.length > 0) {
-              for (const event of daemonResult.events) {
-                session.emit(event);
-              }
-            } else if (daemonResult.structuredOutput) {
-              for (const pipelineEvent of pipelineAdapter?.adaptResult(
-                daemonResult.structuredOutput.result,
-              ) ?? []) {
-                session.emit(pipelineEvent);
-              }
-            }
-
             const ctx: ToolHandlerContext = {
-              emit: (event) => session.emit(event),
+              emit: (event) => {
+                session.emit(event);
+              },
               attach: (image) => session.attach(image),
+              emitProgress: (event) => session.emit(event),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
               structuredOutput: daemonResult.structuredOutput ?? undefined,
@@ -538,19 +535,21 @@ export class DefaultToolInvoker implements ToolInvoker {
       const ctx: ToolHandlerContext = opts.handlerContext ?? {
         emit: (event) => {
           session.emit(event);
+          opts.onProgress?.(event);
         },
         attach: (image) => {
           session.attach(image);
         },
       };
 
-      if (opts.onProgress) {
-        ctx.emitProgress = opts.onProgress;
+      if (!ctx.emitProgress) {
+        ctx.emitProgress = ctx.emit;
       }
 
       await tool.handler(args, ctx);
 
       if (ctx.structuredOutput) {
+        session.setStructuredOutput?.(ctx.structuredOutput);
         opts.onStructuredOutput?.(ctx.structuredOutput);
       }
 
@@ -575,7 +574,7 @@ export class DefaultToolInvoker implements ToolInvoker {
         throw error instanceof Error ? error : new Error(String(error));
       }
       const message = error instanceof Error ? error.message : String(error);
-      session.emit(statusLine('error', `Tool execution failed: ${message}`));
+      session.emit(createStatusEvent('error', `Tool execution failed: ${message}`));
     }
   }
 }

@@ -208,7 +208,9 @@ export async function list_simsLogic(
   log('info', 'Starting xcrun simctl list devices request');
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeListSims = createListSimsExecutor(executor);
   const result = await executeListSims(params, executionContext);
 
@@ -218,10 +220,7 @@ export async function list_simsLogic(
     log('error', `Error listing simulators: ${result.error ?? 'Unknown error'}`);
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = { ...NEXT_STEP_PARAMS };

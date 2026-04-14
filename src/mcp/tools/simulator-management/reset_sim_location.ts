@@ -124,7 +124,9 @@ export async function reset_sim_locationLogic(
   const headerEvent = header('Reset Location', [{ label: 'Simulator', value: params.simulatorId }]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeResetSimulatorLocation = createResetSimulatorLocationExecutor(executor);
 
   ctx.emit(headerEvent);

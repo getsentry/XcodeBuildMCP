@@ -23,7 +23,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { inferPlatform, type InferPlatformResult } from '../../../utils/infer-platform.ts';
 import {
   createBuildDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
@@ -226,7 +226,7 @@ export async function build_simLogic(
 
   ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Build'));
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildSim = createBuildSimExecutor(executor, prepared);
   const result = await executeBuildSim(params, executionContext);
 

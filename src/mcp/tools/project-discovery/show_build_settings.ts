@@ -66,18 +66,9 @@ function parseBuildSettingsEntries(output: string): Array<{ key: string; value: 
     });
 }
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -204,7 +195,7 @@ export async function showBuildSettingsLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
   const result = await executeShowBuildSettings(params, executionContext);
 
@@ -214,10 +205,7 @@ export async function showBuildSettingsLogic(
     log('error', `Error showing build settings: ${result.error ?? 'Unknown error'}`);
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (!result.didError) {
     const pathKey = hasProjectPath ? 'projectPath' : 'workspacePath';

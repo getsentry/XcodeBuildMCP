@@ -93,18 +93,9 @@ interface DeviceDiscoveryOutcome {
   xctraceOutput?: string;
 }
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -394,7 +385,7 @@ export async function list_devicesLogic(
   log('info', 'Starting device discovery');
 
   const ctx = getHandlerContext();
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeListDevices = createListDevicesExecutor(executor, pathDeps, fsDeps);
   const result = await executeListDevices({}, executionContext);
 
@@ -404,10 +395,7 @@ export async function list_devicesLogic(
     log('error', `Error listing devices: ${result.error ?? 'Unknown error'}`);
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = { ...NEXT_STEP_PARAMS };

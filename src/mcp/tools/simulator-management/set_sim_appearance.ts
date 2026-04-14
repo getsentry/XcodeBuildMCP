@@ -133,7 +133,9 @@ export async function set_sim_appearanceLogic(
   ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSetSimAppearance = createSetSimAppearanceExecutor(executor);
 
   ctx.emit(headerEvent);

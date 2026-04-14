@@ -3,7 +3,6 @@ import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { getProcess, terminateTrackedProcess, type ProcessInfo } from './active-processes.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import {
   createTypedToolWithContext,
@@ -49,20 +48,14 @@ export async function swift_package_stopLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeSwiftPackageStop = createSwiftPackageStopExecutor(processManager, timeout);
   const result = await executeSwiftPackageStop(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.stop-result';

@@ -19,7 +19,6 @@ describe('event formatting', () => {
     expect(
       formatHeaderEvent({
         type: 'header',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'Build & Run',
         params: [{ label: 'Scheme', value: 'MyApp' }],
       }),
@@ -30,7 +29,6 @@ describe('event formatting', () => {
     expect(
       formatHeaderEvent({
         type: 'header',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'Test',
         params: [
           { label: 'Scheme', value: 'MyApp' },
@@ -57,7 +55,6 @@ describe('event formatting', () => {
     expect(
       formatBuildStageEvent({
         type: 'build-stage',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'BUILD',
         stage: 'COMPILING',
         message: 'Compiling',
@@ -69,7 +66,6 @@ describe('event formatting', () => {
     expect(
       formatTransientBuildStageEvent({
         type: 'build-stage',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'BUILD',
         stage: 'COMPILING',
         message: 'Compiling',
@@ -84,7 +80,6 @@ describe('event formatting', () => {
       formatHumanCompilerErrorEvent(
         {
           type: 'compiler-error',
-          timestamp: '2026-03-20T12:00:00.000Z',
           operation: 'BUILD',
           message: 'unterminated string literal',
           rawLine: 'ContentView.swift:16:18: error: unterminated string literal',
@@ -103,7 +98,6 @@ describe('event formatting', () => {
     expect(
       formatHumanCompilerErrorEvent({
         type: 'compiler-error',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'BUILD',
         message: 'unterminated string literal',
         rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
@@ -117,7 +111,6 @@ describe('event formatting', () => {
     expect(
       formatHumanCompilerErrorEvent({
         type: 'compiler-error',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'BUILD',
         message: 'No available simulator matched: INVALID-SIM-ID-123',
         rawLine: 'No available simulator matched: INVALID-SIM-ID-123',
@@ -130,7 +123,6 @@ describe('event formatting', () => {
       extractGroupedCompilerError(
         {
           type: 'compiler-error',
-          timestamp: '2026-03-20T12:00:00.000Z',
           operation: 'BUILD',
           message: 'unterminated string literal',
           rawLine: 'ContentView.swift:16:18: error: unterminated string literal',
@@ -149,7 +141,6 @@ describe('event formatting', () => {
         [
           {
             type: 'compiler-error',
-            timestamp: '2026-03-20T12:00:00.000Z',
             operation: 'BUILD',
             message: 'unterminated string literal',
             rawLine: 'ContentView.swift:16:18: error: unterminated string literal',
@@ -172,7 +163,6 @@ describe('event formatting', () => {
     expect(
       formatHumanCompilerWarningEvent({
         type: 'compiler-warning',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'BUILD',
         message: 'Using cached build products',
         rawLine: 'Using cached build products',
@@ -180,11 +170,10 @@ describe('event formatting', () => {
     ).toBe('  \u{26A0} Using cached build products');
   });
 
-  it('formats status-line events with level emojis', () => {
+  it('formats status events with level emojis', () => {
     expect(
       formatStatusLineEvent({
-        type: 'status-line',
-        timestamp: '2026-03-20T12:00:00.000Z',
+        type: 'status',
         level: 'info',
         message: 'Resolving app path',
       }),
@@ -192,19 +181,17 @@ describe('event formatting', () => {
 
     expect(
       formatStatusLineEvent({
-        type: 'status-line',
-        timestamp: '2026-03-20T12:00:00.000Z',
+        type: 'status',
         level: 'success',
         message: 'Build & Run complete',
       }),
     ).toBe('\u{2705} Build & Run complete');
   });
 
-  it('formats transient status-line events for info level', () => {
+  it('formats transient status events for info level', () => {
     expect(
       formatTransientStatusLineEvent({
-        type: 'status-line',
-        timestamp: '2026-03-20T12:00:00.000Z',
+        type: 'status',
         level: 'info',
         message: 'Resolving app path',
       }),
@@ -212,8 +199,7 @@ describe('event formatting', () => {
 
     expect(
       formatTransientStatusLineEvent({
-        type: 'status-line',
-        timestamp: '2026-03-20T12:00:00.000Z',
+        type: 'status',
         level: 'success',
         message: 'App path resolved',
       }),
@@ -223,7 +209,6 @@ describe('event formatting', () => {
   it('formats detail-tree events as a tree section', () => {
     const rendered = formatDetailTreeEvent({
       type: 'detail-tree',
-      timestamp: '2026-03-20T12:00:00.000Z',
       items: [
         { label: 'App Path', value: '/tmp/build/MyApp.app' },
         { label: 'Bundle ID', value: 'com.example.myapp' },
@@ -244,7 +229,6 @@ describe('event formatting', () => {
     expect(
       formatDetailTreeEvent({
         type: 'detail-tree',
-        timestamp: '2026-03-20T12:00:00.000Z',
         items: [{ label: 'App Path', value: '/tmp/build/MyApp.app' }],
       }),
     ).toBe('  \u2514 App Path: /tmp/build/MyApp.app');
@@ -254,7 +238,6 @@ describe('event formatting', () => {
     const rendered = formatGroupedTestFailures([
       {
         type: 'test-failure',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'TEST',
         suite: 'MathTests',
         test: 'testAdd',
@@ -263,7 +246,6 @@ describe('event formatting', () => {
       },
       {
         type: 'test-failure',
-        timestamp: '2026-03-20T12:00:01.000Z',
         operation: 'TEST',
         suite: 'MathTests',
         test: 'testAdd',

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   listSimulatorLaunchOsLogRegistryRecords,
+  setSimulatorLaunchOsLogRecordActiveOverrideForTests,
   setSimulatorLaunchOsLogRegistryDirForTests,
   writeSimulatorLaunchOsLogRegistryRecord,
 } from '../log-capture/simulator-launch-oslog-registry.ts';
@@ -28,13 +29,17 @@ function createRecord(
   };
 }
 
-describe('simulator launch OSLog registry', () => {
+describe.sequential('simulator launch OSLog registry', () => {
   beforeEach(() => {
     registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-oslog-registry-'));
     setSimulatorLaunchOsLogRegistryDirForTests(registryDir);
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(async (record) => {
+      return record.helperPid === process.pid && record.expectedCommandParts.includes('node');
+    });
   });
 
   afterEach(async () => {
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setSimulatorLaunchOsLogRegistryDirForTests(null);
     await rm(registryDir, { recursive: true, force: true });
   });

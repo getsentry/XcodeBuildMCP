@@ -347,7 +347,7 @@ export function createCleanExecutor(
 export async function cleanLogic(params: CleanParams, executor: CommandExecutor): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeClean = createCleanExecutor(executor);
   const result = await executeClean(params, executionContext);

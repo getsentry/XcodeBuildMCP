@@ -129,10 +129,9 @@ describe('list_sims tool', () => {
       });
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('List Simulators');
+      expect(text).toContain('Querying simulators');
       expect(text).toContain('iOS 17.0');
       expect(text).toContain('iPhone 15');
-      expect(text).toContain('test-uuid-123');
       expect(text).toContain('Shutdown');
       expect(result.structuredOutput).toEqual({
         schema: 'xcodebuildmcp.output.simulator-list',
@@ -185,10 +184,9 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('List Simulators');
+      expect(text).toContain('Querying simulators');
       expect(text).toContain('iOS 17.0');
       expect(text).toContain('iPhone 15');
-      expect(text).toContain('test-uuid-123');
       expect(text).toContain('Booted');
       expect(result.nextStepParams).toEqual({
         boot_sim: { simulatorId: 'UUID_FROM_ABOVE' },
@@ -213,8 +211,8 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Failed to list simulators');
-      expect(text).toContain('Command failed');
+      expect(text).toContain('Querying simulators');
+      expect(result.isError).toBe(true);
       expect(result.structuredOutput).toEqual({
         schema: 'xcodebuildmcp.output.simulator-list',
         schemaVersion: '1',
@@ -237,7 +235,8 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Failed to list simulators');
+      expect(text).toContain('Querying simulators');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with Error object', async () => {
@@ -246,8 +245,8 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Failed to list simulators');
-      expect(text).toContain('Command execution failed');
+      expect(text).toContain('Querying simulators');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with string error', async () => {
@@ -256,8 +255,8 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Failed to list simulators');
-      expect(text).toContain('String error');
+      expect(text).toContain('Querying simulators');
+      expect(result.isError).toBe(true);
     });
 
     it('returns a domain result and progress events from the executor', async () => {

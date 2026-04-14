@@ -1,21 +1,13 @@
 import type { ToolHandlerContext } from '../rendering/types.js';
+import type { XcodebuildOperation } from '../types/progress-events.js';
 import { DefaultToolExecutionContext } from './execution/index.js';
-import type { XcodebuildOperation } from '../types/pipeline-events.js';
 
-export function createPipelineCompatExecutionContext(
+export function createToolExecutionContext(
   ctx: ToolHandlerContext,
   xcodebuildOperation?: XcodebuildOperation,
 ): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
     xcodebuildOperation,
   });
 }

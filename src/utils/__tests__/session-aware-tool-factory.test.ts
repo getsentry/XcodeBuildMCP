@@ -18,6 +18,8 @@ import {
 import { createRenderSession } from '../../rendering/render.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
 import { statusLine } from '../tool-event-builders.ts';
+import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
 
 const cwd = '/repo';
 
@@ -31,12 +33,16 @@ function invokeAndCollect(
   args: Record<string, unknown>,
 ): Promise<{ text: string; isError: boolean }> {
   const session = createRenderSession('text');
+  const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
-    emit: (event) => session.emit(event),
+    emit: (event) => {
+      items.push(event);
+      session.emit(event);
+    },
     attach: (image) => session.attach(image),
   };
   return handler(args, ctx).then(() => ({
-    text: session.finalize(),
+    text: renderCliTextTranscript({ items }),
     isError: session.isError(),
   }));
 }

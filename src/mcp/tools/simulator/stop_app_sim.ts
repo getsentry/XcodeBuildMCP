@@ -168,7 +168,9 @@ export async function stop_app_simLogic(
   ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeStopAppSim = createStopAppSimExecutor(executor);
 
   ctx.emit(headerEvent);

@@ -122,15 +122,15 @@ export async function touchLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeTouch = createTouchExecutor(executor, axeHelpers, debuggerManager);
   const result = await executeTouch(params, executionContext);
 
   setUiActionStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

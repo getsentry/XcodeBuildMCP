@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { log } from './logger.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { TestFailureProgressEvent } from '../types/progress-events.ts';
 import { parseRawTestName } from './xcodebuild-line-parsers.ts';
 
 interface XcresultTestNode {
@@ -16,9 +16,9 @@ interface XcresultTestResults {
 
 /**
  * Extract test failure events from an xcresult bundle using xcresulttool.
- * Returns test-failure PipelineEvents for any failed test cases found.
+ * Returns test-failure progress events for any failed test cases found.
  */
-export function extractTestFailuresFromXcresult(xcresultPath: string): PipelineEvent[] {
+export function extractTestFailuresFromXcresult(xcresultPath: string): TestFailureProgressEvent[] {
   try {
     const output = execFileSync(
       'xcrun',
@@ -27,7 +27,7 @@ export function extractTestFailuresFromXcresult(xcresultPath: string): PipelineE
     );
 
     const results: XcresultTestResults = JSON.parse(output);
-    const events: PipelineEvent[] = [];
+    const events: TestFailureProgressEvent[] = [];
 
     function walk(node: XcresultTestNode, suiteContext?: string): void {
       const parsedNodeName = parseRawTestName(node.name);
@@ -44,7 +44,6 @@ export function extractTestFailuresFromXcresult(xcresultPath: string): PipelineE
             const { suiteName, testName } = parsedNodeName;
             events.push({
               type: 'test-failure',
-              timestamp: new Date().toISOString(),
               operation: 'TEST',
               suite: suiteName ?? suiteContext,
               test: testName,

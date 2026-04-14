@@ -237,7 +237,9 @@ export async function sessionSetDefaultsLogic(
   context: SessionSetDefaultsContext,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSessionSetDefaults = createSessionSetDefaultsExecutor(context);
   const result = await executeSessionSetDefaults(params, executionContext);
   const {

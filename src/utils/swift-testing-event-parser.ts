@@ -1,4 +1,4 @@
-import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 import {
   parseSwiftTestingResultLine,
   parseSwiftTestingIssueLine,
@@ -19,11 +19,7 @@ export interface SwiftTestingEventParser {
 }
 
 export interface SwiftTestingEventParserOptions {
-  onEvent: (event: PipelineEvent) => void;
-}
-
-function now(): string {
-  return new Date().toISOString();
+  onEvent: (event: ProgressEvent) => void;
 }
 
 export function createSwiftTestingEventParser(
@@ -50,7 +46,6 @@ export function createSwiftTestingEventParser(
     }
     onEvent({
       type: 'test-failure',
-      timestamp: now(),
       operation: 'TEST',
       suite: lastIssueDiagnostic.suiteName,
       test: lastIssueDiagnostic.testName,
@@ -63,7 +58,6 @@ export function createSwiftTestingEventParser(
   function emitTestProgress(): void {
     onEvent({
       type: 'test-progress',
-      timestamp: now(),
       operation: 'TEST',
       completed: completedCount,
       failed: failedCount,
@@ -91,7 +85,6 @@ export function createSwiftTestingEventParser(
       const durationMs = parseDurationMs(stResult.durationText);
       onEvent({
         type: 'test-failure',
-        timestamp: now(),
         operation: 'TEST',
         suite: lastIssueDiagnostic.suiteName,
         test: lastIssueDiagnostic.testName,
@@ -173,7 +166,6 @@ export function createSwiftTestingEventParser(
     if (xcFailure) {
       onEvent({
         type: 'test-failure',
-        timestamp: now(),
         operation: 'TEST',
         suite: xcFailure.suiteName,
         test: xcFailure.testName,
@@ -187,7 +179,6 @@ export function createSwiftTestingEventParser(
     if (/^[◇] Test run started/u.test(line) || /^Testing started$/u.test(line)) {
       onEvent({
         type: 'build-stage',
-        timestamp: now(),
         operation: 'TEST',
         stage: 'RUN_TESTS',
         message: 'Running tests',

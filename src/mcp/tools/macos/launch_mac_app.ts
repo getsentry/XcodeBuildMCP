@@ -9,7 +9,6 @@ import {
   DefaultToolExecutionContext,
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchMacApp } from '../../../utils/macos-steps.ts';
@@ -31,20 +30,14 @@ export async function launch_mac_appLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeLaunchMacApp = createLaunchMacAppExecutor(executor, fileSystem);
   const result = await executeLaunchMacApp(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error during launch macOS app operation: ${result.error ?? 'Unknown error'}`);

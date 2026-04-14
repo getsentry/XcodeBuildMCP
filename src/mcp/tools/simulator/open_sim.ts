@@ -104,7 +104,9 @@ export async function open_simLogic(
 
   const ctx = getHandlerContext();
   const headerEvent = header('Open Simulator');
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeOpenSim = createOpenSimExecutor(executor);
 
   ctx.emit(headerEvent);

@@ -12,14 +12,14 @@ import type {
   TestResultDomainResult,
   TestSelectionInfo,
 } from '../types/domain-results.js';
-import type { XcodebuildOperation } from '../types/pipeline-events.js';
+import type { XcodebuildOperation } from '../types/progress-events.js';
 import type { ToolExecutionContext } from '../types/tool-execution.js';
 import { finalizeInlineXcodebuild, type ErrorFallbackPolicy } from './xcodebuild-output.js';
 import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
 import { createXcodebuildPipeline } from './xcodebuild-pipeline.js';
 import type { XcodebuildRunState } from './xcodebuild-run-state.js';
 import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.js';
-import { createPipelineCompatExecutionContext } from './tool-execution-compat.js';
+import { createToolExecutionContext } from './tool-execution-compat.js';
 
 const MAX_DISCOVERED_TESTS = 6;
 
@@ -30,6 +30,7 @@ interface LineStreamState {
 
 function emitChunkLines(
   ctx: ToolExecutionContext,
+  operation: XcodebuildOperation,
   stream: 'stdout' | 'stderr',
   state: LineStreamState,
   chunk: string,
@@ -47,6 +48,7 @@ function emitChunkLines(
     state.lines.push(line);
     ctx.emitProgress({
       type: 'xcodebuild-line',
+      operation,
       stream,
       line,
     });
@@ -55,6 +57,7 @@ function emitChunkLines(
 
 function flushChunkLines(
   ctx: ToolExecutionContext,
+  operation: XcodebuildOperation,
   stream: 'stdout' | 'stderr',
   state: LineStreamState,
 ): void {
@@ -65,6 +68,7 @@ function flushChunkLines(
   state.lines.push(state.remainder);
   ctx.emitProgress({
     type: 'xcodebuild-line',
+    operation,
     stream,
     line: state.remainder,
   });
@@ -200,7 +204,6 @@ function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
     durationMs,
     responseContent: options.responseContent,
     errorFallbackPolicy: options.errorFallbackPolicy,
-    emitSummary: false,
   });
 
   return {
@@ -232,12 +235,12 @@ export function createProgressStreamingPipeline(
   const pipeline: XcodebuildPipeline = {
     onStdout(chunk: string): void {
       innerPipeline.onStdout(chunk);
-      emitChunkLines(ctx, 'stdout', stdoutState, chunk);
+      emitChunkLines(ctx, operation, 'stdout', stdoutState, chunk);
     },
 
     onStderr(chunk: string): void {
       innerPipeline.onStderr(chunk);
-      emitChunkLines(ctx, 'stderr', stderrState, chunk);
+      emitChunkLines(ctx, operation, 'stderr', stderrState, chunk);
     },
 
     emitEvent(event): void {
@@ -245,8 +248,8 @@ export function createProgressStreamingPipeline(
     },
 
     finalize(succeeded, durationMs, options) {
-      flushChunkLines(ctx, 'stdout', stdoutState);
-      flushChunkLines(ctx, 'stderr', stderrState);
+      flushChunkLines(ctx, operation, 'stdout', stdoutState);
+      flushChunkLines(ctx, operation, 'stderr', stderrState);
       return innerPipeline.finalize(succeeded, durationMs, options);
     },
 
@@ -365,4 +368,4 @@ export function createTestDomainResult(options: {
   };
 }
 
-export { createPipelineCompatExecutionContext };
+export { createToolExecutionContext };

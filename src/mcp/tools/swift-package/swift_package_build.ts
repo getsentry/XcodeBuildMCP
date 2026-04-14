@@ -14,7 +14,7 @@ import {
 import { header } from '../../../utils/tool-event-builders.ts';
 import {
   createBuildDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
@@ -136,7 +136,7 @@ export async function swift_package_buildLogic(
     ]),
   );
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeSwiftPackageBuild = createSwiftPackageBuildExecutor(executor);
   const result = await executeSwiftPackageBuild(params, executionContext);
 

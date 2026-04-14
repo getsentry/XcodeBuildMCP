@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StructuredToolOutput } from '../../../rendering/types.ts';
 import { createCliTextRenderer } from '../cli-text-renderer.ts';
 
 const reporter = {
@@ -9,6 +10,22 @@ const reporter = {
 vi.mock('../../cli-progress-reporter.ts', () => ({
   createCliProgressReporter: () => reporter,
 }));
+
+function buildOutput(overrides: Partial<StructuredToolOutput['result']>): StructuredToolOutput {
+  return {
+    schema: 'xcodebuildmcp.output.build-result',
+    schemaVersion: '1.0.0',
+    result: {
+      kind: 'build-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { scheme: 'MyApp' },
+      diagnostics: { warnings: [], errors: [] },
+      ...overrides,
+    } as StructuredToolOutput['result'],
+  };
+}
 
 describe('cli-text-renderer', () => {
   const originalIsTTY = process.stdout.isTTY;
@@ -38,9 +55,8 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [
         { label: 'Scheme', value: 'MyApp' },
@@ -50,9 +66,8 @@ describe('cli-text-renderer', () => {
       ],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'build-stage',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -66,49 +81,40 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: true });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [{ label: 'Scheme', value: 'MyApp' }],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'build-stage',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onEvent({
-      type: 'status-line',
-      timestamp: '2026-03-20T12:00:02.000Z',
+    renderer.onProgress({
+      type: 'status',
       level: 'info',
       message: 'Resolving app path',
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'compiler-warning',
-      timestamp: '2026-03-20T12:00:03.000Z',
       operation: 'BUILD',
       message: 'unused variable',
       rawLine: '/tmp/MyApp.swift:10: warning: unused variable',
     });
 
-    renderer.onEvent({
-      type: 'status-line',
-      timestamp: '2026-03-20T12:00:04.000Z',
+    renderer.onProgress({
+      type: 'status',
       level: 'success',
       message: 'Resolving app path',
     });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:05.000Z',
-      operation: 'BUILD',
-      status: 'SUCCEEDED',
-    });
+    renderer.setStructuredOutput(buildOutput({ summary: { status: 'SUCCEEDED' } }));
+    renderer.finalize();
 
     expect(reporter.update).toHaveBeenCalledWith('Compiling...');
     expect(reporter.update).toHaveBeenCalledWith('Resolving app path...');
@@ -124,9 +130,8 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [
         { label: 'Scheme', value: 'MyApp' },
@@ -137,21 +142,17 @@ describe('cli-text-renderer', () => {
       ],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'compiler-error',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       message: 'No available simulator matched: INVALID-SIM-ID-123',
       rawLine: 'No available simulator matched: INVALID-SIM-ID-123',
     });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:02.000Z',
-      operation: 'BUILD',
-      status: 'FAILED',
-      durationMs: 1200,
-    });
+    renderer.setStructuredOutput(
+      buildOutput({ didError: true, summary: { status: 'FAILED', durationMs: 1200 } }),
+    );
+    renderer.finalize();
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain('Errors (1):');
@@ -163,9 +164,8 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [
         { label: 'Scheme', value: 'MyApp' },
@@ -175,29 +175,24 @@ describe('cli-text-renderer', () => {
       ],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'build-stage',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'compiler-error',
-      timestamp: '2026-03-20T12:00:02.000Z',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:03.000Z',
-      operation: 'BUILD',
-      status: 'FAILED',
-      durationMs: 4000,
-    });
+    renderer.setStructuredOutput(
+      buildOutput({ didError: true, summary: { status: 'FAILED', durationMs: 4000 } }),
+    );
+    renderer.finalize();
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain(
@@ -211,9 +206,8 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [
         { label: 'Scheme', value: 'MyApp' },
@@ -223,21 +217,17 @@ describe('cli-text-renderer', () => {
       ],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'compiler-error',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:02.000Z',
-      operation: 'BUILD',
-      status: 'FAILED',
-      durationMs: 2000,
-    });
+    renderer.setStructuredOutput(
+      buildOutput({ didError: true, summary: { status: 'FAILED', durationMs: 2000 } }),
+    );
+    renderer.finalize();
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain(
@@ -250,44 +240,37 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: true });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'header',
-      timestamp: '2026-03-20T12:00:00.000Z',
       operation: 'Build & Run',
       params: [{ label: 'Scheme', value: 'MyApp' }],
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'build-stage',
-      timestamp: '2026-03-20T12:00:01.000Z',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'build-stage',
-      timestamp: '2026-03-20T12:00:02.000Z',
       operation: 'BUILD',
       stage: 'LINKING',
       message: 'Linking',
     });
 
-    renderer.onEvent({
+    renderer.onProgress({
       type: 'compiler-error',
-      timestamp: '2026-03-20T12:00:03.000Z',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:04.000Z',
-      operation: 'BUILD',
-      status: 'FAILED',
-      durationMs: 4000,
-    });
+    renderer.setStructuredOutput(
+      buildOutput({ didError: true, summary: { status: 'FAILED', durationMs: 4000 } }),
+    );
+    renderer.finalize();
 
     expect(reporter.update).toHaveBeenCalledWith('Compiling...');
     expect(reporter.update).toHaveBeenCalledWith('Linking...');
@@ -302,32 +285,26 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onEvent({
-      type: 'summary',
-      timestamp: '2026-03-20T12:00:05.000Z',
-      operation: 'BUILD',
-      status: 'SUCCEEDED',
-      durationMs: 7100,
+    renderer.setStructuredOutput({
+      schema: 'xcodebuildmcp.output.build-run-result',
+      schemaVersion: '1.0.0',
+      result: {
+        kind: 'build-run-result',
+        didError: false,
+        error: null,
+        summary: {
+          status: 'SUCCEEDED',
+          durationMs: 7100,
+        },
+        artifacts: { appPath: '/tmp/build/MyApp.app' },
+        diagnostics: { warnings: [], errors: [] },
+      },
     });
-
-    renderer.onEvent({
-      type: 'status-line',
-      timestamp: '2026-03-20T12:00:06.000Z',
-      level: 'success',
-      message: 'Build & Run complete',
-    });
-
-    renderer.onEvent({
-      type: 'detail-tree',
-      timestamp: '2026-03-20T12:00:06.000Z',
-      items: [{ label: 'App Path', value: '/tmp/build/MyApp.app' }],
-    });
-
-    renderer.onEvent({
-      type: 'next-steps',
-      timestamp: '2026-03-20T12:00:07.000Z',
-      steps: [{ label: 'Get built macOS app path', cliTool: 'get-app-path', workflow: 'macos' }],
-    });
+    renderer.setNextSteps(
+      [{ label: 'Get built macOS app path', cliTool: 'get-app-path', workflow: 'macos' }],
+      'cli',
+    );
+    renderer.finalize();
 
     const output = stdoutWrite.mock.calls.flat().join('');
     const summaryIndex = output.indexOf('\u{2705} Build succeeded.');

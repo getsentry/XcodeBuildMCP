@@ -9,7 +9,6 @@ import {
   DefaultToolExecutionContext,
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -208,20 +207,14 @@ export async function get_mac_app_pathLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
   const result = await executeGetMacAppPath(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);

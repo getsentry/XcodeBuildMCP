@@ -1,10 +1,9 @@
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { StructuredToolOutput } from '../rendering/types.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 import type { ProgressEvent } from '../types/progress-events.ts';
 
-export const DAEMON_PROTOCOL_VERSION = 3 as const;
+export const DAEMON_PROTOCOL_VERSION = 4 as const;
 
 export type DaemonMethod =
   | 'daemon.status'
@@ -55,7 +54,6 @@ export interface ToolInvokeResult {
   structuredOutput: StructuredToolOutput | null;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
-  events?: PipelineEvent[];
 }
 
 export interface ToolInvokeProgressFrame {
@@ -71,7 +69,7 @@ export interface ToolInvokeResultFrame {
 }
 
 export interface DaemonToolResult {
-  events: PipelineEvent[];
+  progress?: ProgressEvent[];
   isError: boolean;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];

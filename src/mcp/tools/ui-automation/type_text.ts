@@ -94,15 +94,15 @@ export async function type_textLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeTypeText = createTypeTextExecutor(executor, axeHelpers, debuggerManager);
   const result = await executeTypeText(params, executionContext);
 
   setUiActionStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

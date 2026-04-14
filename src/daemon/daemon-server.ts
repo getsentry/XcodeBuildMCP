@@ -1,8 +1,8 @@
 import net from 'node:net';
 import { writeFrame, createFrameReader } from './framing.ts';
 import type { ToolCatalog } from '../runtime/types.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
 import type { ToolResponse } from '../types/common.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 import type {
   DaemonRequest,
   DaemonResponse,
@@ -20,7 +20,6 @@ import type {
 import { DAEMON_PROTOCOL_VERSION } from './protocol.ts';
 import { DefaultToolInvoker } from '../runtime/tool-invoker.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
-import { statusLine } from '../utils/tool-event-builders.ts';
 import { log } from '../utils/logger.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
@@ -43,21 +42,25 @@ export interface DaemonServerContext {
 }
 
 function toolResponseToDaemonResult(response: ToolResponse): DaemonToolResult {
-  const events: PipelineEvent[] = [];
-  const metaEvents = response._meta?.events;
-  if (Array.isArray(metaEvents) && metaEvents.length > 0) {
-    for (const event of metaEvents as PipelineEvent[]) {
-      events.push(event);
+  const progress: ProgressEvent[] = [];
+  const metaProgress = response._meta?.progress;
+  if (Array.isArray(metaProgress) && metaProgress.length > 0) {
+    for (const event of metaProgress as ProgressEvent[]) {
+      progress.push(event);
     }
   } else {
     for (const item of response.content) {
       if (item.type === 'text' && item.text) {
-        events.push(statusLine(response.isError ? 'error' : 'success', item.text));
+        progress.push({
+          type: 'status',
+          level: response.isError ? 'error' : 'success',
+          message: item.text,
+        });
       }
     }
   }
   return {
-    events,
+    ...(progress.length > 0 ? { progress } : {}),
     isError: response.isError === true,
     nextStepParams: response.nextStepParams,
     nextSteps: response.nextSteps,
@@ -168,23 +171,26 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
               }
 
               log('info', `[Daemon] Invoking tool: ${params.tool}`);
-              const emittedEvents: PipelineEvent[] = [];
+              const streamProgress = (event: ProgressEvent): void => {
+                const frame: ToolInvokeProgressFrame = {
+                  v: DAEMON_PROTOCOL_VERSION,
+                  id: base.id,
+                  stream: {
+                    kind: 'progress',
+                    event,
+                  },
+                };
+                writeFrame(socket, frame);
+              };
+
               const handlerContext: ToolHandlerContext = {
                 emit: (event) => {
-                  emittedEvents.push(event);
+                  if (!('timestamp' in event)) {
+                    streamProgress(event);
+                  }
                 },
                 attach: () => {},
-                emitProgress: (event) => {
-                  const frame: ToolInvokeProgressFrame = {
-                    v: DAEMON_PROTOCOL_VERSION,
-                    id: base.id,
-                    stream: {
-                      kind: 'progress',
-                      event,
-                    },
-                  };
-                  writeFrame(socket, frame);
-                },
+                emitProgress: streamProgress,
               };
 
               await invoker.invokeDirect(resolved.tool, params.args ?? {}, {
@@ -200,7 +206,6 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                   structuredOutput: handlerContext.structuredOutput ?? null,
                   nextStepParams: handlerContext.nextStepParams,
                   nextSteps: handlerContext.nextSteps,
-                  ...(emittedEvents.length > 0 ? { events: emittedEvents } : {}),
                 },
               };
               return writeFrame(socket, resultFrame);

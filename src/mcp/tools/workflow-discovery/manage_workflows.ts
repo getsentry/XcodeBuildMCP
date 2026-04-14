@@ -122,15 +122,15 @@ export async function manage_workflowsLogic(
   _neverExecutor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeManageWorkflows = createManageWorkflowsExecutor();
   const result = await executeManageWorkflows(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export const schema = baseSchemaObject.shape;

@@ -99,19 +99,9 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: RecordSimVideoResu
   };
 }
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -295,7 +285,7 @@ export async function record_sim_videoLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const headerEvent = header('Record Video', [{ label: 'Simulator', value: params.simulatorId }]);
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeRecordSimVideo = createRecordSimVideoExecutor(executor, axe, video, fs);
 
   ctx.emit(headerEvent);

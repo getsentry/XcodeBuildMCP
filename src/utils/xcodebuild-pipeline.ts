@@ -1,11 +1,12 @@
 import type {
   XcodebuildOperation,
   XcodebuildStage,
-  PipelineEvent,
-} from '../types/pipeline-events.ts';
+  HeaderProgressEvent,
+  ProgressEvent,
+} from '../types/progress-events.ts';
 import { createXcodebuildEventParser } from './xcodebuild-event-parser.ts';
 import { createXcodebuildRunState } from './xcodebuild-run-state.ts';
-import type { XcodebuildRunState } from './xcodebuild-run-state.ts';
+import type { XcodebuildRunState, XcodebuildRunStateHandle } from './xcodebuild-run-state.ts';
 import { displayPath } from './build-preflight.ts';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
 import { formatDeviceId } from './device-name-resolver.ts';
@@ -18,25 +19,21 @@ export interface PipelineOptions {
   toolName: string;
   params: Record<string, unknown>;
   minimumStage?: XcodebuildStage;
-  emit?: (event: PipelineEvent) => void;
+  emit?: (event: ProgressEvent) => void;
 }
 
 export interface PipelineResult {
   state: XcodebuildRunState;
-  events: PipelineEvent[];
 }
 
 export interface PipelineFinalizeOptions {
-  emitSummary?: boolean;
-  tailEvents?: PipelineEvent[];
-  includeBuildLogFileRef?: boolean;
   includeParserDebugFileRef?: boolean;
 }
 
 export interface XcodebuildPipeline {
   onStdout(chunk: string): void;
   onStderr(chunk: string): void;
-  emitEvent(event: PipelineEvent): void;
+  emitEvent(event: ProgressEvent): void;
   finalize(
     succeeded: boolean,
     durationMs?: number,
@@ -52,49 +49,7 @@ export interface StartedPipeline {
   startedAt: number;
 }
 
-function buildLogDetailTreeEvent(logPath: string): PipelineEvent {
-  return {
-    type: 'detail-tree',
-    timestamp: new Date().toISOString(),
-    items: [{ label: 'Build Logs', value: logPath }],
-  };
-}
-
-function injectBuildLogIntoTailEvents(
-  tailEvents: PipelineEvent[],
-  logPath: string,
-): PipelineEvent[] {
-  const hasBuildLogTree = tailEvents.some(
-    (event) =>
-      event.type === 'detail-tree' && event.items.some((item) => item.label === 'Build Logs'),
-  );
-  if (hasBuildLogTree) {
-    return tailEvents;
-  }
-
-  const existingDetailTree = tailEvents.find((event) => event.type === 'detail-tree');
-  if (existingDetailTree) {
-    return tailEvents.map((event) =>
-      event === existingDetailTree
-        ? {
-            ...existingDetailTree,
-            items: [...existingDetailTree.items, { label: 'Build Logs', value: logPath }],
-          }
-        : event,
-    );
-  }
-
-  const nextStepsIndex = tailEvents.findIndex((event) => event.type === 'next-steps');
-  if (nextStepsIndex === -1) {
-    return [...tailEvents, buildLogDetailTreeEvent(logPath)];
-  }
-
-  return [
-    ...tailEvents.slice(0, nextStepsIndex),
-    buildLogDetailTreeEvent(logPath),
-    ...tailEvents.slice(nextStepsIndex),
-  ];
-}
+type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
 function buildHeaderParams(
   params: Record<string, unknown>,
@@ -167,10 +122,9 @@ function buildHeaderParams(
 export function createBuildHeaderEvent(
   params: Record<string, unknown>,
   message: string,
-): PipelineEvent {
+): HeaderProgressEvent {
   return {
     type: 'header',
-    timestamp: new Date().toISOString(),
     operation: message
       .replace(/^[^\p{L}]+/u, '')
       .split('\n')[0]
@@ -220,13 +174,27 @@ export function createXcodebuildPipeline(options: PipelineOptions): XcodebuildPi
 
   const parser = createXcodebuildEventParser({
     operation: options.operation,
-    onEvent: (event: PipelineEvent) => {
-      runState.push(event);
+    onEvent: (event) => {
+      runState.push(event as RunStateEvent);
     },
     onUnrecognizedLine: (line: string) => {
       debugCapture.addUnrecognizedLine(line);
     },
   });
+
+  function isRunStateEvent(event: ProgressEvent): event is RunStateEvent {
+    switch (event.type) {
+      case 'build-stage':
+      case 'compiler-warning':
+      case 'compiler-error':
+      case 'test-discovery':
+      case 'test-progress':
+      case 'test-failure':
+        return true;
+      default:
+        return false;
+    }
+  }
 
   return {
     onStdout(chunk: string): void {
@@ -239,8 +207,13 @@ export function createXcodebuildPipeline(options: PipelineOptions): XcodebuildPi
       parser.onStderr(chunk);
     },
 
-    emitEvent(event: PipelineEvent): void {
-      runState.push(event);
+    emitEvent(event: ProgressEvent): void {
+      if (isRunStateEvent(event)) {
+        runState.push(event);
+        return;
+      }
+
+      emit(event);
     },
 
     finalize(
@@ -251,11 +224,6 @@ export function createXcodebuildPipeline(options: PipelineOptions): XcodebuildPi
       parser.flush();
       logCapture.close();
 
-      const tailEvents =
-        finalizeOptions?.includeBuildLogFileRef === false
-          ? [...(finalizeOptions?.tailEvents ?? [])]
-          : injectBuildLogIntoTailEvents(finalizeOptions?.tailEvents ?? [], logCapture.path);
-
       const debugPath = debugCapture.flush();
       if (debugPath) {
         appLog(
@@ -263,29 +231,23 @@ export function createXcodebuildPipeline(options: PipelineOptions): XcodebuildPi
           `[Pipeline] ${debugCapture.count} unrecognized parser lines written to ${debugPath}`,
         );
         if (finalizeOptions?.includeParserDebugFileRef !== false) {
-          runState.push({
-            type: 'status-line',
-            timestamp: new Date().toISOString(),
+          emit({
+            type: 'status',
             level: 'warning',
             message: 'Parsing issue detected - debug log:',
           });
-          runState.push({
+          emit({
             type: 'file-ref',
-            timestamp: new Date().toISOString(),
             label: 'Parser Debug Log',
             path: debugPath,
           });
         }
       }
 
-      const finalState = runState.finalize(succeeded, durationMs, {
-        emitSummary: finalizeOptions?.emitSummary,
-        tailEvents,
-      });
+      const finalState = runState.finalize(succeeded, durationMs);
 
       return {
         state: finalState,
-        events: finalState.events,
       };
     },
 

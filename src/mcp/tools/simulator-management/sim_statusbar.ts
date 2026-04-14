@@ -155,7 +155,9 @@ export async function sim_statusbarLogic(
   ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSimStatusbar = createSimStatusbarExecutor(executor);
 
   ctx.emit(headerEvent);

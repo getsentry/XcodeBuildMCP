@@ -146,7 +146,9 @@ export async function boot_simLogic(
 
   const ctx = getHandlerContext();
   const headerEvent = header('Boot Simulator', [{ label: 'Simulator', value: params.simulatorId }]);
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeBootSim = createBootSimExecutor(executor);
 
   ctx.emit(headerEvent);

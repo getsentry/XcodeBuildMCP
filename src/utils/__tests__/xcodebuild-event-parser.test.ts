@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createXcodebuildEventParser } from '../xcodebuild-event-parser.ts';
-import type { PipelineEvent } from '../../types/pipeline-events.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
 
 function collectEvents(
   operation: 'BUILD' | 'TEST',
   lines: { source: 'stdout' | 'stderr'; text: string }[],
-): PipelineEvent[] {
-  const events: PipelineEvent[] = [];
+): ProgressEvent[] {
+  const events: ProgressEvent[] = [];
   const parser = createXcodebuildEventParser({
     operation,
     onEvent: (event) => events.push(event),
@@ -219,7 +219,7 @@ describe('xcodebuild-event-parser', () => {
   });
 
   it('handles split chunks across buffer boundaries', () => {
-    const events: PipelineEvent[] = [];
+    const events: ProgressEvent[] = [];
     const parser = createXcodebuildEventParser({
       operation: 'TEST',
       onEvent: (event) => events.push(event),

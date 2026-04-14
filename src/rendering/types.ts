@@ -1,4 +1,3 @@
-import type { PipelineEvent } from '../types/pipeline-events.ts';
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 import type { ToolDomainResult } from '../types/domain-results.ts';
 import type { ProgressEvent } from '../types/progress-events.ts';
@@ -11,9 +10,15 @@ export interface ImageAttachment {
 }
 
 export interface RenderSession {
-  emit(event: PipelineEvent): void;
+  emit(event: ProgressEvent): void;
   attach(image: ImageAttachment): void;
-  getEvents(): readonly PipelineEvent[];
+  setStructuredOutput?(output: StructuredToolOutput): void;
+  getStructuredOutput?(): StructuredToolOutput | undefined;
+  setNextSteps?(steps: NextStep[], runtime: 'cli' | 'daemon' | 'mcp'): void;
+  getNextSteps?(): readonly NextStep[];
+  getNextStepsRuntime?(): 'cli' | 'daemon' | 'mcp' | undefined;
+  getEvents(): readonly ProgressEvent[];
+  getProgressEvents?(): readonly ProgressEvent[];
   getAttachments(): readonly ImageAttachment[];
   isError(): boolean;
   finalize(): string;
@@ -26,7 +31,7 @@ export interface StructuredToolOutput {
 }
 
 export interface ToolHandlerContext {
-  emit: (event: PipelineEvent) => void;
+  emit: (event: ProgressEvent) => void;
   attach: (image: ImageAttachment) => void;
   emitProgress?: (event: ProgressEvent) => void;
   nextStepParams?: NextStepParamsMap;

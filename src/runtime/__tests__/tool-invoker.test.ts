@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { ToolResponse } from '../../types/common.ts';
-import type { PipelineEvent } from '../../types/pipeline-events.ts';
 import type { ProgressEvent } from '../../types/progress-events.ts';
 import type { DaemonToolResult, ToolInvokeResult } from '../../daemon/protocol.ts';
 import type { ToolDefinition } from '../types.ts';
@@ -47,10 +46,9 @@ vi.mock('../../cli/daemon-control.ts', () => ({
 
 function daemonResult(text: string, opts?: Partial<DaemonToolResult>): DaemonToolResult {
   return {
-    events: [
+    progress: [
       {
-        type: 'status-line',
-        timestamp: new Date().toISOString(),
+        type: 'status',
         level: 'success',
         message: text,
       },
@@ -116,25 +114,23 @@ function invokeAndFinalize(
   const promise = invoker.invoke(toolName, args, { ...opts, renderSession: session });
   return promise.then(() => {
     const text = session.finalize();
-    const events = [...session.getEvents()];
     return {
       content: text ? [{ type: 'text' as const, text }] : [],
       isError: session.isError() || undefined,
       nextSteps: undefined as ToolResponse['nextSteps'],
-      ...(events.length > 0 ? { _meta: { events } } : {}),
     } as ToolResponse;
   });
 }
 
 function emitHandler(text: string): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
-    ctx.emit(statusLine('success', text));
+    ctx.emit({ type: 'status', level: 'success', message: text });
   });
 }
 
 function emitErrorHandler(text: string): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
-    ctx.emit(statusLine('error', text));
+    ctx.emit({ type: 'status', level: 'error', message: text });
   });
 }
 
@@ -144,13 +140,13 @@ function emitNextStepsHandler(
   nextStepParams?: ToolResponse['nextStepParams'],
 ): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
-    ctx.emit(statusLine('success', text));
+    ctx.emit({ type: 'status', level: 'success', message: text });
     if (nextSteps) ctx.nextSteps = nextSteps;
     if (nextStepParams) ctx.nextStepParams = nextStepParams;
   });
 }
 
-function emitErrorEventsHandler(events: PipelineEvent[]): ToolDefinition['handler'] {
+function emitErrorEventsHandler(events: ProgressEvent[]): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
     for (const event of events) {
       ctx.emit(event);
@@ -208,7 +204,7 @@ describe('DefaultToolInvoker CLI routing', () => {
     const progressEvents: Array<{ type: string }> = [];
     const structuredOutputs: string[] = [];
     const handler = vi.fn(async (_params, ctx) => {
-      ctx.emitProgress?.({ type: 'status', level: 'info', message: 'Working' });
+      ctx.emit({ type: 'status', level: 'info', message: 'Working' });
       ctx.structuredOutput = {
         schema: 'xcodebuildmcp.output.simulator-list',
         schemaVersion: '1',
@@ -249,7 +245,7 @@ describe('DefaultToolInvoker CLI routing', () => {
     expect(handler).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
-        emitProgress: expect.any(Function),
+        emit: expect.any(Function),
       }),
     );
     expect(progressEvents).toEqual([{ type: 'status' }]);
@@ -300,12 +296,11 @@ describe('DefaultToolInvoker CLI routing', () => {
     expect(response.content[0].text).toContain('daemon-result');
   });
 
-  it('replays daemon-provided pipeline events when present for stateful tools', async () => {
-    daemonClientMock.invokeTool.mockResolvedValue(
-      streamedToolResult({
-        events: [statusLine('success', 'daemon-event-result')],
-      }),
-    );
+  it('renders streamed daemon progress without relying on terminal event replay', async () => {
+    daemonClientMock.invokeTool.mockImplementation(async (_name, _args, options) => {
+      options?.onProgress?.({ type: 'status', level: 'success', message: 'daemon-event-result' });
+      return streamedToolResult();
+    });
     const directHandler = emitHandler('direct-result');
     const catalog = createToolCatalog([
       makeTool({
@@ -744,8 +739,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
   it('renders failure next steps for ordinary error responses with replayable events', async () => {
     const directHandler = emitErrorEventsHandler([
       {
-        type: 'status-line',
-        timestamp: new Date().toISOString(),
+        type: 'status',
         level: 'error',
         message: 'failed',
       },
@@ -787,28 +781,31 @@ describe('DefaultToolInvoker next steps post-processing', () => {
   });
 
   it('suppresses failure next steps for structured xcodebuild failures emitted via handler context', async () => {
-    const directHandler = emitErrorEventsHandler([
-      {
+    const directHandler: ToolDefinition['handler'] = vi.fn(async (_params, ctx) => {
+      ctx.emit({
         type: 'header',
-        timestamp: '2026-03-20T12:00:00.000Z',
         operation: 'Build',
         params: [{ label: 'Scheme', value: 'MyApp' }],
-      },
-      {
+      });
+      ctx.emit({
         type: 'compiler-error',
-        timestamp: '2026-03-20T12:00:00.500Z',
         operation: 'BUILD',
         message: 'Build failed',
         rawLine: 'Build failed',
-      },
-      {
-        type: 'summary',
-        timestamp: '2026-03-20T12:00:01.000Z',
-        status: 'FAILED',
-        operation: 'BUILD',
-        durationMs: 1000,
-      },
-    ]);
+      });
+      ctx.structuredOutput = {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1',
+        result: {
+          kind: 'build-result',
+          didError: true,
+          error: 'Build failed',
+          summary: { status: 'FAILED', durationMs: 1000 },
+          artifacts: {},
+          diagnostics: { warnings: [], errors: [] },
+        },
+      };
+    });
 
     const catalog = createToolCatalog([
       makeTool({

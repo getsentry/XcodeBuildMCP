@@ -5,7 +5,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { launchSimulatorAppWithLogging } from '../simulator-steps.ts';
+import {
+  launchSimulatorAppWithLogging,
+  setSimulatorLogDirOverrideForTests,
+} from '../simulator-steps.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
@@ -16,6 +19,7 @@ import {
 import { setSimulatorLaunchOsLogRecordActiveOverrideForTests } from '../log-capture/simulator-launch-oslog-registry.ts';
 
 let registryDir: string;
+let logDir: string;
 let nextPid = 90000;
 const trackedChildren = new Map<number, ChildProcess>();
 
@@ -60,12 +64,14 @@ function createMockExecutor(pid?: number): CommandExecutor {
   });
 }
 
-describe('launchSimulatorAppWithLogging PID resolution', () => {
+describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
   beforeEach(() => {
     nextPid = 90000;
     trackedChildren.clear();
     registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-oslog-launch-'));
+    logDir = path.join(registryDir, 'logs');
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
+    setSimulatorLogDirOverrideForTests(logDir);
     setRuntimeInstanceForTests({ instanceId: 'launch-test-instance', pid: process.pid });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async (record) => {
       const child = trackedChildren.get(record.helperPid);
@@ -78,6 +84,7 @@ describe('launchSimulatorAppWithLogging PID resolution', () => {
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
     setRuntimeInstanceForTests(null);
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);
+    setSimulatorLogDirOverrideForTests(null);
     trackedChildren.clear();
     await rm(registryDir, { recursive: true, force: true });
     vi.restoreAllMocks();

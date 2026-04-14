@@ -156,15 +156,15 @@ export async function gestureLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeGesture = createGestureExecutor(executor, axeHelpers, debuggerManager);
   const result = await executeGesture(params, executionContext);
 
   setUiActionStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 const publicSchemaObject = z.strictObject(gestureSchema.omit({ simulatorId: true } as const).shape);

@@ -21,7 +21,7 @@ import {
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createBuildDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
@@ -133,7 +133,7 @@ export async function buildDeviceLogic(
     ),
   );
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildDevice = createBuildDeviceExecutor(executor);
   const result = await executeBuildDevice(params, executionContext);
 

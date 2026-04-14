@@ -16,7 +16,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import {
   createBuildDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
@@ -162,7 +162,7 @@ export async function buildMacOSLogic(
     ),
   );
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildMacOS = createBuildMacOSExecutor(executor);
   const result = await executeBuildMacOS(params, executionContext);
 

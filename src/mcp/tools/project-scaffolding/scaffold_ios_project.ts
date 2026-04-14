@@ -389,7 +389,9 @@ export async function scaffold_ios_projectLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeScaffoldIOSProject = createScaffoldIOSProjectExecutor(
     commandExecutor,
     fileSystemExecutor,

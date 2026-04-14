@@ -54,7 +54,7 @@ export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult
     const bridgeResult: BridgeToolResult = bridge
       ? await options.callback(bridge, args)
       : {
-          events: [],
+          progress: [],
           isError: true,
           errorMessage: 'Unable to initialize xcode tools bridge',
         };
@@ -92,9 +92,7 @@ export function finalizeBridgeToolExecution(
     ctx.nextStepParams = nextStepParams;
   }
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export function toBridgeStatusDomainResult(

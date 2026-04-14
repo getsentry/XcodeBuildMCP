@@ -12,22 +12,36 @@ import { list_simsLogic } from '../tools/simulator/list_sims.ts';
 import { createRenderSession } from '../../rendering/render.ts';
 import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
+import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
 
 export async function simulatorsResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
   const session = createRenderSession('text');
+  const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
-    emit: (event) => session.emit(event),
+    emit: (event) => {
+      items.push(event);
+      session.emit(event);
+    },
     attach: () => {},
   };
 
   try {
     log('info', 'Processing simulators resource request');
     await handlerContextStorage.run(ctx, () => list_simsLogic({ enabled: true }, executor));
-    const text = session.finalize();
-    if (session.isError()) {
-      throw new Error(text || 'Failed to retrieve simulator data');
+    const text = renderCliTextTranscript({
+      items,
+      structuredOutput: ctx.structuredOutput,
+      nextSteps: ctx.nextSteps,
+    });
+    const structuredError = ctx.structuredOutput?.result.didError
+      ? (ctx.structuredOutput.result.error ?? null)
+      : null;
+    const isError = session.isError() || ctx.structuredOutput?.result.didError === true;
+    if (isError) {
+      throw new Error(structuredError ?? (text || 'Failed to retrieve simulator data'));
     }
     return {
       contents: [

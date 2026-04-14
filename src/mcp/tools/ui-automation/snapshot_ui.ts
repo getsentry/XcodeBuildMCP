@@ -123,7 +123,9 @@ export async function snapshot_uiLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   let rawHierarchyText = '';
   const executeSnapshotUi = createSnapshotUiExecutor(executor, axeHelpers, debuggerManager, {
     onRawHierarchy: (responseText) => {

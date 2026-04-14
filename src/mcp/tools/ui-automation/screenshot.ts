@@ -360,7 +360,9 @@ export async function screenshotLogic(
   uuidUtils: { v4: () => string } = { v4: uuidv4 },
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeScreenshot = createScreenshotExecutor({
     executor,
     fileSystemExecutor,

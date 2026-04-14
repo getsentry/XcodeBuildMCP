@@ -20,7 +20,7 @@ import { createBuildHeaderEvent } from './xcodebuild-pipeline.ts';
 import type { BuildTarget, TestResultDomainResult } from '../types/domain-results.ts';
 import type { ToolExecutor } from '../types/tool-execution.ts';
 import {
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
   createTestDomainResult,
 } from './xcodebuild-domain-results.ts';
@@ -259,10 +259,15 @@ export async function handleTestLogic(
       ),
     );
 
-    const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+    const executionContext = createToolExecutionContext(ctx, 'TEST');
     const executeTest = createTestExecutor(executor, options);
     const result = await executeTest(params, executionContext);
 
+    ctx.structuredOutput = {
+      result,
+      schema: 'xcodebuildmcp.output.test-result',
+      schemaVersion: '1',
+    };
     executionContext.emitResult(result);
     return;
   } catch (error) {

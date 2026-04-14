@@ -28,7 +28,9 @@ export async function xcodeToolsBridgeSyncLogic(params: Params): Promise<void> {
   log('info', 'Starting bridge sync request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext();
+  const executionContext = new BridgeToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeBridgeSync = createXcodeToolsBridgeSyncExecutor();
   const result = await executeBridgeSync(params, executionContext);
 

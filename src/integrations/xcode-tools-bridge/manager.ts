@@ -115,7 +115,7 @@ export class XcodeToolsBridgeManager {
   async statusTool(): Promise<BridgeToolResult> {
     const status = await this.getStatus();
     return {
-      events: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
+      progress: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
       payload: { kind: 'status', status },
     };
   }
@@ -125,7 +125,7 @@ export class XcodeToolsBridgeManager {
       const sync = await this.syncTools({ reason: 'manual' });
       const status = await this.getStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Sync'),
           section('Sync Result', [JSON.stringify({ sync, status }, null, 2)]),
           statusLine('success', 'Bridge sync completed'),
@@ -136,7 +136,7 @@ export class XcodeToolsBridgeManager {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        events: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
+        progress: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
         isError: true,
         errorMessage: `Bridge sync failed: ${message}`,
         payload: {
@@ -153,7 +153,7 @@ export class XcodeToolsBridgeManager {
       await this.disconnect();
       const status = await this.getStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Disconnect'),
           section('Status', [JSON.stringify(status, null, 2)]),
           statusLine('success', 'Bridge disconnected'),
@@ -164,7 +164,7 @@ export class XcodeToolsBridgeManager {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Disconnect'),
           statusLine('error', `Bridge disconnect failed: ${message}`),
         ],
@@ -192,7 +192,7 @@ export class XcodeToolsBridgeManager {
         tools: tools.map(serializeBridgeTool),
       };
       return {
-        events: [
+        progress: [
           header('Xcode IDE List Tools'),
           section('Tools', [JSON.stringify(payload, null, 2)]),
           statusLine('success', `Found ${tools.length} tool(s)`),
@@ -258,7 +258,7 @@ export class XcodeToolsBridgeManager {
   ): BridgeToolResult {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      events: [header(operation), statusLine('error', `[${code}] ${message}`)],
+      progress: [header(operation), statusLine('error', `[${code}] ${message}`)],
       isError: true,
       errorMessage: `[${code}] ${message}`,
       ...(payload ? { payload } : {}),

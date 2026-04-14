@@ -4,12 +4,12 @@
 
 import { expect } from 'vitest';
 import type { ToolHandlerContext, ImageAttachment } from '../rendering/types.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 import type { ToolResponse, NextStepParamsMap } from '../types/common.ts';
 import type { ToolHandler } from '../utils/typed-tool-factory.ts';
-import { renderEvents } from '../rendering/render.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { handlerContextStorage } from '../utils/typed-tool-factory.ts';
+import { renderCliTextTranscript } from '../utils/renderers/cli-text-renderer.ts';
 
 /**
  * Extract and join all text content items from a tool response.
@@ -30,7 +30,7 @@ export function allText(result: {
  * with an optional next-step tool reference.
  */
 export interface MockToolHandlerResult {
-  events: PipelineEvent[];
+  events: ProgressEvent[];
   attachments: ImageAttachment[];
   nextStepParams?: NextStepParamsMap;
   text(): string;
@@ -42,7 +42,7 @@ export function createMockToolHandlerContext(): {
   result: MockToolHandlerResult;
   run: <T>(fn: () => Promise<T>) => Promise<T>;
 } {
-  const events: PipelineEvent[] = [];
+  const events: ProgressEvent[] = [];
   const attachments: ImageAttachment[] = [];
   const ctx: ToolHandlerContext = {
     emit: (event) => {
@@ -59,13 +59,20 @@ export function createMockToolHandlerContext(): {
       return ctx.nextStepParams;
     },
     text() {
-      return renderEvents(events, 'text');
+      return renderCliTextTranscript({
+        items: events,
+        structuredOutput: ctx.structuredOutput,
+        nextSteps: ctx.nextSteps,
+      });
     },
     isError() {
-      return events.some(
-        (e) =>
-          (e.type === 'status-line' && e.level === 'error') ||
-          (e.type === 'summary' && e.status === 'FAILED'),
+      return (
+        events.some(
+          (e) =>
+            e.type === 'compiler-error' ||
+            e.type === 'test-failure' ||
+            (e.type === 'status' && e.level === 'error'),
+        ) || ctx.structuredOutput?.result.didError === true
       );
     },
   };
@@ -145,12 +152,26 @@ export async function callHandler(
   args: Record<string, unknown>,
 ): Promise<CallHandlerResult> {
   const session = createRenderSession('text');
+  const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
-    emit: (event) => session.emit(event),
+    emit: (event) => {
+      items.push(event);
+      session.emit(event);
+    },
     attach: (image) => session.attach(image),
   };
   await handler(args, ctx);
-  const text = session.finalize();
+  if (ctx.structuredOutput) {
+    session.setStructuredOutput?.(ctx.structuredOutput);
+  }
+  if (ctx.nextSteps && ctx.nextSteps.length > 0) {
+    session.setNextSteps?.([...ctx.nextSteps], 'cli');
+  }
+  const text = renderCliTextTranscript({
+    items,
+    structuredOutput: ctx.structuredOutput,
+    nextSteps: ctx.nextSteps,
+  });
   return {
     content: text ? [{ type: 'text' as const, text }] : [],
     isError: session.isError() || undefined,
@@ -169,7 +190,7 @@ export function expectPendingBuildResponse(
   nextStepToolId?: string,
 ): void {
   if (isMockToolHandlerResult(result)) {
-    expect(result.events.some((event) => event.type === 'summary')).toBe(true);
+    expect(result.text().trim().length).toBeGreaterThan(0);
 
     if (nextStepToolId) {
       expect(result.nextStepParams).toEqual(

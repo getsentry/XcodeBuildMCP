@@ -251,18 +251,9 @@ export async function discoverProjects(
   return computation.result;
 }
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -385,7 +376,7 @@ export async function discover_projsLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeDiscoverProjects = createDiscoverProjectsExecutor(fileSystemExecutor);
   const result = await executeDiscoverProjects(params, executionContext);
 
@@ -400,10 +391,7 @@ export async function discover_projsLogic(
     );
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export const schema = discoverProjsSchema.shape;

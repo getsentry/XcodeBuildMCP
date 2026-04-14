@@ -86,7 +86,9 @@ export function createSessionShowDefaultsExecutor(): ToolExecutor<
 
 export async function sessionShowDefaultsLogic(): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSessionShowDefaults = createSessionShowDefaultsExecutor();
   const result = await executeSessionShowDefaults({}, executionContext);
 

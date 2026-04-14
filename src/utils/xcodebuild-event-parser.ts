@@ -1,8 +1,8 @@
 import type {
   XcodebuildOperation,
-  PipelineEvent,
   XcodebuildStage,
-} from '../types/pipeline-events.ts';
+  ProgressEvent,
+} from '../types/progress-events.ts';
 import {
   packageResolutionPatterns,
   compilePatterns,
@@ -89,13 +89,9 @@ function isIgnoredNoiseLine(line: string): boolean {
   return IGNORED_NOISE_PATTERNS.some((pattern) => pattern.test(line));
 }
 
-function now(): string {
-  return new Date().toISOString();
-}
-
 export interface EventParserOptions {
   operation: XcodebuildOperation;
-  onEvent: (event: PipelineEvent) => void;
+  onEvent: (event: ProgressEvent) => void;
   onUnrecognizedLine?: (line: string) => void;
 }
 
@@ -120,7 +116,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     message: string;
     location?: string;
     rawLines: string[];
-    timestamp: string;
   } | null = null;
 
   const pendingFailureDiagnostics = new Map<
@@ -150,7 +145,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     onEvent({
       type: 'test-failure',
-      timestamp: now(),
       operation: 'TEST',
       suite: failure.suiteName,
       test: failure.testName,
@@ -219,7 +213,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     }
     onEvent({
       type: 'test-progress',
-      timestamp: now(),
       operation: 'TEST',
       completed: completedCount,
       failed: failedCount,
@@ -256,7 +249,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     }
     onEvent({
       type: 'compiler-error',
-      timestamp: pendingError.timestamp,
       operation,
       message: pendingError.message,
       location: pendingError.location,
@@ -341,7 +333,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     if (stage) {
       onEvent({
         type: 'build-stage',
-        timestamp: now(),
         operation,
         stage,
         message: stageMessages[stage],
@@ -355,7 +346,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
         message: buildError.message,
         location: buildError.location,
         rawLines: [line],
-        timestamp: now(),
       };
       return;
     }
@@ -364,7 +354,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     if (warning) {
       onEvent({
         type: 'compiler-warning',
-        timestamp: now(),
         operation,
         message: warning.message,
         location: warning.location,

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { createXcodebuildRunState } from '../xcodebuild-run-state.ts';
-import type { PipelineEvent } from '../../types/pipeline-events.ts';
-import { STAGE_RANK } from '../../types/pipeline-events.ts';
-
-function ts(): string {
-  return '2025-01-01T00:00:00.000Z';
-}
+import type {
+  CompilerErrorProgressEvent,
+  CompilerWarningProgressEvent,
+  ProgressEvent,
+  TestFailureProgressEvent,
+} from '../../types/progress-events.ts';
+import { STAGE_RANK } from '../../types/progress-events.ts';
 
 describe('xcodebuild-run-state', () => {
   it('accepts status events and tracks milestones in order', () => {
-    const forwarded: PipelineEvent[] = [];
+    const forwarded: ProgressEvent[] = [];
     const state = createXcodebuildRunState({
       operation: 'TEST',
       onEvent: (e) => forwarded.push(e),
@@ -17,21 +18,18 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'COMPILING',
       message: 'Compiling',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'RUN_TESTS',
       message: 'Running tests',
@@ -53,14 +51,12 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'BUILD',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -68,14 +64,12 @@ describe('xcodebuild-run-state', () => {
     // Duplicate: should be ignored
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'BUILD',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -94,14 +88,12 @@ describe('xcodebuild-run-state', () => {
     // These should be suppressed because they're at or below COMPILING rank
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -109,7 +101,6 @@ describe('xcodebuild-run-state', () => {
     // This should be accepted
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'RUN_TESTS',
       message: 'Running tests',
@@ -123,9 +114,8 @@ describe('xcodebuild-run-state', () => {
   it('deduplicates error diagnostics by location+message', () => {
     const state = createXcodebuildRunState({ operation: 'BUILD' });
 
-    const error: PipelineEvent = {
+    const error: CompilerErrorProgressEvent = {
       type: 'compiler-error',
-      timestamp: ts(),
       operation: 'BUILD',
       message: 'type mismatch',
       location: '/tmp/App.swift:8',
@@ -142,9 +132,8 @@ describe('xcodebuild-run-state', () => {
   it('deduplicates test failures by location+message', () => {
     const state = createXcodebuildRunState({ operation: 'TEST' });
 
-    const failure: PipelineEvent = {
+    const failure: TestFailureProgressEvent = {
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       suite: 'Suite',
       test: 'testA',
@@ -164,7 +153,6 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       suite: 'CalculatorAppTests.CalculatorAppTests',
       test: 'testCalculatorServiceFailure',
@@ -173,7 +161,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       test: 'testCalculatorServiceFailure()',
       message: 'XCTAssertEqual failed',
@@ -187,9 +174,8 @@ describe('xcodebuild-run-state', () => {
   it('deduplicates warnings by location+message', () => {
     const state = createXcodebuildRunState({ operation: 'BUILD' });
 
-    const warning: PipelineEvent = {
+    const warning: CompilerWarningProgressEvent = {
       type: 'compiler-warning',
-      timestamp: ts(),
       operation: 'BUILD',
       message: 'unused variable',
       location: '/tmp/App.swift:5',
@@ -208,7 +194,6 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 1,
       failed: 0,
@@ -216,7 +201,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 2,
       failed: 1,
@@ -224,7 +208,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 3,
       failed: 1,
@@ -238,7 +221,7 @@ describe('xcodebuild-run-state', () => {
   });
 
   it('auto-inserts RUN_TESTS milestone on first test-progress', () => {
-    const forwarded: PipelineEvent[] = [];
+    const forwarded: ProgressEvent[] = [];
     const state = createXcodebuildRunState({
       operation: 'TEST',
       onEvent: (e) => forwarded.push(e),
@@ -246,7 +229,6 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 1,
       failed: 0,
@@ -260,8 +242,8 @@ describe('xcodebuild-run-state', () => {
     expect(forwarded).toHaveLength(2);
   });
 
-  it('finalize emits summary event and sets final status', () => {
-    const forwarded: PipelineEvent[] = [];
+  it('finalize sets final status and duration without synthesizing summary events', () => {
+    const forwarded: ProgressEvent[] = [];
     const state = createXcodebuildRunState({
       operation: 'TEST',
       onEvent: (e) => forwarded.push(e),
@@ -269,7 +251,6 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 5,
       failed: 2,
@@ -280,26 +261,16 @@ describe('xcodebuild-run-state', () => {
 
     expect(finalState.finalStatus).toBe('FAILED');
     expect(finalState.wallClockDurationMs).toBe(1234);
-
-    const summaryEvents = finalState.events.filter((e) => e.type === 'summary');
-    expect(summaryEvents).toHaveLength(1);
-
-    const summary = summaryEvents[0]!;
-    if (summary.type === 'summary') {
-      expect(summary.status).toBe('FAILED');
-      expect(summary.totalTests).toBe(5);
-      expect(summary.failedTests).toBe(2);
-      expect(summary.passedTests).toBe(3);
-      expect(summary.durationMs).toBe(1234);
-    }
+    expect(finalState.completedTests).toBe(5);
+    expect(finalState.failedTests).toBe(2);
+    expect(finalState.skippedTests).toBe(0);
   });
 
-  it('reconciles summary counts with explicit test failures', () => {
+  it('preserves explicit test failures alongside raw progress counts', () => {
     const state = createXcodebuildRunState({ operation: 'TEST' });
 
     state.push({
       type: 'test-progress',
-      timestamp: ts(),
       operation: 'TEST',
       completed: 6,
       failed: 1,
@@ -307,7 +278,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       suite: 'CalculatorAppTests',
       test: 'testCalculatorServiceFailure',
@@ -316,7 +286,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       test: 'test',
       message: 'Expectation failed: Bool(false)',
@@ -324,15 +293,10 @@ describe('xcodebuild-run-state', () => {
     });
 
     const finalState = state.finalize(false, 1234);
-    const summary = finalState.events.find((event) => event.type === 'summary');
-
-    expect(summary).toBeDefined();
-    if (summary?.type === 'summary') {
-      expect(summary.totalTests).toBe(6);
-      expect(summary.passedTests).toBe(4);
-      expect(summary.failedTests).toBe(2);
-      expect(summary.skippedTests).toBe(0);
-    }
+    expect(finalState.completedTests).toBe(6);
+    expect(finalState.failedTests).toBe(1);
+    expect(finalState.skippedTests).toBe(0);
+    expect(finalState.testFailures).toHaveLength(2);
   });
 
   it('highestStageRank returns correct rank for multi-phase handoff', () => {
@@ -340,14 +304,12 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
     });
     state.push({
       type: 'build-stage',
-      timestamp: ts(),
       operation: 'TEST',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -361,7 +323,6 @@ describe('xcodebuild-run-state', () => {
 
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       suite: 'SuiteA',
       test: 'testOne',
@@ -370,7 +331,6 @@ describe('xcodebuild-run-state', () => {
     });
     state.push({
       type: 'test-failure',
-      timestamp: ts(),
       operation: 'TEST',
       suite: 'SuiteB',
       test: 'testTwo',
@@ -381,27 +341,26 @@ describe('xcodebuild-run-state', () => {
     expect(state.snapshot().testFailures).toHaveLength(2);
   });
 
-  it('passes through header and next-steps events', () => {
-    const forwarded: PipelineEvent[] = [];
+  it('forwards test discovery events without storing additional state', () => {
+    const forwarded: ProgressEvent[] = [];
     const state = createXcodebuildRunState({
       operation: 'TEST',
       onEvent: (e) => forwarded.push(e),
     });
 
     state.push({
-      type: 'header',
-      timestamp: ts(),
-      operation: 'Test',
-      params: [],
-    });
-    state.push({
-      type: 'next-steps',
-      timestamp: ts(),
-      steps: [{ tool: 'foo' }],
+      type: 'test-discovery',
+      operation: 'TEST',
+      total: 3,
+      tests: ['testA', 'testB', 'testC'],
+      truncated: false,
     });
 
-    expect(forwarded).toHaveLength(2);
-    expect(forwarded[0].type).toBe('header');
-    expect(forwarded[1].type).toBe('next-steps');
+    expect(forwarded).toHaveLength(1);
+    expect(forwarded[0]).toMatchObject({
+      type: 'test-discovery',
+      total: 3,
+      tests: ['testA', 'testB', 'testC'],
+    });
   });
 });

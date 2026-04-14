@@ -24,7 +24,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { createPipelineCompatExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
+import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
@@ -168,7 +168,7 @@ export async function testDeviceLogic(
 
   ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(ctx, 'TEST');
   const executeTestDevice = createTestDeviceExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestDevice(params, executionContext);
 

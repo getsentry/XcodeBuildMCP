@@ -2,9 +2,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
+import { renderCliTextTranscript } from './renderers/cli-text-renderer.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import { statusLine } from './tool-event-builders.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
@@ -17,7 +18,7 @@ import { mergeSessionDefaultArgs } from './session-default-args.ts';
 export interface ToolTestResult {
   content: Array<{ type: 'text'; text: string }>;
   isError?: boolean;
-  _meta?: { events: PipelineEvent[] };
+  _meta?: { progress: ProgressEvent[] };
 }
 
 /**
@@ -52,8 +53,13 @@ function isToolHandlerContext(value: unknown): value is ToolHandlerContext {
 }
 
 function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {
-  const text = session.finalize();
-  const events = [...session.getEvents()];
+  const progress = [...(session.getProgressEvents?.() ?? session.getEvents())];
+  const text = renderCliTextTranscript({
+    items: progress,
+    structuredOutput: session.getStructuredOutput?.(),
+    nextSteps: session.getNextSteps?.(),
+    nextStepsRuntime: session.getNextStepsRuntime?.(),
+  });
 
   const content: Array<{ type: 'text'; text: string }> = [];
   if (text) {
@@ -63,7 +69,7 @@ function sessionToTestResult(session: ReturnType<typeof createRenderSession>): T
   return {
     content,
     isError: session.isError() || undefined,
-    ...(events.length > 0 ? { _meta: { events } } : {}),
+    ...(progress.length > 0 ? { _meta: { progress } } : {}),
   };
 }
 
@@ -95,6 +101,12 @@ function createValidatedHandler<TParams, TContext>(
       const validatedParams = schema.parse(args);
       await handlerContextStorage.run(ctx, () => logicFunction(validatedParams, context));
       if (!hasProvidedHandlerContext) {
+        if (ctx.structuredOutput) {
+          session!.setStructuredOutput?.(ctx.structuredOutput);
+        }
+        if (ctx.nextSteps && ctx.nextSteps.length > 0) {
+          session!.setNextSteps?.([...ctx.nextSteps], 'cli');
+        }
         return sessionToTestResult(session!);
       }
     } catch (error) {
@@ -225,6 +237,12 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
 
     const finalize = (): ToolTestResult | void => {
       if (!hasProvidedHandlerContext) {
+        if (ctx.structuredOutput) {
+          session!.setStructuredOutput?.(ctx.structuredOutput);
+        }
+        if (ctx.nextSteps && ctx.nextSteps.length > 0) {
+          session!.setNextSteps?.([...ctx.nextSteps], 'cli');
+        }
         return sessionToTestResult(session!);
       }
     };

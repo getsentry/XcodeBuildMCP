@@ -125,16 +125,9 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetCoverageReportR
   };
 }
 
-function createPipelineCompatExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -283,7 +276,7 @@ export async function get_coverage_reportLogic(
     headerParams.push({ label: 'Target Filter', value: params.target });
   }
   const headerEvent = header('Coverage Report', headerParams);
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeGetCoverageReport = createGetCoverageReportExecutor(context);
 
   ctx.emit(headerEvent);

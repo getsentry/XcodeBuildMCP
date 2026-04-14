@@ -1,33 +1,41 @@
 import type {
   XcodebuildOperation,
   XcodebuildStage,
-  PipelineEvent,
-  BuildStageEvent,
-  CompilerWarningEvent,
-  CompilerErrorEvent,
-  TestFailureEvent,
-} from '../types/pipeline-events.ts';
-import { STAGE_RANK } from '../types/pipeline-events.ts';
+  BuildStageProgressEvent,
+  CompilerWarningProgressEvent,
+  CompilerErrorProgressEvent,
+  TestDiscoveryProgressEvent,
+  TestFailureProgressEvent,
+  TestProgressProgressEvent,
+} from '../types/progress-events.ts';
+import { STAGE_RANK } from '../types/progress-events.ts';
+
+type XcodebuildRunStateEvent =
+  | BuildStageProgressEvent
+  | CompilerWarningProgressEvent
+  | CompilerErrorProgressEvent
+  | TestDiscoveryProgressEvent
+  | TestFailureProgressEvent
+  | TestProgressProgressEvent;
 
 export interface XcodebuildRunState {
   operation: XcodebuildOperation;
   currentStage: XcodebuildStage | null;
-  milestones: BuildStageEvent[];
-  warnings: CompilerWarningEvent[];
-  errors: CompilerErrorEvent[];
-  testFailures: TestFailureEvent[];
+  milestones: BuildStageProgressEvent[];
+  warnings: CompilerWarningProgressEvent[];
+  errors: CompilerErrorProgressEvent[];
+  testFailures: TestFailureProgressEvent[];
   completedTests: number;
   failedTests: number;
   skippedTests: number;
   finalStatus: 'SUCCEEDED' | 'FAILED' | null;
   wallClockDurationMs: number | null;
-  events: PipelineEvent[];
 }
 
 export interface RunStateOptions {
   operation: XcodebuildOperation;
   minimumStage?: XcodebuildStage;
-  onEvent?: (event: PipelineEvent) => void;
+  onEvent?: (event: XcodebuildRunStateEvent) => void;
 }
 
 function normalizeDiagnosticKey(location: string | undefined, message: string): string {
@@ -47,7 +55,7 @@ function normalizeTestFailureLocation(location: string | undefined): string | nu
   return (match?.[1] ?? location).trim().toLowerCase();
 }
 
-function normalizeTestFailureKey(event: TestFailureEvent): string {
+function normalizeTestFailureKey(event: TestFailureProgressEvent): string {
   const normalizedLocation = normalizeTestFailureLocation(event.location);
   const normalizedMessage = event.message.trim().toLowerCase();
   const suite = normalizeTestIdentifier(event.suite);
@@ -62,14 +70,9 @@ function normalizeTestFailureKey(event: TestFailureEvent): string {
   return `${suite}|${test}|${normalizedMessage}`;
 }
 
-export interface FinalizeOptions {
-  emitSummary?: boolean;
-  tailEvents?: PipelineEvent[];
-}
-
 export interface XcodebuildRunStateHandle {
-  push(event: PipelineEvent): void;
-  finalize(succeeded: boolean, durationMs?: number, options?: FinalizeOptions): XcodebuildRunState;
+  push(event: XcodebuildRunStateEvent): void;
+  finalize(succeeded: boolean, durationMs?: number): XcodebuildRunState;
   snapshot(): Readonly<XcodebuildRunState>;
   highestStageRank(): number;
 }
@@ -89,19 +92,17 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
     skippedTests: 0,
     finalStatus: null,
     wallClockDurationMs: null,
-    events: [],
   };
 
   let highestRank = options.minimumStage !== undefined ? STAGE_RANK[options.minimumStage] : -1;
   const seenDiagnostics = new Set<string>();
 
-  function accept(event: PipelineEvent): void {
-    state.events.push(event);
+  function accept(event: XcodebuildRunStateEvent): void {
     onEvent?.(event);
   }
 
   function acceptDedupedDiagnostic<T extends { location?: string; message: string }>(
-    event: PipelineEvent & T,
+    event: XcodebuildRunStateEvent & T,
     collection: T[],
   ): void {
     const key = normalizeDiagnosticKey(event.location, event.message);
@@ -114,7 +115,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
   }
 
   return {
-    push(event: PipelineEvent): void {
+    push(event: XcodebuildRunStateEvent): void {
       switch (event.type) {
         case 'build-stage': {
           const rank = STAGE_RANK[event.stage];
@@ -149,15 +150,19 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
           break;
         }
 
+        case 'test-discovery': {
+          accept(event);
+          break;
+        }
+
         case 'test-progress': {
           state.completedTests = event.completed;
           state.failedTests = event.failed;
           state.skippedTests = event.skipped;
 
           if (highestRank < STAGE_RANK.RUN_TESTS) {
-            const runTestsEvent: BuildStageEvent = {
+            const runTestsEvent: BuildStageProgressEvent = {
               type: 'build-stage',
-              timestamp: event.timestamp,
               operation: 'TEST',
               stage: 'RUN_TESTS',
               message: 'Running tests',
@@ -171,67 +176,15 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
           accept(event);
           break;
         }
-
-        case 'header':
-        case 'status-line':
-        case 'section':
-        case 'detail-tree':
-        case 'table':
-        case 'file-ref':
-        case 'test-discovery':
-        case 'summary':
-        case 'next-steps': {
-          accept(event);
-          break;
-        }
       }
     },
 
-    finalize(
-      succeeded: boolean,
-      durationMs?: number,
-      options?: FinalizeOptions,
-    ): XcodebuildRunState {
+    finalize(succeeded: boolean, durationMs?: number): XcodebuildRunState {
       state.finalStatus = succeeded ? 'SUCCEEDED' : 'FAILED';
       state.wallClockDurationMs = durationMs ?? null;
 
-      if (options?.emitSummary !== false) {
-        const reconciledFailedTests = Math.max(state.failedTests, state.testFailures.length);
-        const reconciledPassedTests = Math.max(
-          0,
-          state.completedTests - reconciledFailedTests - state.skippedTests,
-        );
-        const reconciledTotalTests =
-          operation === 'TEST'
-            ? reconciledPassedTests + reconciledFailedTests + state.skippedTests
-            : undefined;
-
-        const summaryEvent: PipelineEvent = {
-          type: 'summary',
-          timestamp: new Date().toISOString(),
-          operation,
-          status: state.finalStatus,
-          ...(operation === 'TEST'
-            ? {
-                totalTests: reconciledTotalTests,
-                passedTests: reconciledPassedTests,
-                failedTests: reconciledFailedTests,
-                skippedTests: state.skippedTests,
-              }
-            : {}),
-          durationMs,
-        };
-
-        accept(summaryEvent);
-      }
-
-      for (const tailEvent of options?.tailEvents ?? []) {
-        accept(tailEvent);
-      }
-
       return {
         ...state,
-        events: [...state.events],
         milestones: [...state.milestones],
         warnings: [...state.warnings],
         errors: [...state.errors],
@@ -242,7 +195,6 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
     snapshot(): Readonly<XcodebuildRunState> {
       return {
         ...state,
-        events: [...state.events],
         milestones: [...state.milestones],
         warnings: [...state.warnings],
         errors: [...state.errors],

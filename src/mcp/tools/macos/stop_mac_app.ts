@@ -8,7 +8,6 @@ import {
   DefaultToolExecutionContext,
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -28,7 +27,7 @@ export async function stop_mac_appLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeStopMacApp = createStopMacAppExecutor(executor);
   const result = await executeStopMacApp(params, executionContext);
@@ -37,13 +36,7 @@ export async function stop_mac_appLogic(
     setStructuredOutput(ctx, result);
   }
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error stopping macOS app: ${result.error ?? 'Unknown error'}`);

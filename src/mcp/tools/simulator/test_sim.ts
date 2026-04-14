@@ -27,7 +27,7 @@ import { inferPlatform, type InferPlatformResult } from '../../../utils/infer-pl
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { resolveSimulatorIdOrName } from '../../../utils/simulator-resolver.ts';
 import {
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
   createTestDomainResult,
 } from '../../../utils/xcodebuild-domain-results.ts';
@@ -262,7 +262,7 @@ export async function test_simLogic(
 
   ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(ctx, 'TEST');
   const executeTestSim = createTestSimExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestSim(params, executionContext);
 

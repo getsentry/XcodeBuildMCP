@@ -6,7 +6,7 @@ import { buildCliToolCatalogFromManifest, createToolCatalog } from '../runtime/t
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
 import { toKebabCase } from '../runtime/naming.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
-import type { PipelineEvent } from '../types/pipeline-events.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 import { jsonSchemaToZod } from '../integrations/xcode-tools-bridge/jsonschema-to-zod.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
@@ -64,9 +64,9 @@ async function invokeRemoteToolOneShot(
       isError?: boolean;
       _meta?: Record<string, unknown>;
     };
-    const events = response._meta?.events;
-    if (Array.isArray(events)) {
-      for (const event of events as PipelineEvent[]) {
+    const progress = response._meta?.progress;
+    if (Array.isArray(progress)) {
+      for (const event of progress as ProgressEvent[]) {
         ctx.emit(event);
       }
     } else if (response.content) {

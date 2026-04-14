@@ -16,7 +16,6 @@ import {
   DefaultToolExecutionContext,
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { constructDestinationString } from '../../../utils/xcode.ts';
 import {
@@ -255,19 +254,15 @@ export async function get_sim_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeGetSimAppPath = createGetSimAppPathExecutor(executor);
   const result = await executeGetSimAppPath(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);

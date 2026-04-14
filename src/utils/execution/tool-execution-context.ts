@@ -1,61 +1,65 @@
-import type { RenderSession } from '../../rendering/types.js';
 import type { ToolDomainResult } from '../../types/domain-results.js';
-import type { PipelineEvent, XcodebuildOperation } from '../../types/pipeline-events.js';
-import type { ProgressEvent } from '../../types/progress-events.js';
+import type { ProgressEvent, XcodebuildOperation } from '../../types/progress-events.js';
 import type { ToolAttachment, ToolExecutionContext } from '../../types/tool-execution.js';
-import { DomainResultPipelineEventAdapter } from '../domain-result-adapter.js';
+import { renderDomainResultTextItems } from '../renderers/domain-result-text.js';
 
 export interface DefaultToolExecutionContextOptions {
-  renderSession?: RenderSession;
   xcodebuildOperation?: XcodebuildOperation;
   progressSink?: (event: ProgressEvent) => void;
+}
+
+function isProgressEvent(
+  item: ReturnType<typeof renderDomainResultTextItems>[number],
+): item is ProgressEvent {
+  return item.type !== 'summary';
+}
+
+function shouldAdaptResult(result: ToolDomainResult): boolean {
+  switch (result.kind) {
+    case 'doctor-report':
+    case 'ui-action-result':
+    case 'xcode-bridge-status':
+    case 'xcode-bridge-sync':
+    case 'xcode-bridge-tool-list':
+    case 'xcode-bridge-call-result':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function adaptDomainResultToProgressEvents(result: ToolDomainResult): ProgressEvent[] {
+  if (!shouldAdaptResult(result)) {
+    return [];
+  }
+
+  return renderDomainResultTextItems(result).filter(isProgressEvent);
 }
 
 export class DefaultToolExecutionContext implements ToolExecutionContext {
   private readonly progressEvents: ProgressEvent[] = [];
   private readonly attachments: ToolAttachment[] = [];
-  private readonly renderSession?: RenderSession;
   private readonly progressSink?: (event: ProgressEvent) => void;
-  private readonly adapter: DomainResultPipelineEventAdapter;
   private result?: ToolDomainResult;
 
   constructor(options: DefaultToolExecutionContextOptions = {}) {
-    this.renderSession = options.renderSession;
     this.progressSink = options.progressSink;
-    this.adapter = new DomainResultPipelineEventAdapter({
-      xcodebuildOperation: options.xcodebuildOperation,
-    });
   }
 
   emitProgress(event: ProgressEvent): void {
     this.progressEvents.push(event);
     this.progressSink?.(event);
-
-    if (!this.renderSession) {
-      return;
-    }
-
-    for (const pipelineEvent of this.adapter.adaptProgressEvent(event)) {
-      this.renderSession.emit(pipelineEvent);
-    }
   }
 
   attach(image: ToolAttachment): void {
     this.attachments.push(image);
   }
 
-  emitResult(result: ToolDomainResult): PipelineEvent[] {
+  emitResult(result: ToolDomainResult): void {
     this.result = result;
-
-    const pipelineEvents = this.adapter.adaptResult(result);
-
-    if (this.renderSession) {
-      for (const event of pipelineEvents) {
-        this.renderSession.emit(event);
-      }
+    for (const event of adaptDomainResultToProgressEvents(result)) {
+      this.emitProgress(event);
     }
-
-    return pipelineEvents;
   }
 
   getProgressEvents(): readonly ProgressEvent[] {

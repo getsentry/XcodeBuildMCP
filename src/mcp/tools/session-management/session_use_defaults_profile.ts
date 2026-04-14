@@ -120,7 +120,9 @@ export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
 
 export async function sessionUseDefaultsProfileLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSessionUseDefaultsProfile = createSessionUseDefaultsProfileExecutor();
   const result = await executeSessionUseDefaultsProfile(params, executionContext);
 

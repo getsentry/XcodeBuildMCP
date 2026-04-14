@@ -28,7 +28,9 @@ export async function xcodeToolsBridgeDisconnectLogic(params: Params): Promise<v
   log('info', 'Starting bridge disconnect request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext();
+  const executionContext = new BridgeToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeBridgeDisconnect = createXcodeToolsBridgeDisconnectExecutor();
   const result = await executeBridgeDisconnect(params, executionContext);
 

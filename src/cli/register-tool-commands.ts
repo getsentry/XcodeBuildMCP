@@ -16,6 +16,7 @@ import {
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
+import type { ProgressEvent } from '../types/progress-events.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -68,14 +69,21 @@ function setEnvScoped(key: string, value: string): () => void {
   };
 }
 
-function createBufferedHandlerContext(session: RenderSession): ToolHandlerContext {
+function createBufferedHandlerContext(
+  session: RenderSession,
+  opts?: { onProgress?: (event: ProgressEvent) => void },
+): ToolHandlerContext {
+  const emit = (event: ProgressEvent): void => {
+    session.emit(event);
+    opts?.onProgress?.(event);
+  };
+
   return {
-    emit: (event) => {
-      session.emit(event);
-    },
+    emit,
     attach: (image) => {
       session.attach(image);
     },
+    emitProgress: emit,
   };
 }
 
@@ -341,19 +349,20 @@ function registerToolSubcommand(
             : outputFormat === 'raw'
               ? createRenderSession('text')
               : createRenderSession('text');
-        const handlerContext = createBufferedHandlerContext(session);
-
-        if (outputFormat === 'jsonl') {
-          handlerContext.emitProgress = (event) => {
-            process.stdout.write(JSON.stringify(event) + '\n');
-          };
-        }
+        const handlerContext = createBufferedHandlerContext(session, {
+          onProgress:
+            outputFormat === 'jsonl'
+              ? (event) => {
+                  process.stdout.write(JSON.stringify(event) + '\n');
+                }
+              : undefined,
+        });
 
         await invoker.invokeDirect(tool, args, {
           runtime: 'cli',
           renderSession: session,
           handlerContext,
-          onProgress: handlerContext.emitProgress,
+          onProgress: outputFormat === 'jsonl' ? handlerContext.emit : undefined,
           onStructuredOutput: (structuredOutput) => {
             handlerContext.structuredOutput = structuredOutput;
           },

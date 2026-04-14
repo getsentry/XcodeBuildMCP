@@ -133,7 +133,9 @@ export function createSessionClearDefaultsExecutor(): ToolExecutor<
 export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
   const activeProfileBefore = sessionStore.getActiveProfile();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSessionClearDefaults = createSessionClearDefaultsExecutor();
   const result = await executeSessionClearDefaults(params, executionContext);
 

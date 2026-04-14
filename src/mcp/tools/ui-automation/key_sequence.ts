@@ -96,15 +96,15 @@ export async function key_sequenceLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeKeySequence = createKeySequenceExecutor(executor, axeHelpers, debuggerManager);
   const result = await executeKeySequence(params, executionContext);
 
   setUiActionStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 const publicSchemaObject = z.strictObject(

@@ -18,7 +18,7 @@ const runBuildRunDeviceLogic = (
 
 function expectPendingBuildRunResponse(result: MockToolHandlerResult, isError: boolean): void {
   expect(result.isError()).toBe(isError);
-  expect(result.events.some((event) => event.type === 'summary')).toBe(true);
+  expect(result.text()).not.toHaveLength(0);
 }
 
 describe('build_run_device tool', () => {
@@ -199,23 +199,11 @@ describe('build_run_device tool', () => {
       expect(result.nextStepParams).toMatchObject({
         stop_app_device: { deviceId: 'DEVICE-UDID', processId: 1234 },
       });
-      expect(result.events).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'status-line',
-            level: 'success',
-            message: 'Build & Run complete',
-          }),
-          expect.objectContaining({
-            type: 'detail-tree',
-            items: expect.arrayContaining([
-              expect.objectContaining({ label: 'App Path', value: '/tmp/build/MyApp.app' }),
-              expect.objectContaining({ label: 'Bundle ID', value: 'io.sentry.MyApp' }),
-              expect.objectContaining({ label: 'Process ID', value: '1234' }),
-            ]),
-          }),
-        ]),
-      );
+      const text = result.text();
+      expect(text).toContain('Build & Run complete');
+      expect(text).toContain('/tmp/build/MyApp.app');
+      expect(text).toContain('io.sentry.MyApp');
+      expect(text).toContain('1234');
     });
 
     it('succeeds without processId when launch JSON is unparseable', async () => {
@@ -250,20 +238,9 @@ describe('build_run_device tool', () => {
       expectPendingBuildRunResponse(result, false);
       expect(result.nextStepParams?.stop_app_device).toBeUndefined();
 
-      const completionEvent = result.events.find(
-        (event) =>
-          event.type === 'status-line' &&
-          event.level === 'success' &&
-          event.message === 'Build & Run complete',
-      );
-      expect(completionEvent).toBeDefined();
-
-      const detailTrees = result.events.filter((event) => event.type === 'detail-tree');
-      const detailTree = detailTrees[detailTrees.length - 1] as
-        | { type: 'detail-tree'; items: Array<{ label: string; value: string }> }
-        | undefined;
-      expect(detailTree).toBeDefined();
-      expect(detailTree?.items.some((item) => item.label === 'Process ID')).toBe(false);
+      const text = result.text();
+      expect(text).toContain('Build & Run complete');
+      expect(text).not.toContain('Process ID');
     });
 
     it('uses generic destination for build-settings lookup', async () => {

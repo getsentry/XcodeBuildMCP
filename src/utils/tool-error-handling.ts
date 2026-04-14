@@ -1,5 +1,5 @@
 import type { ToolHandlerContext } from '../rendering/types.ts';
-import type { HeaderEvent, PipelineEvent } from '../types/pipeline-events.ts';
+import type { HeaderProgressEvent, ProgressEvent } from '../types/progress-events.ts';
 import { toErrorMessage } from './errors.ts';
 import { statusLine } from './tool-event-builders.ts';
 import { log } from './logging/index.ts';
@@ -7,12 +7,12 @@ import { log } from './logging/index.ts';
 export interface MapErrorContext {
   error: unknown;
   message: string;
-  headerEvent: HeaderEvent;
-  emit?: (event: PipelineEvent) => void;
+  headerEvent: HeaderProgressEvent;
+  emit?: (event: ProgressEvent) => void;
 }
 
 export interface WithErrorHandlingOptions {
-  header: HeaderEvent | (() => HeaderEvent);
+  header: HeaderProgressEvent | (() => HeaderProgressEvent);
   errorMessage: string | ((errCtx: { message: string; error: unknown }) => string);
   logMessage?: string | ((errCtx: { message: string; error: unknown }) => string);
   mapError?: (errCtx: MapErrorContext) => void | undefined;
@@ -31,7 +31,7 @@ export async function withErrorHandling(
 
     if (options.mapError) {
       let emitted = false;
-      const emit = (event: PipelineEvent) => {
+      const emit = (event: ProgressEvent) => {
         ctx.emit(event);
         emitted = true;
       };

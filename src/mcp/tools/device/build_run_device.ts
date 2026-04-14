@@ -30,7 +30,7 @@ import { installAppOnDevice, launchAppOnDevice } from '../../../utils/device-ste
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
 import {
   createBuildRunDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 
@@ -292,7 +292,7 @@ export async function build_run_deviceLogic(
     ),
   );
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildRunDevice = createBuildRunDeviceExecutor(executor, fileSystemExecutor);
   const result = await executeBuildRunDevice(params, executionContext);
 

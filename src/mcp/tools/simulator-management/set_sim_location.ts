@@ -164,7 +164,9 @@ export async function set_sim_locationLogic(
   ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeSetSimulatorLocation = createSetSimulatorLocationExecutor(executor);
 
   ctx.emit(headerEvent);

@@ -89,7 +89,9 @@ function mockInvokeDirectThroughHandler() {
     .mockImplementation(async (tool, args, opts) => {
       const handlerContext = opts.handlerContext ?? {
         emit: (event) => {
-          opts.renderSession?.emit(event);
+          if (!('timestamp' in event)) {
+            opts.renderSession?.emit(event);
+          }
         },
         attach: (image) => {
           opts.renderSession?.attach(image);
@@ -386,8 +388,7 @@ describe('registerToolCommands', () => {
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
         ctx?.emit({
-          type: 'status-line',
-          timestamp: '2026-01-01T00:00:00.000Z',
+          type: 'status',
           level: 'info',
           message: 'legacy event',
         });
@@ -455,12 +456,12 @@ describe('registerToolCommands', () => {
 
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
-        ctx?.emitProgress?.({
+        ctx?.emit({
           type: 'status',
           level: 'info',
           message: 'Starting work',
         });
-        ctx?.emitProgress?.({
+        ctx?.emit({
           type: 'artifact',
           name: 'Build Log',
           path: '/tmp/build.log',
@@ -498,8 +499,7 @@ describe('registerToolCommands', () => {
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
         ctx?.emit({
-          type: 'status-line',
-          timestamp: '2026-01-01T00:00:00.000Z',
+          type: 'status',
           level: 'info',
           message: 'legacy event',
         });

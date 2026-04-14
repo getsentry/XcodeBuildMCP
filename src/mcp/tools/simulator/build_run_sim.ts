@@ -38,7 +38,7 @@ import {
 import { statusLine } from '../../../utils/tool-event-builders.ts';
 import {
   createBuildRunDomainResult,
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
@@ -485,7 +485,7 @@ export async function build_run_simLogic(
 
     ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Build & Run'));
 
-    const executionContext = createPipelineCompatExecutionContext(ctx, 'BUILD');
+    const executionContext = createToolExecutionContext(ctx, 'BUILD');
     const executeBuildRunSim = createBuildRunSimExecutor(executor, launcher, prepared);
     const result = await executeBuildRunSim(params, executionContext);
 

@@ -12,21 +12,32 @@ import { list_devicesLogic } from '../tools/device/list_devices.ts';
 import { createRenderSession } from '../../rendering/render.ts';
 import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
+import type { ProgressEvent } from '../../types/progress-events.ts';
+import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
 
 export async function devicesResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
   const session = createRenderSession('text');
+  const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
-    emit: (event) => session.emit(event),
+    emit: (event) => {
+      items.push(event);
+      session.emit(event);
+    },
     attach: () => {},
   };
 
   try {
     log('info', 'Processing devices resource request');
     await handlerContextStorage.run(ctx, () => list_devicesLogic({}, executor));
-    const text = session.finalize();
-    if (session.isError()) {
+    const text = renderCliTextTranscript({
+      items,
+      structuredOutput: ctx.structuredOutput,
+      nextSteps: ctx.nextSteps,
+    });
+    const isError = session.isError() || ctx.structuredOutput?.result.didError === true;
+    if (isError) {
       throw new Error(text || 'Failed to retrieve device data');
     }
     return {

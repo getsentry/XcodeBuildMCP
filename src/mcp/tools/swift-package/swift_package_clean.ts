@@ -8,7 +8,7 @@ import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { header } from '../../../utils/tool-event-builders.ts';
-import { createPipelineCompatExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
+import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
@@ -116,7 +116,7 @@ export async function swift_package_cleanLogic(
 
   ctx.emit(header('Swift Package Clean', [{ label: 'Package', value: resolvedPath }]));
 
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeSwiftPackageClean = createSwiftPackageCleanExecutor(executor);
   const result = await executeSwiftPackageClean(params, executionContext);
 

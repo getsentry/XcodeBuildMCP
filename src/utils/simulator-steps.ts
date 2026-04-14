@@ -11,6 +11,8 @@ import {
   stopSimulatorLaunchOsLogSessionsForApp,
 } from './log-capture/simulator-launch-oslog-sessions.ts';
 
+let logDirOverrideForTests: string | null = null;
+
 function formatLogTimestamp(): string {
   return new Date().toISOString().replace(/:/g, '-').replace('.', '-');
 }
@@ -163,7 +165,7 @@ export async function launchSimulatorAppWithLogging(
 ): Promise<LaunchWithLoggingResult> {
   const spawner = deps?.spawner ?? spawn;
 
-  const logsDir = LOG_DIR;
+  const logsDir = logDirOverrideForTests ?? LOG_DIR;
   const ts = formatLogTimestamp();
   const logFileName = `${bundleId}_${ts}_pid${process.pid}.log`;
   const logFilePath = path.join(logsDir, logFileName);
@@ -233,6 +235,10 @@ export async function launchSimulatorAppWithLogging(
     log('error', `Failed to launch simulator app with logging: ${message}`);
     return { success: false, logFilePath, error: message };
   }
+}
+
+export function setSimulatorLogDirOverrideForTests(dir: string | null): void {
+  logDirOverrideForTests = dir;
 }
 
 async function resolveAppPidViaLaunch(

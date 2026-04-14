@@ -13,7 +13,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { header } from '../../../utils/tool-event-builders.ts';
 import {
-  createPipelineCompatExecutionContext,
+  createToolExecutionContext,
   createProgressStreamingPipeline,
   createTestDomainResult,
 } from '../../../utils/xcodebuild-domain-results.ts';
@@ -162,7 +162,7 @@ export async function swift_package_testLogic(
     ]),
   );
 
-  const executionContext = createPipelineCompatExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(ctx, 'TEST');
   const executeSwiftPackageTest = createSwiftPackageTestExecutor(executor);
   const result = await executeSwiftPackageTest(params, executionContext);
 

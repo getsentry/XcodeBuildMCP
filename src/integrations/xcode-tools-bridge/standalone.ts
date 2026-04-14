@@ -32,7 +32,7 @@ export class StandaloneXcodeToolsBridge {
   async statusTool(): Promise<BridgeToolResult> {
     const status = await this.getStatus();
     return {
-      events: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
+      progress: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
       payload: { kind: 'status', status },
     };
   }
@@ -49,7 +49,7 @@ export class StandaloneXcodeToolsBridge {
       };
       const status = await this.getStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Sync'),
           section('Sync Result', [JSON.stringify({ sync, status }, null, 2)]),
           statusLine('success', 'Bridge sync completed'),
@@ -60,7 +60,7 @@ export class StandaloneXcodeToolsBridge {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        events: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
+        progress: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
         isError: true,
         errorMessage: `Bridge sync failed: ${message}`,
         payload: {
@@ -79,7 +79,7 @@ export class StandaloneXcodeToolsBridge {
       await this.service.disconnect();
       const status = await this.getStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Disconnect'),
           section('Status', [JSON.stringify(status, null, 2)]),
           statusLine('success', 'Bridge disconnected'),
@@ -90,7 +90,7 @@ export class StandaloneXcodeToolsBridge {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        events: [
+        progress: [
           header('Bridge Disconnect'),
           statusLine('error', `Bridge disconnect failed: ${message}`),
         ],
@@ -109,7 +109,7 @@ export class StandaloneXcodeToolsBridge {
         tools: tools.map(serializeBridgeTool),
       };
       return {
-        events: [
+        progress: [
           header('Xcode IDE List Tools'),
           section('Tools', [JSON.stringify(payload, null, 2)]),
           statusLine('success', `Found ${tools.length} tool(s)`),
@@ -120,7 +120,7 @@ export class StandaloneXcodeToolsBridge {
       const message = error instanceof Error ? error.message : String(error);
       const code = classifyBridgeError(error, 'list');
       return {
-        events: [header('Xcode IDE List Tools'), statusLine('error', `[${code}] ${message}`)],
+        progress: [header('Xcode IDE List Tools'), statusLine('error', `[${code}] ${message}`)],
         isError: true,
         errorMessage: `[${code}] ${message}`,
         payload: { kind: 'tool-list', toolCount: 0, tools: [] },
@@ -144,7 +144,7 @@ export class StandaloneXcodeToolsBridge {
       const message = error instanceof Error ? error.message : String(error);
       const code = classifyBridgeError(error, 'call');
       return {
-        events: [header('Xcode IDE Call Tool'), statusLine('error', `[${code}] ${message}`)],
+        progress: [header('Xcode IDE Call Tool'), statusLine('error', `[${code}] ${message}`)],
         isError: true,
         errorMessage: `[${code}] ${message}`,
         payload: { kind: 'call-result', succeeded: false, content: [] },

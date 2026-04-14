@@ -149,7 +149,9 @@ export async function erase_simsLogic(
   ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeEraseSims = createEraseSimsExecutor(executor);
 
   log(

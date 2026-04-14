@@ -364,7 +364,9 @@ export async function scaffold_macos_projectLogic(
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeScaffoldMacOSProject = createScaffoldMacOSProjectExecutor(
     commandExecutor,
     fileSystemExecutor,

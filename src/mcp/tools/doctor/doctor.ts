@@ -15,7 +15,7 @@ import {
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
 import { version } from '../../../utils/version/index.ts';
-import type { PipelineEvent } from '../../../types/pipeline-events.ts';
+import type { ProgressEvent } from '../../../types/progress-events.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getConfig } from '../../../utils/config-store.ts';
 import { detectXcodeRuntime } from '../../../utils/xcode-process.ts';
@@ -472,7 +472,7 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
       dapSelected,
     } = await collectDoctorData(params, deps);
 
-    const events: PipelineEvent[] = [
+    const events: ProgressEvent[] = [
       header('XcodeBuildMCP Doctor', [
         { label: 'Generated', value: doctorInfo.timestamp },
         { label: 'Server Version', value: doctorInfo.serverVersion },
@@ -691,14 +691,12 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
 
     const rendered = renderEvents(events, 'text');
     const hasError = events.some(
-      (e) =>
-        (e.type === 'status-line' && e.level === 'error') ||
-        (e.type === 'summary' && e.status === 'FAILED'),
+      (e) => e.type === 'compiler-error' || (e.type === 'status' && e.level === 'error'),
     );
     return {
       content: [{ type: 'text' as const, text: rendered }],
       isError: hasError || undefined,
-      _meta: { events: [...events] },
+      _meta: { progress: [...events] },
     };
   } finally {
     if (prevSilence === undefined) {
@@ -720,15 +718,15 @@ export async function doctorToolLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const deps = createDoctorDependencies(executor);
-  const executionContext = new DefaultToolExecutionContext();
+  const executionContext = new DefaultToolExecutionContext({
+    progressSink: ctx.emitProgress ?? ctx.emit,
+  });
   const executeDoctor = createDoctorExecutor(deps);
   const result = await executeDoctor(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 export const schema = doctorSchema.shape;

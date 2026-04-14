@@ -4,7 +4,6 @@ import type { ProcessListDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/command.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { activeProcesses } from './active-processes.ts';
 
@@ -106,7 +105,7 @@ export async function swift_package_listLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeSwiftPackageList = createSwiftPackageListExecutor(dependencies);
   const result = await executeSwiftPackageList(
@@ -116,13 +115,7 @@ export async function swift_package_listLogic(
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter();
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of executionContext.emitResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 }
 
 const swiftPackageListSchema = z.object({});

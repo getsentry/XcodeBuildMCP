@@ -139,16 +139,9 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetFileCoverageRes
   };
 }
 
-function createPipelineCompatExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -326,7 +319,7 @@ export async function get_file_coverageLogic(
     { label: 'xcresult', value: xcresultPath },
     { label: 'File', value: file },
   ]);
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeGetFileCoverage = createGetFileCoverageExecutor(context);
 
   ctx.emit(headerEvent);

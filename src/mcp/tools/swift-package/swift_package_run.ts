@@ -16,7 +16,6 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { acquireDaemonActivity } from '../../../daemon/activity-registry.ts';
-import { DomainResultPipelineEventAdapter } from '../../../utils/domain-result-adapter.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseSchemaObject = z.object({
@@ -81,20 +80,14 @@ export async function swift_package_runLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress,
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
   const executeSwiftPackageRun = createSwiftPackageRunExecutor(executor);
   const result = await executeSwiftPackageRun(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
-  const adapter = new DomainResultPipelineEventAdapter({ xcodebuildOperation: 'BUILD' });
-  for (const event of adapter.adaptProgressEvents(executionContext.getProgressEvents())) {
-    ctx.emit(event);
-  }
-  for (const event of adapter.adaptResult(result)) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Swift run failed: ${result.error ?? 'Unknown error'}`);
@@ -212,6 +205,7 @@ function emitChunkLines(
     }
     ctx.emitProgress({
       type: 'xcodebuild-line',
+      operation: 'BUILD',
       stream,
       line,
     });
@@ -229,6 +223,7 @@ function flushChunkLines(
 
   ctx.emitProgress({
     type: 'xcodebuild-line',
+    operation: 'BUILD',
     stream,
     line: state.remainder,
   });

@@ -25,18 +25,9 @@ const getAppBundleIdSchema = z.object({
 type GetAppBundleIdParams = z.infer<typeof getAppBundleIdSchema>;
 type GetAppBundleIdResult = BundleIdDomainResult;
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -135,7 +126,7 @@ export async function get_app_bundle_idLogic(
   log('info', `Starting bundle ID extraction for app: ${appPath}`);
 
   const ctx = getHandlerContext();
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeGetAppBundleId = createGetAppBundleIdExecutor(executor, fileSystemExecutor);
   const result = await executeGetAppBundleId(params, executionContext);
 
@@ -147,10 +138,7 @@ export async function get_app_bundle_idLogic(
     log('info', `Extracted app bundle ID: ${result.artifacts.bundleId}`);
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (!result.didError && result.artifacts.bundleId) {
     ctx.nextStepParams = {

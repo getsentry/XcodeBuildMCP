@@ -68,18 +68,9 @@ export async function listSchemes(
   return parseSchemesFromXcodebuildListOutput(result.output);
 }
 
-function createPipelineCompatExecutionContext(
-  ctx: ToolHandlerContext,
-): DefaultToolExecutionContext {
+function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    renderSession: {
-      emit: ctx.emit,
-      attach: () => {},
-      getEvents: () => [],
-      getAttachments: () => [],
-      isError: () => false,
-      finalize: () => '',
-    },
+    progressSink: ctx.emitProgress ?? ctx.emit,
   });
 }
 
@@ -173,7 +164,7 @@ export async function listSchemesLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
-  const executionContext = createPipelineCompatExecutionContext(ctx);
+  const executionContext = createToolExecutionContext(ctx);
   const executeListSchemes = createListSchemesExecutor(executor);
   const result = await executeListSchemes(params, executionContext);
 
@@ -183,10 +174,7 @@ export async function listSchemesLogic(
     log('error', `Error listing schemes: ${result.error ?? 'Unknown error'}`);
   }
 
-  const events = executionContext.emitResult(result);
-  for (const event of events) {
-    ctx.emit(event);
-  }
+  executionContext.emitResult(result);
 
   if (result.schemes.length > 0 && !result.didError) {
     const firstScheme = result.schemes[0];
