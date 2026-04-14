@@ -19,14 +19,23 @@ export type XcodeToolsBridgeStatus = {
   xcodeSessionId: string | null;
 };
 
-export function serializeBridgeTool(tool: Tool): Record<string, unknown> {
+export interface SerializedBridgeTool {
+  name: string;
+  title: string | null;
+  description: string | null;
+  inputSchema: Record<string, unknown> | boolean | null;
+  outputSchema: Record<string, unknown> | boolean | null;
+  annotations: Record<string, unknown> | null;
+}
+
+export function serializeBridgeTool(tool: Tool): SerializedBridgeTool {
   return {
     name: tool.name,
-    title: tool.title,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-    outputSchema: tool.outputSchema,
-    annotations: tool.annotations,
+    title: tool.title ?? null,
+    description: tool.description ?? null,
+    inputSchema: toJsonSchemaValue(tool.inputSchema),
+    outputSchema: toJsonSchemaValue(tool.outputSchema),
+    annotations: toJsonObject(tool.annotations),
   };
 }
 
@@ -111,4 +120,18 @@ export function classifyBridgeError(
     return 'XCODE_SESSION_NOT_READY';
   }
   return 'XCODE_MCP_UNAVAILABLE';
+}
+
+function toJsonSchemaValue(value: unknown): Record<string, unknown> | boolean | null {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return toJsonObject(value);
+}
+
+function toJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
 }

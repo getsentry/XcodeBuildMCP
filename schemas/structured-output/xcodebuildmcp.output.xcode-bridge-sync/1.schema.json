@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.xcode-bridge-sync/1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/errorConsistency"
+    }
+  ],
+  "$defs": {
+    "bridgeStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowEnabled": { "type": "boolean" },
+        "bridgeAvailable": { "type": "boolean" },
+        "bridgePath": { "type": ["string", "null"] },
+        "xcodeRunning": { "type": ["boolean", "null"] },
+        "connected": { "type": "boolean" },
+        "bridgePid": { "type": ["integer", "null"] },
+        "proxiedToolCount": { "type": "integer", "minimum": 0 },
+        "lastError": { "type": ["string", "null"] },
+        "xcodePid": { "type": ["string", "null"] },
+        "xcodeSessionId": { "type": ["string", "null"] }
+      },
+      "required": [
+        "workflowEnabled",
+        "bridgeAvailable",
+        "bridgePath",
+        "xcodeRunning",
+        "connected",
+        "bridgePid",
+        "proxiedToolCount",
+        "lastError",
+        "xcodePid",
+        "xcodeSessionId"
+      ]
+    }
+  },
+  "properties": {
+    "schema": { "const": "xcodebuildmcp.output.xcode-bridge-sync" },
+    "schemaVersion": { "const": "1" },
+    "didError": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sync": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "added": { "type": "integer", "minimum": 0 },
+            "updated": { "type": "integer", "minimum": 0 },
+            "removed": { "type": "integer", "minimum": 0 },
+            "total": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["added", "updated", "removed", "total"]
+        },
+        "status": { "$ref": "#/$defs/bridgeStatus" }
+      },
+      "required": ["sync", "status"]
+    }
+  },
+  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+}

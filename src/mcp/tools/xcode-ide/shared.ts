@@ -2,34 +2,185 @@ import type {
   BridgeToolResult,
   XcodeToolsBridgeToolHandler,
 } from '../../../integrations/xcode-tools-bridge/index.ts';
+import type { NextStepParamsMap } from '../../../types/common.ts';
+import type {
+  ToolDomainResult,
+  XcodeBridgeCallResultDomainResult,
+  XcodeBridgeStatusDomainResult,
+  XcodeBridgeStatusInfo,
+  XcodeBridgeSyncDomainResult,
+  XcodeBridgeToolListDomainResult,
+} from '../../../types/domain-results.ts';
+import type { ToolExecutionContext, ToolExecutor } from '../../../types/tool-execution.ts';
 import { getServer } from '../../../server/server-state.ts';
 import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tools-bridge/index.ts';
-import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import type { ImageAttachment, ToolHandlerContext } from '../../../rendering/types.ts';
+import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 
-export async function withBridgeToolHandler(
-  operation: string,
-  callback: (bridge: XcodeToolsBridgeToolHandler) => Promise<BridgeToolResult>,
-): Promise<void> {
-  const ctx = getHandlerContext();
-  const bridge = getXcodeToolsBridgeToolHandler(getServer());
-  if (!bridge) {
-    ctx.emit(header(operation));
-    ctx.emit(statusLine('error', 'Unable to initialize xcode tools bridge'));
-    return;
+export class BridgeToolExecutionContext extends DefaultToolExecutionContext {
+  private nextStepParams?: NextStepParamsMap;
+  private readonly bridgeImages: ImageAttachment[] = [];
+
+  setNextStepParams(nextStepParams?: NextStepParamsMap): void {
+    this.nextStepParams = nextStepParams;
   }
 
-  const result = await callback(bridge);
+  getNextStepParams(): NextStepParamsMap | undefined {
+    return this.nextStepParams;
+  }
 
-  for (const event of result.events) {
+  addBridgeImages(images: ImageAttachment[]): void {
+    this.bridgeImages.push(...images);
+  }
+
+  getBridgeImages(): readonly ImageAttachment[] {
+    return [...this.bridgeImages];
+  }
+}
+
+export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult>(options: {
+  progressMessage: string;
+  callback: (bridge: XcodeToolsBridgeToolHandler, args: TArgs) => Promise<BridgeToolResult>;
+  toDomainResult: (bridgeResult: BridgeToolResult, args: TArgs) => TResult;
+}): ToolExecutor<TArgs, TResult> {
+  return async (args, ctx) => {
+    ctx.emitProgress({
+      type: 'status',
+      level: 'info',
+      message: options.progressMessage,
+    });
+
+    const bridge = getXcodeToolsBridgeToolHandler(getServer());
+    const bridgeResult: BridgeToolResult = bridge
+      ? await options.callback(bridge, args)
+      : {
+          events: [],
+          isError: true,
+          errorMessage: 'Unable to initialize xcode tools bridge',
+        };
+
+    if (bridgeResult.images && isBridgeToolExecutionContext(ctx)) {
+      ctx.addBridgeImages(bridgeResult.images);
+    }
+
+    if (bridgeResult.nextStepParams && isBridgeToolExecutionContext(ctx)) {
+      ctx.setNextStepParams(bridgeResult.nextStepParams);
+    }
+
+    return options.toDomainResult(bridgeResult, args);
+  };
+}
+
+export function finalizeBridgeToolExecution(
+  ctx: ToolHandlerContext,
+  executionContext: BridgeToolExecutionContext,
+  result: ToolDomainResult,
+  schema: string,
+): void {
+  ctx.structuredOutput = {
+    result,
+    schema,
+    schemaVersion: '1',
+  };
+
+  for (const image of executionContext.getBridgeImages()) {
+    ctx.attach(image);
+  }
+
+  const nextStepParams = executionContext.getNextStepParams();
+  if (nextStepParams) {
+    ctx.nextStepParams = nextStepParams;
+  }
+
+  for (const event of executionContext.emitResult(result)) {
     ctx.emit(event);
   }
+}
 
-  for (const img of result.images ?? []) {
-    ctx.attach(img);
-  }
+export function toBridgeStatusDomainResult(
+  bridgeResult: BridgeToolResult,
+  action: XcodeBridgeStatusDomainResult['action'],
+): XcodeBridgeStatusDomainResult {
+  const payload = bridgeResult.payload?.kind === 'status' ? bridgeResult.payload : null;
 
-  if (result.nextStepParams) {
-    ctx.nextStepParams = result.nextStepParams;
-  }
+  return {
+    kind: 'xcode-bridge-status',
+    action,
+    didError: Boolean(bridgeResult.isError),
+    error: bridgeResult.isError ? (bridgeResult.errorMessage ?? 'Bridge command failed') : null,
+    status: payload?.status ?? createFallbackBridgeStatus(bridgeResult.errorMessage ?? null),
+  };
+}
+
+export function toBridgeSyncDomainResult(
+  bridgeResult: BridgeToolResult,
+): XcodeBridgeSyncDomainResult {
+  const payload = bridgeResult.payload?.kind === 'sync' ? bridgeResult.payload : null;
+
+  return {
+    kind: 'xcode-bridge-sync',
+    didError: Boolean(bridgeResult.isError),
+    error: bridgeResult.isError ? (bridgeResult.errorMessage ?? 'Bridge sync failed') : null,
+    sync: payload?.sync ?? { added: 0, updated: 0, removed: 0, total: 0 },
+    status: payload?.status ?? createFallbackBridgeStatus(bridgeResult.errorMessage ?? null),
+  };
+}
+
+export function toBridgeToolListDomainResult(
+  bridgeResult: BridgeToolResult,
+): XcodeBridgeToolListDomainResult {
+  const payload = bridgeResult.payload?.kind === 'tool-list' ? bridgeResult.payload : null;
+
+  return {
+    kind: 'xcode-bridge-tool-list',
+    didError: Boolean(bridgeResult.isError),
+    error: bridgeResult.isError
+      ? (bridgeResult.errorMessage ?? 'Failed to list bridge tools')
+      : null,
+    toolCount: payload?.toolCount ?? 0,
+    tools: payload?.tools ?? [],
+  };
+}
+
+export function toBridgeCallResultDomainResult(
+  bridgeResult: BridgeToolResult,
+  remoteTool: string,
+): XcodeBridgeCallResultDomainResult {
+  const payload = bridgeResult.payload?.kind === 'call-result' ? bridgeResult.payload : null;
+
+  return {
+    kind: 'xcode-bridge-call-result',
+    remoteTool,
+    didError: Boolean(bridgeResult.isError),
+    error: bridgeResult.isError
+      ? (bridgeResult.errorMessage ?? `Tool "${remoteTool}" failed`)
+      : null,
+    succeeded: payload?.succeeded ?? !Boolean(bridgeResult.isError),
+    content: payload?.content ?? [],
+    ...(payload?.structuredContent !== undefined
+      ? { structuredContent: payload.structuredContent }
+      : {}),
+  };
+}
+
+function isBridgeToolExecutionContext(ctx: ToolExecutionContext): ctx is ToolExecutionContext & {
+  setNextStepParams(nextStepParams?: NextStepParamsMap): void;
+  addBridgeImages(images: ImageAttachment[]): void;
+} {
+  return typeof (ctx as { setNextStepParams?: unknown }).setNextStepParams === 'function';
+}
+
+function createFallbackBridgeStatus(error: string | null): XcodeBridgeStatusInfo {
+  return {
+    workflowEnabled: false,
+    bridgeAvailable: false,
+    bridgePath: null,
+    xcodeRunning: null,
+    connected: false,
+    bridgePid: null,
+    proxiedToolCount: 0,
+    lastError: error,
+    xcodePid: null,
+    xcodeSessionId: null,
+  };
 }

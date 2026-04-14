@@ -1,6 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { log } from '../../utils/logger.ts';
-import { callToolResultToBridgeResult, type BridgeToolResult } from './bridge-tool-result.ts';
+import {
+  callToolResultToBridgeResult,
+  type BridgeToolPayload,
+  type BridgeToolResult,
+} from './bridge-tool-result.ts';
 import { header, statusLine, section } from '../../utils/tool-event-builders.ts';
 import { XcodeToolsProxyRegistry, type ProxySyncResult } from './registry.ts';
 import {
@@ -112,6 +116,7 @@ export class XcodeToolsBridgeManager {
     const status = await this.getStatus();
     return {
       events: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
+      payload: { kind: 'status', status },
     };
   }
 
@@ -125,12 +130,20 @@ export class XcodeToolsBridgeManager {
           section('Sync Result', [JSON.stringify({ sync, status }, null, 2)]),
           statusLine('success', 'Bridge sync completed'),
         ],
+        payload: { kind: 'sync', sync, status },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const status = await this.safeGetStatus();
       return {
         events: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
         isError: true,
+        errorMessage: `Bridge sync failed: ${message}`,
+        payload: {
+          kind: 'sync',
+          sync: { added: 0, updated: 0, removed: 0, total: 0 },
+          ...(status ? { status } : {}),
+        },
       };
     }
   }
@@ -145,15 +158,19 @@ export class XcodeToolsBridgeManager {
           section('Status', [JSON.stringify(status, null, 2)]),
           statusLine('success', 'Bridge disconnected'),
         ],
+        payload: { kind: 'status', status },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const status = await this.safeGetStatus();
       return {
         events: [
           header('Bridge Disconnect'),
           statusLine('error', `Bridge disconnect failed: ${message}`),
         ],
         isError: true,
+        errorMessage: `Bridge disconnect failed: ${message}`,
+        ...(status ? { payload: { kind: 'status', status } } : {}),
       };
     }
   }
@@ -161,8 +178,10 @@ export class XcodeToolsBridgeManager {
   async listToolsTool(params: { refresh?: boolean }): Promise<BridgeToolResult> {
     if (!this.workflowEnabled) {
       return this.createBridgeFailureResult(
+        'Xcode IDE List Tools',
         'XCODE_MCP_UNAVAILABLE',
         'xcode-ide workflow is not enabled',
+        { kind: 'tool-list', toolCount: 0, tools: [] },
       );
     }
 
@@ -178,13 +197,16 @@ export class XcodeToolsBridgeManager {
           section('Tools', [JSON.stringify(payload, null, 2)]),
           statusLine('success', `Found ${tools.length} tool(s)`),
         ],
+        payload: { kind: 'tool-list', ...payload },
       };
     } catch (error) {
       return this.createBridgeFailureResult(
+        'Xcode IDE List Tools',
         classifyBridgeError(error, 'list', {
           connected: this.service.getClientStatus().connected,
         }),
         error,
+        { kind: 'tool-list', toolCount: 0, tools: [] },
       );
     }
   }
@@ -196,8 +218,10 @@ export class XcodeToolsBridgeManager {
   }): Promise<BridgeToolResult> {
     if (!this.workflowEnabled) {
       return this.createBridgeFailureResult(
+        'Xcode IDE Call Tool',
         'XCODE_MCP_UNAVAILABLE',
         'xcode-ide workflow is not enabled',
+        { kind: 'call-result', succeeded: false, content: [] },
       );
     }
 
@@ -208,19 +232,36 @@ export class XcodeToolsBridgeManager {
       return callToolResultToBridgeResult(response);
     } catch (error) {
       return this.createBridgeFailureResult(
+        'Xcode IDE Call Tool',
         classifyBridgeError(error, 'call', {
           connected: this.service.getClientStatus().connected,
         }),
         error,
+        { kind: 'call-result', succeeded: false, content: [] },
       );
     }
   }
 
-  private createBridgeFailureResult(code: string, error: unknown): BridgeToolResult {
+  private async safeGetStatus(): Promise<XcodeToolsBridgeStatus | null> {
+    try {
+      return await this.getStatus();
+    } catch {
+      return null;
+    }
+  }
+
+  private createBridgeFailureResult(
+    operation: string,
+    code: string,
+    error: unknown,
+    payload?: BridgeToolPayload,
+  ): BridgeToolResult {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      events: [header('Xcode IDE Call Tool'), statusLine('error', `[${code}] ${message}`)],
+      events: [header(operation), statusLine('error', `[${code}] ${message}`)],
       isError: true,
+      errorMessage: `[${code}] ${message}`,
+      ...(payload ? { payload } : {}),
     };
   }
 }

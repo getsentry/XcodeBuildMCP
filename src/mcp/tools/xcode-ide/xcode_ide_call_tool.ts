@@ -1,6 +1,16 @@
 import * as z from 'zod';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
-import { withBridgeToolHandler } from './shared.ts';
+import type { XcodeBridgeCallResultDomainResult } from '../../../types/domain-results.ts';
+import { log } from '../../../utils/logging/index.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
+import {
+  BridgeToolExecutionContext,
+  createBridgeToolExecutor,
+  finalizeBridgeToolExecution,
+  toBridgeCallResultDomainResult,
+} from './shared.ts';
 
 const schemaObject = z.object({
   remoteTool: z.string().min(1).describe('Exact remote Xcode MCP tool name.'),
@@ -20,13 +30,33 @@ const schemaObject = z.object({
 
 type Params = z.infer<typeof schemaObject>;
 
+export function createXcodeIdeCallToolExecutor() {
+  return createBridgeToolExecutor<Params, XcodeBridgeCallResultDomainResult>({
+    progressMessage: 'Calling remote Xcode IDE tool',
+    callback: (bridge, params) =>
+      bridge.callToolTool({
+        remoteTool: params.remoteTool,
+        arguments: params.arguments ?? {},
+        timeoutMs: params.timeoutMs,
+      }),
+    toDomainResult: (bridgeResult, params) =>
+      toBridgeCallResultDomainResult(bridgeResult, params.remoteTool),
+  });
+}
+
 export async function xcodeIdeCallToolLogic(params: Params): Promise<void> {
-  await withBridgeToolHandler('Xcode IDE Call Tool', (bridge) =>
-    bridge.callToolTool({
-      remoteTool: params.remoteTool,
-      arguments: params.arguments ?? {},
-      timeoutMs: params.timeoutMs,
-    }),
+  log('info', `Starting Xcode IDE remote tool call for ${params.remoteTool}`);
+
+  const ctx = getHandlerContext();
+  const executionContext = new BridgeToolExecutionContext();
+  const executeCallTool = createXcodeIdeCallToolExecutor();
+  const result = await executeCallTool(params, executionContext);
+
+  finalizeBridgeToolExecution(
+    ctx,
+    executionContext,
+    result,
+    'xcodebuildmcp.output.xcode-bridge-call-result',
   );
 }
 

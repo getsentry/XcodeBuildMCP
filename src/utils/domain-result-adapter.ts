@@ -217,6 +217,59 @@ function createSimulatorListEvents(
   return events;
 }
 
+function createDoctorReportEvents(
+  result: Extract<ToolDomainResult, { kind: 'doctor-report' }>,
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [
+    header('Doctor', [{ label: 'Server Version', value: result.serverVersion }]),
+    table(
+      ['name', 'status', 'message'],
+      result.checks.map((check) => ({
+        name: check.name,
+        status: check.status,
+        message: check.message,
+      })),
+      'Doctor Checks',
+    ),
+  ];
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? 'Doctor failed.'));
+  } else if (result.checks.some((check) => check.status === 'error')) {
+    events.push(statusLine('warning', 'Doctor completed with diagnostic errors.'));
+  } else if (result.checks.some((check) => check.status === 'warning')) {
+    events.push(statusLine('warning', 'Doctor completed with warnings.'));
+  } else {
+    events.push(statusLine('success', 'Doctor diagnostics complete'));
+  }
+
+  return events;
+}
+
+function createWorkflowSelectionEvents(
+  result: Extract<ToolDomainResult, { kind: 'workflow-selection' }>,
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [header('Manage Workflows')];
+
+  if (result.enabledWorkflows.length > 0) {
+    events.push(
+      section(
+        'Enabled Workflows',
+        result.enabledWorkflows.map((workflow) => workflow),
+      ),
+    );
+  } else {
+    events.push(section('Enabled Workflows', ['(none)']));
+  }
+
+  const message = result.didError
+    ? (result.error ?? 'Failed to update workflows.')
+    : `Workflows enabled: ${result.enabledWorkflows.join(', ') || '(none)'} (${result.registeredToolCount} tools registered)`;
+  events.push(statusLine(result.didError ? 'error' : 'success', message));
+
+  return events;
+}
+
 function createDiagnosticSections(result: ToolDomainResult): SectionEvent[] {
   const sections: SectionEvent[] = [];
 
@@ -448,6 +501,105 @@ function createUiActionResultEvents(
   return events;
 }
 
+function createXcodeBridgeStatusEvents(
+  result: Extract<ToolDomainResult, { kind: 'xcode-bridge-status' }>,
+): PipelineEvent[] {
+  const title = result.action === 'disconnect' ? 'Bridge Disconnect' : 'Bridge Status';
+  const events: PipelineEvent[] = [header(title)];
+
+  if (!result.didError || result.action === 'status') {
+    events.push(section('Status', [JSON.stringify(result.status, null, 2)]));
+  }
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? `${title} failed`));
+    return events;
+  }
+
+  if (result.action === 'disconnect') {
+    events.push(statusLine('success', 'Bridge disconnected'));
+  }
+
+  return events;
+}
+
+function createXcodeBridgeSyncEvents(
+  result: Extract<ToolDomainResult, { kind: 'xcode-bridge-sync' }>,
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [header('Bridge Sync')];
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? 'Bridge sync failed'));
+    return events;
+  }
+
+  events.push(
+    section('Sync Result', [JSON.stringify({ sync: result.sync, status: result.status }, null, 2)]),
+  );
+  events.push(statusLine('success', 'Bridge sync completed'));
+  return events;
+}
+
+function createXcodeBridgeToolListEvents(
+  result: Extract<ToolDomainResult, { kind: 'xcode-bridge-tool-list' }>,
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [header('Xcode IDE List Tools')];
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? 'Failed to list bridge tools'));
+    return events;
+  }
+
+  events.push(
+    section('Tools', [
+      JSON.stringify({ toolCount: result.toolCount, tools: result.tools }, null, 2),
+    ]),
+  );
+  events.push(statusLine('success', `Found ${result.toolCount} tool(s)`));
+  return events;
+}
+
+function createXcodeBridgeCallResultEvents(
+  result: Extract<ToolDomainResult, { kind: 'xcode-bridge-call-result' }>,
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [
+    header('Xcode IDE Call Tool', [{ label: 'Remote Tool', value: result.remoteTool }]),
+  ];
+
+  if (result.didError) {
+    events.push(statusLine('error', result.error ?? `Tool "${result.remoteTool}" failed`));
+    if (result.content.length > 0) {
+      events.push(section('Relayed Content', renderBridgeCallContent(result.content)));
+    }
+    return events;
+  }
+
+  if (result.content.length > 0) {
+    events.push(section('Relayed Content', renderBridgeCallContent(result.content)));
+  }
+
+  if (result.structuredContent) {
+    events.push(section('Structured Content', [JSON.stringify(result.structuredContent, null, 2)]));
+  }
+
+  if (result.content.length === 0 && !result.structuredContent) {
+    events.push(statusLine('success', `Tool "${result.remoteTool}" completed successfully`));
+  }
+
+  return events;
+}
+
+function renderBridgeCallContent(
+  content: Extract<ToolDomainResult, { kind: 'xcode-bridge-call-result' }>['content'],
+): string[] {
+  return content.map((item) => {
+    if (item.type === 'text' && typeof item.text === 'string') {
+      return item.text;
+    }
+    return JSON.stringify(item, null, 2);
+  });
+}
+
 export class DomainResultPipelineEventAdapter {
   private readonly fallbackOperation?: XcodebuildOperation;
   private readonly bufferedEvents: PipelineEvent[] = [];
@@ -483,8 +635,26 @@ export class DomainResultPipelineEventAdapter {
     if (result.kind === 'simulator-list') {
       return createSimulatorListEvents(result);
     }
+    if (result.kind === 'doctor-report') {
+      return createDoctorReportEvents(result);
+    }
     if (result.kind === 'ui-action-result') {
       return createUiActionResultEvents(result);
+    }
+    if (result.kind === 'workflow-selection') {
+      return createWorkflowSelectionEvents(result);
+    }
+    if (result.kind === 'xcode-bridge-status') {
+      return createXcodeBridgeStatusEvents(result);
+    }
+    if (result.kind === 'xcode-bridge-sync') {
+      return createXcodeBridgeSyncEvents(result);
+    }
+    if (result.kind === 'xcode-bridge-tool-list') {
+      return createXcodeBridgeToolListEvents(result);
+    }
+    if (result.kind === 'xcode-bridge-call-result') {
+      return createXcodeBridgeCallResultEvents(result);
     }
 
     const operation = this.fallbackOperation ?? inferXcodebuildOperation(result);

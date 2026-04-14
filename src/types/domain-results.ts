@@ -6,6 +6,7 @@ export type ToolDomainResultKind =
   | 'bundle-id'
   | 'capture-result'
   | 'coverage-result'
+  | 'doctor-report'
   | 'debug-breakpoint-result'
   | 'debug-command-result'
   | 'debug-session-action'
@@ -24,7 +25,12 @@ export type ToolDomainResultKind =
   | 'simulator-list'
   | 'stop-result'
   | 'test-result'
-  | 'ui-action-result';
+  | 'ui-action-result'
+  | 'workflow-selection'
+  | 'xcode-bridge-call-result'
+  | 'xcode-bridge-status'
+  | 'xcode-bridge-sync'
+  | 'xcode-bridge-tool-list';
 export interface ToolDomainResultBase {
   kind: string;
   didError: boolean;
@@ -47,6 +53,11 @@ export type DebugExecutionState = 'paused' | 'running';
 export interface DiagnosticEntry {
   message: string;
   location?: string;
+}
+export interface DoctorCheckEntry {
+  name: string;
+  status: 'ok' | 'warning' | 'error';
+  message: string;
 }
 export interface BasicDiagnostics {
   warnings: DiagnosticEntry[];
@@ -261,6 +272,36 @@ export interface ProcessEntry {
   uptimeSeconds: number;
   artifacts?: { packagePath: string };
 }
+export interface XcodeBridgeStatusInfo {
+  workflowEnabled: boolean;
+  bridgeAvailable: boolean;
+  bridgePath: string | null;
+  xcodeRunning: boolean | null;
+  connected: boolean;
+  bridgePid: number | null;
+  proxiedToolCount: number;
+  lastError: string | null;
+  xcodePid: string | null;
+  xcodeSessionId: string | null;
+}
+export interface XcodeBridgeSyncStats {
+  added: number;
+  updated: number;
+  removed: number;
+  total: number;
+}
+export interface XcodeBridgeToolDescriptor {
+  name: string;
+  title: string | null;
+  description: string | null;
+  inputSchema: Record<string, unknown> | boolean | null;
+  outputSchema: Record<string, unknown> | boolean | null;
+  annotations: Record<string, unknown> | null;
+}
+export interface XcodeBridgeRelayedContentItem {
+  type: string;
+  [key: string]: unknown;
+}
 export interface ProjectListSummary extends StatusSummary {
   maxDepth: number;
   projectCount?: number;
@@ -446,6 +487,11 @@ export type DebugVariablesResultDomainResult =
       };
     })
   | (ToolDomainResultBase & { kind: 'debug-variables-result' });
+export type DoctorReportDomainResult = ToolDomainResultBase & {
+  kind: 'doctor-report';
+  serverVersion: string;
+  checks: DoctorCheckEntry[];
+};
 export type DeviceListDomainResult = ToolDomainResultBase & {
   kind: 'device-list';
   devices: DeviceInfo[];
@@ -533,6 +579,33 @@ export type UiActionResultDomainResult = ToolDomainResultBase & {
   artifacts: { simulatorId: string };
   diagnostics?: BasicDiagnostics;
 };
+export type XcodeBridgeCallResultDomainResult = ToolDomainResultBase & {
+  kind: 'xcode-bridge-call-result';
+  remoteTool: string;
+  succeeded: boolean;
+  content: XcodeBridgeRelayedContentItem[];
+  structuredContent?: Record<string, unknown> | null;
+};
+export type XcodeBridgeStatusDomainResult = ToolDomainResultBase & {
+  kind: 'xcode-bridge-status';
+  action: 'status' | 'disconnect';
+  status: XcodeBridgeStatusInfo;
+};
+export type XcodeBridgeSyncDomainResult = ToolDomainResultBase & {
+  kind: 'xcode-bridge-sync';
+  sync: XcodeBridgeSyncStats;
+  status: XcodeBridgeStatusInfo;
+};
+export type XcodeBridgeToolListDomainResult = ToolDomainResultBase & {
+  kind: 'xcode-bridge-tool-list';
+  toolCount: number;
+  tools: XcodeBridgeToolDescriptor[];
+};
+export type WorkflowSelectionDomainResult = ToolDomainResultBase & {
+  kind: 'workflow-selection';
+  enabledWorkflows: string[];
+  registeredToolCount: number;
+};
 export type ToolDomainResult =
   | AppPathDomainResult
   | BuildResultDomainResult
@@ -541,6 +614,7 @@ export type ToolDomainResult =
   | BundleIdDomainResult
   | CaptureResultDomainResult
   | CoverageResultDomainResult
+  | DoctorReportDomainResult
   | DebugBreakpointResultDomainResult
   | DebugCommandResultDomainResult
   | DebugSessionActionDomainResult
@@ -559,4 +633,9 @@ export type ToolDomainResult =
   | SimulatorListDomainResult
   | StopResultDomainResult
   | TestResultDomainResult
-  | UiActionResultDomainResult;
+  | UiActionResultDomainResult
+  | WorkflowSelectionDomainResult
+  | XcodeBridgeCallResultDomainResult
+  | XcodeBridgeStatusDomainResult
+  | XcodeBridgeSyncDomainResult
+  | XcodeBridgeToolListDomainResult;
