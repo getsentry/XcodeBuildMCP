@@ -3,6 +3,7 @@ import type {
   CompilerWarningEvent,
   PipelineEvent,
   StatusLineEvent,
+  TestCaseResultEvent,
   TestFailureEvent,
 } from '../../types/pipeline-events.ts';
 import { createCliProgressReporter } from '../cli-progress-reporter.ts';
@@ -25,6 +26,7 @@ import {
   formatSummaryEvent,
   formatNextStepsEvent,
   formatTestDiscoveryEvent,
+  formatTestCaseResults,
 } from './event-formatting.ts';
 
 function formatCliTextBlock(text: string): string {
@@ -57,6 +59,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
   const groupedCompilerErrors: CompilerErrorEvent[] = [];
   const groupedWarnings: CompilerWarningEvent[] = [];
   const groupedTestFailures: TestFailureEvent[] = [];
+  const collectedTestCaseResults: TestCaseResultEvent[] = [];
   let pendingTransientRuntimeLine: string | null = null;
   let diagnosticBaseDir: string | null = null;
   let hasDurableRuntimeContent = false;
@@ -188,6 +191,11 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
           break;
         }
 
+        case 'test-case-result': {
+          collectedTestCaseResults.push(event);
+          break;
+        }
+
         case 'summary': {
           const diagOpts = { baseDir: diagnosticBaseDir ?? undefined };
           const diagnosticSections: string[] = [];
@@ -219,6 +227,14 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
             }
           } else if (event.status === 'FAILED') {
             flushPendingTransientRuntimeLine();
+          }
+
+          if (collectedTestCaseResults.length > 0) {
+            const testResultsBlock = formatTestCaseResults(collectedTestCaseResults);
+            if (testResultsBlock) {
+              writeSection(testResultsBlock);
+            }
+            collectedTestCaseResults.length = 0;
           }
 
           writeSection(formatSummaryEvent(event));

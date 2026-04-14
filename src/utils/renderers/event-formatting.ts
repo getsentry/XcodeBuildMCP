@@ -12,6 +12,7 @@ import type {
   FileRefEvent,
   DetailTreeEvent,
   SummaryEvent,
+  TestCaseResultEvent,
   TestDiscoveryEvent,
   TestFailureEvent,
   NextStepsEvent,
@@ -591,5 +592,26 @@ export function formatGroupedTestFailures(
     }
   }
 
+  return lines.join('\n');
+}
+
+export function formatTestCaseResults(results: TestCaseResultEvent[]): string {
+  if (results.length === 0) {
+    return '';
+  }
+
+  const statusIcon: Record<string, string> = {
+    passed: '\u{2705}',
+    failed: '\u{274C}',
+    skipped: '\u{23ED}\u{FE0F}',
+  };
+
+  const lines: string[] = ['Test Results:'];
+  for (const r of results) {
+    const icon = statusIcon[r.status] ?? '?';
+    const duration = r.durationMs !== undefined ? ` (${(r.durationMs / 1000).toFixed(3)}s)` : '';
+    const name = r.suite ? `${r.suite}/${r.test}` : r.test;
+    lines.push(`  ${icon} ${name}${duration}`);
+  }
   return lines.join('\n');
 }
