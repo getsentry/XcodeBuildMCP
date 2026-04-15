@@ -194,7 +194,9 @@ function createCliTextProcessor(options: CliTextProcessorOptions): PipelineRende
         }
 
         case 'test-case-result': {
-          collectedTestCaseResults.push(event);
+          if (showTestResults) {
+            collectedTestCaseResults.push(event);
+          }
           break;
         }
 
