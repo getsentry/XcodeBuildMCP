@@ -18,7 +18,6 @@ type Params = z.infer<typeof schemaObject>;
 
 export function createXcodeToolsBridgeDisconnectExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeStatusDomainResult>({
-    progressMessage: 'Disconnecting bridge',
     callback: (bridge) => bridge.disconnectTool(),
     toDomainResult: (bridgeResult) => toBridgeStatusDomainResult(bridgeResult, 'disconnect'),
   });
@@ -28,9 +27,7 @@ export async function xcodeToolsBridgeDisconnectLogic(params: Params): Promise<v
   log('info', 'Starting bridge disconnect request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
+  const executionContext = new BridgeToolExecutionContext();
   const executeBridgeDisconnect = createXcodeToolsBridgeDisconnectExecutor();
   const result = await executeBridgeDisconnect(params, executionContext);
 

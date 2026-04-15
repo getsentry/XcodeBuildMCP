@@ -235,6 +235,23 @@ describe('handleTestLogic (pipeline)', () => {
     expect(commands[1]).not.toContain('-only-testing:AppTests');
 
     expectPendingTestResponse(result, true);
+    expect(result.events).toContainEqual({
+      type: 'test-discovery',
+      operation: 'TEST',
+      total: 1,
+      tests: ['AppTests/AppTests/testFailure'],
+      truncated: false,
+    });
+    expect(result.events).toContainEqual({
+      type: 'summary',
+      operation: 'TEST',
+      status: 'FAILED',
+      totalTests: 1,
+      passedTests: 0,
+      failedTests: 1,
+      skippedTests: 0,
+      durationMs: expect.any(Number),
+    });
 
     const renderedText = finalizeAndGetText(result);
     expect(renderedText).toContain('   Selective Testing:');

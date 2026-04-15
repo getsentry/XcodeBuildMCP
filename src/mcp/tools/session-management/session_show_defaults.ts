@@ -5,21 +5,18 @@ import type {
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
-import { header, section } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import {
-  formatProfileLabel,
-  buildFullDetailTree,
-  formatDetailLines,
-} from './session-format-helpers.ts';
+import { formatProfileLabel } from './session-format-helpers.ts';
 
 const schemaObject = z.object({});
 type SessionShowDefaultsParams = z.infer<typeof schemaObject>;
+type SessionShowDefaultsResult = SessionDefaultsDomainResult & {
+  operation: { type: 'show' };
+};
 
 function createSessionDefaultsProfile(profile: Record<string, unknown>): SessionDefaultsProfile {
   return {
@@ -44,7 +41,7 @@ function createSessionDefaultsProfile(profile: Record<string, unknown>): Session
   };
 }
 
-function createSessionDefaultsResult(): SessionDefaultsDomainResult {
+function createSessionDefaultsResult(): SessionShowDefaultsResult {
   const profiles: SessionDefaultsDomainResult['profiles'] = {
     '(default)': createSessionDefaultsProfile(sessionStore.getAllForProfile(null)),
   };
@@ -59,10 +56,11 @@ function createSessionDefaultsResult(): SessionDefaultsDomainResult {
     error: null,
     currentProfile: formatProfileLabel(sessionStore.getActiveProfile()),
     profiles,
+    operation: { type: 'show' },
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDomainResult): void {
+function setStructuredOutput(ctx: ToolHandlerContext, result: SessionShowDefaultsResult): void {
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-defaults',
@@ -72,30 +70,17 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDom
 
 export function createSessionShowDefaultsExecutor(): ToolExecutor<
   SessionShowDefaultsParams,
-  SessionDefaultsDomainResult
+  SessionShowDefaultsResult
 > {
   return async () => createSessionDefaultsResult();
 }
 
 export async function sessionShowDefaultsLogic(): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSessionShowDefaults = createSessionShowDefaultsExecutor();
-  const result = await executeSessionShowDefaults({}, executionContext);
+  const result = await executeSessionShowDefaults({}, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-  ctx.emit(header('Show Defaults'));
-
-  for (const [profileKey, defaults] of Object.entries(result.profiles)) {
-    const label = `\u{1F4C1} ${profileKey}`;
-    const items = buildFullDetailTree(
-      Object.fromEntries(Object.entries(defaults).filter(([, value]) => value !== null)),
-    );
-    ctx.emit(section(label, formatDetailLines(items)));
-  }
 }
 
 export const schema = schemaObject.shape;

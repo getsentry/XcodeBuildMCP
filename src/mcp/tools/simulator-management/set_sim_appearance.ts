@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const setSimAppearanceSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -116,34 +112,21 @@ export async function set_sim_appearanceLogic(
 ): Promise<void> {
   log('info', `Setting simulator ${params.simulatorId} appearance to ${params.mode} mode`);
 
-  const headerEvent = header('Set Appearance', [
-    { label: 'Simulator', value: params.simulatorId },
-    { label: 'Mode', value: params.mode },
-  ]);
-
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSetSimAppearance = createSetSimAppearanceExecutor(executor);
 
-  ctx.emit(headerEvent);
-
-  const result = await executeSetSimAppearance(params, executionContext);
+  const result = await executeSetSimAppearance(params, { emitProgress() {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log(
       'error',
       `Error during set simulator appearance for simulator ${params.simulatorId}: ${result.error ?? 'Unknown error'}`,
     );
-    ctx.emit(statusLine('error', result.error ?? 'Failed to set simulator appearance'));
     return;
   }
 
   log('info', `Set simulator ${params.simulatorId} appearance to ${params.mode} mode`);
-  ctx.emit(statusLine('success', `Appearance successfully set to ${params.mode} mode`));
 }
 
 const publicSchemaObject = z.strictObject(

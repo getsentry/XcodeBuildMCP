@@ -1,10 +1,7 @@
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
 import type { DebuggerManager } from '../../../utils/debugger/debugger-manager.ts';
 import { guardUiAutomationAgainstStoppedDebugger } from '../../../utils/debugger/ui-automation-guard.ts';
@@ -16,7 +13,6 @@ import {
 import { recordSnapshotUiCall } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 import type {
   AccessibilityNode,
   CaptureResultDomainResult,
@@ -28,6 +24,7 @@ import {
   mapAxeCommandError,
   setCaptureStructuredOutput,
 } from './shared/domain-result.ts';
+import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const snapshotUiSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -62,7 +59,6 @@ export function createSnapshotUiExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-  options: { onRawHierarchy?: (responseText: string) => void } = {},
 ): ToolExecutor<SnapshotUiParams, SnapshotUiResult> {
   return async (params) => {
     const toolName = 'snapshot_ui';
@@ -89,7 +85,6 @@ export function createSnapshotUiExecutor(
         axeHelpers,
       );
 
-      options.onRawHierarchy?.(responseText);
       recordSnapshotUiCall(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
 
@@ -123,54 +118,10 @@ export async function snapshot_uiLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
-  let rawHierarchyText = '';
-  const executeSnapshotUi = createSnapshotUiExecutor(executor, axeHelpers, debuggerManager, {
-    onRawHierarchy: (responseText) => {
-      rawHierarchyText = responseText;
-    },
-  });
-  const result = await executeSnapshotUi(params, executionContext);
+  const executeSnapshotUi = createSnapshotUiExecutor(executor, axeHelpers, debuggerManager);
+  const result = await executeSnapshotUi(params, noopToolExecutionContext);
 
   setCaptureStructuredOutput(ctx, result);
-
-  const headerEvent = header('Snapshot UI', [{ label: 'Simulator', value: params.simulatorId }]);
-  ctx.emit(headerEvent);
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to get accessibility hierarchy.'));
-    const details = result.diagnostics?.errors ?? [];
-    if (details.length > 0) {
-      ctx.emit(
-        section(
-          'Details',
-          details.map((entry) =>
-            entry.message.startsWith('Error: ') ? entry.message : `Error: ${entry.message}`,
-          ),
-        ),
-      );
-    }
-    return;
-  }
-
-  ctx.emit(statusLine('success', 'Accessibility hierarchy retrieved successfully.'));
-  if (rawHierarchyText.length > 0) {
-    ctx.emit(section('Accessibility Hierarchy', ['```json', rawHierarchyText, '```']));
-  }
-  ctx.emit(
-    section('Tips', [
-      '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
-      '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
-      '- Screenshots are for visual verification only',
-    ]),
-  );
-
-  const warnings = result.diagnostics?.warnings ?? [];
-  for (const warning of warnings) {
-    ctx.emit(statusLine('warning', warning.message));
-  }
 
   ctx.nextStepParams = {
     snapshot_ui: { simulatorId: params.simulatorId },

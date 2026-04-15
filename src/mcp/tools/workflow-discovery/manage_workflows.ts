@@ -3,7 +3,6 @@ import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { WorkflowSelectionDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor, type CommandExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -60,13 +59,7 @@ export function createManageWorkflowsExecutor(): ToolExecutor<
   ManageWorkflowsParams,
   ManageWorkflowsResult
 > {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Updating workflow selection',
-    });
-
+  return async (params) => {
     try {
       const workflowNames = params.workflowNames;
       const currentWorkflows = getRegisteredWorkflows();
@@ -86,32 +79,12 @@ export function createManageWorkflowsExecutor(): ToolExecutor<
         predicateContext,
       );
 
-      ctx.emitProgress({
-        type: 'table',
-        name: 'enabled-workflows',
-        columns: ['workflow'],
-        rows:
-          registryState.enabledWorkflows.length > 0
-            ? registryState.enabledWorkflows.map((workflow) => ({ workflow }))
-            : [{ workflow: '(none)' }],
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'success',
-        message: `Enabled ${registryState.enabledWorkflows.length} workflow(s); registered ${registryState.registeredToolCount} tool(s).`,
-      });
-
       return createManageWorkflowsResult(
         registryState.enabledWorkflows,
         registryState.registeredToolCount,
       );
     } catch (error) {
       const message = `Failed to update workflows: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createManageWorkflowsErrorResult(message);
     }
   };
@@ -122,15 +95,10 @@ export async function manage_workflowsLogic(
   _neverExecutor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeManageWorkflows = createManageWorkflowsExecutor();
-  const result = await executeManageWorkflows(params, executionContext);
+  const result = await executeManageWorkflows(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 }
 
 export const schema = baseSchemaObject.shape;

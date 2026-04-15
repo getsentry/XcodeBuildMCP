@@ -10,10 +10,7 @@ import type { DoctorReportDomainResult } from '../../../types/domain-results.ts'
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { version } from '../../../utils/version/index.ts';
 import type { ProgressEvent } from '../../../types/progress-events.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
@@ -423,33 +420,12 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DoctorResult): voi
 export function createDoctorExecutor(
   deps: DoctorDependencies,
 ): ToolExecutor<DoctorParams, DoctorResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Running doctor diagnostics',
-    });
-
+  return async (params) => {
     try {
       const data = await collectDoctorData(params, deps);
-      const result = createDoctorResult(data);
-      ctx.emitProgress({
-        type: 'status',
-        level: result.checks.some((check) => check.status === 'error')
-          ? 'warning'
-          : result.checks.some((check) => check.status === 'warning')
-            ? 'warning'
-            : 'success',
-        message: 'Doctor diagnostics complete',
-      });
-      return result;
+      return createDoctorResult(data);
     } catch (error) {
       const message = `Doctor failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createDoctorErrorResult(message);
     }
   };
@@ -718,15 +694,10 @@ export async function doctorToolLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const deps = createDoctorDependencies(executor);
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeDoctor = createDoctorExecutor(deps);
-  const result = await executeDoctor(params, executionContext);
+  const result = await executeDoctor(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 }
 
 export const schema = doctorSchema.shape;

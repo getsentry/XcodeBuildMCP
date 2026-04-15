@@ -23,7 +23,6 @@ type Params = z.infer<typeof schemaObject>;
 
 export function createXcodeIdeListToolsExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeToolListDomainResult>({
-    progressMessage: 'Listing Xcode IDE bridge tools',
     callback: (bridge, params) => bridge.listToolsTool({ refresh: params.refresh }),
     toDomainResult: (bridgeResult) => toBridgeToolListDomainResult(bridgeResult),
   });
@@ -33,9 +32,7 @@ export async function xcodeIdeListToolsLogic(params: Params): Promise<void> {
   log('info', 'Starting Xcode IDE bridge tool listing request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
+  const executionContext = new BridgeToolExecutionContext();
   const executeListTools = createXcodeIdeListToolsExecutor();
   const result = await executeListTools(params, executionContext);
 

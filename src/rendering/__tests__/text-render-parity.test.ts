@@ -148,6 +148,90 @@ describe('text render parity', () => {
     ).toBe(captureCliText(fixture));
   });
 
+  it('does not duplicate streamed test discovery, failures, or summary from structured output fallback', () => {
+    const fixture: TranscriptFixture = {
+      progressEvents: [
+        {
+          type: 'header',
+          operation: 'Test',
+          params: [{ label: 'Scheme', value: 'MCPTest' }],
+        },
+        {
+          type: 'test-discovery',
+          operation: 'TEST',
+          total: 2,
+          tests: ['MCPTestTests/testOne', 'MCPTestTests/testTwo'],
+          truncated: false,
+        },
+        {
+          type: 'test-failure',
+          operation: 'TEST',
+          suite: 'MCPTestTests',
+          test: 'testTwo()',
+          message: 'XCTAssertTrue failed',
+          location: 'MCPTestTests.swift:11',
+        },
+        {
+          type: 'summary',
+          operation: 'TEST',
+          status: 'FAILED',
+          totalTests: 2,
+          passedTests: 1,
+          failedTests: 1,
+          skippedTests: 0,
+          durationMs: 2200,
+        },
+      ],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'test-result',
+          didError: true,
+          error: null,
+          summary: {
+            status: 'FAILED',
+            durationMs: 2200,
+            counts: { passed: 1, failed: 1, skipped: 0 },
+          },
+          artifacts: { buildLogPath: '/tmp/Test.log' },
+          diagnostics: {
+            warnings: [],
+            errors: [],
+            testFailures: [
+              {
+                suite: 'MCPTestTests',
+                test: 'testTwo()',
+                message: 'XCTAssertTrue failed',
+                location: 'MCPTestTests.swift:11',
+              },
+            ],
+          },
+          tests: {
+            discovered: {
+              total: 2,
+              items: ['MCPTestTests/testOne', 'MCPTestTests/testTwo'],
+            },
+          },
+        },
+      },
+    };
+
+    const output = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+      },
+      'text',
+    );
+
+    expect(output).toBe(captureCliText(fixture));
+    expect(output.match(/Discovered 2 test\(s\):/g)).toHaveLength(1);
+    expect(output.match(/MCPTestTests\n  ✗ testTwo\(\):/g)).toHaveLength(1);
+    expect(output.match(/1 test failed, 1 passed, 0 skipped/g)).toHaveLength(1);
+    expect(output).toContain('Build Logs: /tmp/Test.log');
+  });
+
   it('renders next steps in MCP tool-call syntax for MCP runtime text transcripts', () => {
     const fixture: TranscriptFixture = {
       progressEvents: [],

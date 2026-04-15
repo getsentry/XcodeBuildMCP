@@ -18,7 +18,6 @@ type Params = z.infer<typeof schemaObject>;
 
 export function createXcodeToolsBridgeSyncExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeSyncDomainResult>({
-    progressMessage: 'Syncing bridge tools',
     callback: (bridge) => bridge.syncTool(),
     toDomainResult: (bridgeResult) => toBridgeSyncDomainResult(bridgeResult),
   });
@@ -28,9 +27,7 @@ export async function xcodeToolsBridgeSyncLogic(params: Params): Promise<void> {
   log('info', 'Starting bridge sync request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
+  const executionContext = new BridgeToolExecutionContext();
   const executeBridgeSync = createXcodeToolsBridgeSyncExecutor();
   const result = await executeBridgeSync(params, executionContext);
 

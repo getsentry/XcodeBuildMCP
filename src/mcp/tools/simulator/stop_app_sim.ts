@@ -4,17 +4,13 @@ import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import { stopSimulatorLaunchOsLogSessionsForApp } from '../../../utils/log-capture/index.ts';
 
 const baseSchemaObject = z.object({
@@ -145,36 +141,18 @@ export async function stop_app_simLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const simulatorId = params.simulatorId;
-  const simulatorDisplayName = params.simulatorName
-    ? `"${params.simulatorName}" (${simulatorId})`
-    : simulatorId;
 
   log('info', `Stopping app ${params.bundleId} in simulator ${simulatorId}`);
 
-  const headerEvent = header('Stop App', [
-    { label: 'Simulator', value: simulatorDisplayName },
-    { label: 'Bundle ID', value: params.bundleId },
-  ]);
-
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeStopAppSim = createStopAppSimExecutor(executor);
-
-  ctx.emit(headerEvent);
-
-  const result = await executeStopAppSim(params, executionContext);
+  const result = await executeStopAppSim(params, { emitProgress: () => {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error stopping app in simulator: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Stop app in simulator operation failed'));
     return;
   }
-
-  ctx.emit(statusLine('success', 'App stopped successfully'));
 }
 
 const publicSchemaObject = z.strictObject(

@@ -4,10 +4,7 @@ import type { LaunchResultDomainResult } from '../../../types/domain-results.ts'
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -17,9 +14,7 @@ import {
   launchSimulatorAppWithLogging,
   type LaunchWithLoggingResult,
 } from '../../../utils/simulator-steps.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -65,24 +60,10 @@ export async function launch_app_simLogic(
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const simulatorDisplayName = params.simulatorName
-    ? `"${params.simulatorName}" (${params.simulatorId})`
-    : params.simulatorId;
-  ctx.emit(
-    header('Launch App', [
-      { label: 'Simulator', value: simulatorDisplayName },
-      { label: 'Bundle ID', value: params.bundleId },
-    ]),
-  );
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeLaunchAppSim = createLaunchAppSimExecutor(executor, launcher);
-  const result = await executeLaunchAppSim(params, executionContext);
+  const result = await executeLaunchAppSim(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log(
@@ -153,7 +134,7 @@ export function createLaunchAppSimExecutor(
   executor: CommandExecutor,
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
 ): ToolExecutor<LaunchAppSimParams, LaunchAppSimResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     log('info', `Starting xcrun simctl launch request for simulator ${params.simulatorId}`);
 
     try {
@@ -173,13 +154,11 @@ export function createLaunchAppSimExecutor(
       if (!getAppContainerResult.success) {
         const message =
           'App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppSimErrorResult(params, message);
       }
     } catch {
       const message =
         'App is not installed on the simulator (check failed). Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppSimErrorResult(params, message);
     }
 
@@ -191,30 +170,12 @@ export function createLaunchAppSimExecutor(
 
       if (!launchResult.success) {
         const message = `Launch app in simulator operation failed: ${launchResult.error}`;
-        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppSimErrorResult(params, message);
-      }
-
-      ctx.emitProgress(statusLine('success', 'App launched successfully'));
-
-      const detailRows: Array<{ label: string; value: string }> = [];
-      if (launchResult.processId !== undefined) {
-        detailRows.push({ label: 'Process ID', value: String(launchResult.processId) });
-      }
-      if (launchResult.logFilePath) {
-        detailRows.push({ label: 'Runtime Logs', value: displayPath(launchResult.logFilePath) });
-      }
-      if (launchResult.osLogPath) {
-        detailRows.push({ label: 'OSLog', value: displayPath(launchResult.osLogPath) });
-      }
-      if (detailRows.length > 0) {
-        ctx.emitProgress(detailTree(detailRows));
       }
 
       return createLaunchAppSimResult(params, launchResult);
     } catch (error) {
       const message = `Launch app in simulator operation failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppSimErrorResult(params, message);
     }
   };

@@ -2,9 +2,7 @@ import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugBreakpointResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createTypedToolWithContext,
@@ -86,24 +84,6 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugBreakpointAdd
   };
 }
 
-function formatBreakpointAddOutput(result: DebugBreakpointAddResult): string[] {
-  if (result.action !== 'add') {
-    return [];
-  }
-
-  if (result.breakpoint.kind === 'function') {
-    return result.breakpoint.breakpointId
-      ? [`Set breakpoint ${result.breakpoint.breakpointId} on ${result.breakpoint.name}`]
-      : [];
-  }
-
-  return result.breakpoint.breakpointId
-    ? [
-        `Set breakpoint ${result.breakpoint.breakpointId} at ${result.breakpoint.file}:${result.breakpoint.line}`,
-      ]
-    : [];
-}
-
 export function createDebugBreakpointAddExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugBreakpointAddParams, DebugBreakpointAddResult> {
@@ -134,31 +114,11 @@ export async function debug_breakpoint_addLogic(
   params: DebugBreakpointAddParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('Add Breakpoint');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugBreakpointAdd = createDebugBreakpointAddExecutor(ctx.debugger);
-  const result = await executeDebugBreakpointAdd(params, executionContext);
+  const result = await executeDebugBreakpointAdd(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
-  if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to add breakpoint'));
-    return;
-  }
-
-  handlerCtx.emit(
-    statusLine('success', `Breakpoint ${result.breakpoint.breakpointId ?? 'unknown'} set`),
-  );
-
-  const outputLines = formatBreakpointAddOutput(result);
-  if (outputLines.length > 0) {
-    handlerCtx.emit(section('Output:', outputLines));
-  }
 }
 
 export const schema = baseSchemaObject.shape;

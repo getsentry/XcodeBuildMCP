@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const setSimulatorLocationSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -147,22 +143,12 @@ export async function set_sim_locationLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const coords = `${params.latitude},${params.longitude}`;
-  const headerEvent = header('Set Location', [
-    { label: 'Simulator', value: params.simulatorId },
-    { label: 'Coordinates', value: coords },
-  ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSetSimulatorLocation = createSetSimulatorLocationExecutor(executor);
 
-  ctx.emit(headerEvent);
-
-  const result = await executeSetSimulatorLocation(params, executionContext);
+  const result = await executeSetSimulatorLocation(params, { emitProgress() {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     if (result.error?.startsWith('Failed to set simulator location:')) {
@@ -171,12 +157,10 @@ export async function set_sim_locationLogic(
         `Error during set simulator location for simulator ${params.simulatorId}: ${result.error}`,
       );
     }
-    ctx.emit(statusLine('error', result.error ?? 'Failed to set simulator location'));
     return;
   }
 
   log('info', `Set simulator ${params.simulatorId} location to ${coords}`);
-  ctx.emit(statusLine('success', 'Location set successfully'));
 }
 
 const publicSchemaObject = z.strictObject(

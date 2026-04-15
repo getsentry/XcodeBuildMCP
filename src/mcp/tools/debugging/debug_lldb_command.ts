@@ -2,9 +2,7 @@ import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugCommandResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createTypedToolWithContext,
@@ -82,27 +80,11 @@ export async function debug_lldb_commandLogic(
   params: DebugLldbCommandParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('LLDB Command', [{ label: 'Command', value: params.command }]);
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
-  const result = await executeDebugLldbCommand(params, executionContext);
+  const result = await executeDebugLldbCommand(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
-  if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to run LLDB command'));
-    return;
-  }
-
-  handlerCtx.emit(statusLine('success', 'Command executed'));
-  if (result.outputLines.length > 0) {
-    handlerCtx.emit(section('Output:', result.outputLines));
-  }
 }
 
 export const schema = baseSchemaObject.shape;

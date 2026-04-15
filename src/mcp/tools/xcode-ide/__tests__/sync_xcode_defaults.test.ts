@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { createCommandMatchingMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, syncXcodeDefaultsLogic } from '../sync_xcode_defaults.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('sync_xcode_defaults tool', () => {
   beforeEach(() => {
@@ -23,12 +23,12 @@ describe('sync_xcode_defaults tool', () => {
         find: { output: '' },
       });
 
-      const result = await runLogic(() =>
+      const { result } = await runToolLogic(() =>
         syncXcodeDefaultsLogic({}, { executor, cwd: '/test/project' }),
       );
 
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('Failed to read Xcode IDE state');
+      expect(result.events).toHaveLength(0);
+      expect(result.isError()).toBe(true);
     });
 
     it('returns error when xcuserstate file not found', async () => {
@@ -38,12 +38,12 @@ describe('sync_xcode_defaults tool', () => {
         stat: { success: false, error: 'No such file' },
       });
 
-      const result = await runLogic(() =>
+      const { result } = await runToolLogic(() =>
         syncXcodeDefaultsLogic({}, { executor, cwd: '/test/project' }),
       );
 
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('Failed to read Xcode IDE state');
+      expect(result.events).toHaveLength(0);
+      expect(result.isError()).toBe(true);
     });
   });
 });

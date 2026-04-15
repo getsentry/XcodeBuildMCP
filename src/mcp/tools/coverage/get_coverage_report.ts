@@ -13,7 +13,6 @@ import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
-  DefaultToolExecutionContext,
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
@@ -21,7 +20,6 @@ import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 
 const getCoverageReportSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -34,7 +32,23 @@ const getCoverageReportSchema = z.object({
 });
 
 type GetCoverageReportParams = z.infer<typeof getCoverageReportSchema>;
-type GetCoverageReportResult = CoverageResultDomainResult;
+type CoverageReportTargetFile = {
+  name: string;
+  path?: string;
+  coveragePct: number;
+  coveredLines: number;
+  executableLines: number;
+};
+type CoverageReportTargetResult = {
+  name: string;
+  coveragePct: number;
+  coveredLines: number;
+  executableLines: number;
+  files?: CoverageReportTargetFile[];
+};
+type GetCoverageReportResult = CoverageResultDomainResult & {
+  targets?: CoverageReportTargetResult[];
+};
 
 interface CoverageFile {
   coveredLines: number;
@@ -87,12 +101,7 @@ function createCoverageReportResult(params: {
   coveragePct?: number;
   coveredLines?: number;
   executableLines?: number;
-  targets?: Array<{
-    name: string;
-    coveragePct: number;
-    coveredLines: number;
-    executableLines: number;
-  }>;
+  targets?: CoverageReportTargetResult[];
   diagnosticsMessage?: string;
 }): GetCoverageReportResult {
   return {
@@ -125,16 +134,10 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetCoverageReportR
   };
 }
 
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
-}
-
 export function createGetCoverageReportExecutor(
   context: GetCoverageReportContext,
 ): ToolExecutor<GetCoverageReportParams, GetCoverageReportResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const { xcresultPath, target, showFiles } = params;
 
     const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
@@ -227,26 +230,6 @@ export function createGetCoverageReportExecutor(
 
     targets.sort((a, b) => a.lineCoverage - b.lineCoverage);
 
-    if (showFiles) {
-      for (const entry of targets) {
-        if (!entry.files || entry.files.length === 0) {
-          continue;
-        }
-
-        const sortedFiles = [...entry.files].sort((left, right) => left.lineCoverage - right.lineCoverage);
-        const fileLines = sortedFiles.map((fileEntry) => {
-          const filePct = (fileEntry.lineCoverage * 100).toFixed(1);
-          return `  ${fileEntry.name}: ${filePct}% (${fileEntry.coveredLines}/${fileEntry.executableLines} lines)`;
-        });
-
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: `${entry.name} files:\n${fileLines.join('\n')}`,
-        });
-      }
-    }
-
     return createCoverageReportResult({
       xcresultPath,
       didError: false,
@@ -259,6 +242,19 @@ export function createGetCoverageReportExecutor(
         coveragePct: Number((entry.lineCoverage * 100).toFixed(1)),
         coveredLines: entry.coveredLines,
         executableLines: entry.executableLines,
+        ...(showFiles && entry.files?.length
+          ? {
+              files: [...entry.files]
+                .sort((left, right) => left.lineCoverage - right.lineCoverage)
+                .map((fileEntry) => ({
+                  name: fileEntry.name,
+                  path: fileEntry.path,
+                  coveragePct: Number((fileEntry.lineCoverage * 100).toFixed(1)),
+                  coveredLines: fileEntry.coveredLines,
+                  executableLines: fileEntry.executableLines,
+                })),
+            }
+          : {}),
       })),
     });
   };
@@ -270,41 +266,15 @@ export async function get_coverage_reportLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const { xcresultPath } = params;
-
-  const headerParams = [{ label: 'xcresult', value: xcresultPath }];
-  if (params.target) {
-    headerParams.push({ label: 'Target Filter', value: params.target });
-  }
-  const headerEvent = header('Coverage Report', headerParams);
-  const executionContext = createToolExecutionContext(ctx);
   const executeGetCoverageReport = createGetCoverageReportExecutor(context);
-
-  ctx.emit(headerEvent);
-  const result = await executeGetCoverageReport(params, executionContext);
+  const result = await executeGetCoverageReport(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  const targetLines =
-    result.targets?.map(
-      (entry) =>
-        `${entry.name}: ${entry.coveragePct.toFixed(1)}% (${entry.coveredLines}/${entry.executableLines} lines)`,
-    ) ?? [];
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to get coverage report'));
-    return;
+  if (!result.didError) {
+    ctx.nextStepParams = {
+      get_file_coverage: { xcresultPath },
+    };
   }
-
-  ctx.emit(
-    statusLine(
-      'info',
-      `Overall: ${result.summary.coveragePct?.toFixed(1) ?? '0.0'}% (${result.summary.coveredLines ?? 0}/${result.summary.executableLines ?? 0} lines)`,
-    ),
-  );
-  ctx.emit(section('Targets', targetLines));
-  ctx.nextStepParams = {
-    get_file_coverage: { xcresultPath },
-  };
 }
 
 export const schema = getCoverageReportSchema.shape;

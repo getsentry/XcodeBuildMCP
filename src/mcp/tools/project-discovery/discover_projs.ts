@@ -13,10 +13,8 @@ import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const DEFAULT_MAX_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['build', 'DerivedData', 'Pods', '.git', 'node_modules']);
@@ -252,12 +250,6 @@ export async function discoverProjects(
   return computation.result;
 }
 
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
-}
-
 function createDiscoverProjectsResult(
   context: DiscoverProjectsExecutionContext,
   result: DiscoverProjectsResult,
@@ -341,58 +333,19 @@ export async function discover_projsLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const workspaceRoot = path.resolve(params.workspaceRoot);
-  const scanPath = path.resolve(
-    workspaceRoot,
-    resolveScanBase(params.workspaceRoot, params.scanPath),
-  );
-  const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
-  ctx.emit(
-    header('Discover Projects', [
-      { label: 'Workspace root', value: workspaceRoot },
-      { label: 'Scan path', value: scanPath },
-      { label: 'Max depth', value: String(maxDepth) },
-    ]),
-  );
-  const executionContext = createToolExecutionContext(ctx);
   const executeDiscoverProjects = createDiscoverProjectsExecutor(fileSystemExecutor);
-  const result = await executeDiscoverProjects(params, executionContext);
+  const result = await executeDiscoverProjects(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error discovering projects: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Failed to discover projects'));
   } else {
     log(
       'info',
       `Discovery finished. Found ${result.projects.length} projects and ${result.workspaces.length} workspaces.`,
     );
-    ctx.emit(
-      statusLine(
-        'success',
-        `Found ${result.projects.length} project${result.projects.length === 1 ? '' : 's'} and ${result.workspaces.length} workspace${result.workspaces.length === 1 ? '' : 's'}`,
-      ),
-    );
-    if (result.projects.length > 0) {
-      ctx.emit(
-        section(
-          'Projects:',
-          result.projects.map((project) => project.path),
-        ),
-      );
-    }
-    if (result.workspaces.length > 0) {
-      ctx.emit(
-        section(
-          'Workspaces:',
-          result.workspaces.map((workspace) => workspace.path),
-        ),
-      );
-    }
   }
-
-  executionContext.emitResult(result);
 }
 
 export const schema = discoverProjsSchema.shape;

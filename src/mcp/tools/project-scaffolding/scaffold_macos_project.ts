@@ -7,8 +7,6 @@ import { TemplateManager } from '../../../utils/template/index.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -358,36 +356,20 @@ export async function scaffold_macos_projectLogic(
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeScaffoldMacOSProject = createScaffoldMacOSProjectExecutor(
     commandExecutor,
     fileSystemExecutor,
   );
-  const result = await executeScaffoldMacOSProject(params, executionContext);
+  const result = await executeScaffoldMacOSProject(params, { emitProgress() {} });
 
   setScaffoldStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-
-  ctx.emit(
-    header('Scaffold macOS Project', [
-      { label: 'Name', value: params.projectName },
-      { label: 'Path', value: result.artifacts.outputPath },
-      { label: 'Platform', value: 'macOS' },
-    ]),
-  );
 
   if (result.didError) {
     log('error', `Failed to scaffold macOS project: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Failed to scaffold macOS project'));
     return;
   }
 
   const generatedProjectName = params.customizeNames === false ? 'MyProject' : params.projectName;
-  ctx.emit(
-    statusLine('success', `Project scaffolded successfully\n  └ ${result.artifacts.outputPath}`),
-  );
   ctx.nextStepParams = {
     build_macos: {
       workspacePath:

@@ -74,7 +74,9 @@ describe('record_sim_video logic - start behavior', () => {
     const texts = result.text();
 
     expect(texts).toContain('30');
-    expect(texts.toLowerCase()).toContain('outputfile is ignored');
+    expect(texts).toContain('Video recording started');
+    expect(texts).toContain('sess-123');
+    expect(texts.toLowerCase()).not.toContain('outputfile is ignored');
 
     expect(result.nextStepParams).toBeDefined();
     expect(result.nextStepParams?.record_sim_video).toBeDefined();
@@ -137,8 +139,8 @@ describe('record_sim_video logic - end-to-end stop with rename', () => {
 
     expect(stopResult.isError()).toBe(false);
     const texts = stopResult.text();
-    expect(texts).toContain('Original file: /tmp/recorded.mp4');
-    expect(texts).toContain(`Saved to: ${outputFile}`);
+    expect(texts).toContain('Video recording stopped');
+    expect(texts).toContain(`Output File: ${outputFile}`);
   });
 });
 

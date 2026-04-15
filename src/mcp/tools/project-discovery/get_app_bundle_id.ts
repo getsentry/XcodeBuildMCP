@@ -13,11 +13,9 @@ import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const getAppBundleIdSchema = z.object({
   appPath: z.string().describe('Path to the .app bundle'),
@@ -25,12 +23,6 @@ const getAppBundleIdSchema = z.object({
 
 type GetAppBundleIdParams = z.infer<typeof getAppBundleIdSchema>;
 type GetAppBundleIdResult = BundleIdDomainResult;
-
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
-}
 
 function createBundleIdResult(
   appPath: string,
@@ -60,17 +52,15 @@ export function createGetAppBundleIdExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): ToolExecutor<GetAppBundleIdParams, GetAppBundleIdResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const appPath = params.appPath;
 
     if (!fileSystemExecutor.existsSync(appPath)) {
-      const result = createBundleIdResult(
+      return createBundleIdResult(
         appPath,
         undefined,
         `File not found: '${appPath}'. Please check the path and try again.`,
       );
-      ctx.emitProgress(statusLine('error', result.error ?? 'Bundle ID extraction failed'));
-      return result;
     }
 
     try {
@@ -81,12 +71,9 @@ export function createGetAppBundleIdExecutor(
       });
 
       const trimmedBundleId = bundleId.trim();
-      ctx.emitProgress(statusLine('success', `Bundle ID\n  \u2514 ${trimmedBundleId}`));
       return createBundleIdResult(appPath, trimmedBundleId);
     } catch (error) {
-      const result = createBundleIdResult(appPath, undefined, toErrorMessage(error));
-      ctx.emitProgress(statusLine('error', result.error ?? 'Bundle ID extraction failed'));
-      return result;
+      return createBundleIdResult(appPath, undefined, toErrorMessage(error));
     }
   };
 }
@@ -104,10 +91,8 @@ export async function get_app_bundle_idLogic(
   log('info', `Starting bundle ID extraction for app: ${appPath}`);
 
   const ctx = getHandlerContext();
-  ctx.emit(header('Get Bundle ID', [{ label: 'App', value: appPath }]));
-  const executionContext = createToolExecutionContext(ctx);
   const executeGetAppBundleId = createGetAppBundleIdExecutor(executor, fileSystemExecutor);
-  const result = await executeGetAppBundleId(params, executionContext);
+  const result = await executeGetAppBundleId(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
 
@@ -116,8 +101,6 @@ export async function get_app_bundle_idLogic(
   } else if (result.artifacts.bundleId) {
     log('info', `Extracted app bundle ID: ${result.artifacts.bundleId}`);
   }
-
-  executionContext.emitResult(result);
 
   if (!result.didError && result.artifacts.bundleId) {
     ctx.nextStepParams = {

@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const resetSimulatorLocationSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -110,31 +106,21 @@ export async function reset_sim_locationLogic(
 ): Promise<void> {
   log('info', `Resetting simulator ${params.simulatorId} location`);
 
-  const headerEvent = header('Reset Location', [{ label: 'Simulator', value: params.simulatorId }]);
-
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeResetSimulatorLocation = createResetSimulatorLocationExecutor(executor);
 
-  ctx.emit(headerEvent);
-
-  const result = await executeResetSimulatorLocation(params, executionContext);
+  const result = await executeResetSimulatorLocation(params, { emitProgress() {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log(
       'error',
       `Error during reset simulator location for simulator ${params.simulatorId}: ${result.error ?? 'Unknown error'}`,
     );
-    ctx.emit(statusLine('error', result.error ?? 'Failed to reset simulator location'));
     return;
   }
 
   log('info', `Reset simulator ${params.simulatorId} location`);
-  ctx.emit(statusLine('success', 'Location successfully reset to default'));
 }
 
 const publicSchemaObject = z.strictObject(

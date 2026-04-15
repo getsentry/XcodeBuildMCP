@@ -12,7 +12,6 @@ import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
-  DefaultToolExecutionContext,
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
@@ -21,10 +20,8 @@ import {
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchAppOnDevice } from '../../../utils/device-steps.ts';
-import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -51,21 +48,10 @@ export async function launch_app_deviceLogic(
   fileSystem: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Launch App', [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'Bundle ID', value: params.bundleId },
-    ]),
-  );
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeLaunchAppDevice = createLaunchAppDeviceExecutor(executor, fileSystem);
-  const result = await executeLaunchAppDevice(params, executionContext);
+  const result = await executeLaunchAppDevice(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error launching app on device: ${result.error ?? 'Unknown error'}`);
@@ -135,7 +121,7 @@ export function createLaunchAppDeviceExecutor(
   executor: CommandExecutor,
   fileSystem: FileSystemExecutor,
 ): ToolExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     log('info', `Launching app ${params.bundleId} on device ${params.deviceId}`);
 
     try {
@@ -151,22 +137,12 @@ export function createLaunchAppDeviceExecutor(
 
       if (!launchResult.success) {
         const message = `Failed to launch app: ${launchResult.error}`;
-        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppDeviceErrorResult(params, message);
-      }
-
-      ctx.emitProgress(statusLine('success', 'App launched successfully'));
-
-      if (launchResult.processId !== undefined) {
-        ctx.emitProgress(
-          detailTree([{ label: 'Process ID', value: String(launchResult.processId) }]),
-        );
       }
 
       return createLaunchAppDeviceResult(params, launchResult.processId);
     } catch (error) {
       const message = `Failed to launch app on device: ${toErrorMessage(error)}`;
-      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppDeviceErrorResult(params, message);
     }
   };

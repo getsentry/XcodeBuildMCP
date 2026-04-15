@@ -14,14 +14,10 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { constructDestinationString } from '../../../utils/xcode.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseOptions = {
@@ -312,40 +308,10 @@ export function createCleanExecutor(
 
 export async function cleanLogic(params: CleanParams, executor: CommandExecutor): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeClean = createCleanExecutor(executor);
-  const result = await executeClean(params, executionContext);
+  const result = await executeClean(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-
-  const prepared = prepareCleanCommand(params);
-  const configuration =
-    typeof prepared === 'string' ? (params.configuration ?? 'Debug') : prepared.configuration;
-  const cleanPlatform =
-    typeof prepared === 'string'
-      ? (resolveCleanPlatform(params) ?? XcodePlatform.iOS)
-      : prepared.cleanPlatform;
-  const scheme = params.scheme ?? '';
-
-  ctx.emit(
-    header('Clean', [
-      ...(scheme ? [{ label: 'Scheme', value: scheme }] : []),
-      ...(params.workspacePath ? [{ label: 'Workspace', value: params.workspacePath }] : []),
-      ...(params.projectPath ? [{ label: 'Project', value: params.projectPath }] : []),
-      { label: 'Configuration', value: configuration },
-      { label: 'Platform', value: String(cleanPlatform) },
-    ]),
-  );
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Clean failed: Unknown error'));
-    return;
-  }
-
-  ctx.emit(statusLine('success', 'Clean successful'));
 }
 
 const publicSchemaObject = baseSchemaObject.omit({

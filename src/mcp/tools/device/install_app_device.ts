@@ -11,19 +11,14 @@ import type { InstallResultDomainResult } from '../../../types/domain-results.ts
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnDevice } from '../../../utils/device-steps.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const installAppDeviceSchema = z.object({
   deviceId: z
@@ -45,21 +40,10 @@ export async function install_app_deviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Install App', [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'App', value: params.appPath },
-    ]),
-  );
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeInstallAppDevice = createInstallAppDeviceExecutor(executor);
-  const result = await executeInstallAppDevice(params, executionContext);
+  const result = await executeInstallAppDevice(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error installing app on device: ${result.error ?? 'Unknown error'}`);
@@ -114,7 +98,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: InstallAppDeviceRe
 export function createInstallAppDeviceExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<InstallAppDeviceParams, InstallAppDeviceResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     log('info', `Installing app on device ${params.deviceId}`);
 
     try {
@@ -122,16 +106,12 @@ export function createInstallAppDeviceExecutor(
 
       if (!installResult.success) {
         const message = `Failed to install app: ${installResult.error}`;
-        ctx.emitProgress(statusLine('error', message));
         return createInstallAppDeviceErrorResult(params, message);
       }
-
-      ctx.emitProgress(statusLine('success', 'App installed successfully'));
 
       return createInstallAppDeviceResult(params);
     } catch (error) {
       const message = `Failed to install app on device: ${toErrorMessage(error)}`;
-      ctx.emitProgress(statusLine('error', message));
       return createInstallAppDeviceErrorResult(params, message);
     }
   };

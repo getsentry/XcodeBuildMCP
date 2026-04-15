@@ -263,8 +263,8 @@ describe('list_devices plugin (device-shared)', () => {
 
       expect(result.isError).toBeFalsy();
       const text = allText(result);
-      expect(text).toContain('xctrace output');
-      expect(text).toContain('iPhone 15 (12345678-1234-1234-1234-123456789012)');
+      expect(text).toContain('List Devices');
+      expect(text).toContain('0 physical devices discovered');
     });
 
     it('should return successful no devices found response', async () => {
@@ -312,7 +312,8 @@ describe('list_devices plugin (device-shared)', () => {
 
       expect(result.isError).toBeFalsy();
       const text = allText(result);
-      expect(text).toContain('xctrace output');
+      expect(text).toContain('List Devices');
+      expect(text).toContain('0 physical devices discovered');
     });
   });
 });

@@ -23,18 +23,24 @@ vi.mock('../../../../integrations/xcode-tools-bridge/client.ts', () => ({
   XcodeToolsBridgeClient: vi.fn().mockImplementation(() => clientMocks),
 }));
 
-import { handler as statusHandler } from '../xcode_tools_bridge_status.ts';
-import { handler as syncHandler } from '../xcode_tools_bridge_sync.ts';
-import { handler as disconnectHandler } from '../xcode_tools_bridge_disconnect.ts';
-import { handler as listHandler } from '../xcode_ide_list_tools.ts';
-import { handler as callHandler } from '../xcode_ide_call_tool.ts';
+import {
+  handler as statusHandler,
+  xcodeToolsBridgeStatusLogic,
+} from '../xcode_tools_bridge_status.ts';
+import { handler as syncHandler, xcodeToolsBridgeSyncLogic } from '../xcode_tools_bridge_sync.ts';
+import {
+  handler as disconnectHandler,
+  xcodeToolsBridgeDisconnectLogic,
+} from '../xcode_tools_bridge_disconnect.ts';
+import { handler as listHandler, xcodeIdeListToolsLogic } from '../xcode_ide_list_tools.ts';
+import { handler as callHandler, xcodeIdeCallToolLogic } from '../xcode_ide_call_tool.ts';
 import { getServer } from '../../../../server/server-state.ts';
 import { shutdownXcodeToolsBridge } from '../../../../integrations/xcode-tools-bridge/index.ts';
 import {
   buildXcodeToolsBridgeStatus,
   getMcpBridgeAvailability,
 } from '../../../../integrations/xcode-tools-bridge/core.ts';
-import { allText } from '../../../../test-utils/test-helpers.ts';
+import { allText, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('xcode-ide bridge tools (standalone fallback)', () => {
   beforeEach(async () => {
@@ -120,5 +126,24 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
     expect(result.isError).toBeFalsy();
     expect(clientMocks.callTool).toHaveBeenCalledWith('toolA', { foo: 'bar' }, {});
     expect(clientMocks.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('logic functions do not emit progress events', async () => {
+    const status = await runToolLogic(() => xcodeToolsBridgeStatusLogic({}));
+    expect(status.result.events).toHaveLength(0);
+
+    const sync = await runToolLogic(() => xcodeToolsBridgeSyncLogic({}));
+    expect(sync.result.events).toHaveLength(0);
+
+    const disconnect = await runToolLogic(() => xcodeToolsBridgeDisconnectLogic({}));
+    expect(disconnect.result.events).toHaveLength(0);
+
+    const list = await runToolLogic(() => xcodeIdeListToolsLogic({ refresh: true }));
+    expect(list.result.events).toHaveLength(0);
+
+    const call = await runToolLogic(() =>
+      xcodeIdeCallToolLogic({ remoteTool: 'toolA', arguments: { foo: 'bar' } }),
+    );
+    expect(call.result.events).toHaveLength(0);
   });
 });

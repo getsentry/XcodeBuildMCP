@@ -6,11 +6,9 @@ import { ValidationError } from '../../../utils/errors.ts';
 import { TemplateManager } from '../../../utils/template/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
-  DefaultToolExecutionContext,
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -383,36 +381,20 @@ export async function scaffold_ios_projectLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeScaffoldIOSProject = createScaffoldIOSProjectExecutor(
     commandExecutor,
     fileSystemExecutor,
   );
-  const result = await executeScaffoldIOSProject(params, executionContext);
+  const result = await executeScaffoldIOSProject(params, { emitProgress() {} });
 
   setScaffoldStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-
-  ctx.emit(
-    header('Scaffold iOS Project', [
-      { label: 'Name', value: params.projectName },
-      { label: 'Path', value: result.artifacts.outputPath },
-      { label: 'Platform', value: 'iOS' },
-    ]),
-  );
 
   if (result.didError) {
     log('error', `Failed to scaffold iOS project: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Failed to scaffold iOS project'));
     return;
   }
 
   const generatedProjectName = params.customizeNames === false ? 'MyProject' : params.projectName;
-  ctx.emit(
-    statusLine('success', `Project scaffolded successfully\n  └ ${result.artifacts.outputPath}`),
-  );
   ctx.nextStepParams = {
     build_sim: {
       workspacePath:

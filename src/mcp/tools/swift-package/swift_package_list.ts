@@ -4,9 +4,8 @@ import type { ProcessListDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/command.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { activeProcesses } from './active-processes.ts';
-import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
+import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
 
 type ListProcessInfo = {
   executableName?: string;
@@ -79,36 +78,13 @@ export async function swift_package_listLogic(
   dependencies?: ProcessListDependencies,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSwiftPackageList = createSwiftPackageListExecutor(dependencies);
   const result = await executeSwiftPackageList(
     (params ?? {}) as SwiftPackageListParams,
-    executionContext,
+    noopToolExecutionContext,
   );
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
-  ctx.emit(header('Swift Package Processes'));
-
-  if (result.processes.length === 0) {
-    ctx.emit(statusLine('info', 'No Swift Package processes currently running.'));
-    return;
-  }
-
-  ctx.emit(
-    section(
-      `Running Processes (${result.processes.length}):`,
-      result.processes.flatMap((processInfo) => [
-        `🟢 ${processInfo.name}`,
-        `   PID: ${processInfo.processId} | Uptime: ${processInfo.uptimeSeconds}s`,
-        `   Package: ${processInfo.artifacts?.packagePath ?? 'unknown package'}`,
-      ]),
-      { blankLineAfterTitle: true },
-    ),
-  );
 }
 
 const swiftPackageListSchema = z.object({});

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { schema, erase_simsLogic } from '../erase_sims.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('erase_sims tool (single simulator)', () => {
   describe('Plugin Structure', () => {
@@ -23,13 +23,11 @@ describe('erase_sims tool (single simulator)', () => {
       expect(res.isError).toBe(true);
     });
 
-    it('adds tool hint when booted error occurs without shutdownFirst', async () => {
+    it('returns an error when the simulator is booted and shutdownFirst is not enabled', async () => {
       const bootedError =
         'An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):\nUnable to erase contents and settings in current state: Booted\n';
       const mock = createMockExecutor({ success: false, error: bootedError });
       const res = await runLogic(() => erase_simsLogic({ simulatorId: 'UD1' }, mock));
-      const text = allText(res);
-      expect(text).toContain('shutdownFirst: true');
       expect(res.isError).toBe(true);
     });
 

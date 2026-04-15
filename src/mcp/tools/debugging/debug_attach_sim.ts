@@ -3,9 +3,7 @@ import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugSessionActionDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import {
@@ -242,50 +240,15 @@ export async function debug_attach_simLogic(
   params: DebugAttachSimParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('Attach Debugger');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugAttachSim = createDebugAttachSimExecutor(ctx);
-  const result = await executeDebugAttachSim(params, executionContext);
+  const result = await executeDebugAttachSim(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
   if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to attach debugger'));
     return;
   }
 
-  const backendLabel =
-    ctx.debugger.listSessions().find((session) => session.id === result.session?.debugSessionId)
-      ?.backend === 'lldb-cli'
-      ? 'LLDB'
-      : 'DAP debugger';
-  const currentText =
-    (params.makeCurrent ?? true) === true
-      ? 'This session is now the current debug session.'
-      : 'This session is not set as the current session.';
-  const resumeText =
-    result.session?.executionState === 'running'
-      ? 'Execution is running. App is responsive to UI interaction.'
-      : 'Execution is paused. Use debug_continue to resume before UI automation.';
-
-  handlerCtx.emit(
-    statusLine(
-      'success',
-      `Attached ${backendLabel} to simulator process ${result.artifacts?.processId ?? params.pid ?? 'unknown'} (${result.artifacts?.simulatorId ?? params.simulatorId ?? 'unknown'})`,
-    ),
-  );
-  handlerCtx.emit(
-    detailTree([
-      { label: 'Debug session ID', value: result.session?.debugSessionId ?? 'unknown' },
-      { label: 'Status', value: currentText },
-      { label: 'Execution', value: resumeText },
-    ]),
-  );
   handlerCtx.nextStepParams = {
     debug_breakpoint_add: {
       debugSessionId: result.session?.debugSessionId ?? '',

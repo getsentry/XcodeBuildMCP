@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const simStatusbarSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -143,29 +139,17 @@ export async function sim_statusbarLogic(
     `Setting simulator ${params.simulatorId} status bar data network to ${params.dataNetwork}`,
   );
 
-  const headerEvent = header('Statusbar', [
-    { label: 'Simulator', value: params.simulatorId },
-    { label: 'Data Network', value: params.dataNetwork },
-  ]);
-
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSimStatusbar = createSimStatusbarExecutor(executor);
 
-  ctx.emit(headerEvent);
-
-  const result = await executeSimStatusbar(params, executionContext);
+  const result = await executeSimStatusbar(params, { emitProgress() {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log(
       'error',
       `Error setting status bar for simulator ${params.simulatorId}: ${result.error ?? 'Unknown error'}`,
     );
-    ctx.emit(statusLine('error', result.error ?? 'Failed to set status bar'));
     return;
   }
 
@@ -175,7 +159,6 @@ export async function sim_statusbarLogic(
       : 'Status bar data network set successfully';
 
   log('info', `${successMsg} (simulator: ${params.simulatorId})`);
-  ctx.emit(statusLine('success', successMsg));
 }
 
 const publicSchemaObject = z.strictObject(

@@ -4,13 +4,9 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const openSimSchema = z.object({});
 
@@ -60,7 +56,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: OpenSimResult): vo
 export function createOpenSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<OpenSimParams, OpenSimResult> {
-  return async (_params, _ctx) => {
+  return async (_params) => {
     try {
       const result = await executor(['open', '-a', 'Simulator'], 'Open Simulator', false);
 
@@ -92,25 +88,15 @@ export async function open_simLogic(
   log('info', 'Starting open simulator request');
 
   const ctx = getHandlerContext();
-  const headerEvent = header('Open Simulator');
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeOpenSim = createOpenSimExecutor(executor);
-
-  ctx.emit(headerEvent);
-
-  const result = await executeOpenSim(_params, executionContext);
+  const result = await executeOpenSim(_params, { emitProgress: () => {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error during open simulator operation: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Open simulator operation failed'));
     return;
   }
 
-  ctx.emit(statusLine('success', 'Simulator opened successfully'));
   ctx.nextStepParams = {
     boot_sim: { simulatorId: 'UUID_FROM_LIST_SIMS' },
   };

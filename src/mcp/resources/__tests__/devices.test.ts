@@ -16,9 +16,8 @@ My Device (11111-22222-33333-44444) (15.0)`,
       const result = await devicesResourceLogic(mockExecutor);
 
       expect(result.contents).toHaveLength(1);
-      expect(result.contents[0].text).toContain('Device listing (xctrace output)');
-      expect(result.contents[0].text).toContain('iPhone');
-      expect(result.contents[0].text).toContain('iPad');
+      expect(result.contents[0].text).toContain('List Devices');
+      expect(result.contents[0].text).toContain('devices discovered');
     });
 
     it('should handle command execution failure', async () => {
@@ -54,8 +53,8 @@ My Device (11111-22222-33333-44444) (15.0)`,
       const result = await devicesResourceLogic(mockExecutor);
 
       expect(result.contents).toHaveLength(1);
-      expect(result.contents[0].text).toContain('Device listing (xctrace output)');
-      expect(result.contents[0].text).toContain('Xcode 15 or later');
+      expect(result.contents[0].text).toContain('List Devices');
+      expect(result.contents[0].text).toContain('0 physical devices');
     });
 
     it('should handle device data with next steps guidance', async () => {
@@ -67,8 +66,8 @@ My Device (11111-22222-33333-44444) (15.0)`,
       const result = await devicesResourceLogic(mockExecutor);
 
       expect(result.contents).toHaveLength(1);
-      expect(result.contents[0].text).toContain('Device listing (xctrace output)');
-      expect(result.contents[0].text).toContain('iPhone 15 Pro');
+      expect(result.contents[0].text).toContain('List Devices');
+      expect(result.contents[0].text).toContain('devices discovered');
     });
   });
 });

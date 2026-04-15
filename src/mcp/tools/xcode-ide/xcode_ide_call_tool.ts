@@ -32,7 +32,6 @@ type Params = z.infer<typeof schemaObject>;
 
 export function createXcodeIdeCallToolExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeCallResultDomainResult>({
-    progressMessage: 'Calling remote Xcode IDE tool',
     callback: (bridge, params) =>
       bridge.callToolTool({
         remoteTool: params.remoteTool,

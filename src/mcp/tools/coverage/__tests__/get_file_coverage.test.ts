@@ -10,7 +10,7 @@ import {
   __clearTestExecutorOverrides,
 } from '../../../../utils/execution/index.ts';
 import { schema, handler, get_file_coverageLogic } from '../get_file_coverage.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 
 
@@ -350,13 +350,16 @@ describe('get_file_coverage', () => {
         return createMockCommandResponse({ success: true, output: sampleArchiveOutput, exitCode: 0 });
       };
 
-      const result = await runLogic(() => get_file_coverageLogic(
-        { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
-        { executor: mockExecutor, fileSystem: mockFileSystem },
-      ));
+      const { result } = await runToolLogic(() =>
+        get_file_coverageLogic(
+          { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
+          { executor: mockExecutor, fileSystem: mockFileSystem },
+        ),
+      );
 
-      const text = allText(result);
-      expect(text).toContain('Uncovered line ranges (/src/MyApp/ViewModel.swift)');
+      expect(result.events).toHaveLength(0);
+      const text = result.text();
+      expect(text).toContain('Uncovered Lines');
       expect(text).toContain('L4-6');
       expect(text).toContain('L9');
     });
@@ -416,14 +419,17 @@ describe('get_file_coverage', () => {
         });
       };
 
-      const result = await runLogic(() => get_file_coverageLogic(
-        { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
-        { executor: mockExecutor, fileSystem: mockFileSystem },
-      ));
+      const result = await runLogic(() =>
+        get_file_coverageLogic(
+          { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
+          { executor: mockExecutor, fileSystem: mockFileSystem },
+        ),
+      );
 
       expect(result.isError).toBeUndefined();
       const text = allText(result);
-      expect(text).toContain('Could not retrieve line-level coverage from archive');
+      expect(text).toContain('Coverage: 61.9%');
+      expect(text).not.toContain('Uncovered Lines');
     });
   });
 

@@ -2,53 +2,69 @@
 
 ## Goal
 
-Move to a model where:
+Tools produce **domain results** as the canonical output. Rendering is derived from domain results for non-streaming tools, and from a live progress stream for streaming tools. The two paths never overlap.
 
-- tools produce **domain results** first
-- progress streaming is a separate concern
-- `json` returns the final structured result
-- `jsonl` streams machine-readable progress events
-- `text` renders the same progress stream for humans
-- existing snapshot fixtures remain the source of truth during the refactor
+- `json` returns the final structured result (all tools)
+- `jsonl` streams machine-readable progress events (streaming tools only)
+- `text` renders from the domain result OR from the live progress stream depending on tool type
+- existing snapshot fixtures remain the source of truth
 
 ## Core idea
 
-Separate these concerns explicitly:
+Tools fall into two categories:
 
-1. **Domain result**
-   - final machine-readable tool outcome
-2. **Progress stream**
-   - realtime machine-readable progress events
-3. **Presentation**
-   - text rendering from the progress stream
+1. **Non-streaming tools** (majority: list, install, launch, stop, discover, etc.)
+   - Run to completion, return a domain result
+   - Domain result is the **sole source of truth** for all output modes
+   - No progress events emitted during execution
 
-`PipelineEvent` should stop being the canonical result model.
-It should become a downstream progress or presentation transport, or be replaced by a cleaner progress-event model over time.
+2. **Streaming tools** (xcodebuild-based: build, build-run, test)
+   - Emit progress events during long-running execution
+   - Return a domain result when complete
+   - Live streaming only happens for **CLI text** and **CLI jsonl**
+   - All other runtimes/modes render from the domain result
 
 ## High-level model
 
+### Non-streaming tools
+
 ```mermaid
 flowchart LR
-    A[External tool output\nxcodebuild simctl xcdevice] --> B[Parser / extractor]
-    B --> C[Domain result]
-    B --> D[Progress events]
+    A[Tool execution] --> B[Domain result]
+    B --> C[Structured JSON envelope]
+    B --> D[Text renderer]
+    C --> E[--output json]
+    D --> F[--output text]
+    D --> G[MCP text content]
+```
 
-    C --> E[Structured JSON envelope]
-    D --> F[JSONL stream]
-    D --> G[Text renderer]
+### Streaming tools
 
-    E --> H[--output json]
-    F --> I[--output jsonl]
-    G --> J[--output text]
+```mermaid
+flowchart LR
+    A[xcodebuild process] --> B[Line parser]
+    B --> C[Live ProgressEvent stream]
+    B --> D[Accumulated domain result]
+
+    C --> E{Runtime + output mode?}
+    E -->|CLI text| F[Text renderer - live]
+    E -->|CLI jsonl| G[NDJSON stream]
+    E -->|CLI json| H[Ignore stream]
+    E -->|MCP| I[Ignore stream]
+
+    D --> J[Final domain result]
+    J -->|CLI json| K[Structured JSON envelope]
+    J -->|MCP| L[Text from domain result]
 ```
 
 ## Why this is better
 
-- no back-parsing rendered text into JSON
-- no treating UI-shaped events as canonical data
-- clean separation between final result and live progress
-- JSON becomes a first-class output, not a renderer hack
-- text and jsonl keep realtime behavior for long-running tools
+- No dual-path rendering — each tool category has one source of truth
+- No back-parsing rendered text into JSON
+- No filtering/deduplication hacks between live stream and domain result
+- JSON is always from the domain result
+- Text output is either from the domain result OR the live stream, never both
+- Streaming tools get real-time output for CLI users without compromising structured output
 
 ---
 
@@ -56,7 +72,7 @@ flowchart LR
 
 ## Domain result
 
-A tool family should produce a result type that represents the final outcome.
+A tool family produces a result type that represents the final outcome.
 
 ```ts
 export interface ToolDomainResultBase {
@@ -64,65 +80,36 @@ export interface ToolDomainResultBase {
   didError: boolean;
   error: string | null;
 }
-
-export interface SimulatorListResult extends ToolDomainResultBase {
-  kind: 'simulator-list';
-  simulators: Array<{
-    simulatorId: string;
-    name: string;
-    runtime: string;
-    state: string;
-    isAvailable: boolean;
-  }>;
-}
-
-export interface LaunchResult extends ToolDomainResultBase {
-  kind: 'launch-result';
-  summary: { status: 'SUCCEEDED' | 'FAILED' };
-  artifacts: {
-    bundleId?: string;
-    simulatorId?: string;
-    deviceId?: string;
-    processId?: number;
-    appPath?: string;
-    runtimeLogPath?: string;
-    osLogPath?: string;
-  };
-  diagnostics: {
-    warnings: string[];
-    errors: string[];
-  };
-}
 ```
+
+The domain result is the canonical data for all output modes. For non-streaming tools, it is also the sole source of text rendering.
 
 ## Progress event
 
-Progress events are for live updates, not final canonical data.
+Progress events are for **live streaming only** — used by streaming tools in CLI text/jsonl modes.
 
 ```ts
 export type ProgressEvent =
-  | {
-      type: 'status';
-      level: 'info' | 'warning' | 'error';
-      message: string;
-    }
-  | {
-      type: 'xcodebuild-line';
-      stream: 'stdout' | 'stderr';
-      line: string;
-    }
-  | {
-      type: 'table';
-      name: string;
-      columns: string[];
-      rows: Array<Record<string, string>>;
-    }
-  | {
-      type: 'artifact';
-      name: string;
-      path: string;
-    };
+  | { type: 'status'; level: 'info' | 'warning' | 'error' | 'success'; message: string }
+  | { type: 'xcodebuild-line'; operation: 'BUILD' | 'TEST'; stream: 'stdout' | 'stderr'; line: string }
+  | { type: 'header'; operation: string; params: Array<{ label: string; value: string }> }
+  | { type: 'build-stage'; operation: 'BUILD' | 'TEST'; stage: string; message: string }
+  | { type: 'compiler-warning'; operation: 'BUILD' | 'TEST'; message: string; location?: string }
+  | { type: 'compiler-error'; operation: 'BUILD' | 'TEST'; message: string; location?: string }
+  | { type: 'test-discovery'; operation: 'TEST'; total: number; tests: string[]; truncated: boolean }
+  | { type: 'test-progress'; operation: 'TEST'; completed: number; failed: number; skipped: number }
+  | { type: 'test-failure'; operation: 'TEST'; suite?: string; test?: string; message: string; location?: string }
+  | { type: 'summary'; status: 'SUCCEEDED' | 'FAILED'; operation?: string; durationMs?: number }
+  | { type: 'section'; title: string; lines: string[] }
+  | { type: 'detail-tree'; items: Array<{ label: string; value: string }> }
+  | { type: 'table'; name: string; columns: string[]; rows: Array<Record<string, string>> }
+  | { type: 'file-ref'; label?: string; path: string }
+  | { type: 'artifact'; name: string; path: string }
+  | { type: 'next-steps'; steps: Array<{ label: string; toolId: string; args: Record<string, unknown> }> }
+  // ...additional variants as needed
 ```
+
+Non-streaming tools do **not** emit progress events. They return a domain result only.
 
 ## Structured JSON envelope
 
@@ -138,52 +125,35 @@ export interface StructuredOutputEnvelope<TData> {
 
 ---
 
-# Execution model
+# Tool categories
 
-## Tool contract
+## Non-streaming tools
 
-Tools should produce:
+The majority of tools: list, install, launch, stop, discover, app-path, bundle-id, session management, simulator management, debugging, UI automation, coverage, scaffolding, doctor, clean, workflow management, xcode-ide bridge.
 
-- a final domain result
-- zero or more progress events while running
+### Contract
 
 ```ts
-export interface ToolExecutionContext {
-  emitProgress(event: ProgressEvent): void;
-  attach?(image: { path: string; mimeType: string }): void;
-}
-
 export type ToolExecutor<TArgs, TResult> = (
   args: TArgs,
   ctx: ToolExecutionContext,
 ) => Promise<TResult>;
 ```
 
-## Example
+Non-streaming executors:
+- Do **not** call `ctx.emitProgress()`
+- Return the domain result
+- The domain result drives all output modes
+
+### Text rendering
+
+`renderDomainResultTextItems(result)` converts the domain result into the complete text output — header, details, status lines, diagnostics, summary, next steps. This is the sole text source for non-streaming tools across CLI text, MCP, and daemon.
+
+### Example
 
 ```ts
-const listSimulators: ToolExecutor<ListSimArgs, SimulatorListResult> = async (
-  args,
-  ctx,
-) => {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Querying simulators',
-  });
-
+const listSimulators: ToolExecutor<ListSimArgs, SimulatorListResult> = async (args, ctx) => {
   const simulators = await fetchSimulators(args);
-
-  ctx.emitProgress({
-    type: 'table',
-    name: 'simulators',
-    columns: ['name', 'runtime', 'state'],
-    rows: simulators.map((sim) => ({
-      name: sim.name,
-      runtime: sim.runtime,
-      state: sim.state,
-    })),
-  });
 
   return {
     kind: 'simulator-list',
@@ -194,236 +164,144 @@ const listSimulators: ToolExecutor<ListSimArgs, SimulatorListResult> = async (
 };
 ```
 
+## Streaming tools
+
+Xcodebuild-based tools: build, build-run, test (simulator, device, macOS, swift-package).
+
+### Contract
+
+Streaming executors:
+- Call `ctx.emitProgress()` for live updates during execution
+- Emit the **complete event stream** including header, frontmatter, xcodebuild lines, diagnostics, test discovery/failures, summary, and artifact tail
+- Return the domain result for structured output
+
+### When streaming is active
+
+Streaming only occurs for **CLI text** and **CLI jsonl** output modes. For all other runtime/output combinations, the tool runs without streaming and the domain result drives the output:
+
+| Runtime | Output | Source of text rendering |
+|---------|--------|------------------------|
+| CLI     | text   | Live progress stream |
+| CLI     | jsonl  | Live progress stream as NDJSON |
+| CLI     | json   | Domain result → structured envelope |
+| MCP     | —      | Domain result → `renderDomainResultTextItems` |
+| Daemon  | —      | Domain result (forwarded to CLI) |
+
+### Live stream flow
+
+For CLI text/jsonl, the executor emits the complete output as progress events:
+
+```ts
+const buildTool: ToolExecutor<BuildArgs, BuildResult> = async (args, ctx) => {
+  // Header + frontmatter
+  ctx.emitProgress({ type: 'header', operation: 'Build', params: [...] });
+
+  // xcodebuild lines streamed live — renderer parses diagnostics in real-time
+  await runXcodebuild(args, {
+    onLine(line, stream) {
+      ctx.emitProgress({ type: 'xcodebuild-line', operation: 'BUILD', stream, line });
+    },
+  });
+
+  const result = finalizeBuildResult(state);
+
+  // Tail events emitted by executor after xcodebuild completes
+  ctx.emitProgress({ type: 'summary', status: result.summary.status, durationMs: result.summary.durationMs });
+  if (result.artifacts.buildLogPath) {
+    ctx.emitProgress({ type: 'file-ref', label: 'Build Logs', path: result.artifacts.buildLogPath });
+  }
+
+  return result;
+};
+```
+
+The text renderer processes the stream in a single pass — no finalize-time rendering from the domain result needed.
+
+### MCP / non-streaming path
+
+When the runtime is MCP or the output mode is json, the executor still runs but progress events are discarded. The domain result is used to render text via `renderDomainResultTextItems(result)`.
+
 ---
 
-# CLI flows
+# CLI output flows
 
 ## `--output json`
 
-Return the final structured result only.
-
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Tool
-    participant Parser
-    CLI->>Tool: execute(args)
-    Tool->>Parser: parse external tool output
-    Parser-->>Tool: domain result + progress events
-    Tool-->>CLI: Promise<DomainResult>
-    CLI->>CLI: map result to schema envelope
-    CLI-->>User: one JSON document
-```
-
-### Example
+All tools, all runtimes. Final structured result only.
 
 ```ts
-const result = await executeTool(args, progressSink);
+const result = await executeTool(args, ctx);
 const envelope = toStructuredEnvelope(result);
-process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
-```
-
-### Output example
-
-```json
-{
-  "schema": "xcodebuildmcp.output.simulator-list",
-  "schemaVersion": "1",
-  "didError": false,
-  "error": null,
-  "data": {
-    "simulators": [
-      {
-        "simulatorId": "SIM-123",
-        "name": "iPhone 16",
-        "runtime": "iOS 18.0",
-        "state": "Booted",
-        "isAvailable": true
-      }
-    ]
-  }
-}
+process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
 ```
 
 ## `--output jsonl`
 
-Stream progress events as NDJSON.
-
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Tool
-    participant User as Consumer
-    CLI->>Tool: execute(args, emitProgress)
-    Tool-->>CLI: ProgressEvent
-    CLI-->>User: NDJSON line
-    Tool-->>CLI: ProgressEvent
-    CLI-->>User: NDJSON line
-    Tool-->>CLI: final DomainResult
-    Note over CLI,User: CLI may exit with code based on final result
-```
-
-### Example
+Streaming tools emit NDJSON lines. Non-streaming tools: the domain result text items could be emitted as NDJSON, or this mode could be unsupported for non-streaming tools.
 
 ```ts
-const progressSink = (event: ProgressEvent) => {
-  process.stdout.write(`${JSON.stringify(event)}\n`);
+// Streaming tool
+ctx.emitProgress = (event) => {
+  process.stdout.write(JSON.stringify(event) + '\n');
 };
-
-const result = await executeTool(args, { emitProgress: progressSink });
-process.exitCode = result.didError ? 1 : 0;
-```
-
-### Output example
-
-```json
-{"type":"status","level":"info","message":"Querying simulators"}
-{"type":"table","name":"simulators","columns":["name","runtime","state"],"rows":[{"name":"iPhone 16","runtime":"iOS 18.0","state":"Booted"}]}
 ```
 
 ## `--output text`
 
-Render the progress stream for humans.
-
-```mermaid
-sequenceDiagram
-    participant CLI
-    participant Tool
-    participant Renderer
-    participant User
-    CLI->>Tool: execute(args, emitProgress)
-    Tool-->>Renderer: ProgressEvent
-    Renderer-->>User: formatted text
-    Tool-->>Renderer: ProgressEvent
-    Renderer-->>User: formatted text
-    Tool-->>CLI: final DomainResult
-    CLI->>Renderer: optional final summary from result
-    Renderer-->>User: final summary text
-```
-
-### Example
-
-```ts
-const renderer = createCliTextRenderer();
-
-const result = await executeTool(args, {
-  emitProgress(event) {
-    renderer.render(event);
-  },
-});
-
-renderer.finish(result);
-process.exitCode = result.didError ? 1 : 0;
-```
+- **Non-streaming tools:** `renderDomainResultTextItems(result)` produces the complete transcript
+- **Streaming tools:** Progress events flow through the text renderer live. The executor emits the complete stream including tail events. No domain-result rendering at finalize.
 
 ## `--output raw`
 
-No design change proposed here.
+Unchanged.
 
 ---
 
 # Daemon / CLI split
 
-## Current problem
-
-Today the daemon boundary primarily carries `PipelineEvent`s.
-That makes progress or presentation data the main contract across the boundary.
-
-## Proposed model
-
-The daemon boundary should carry:
-
-1. **progress stream** for realtime output
-2. **final domain result** for canonical machine-readable output
-
-## End-state daemon flow
+The daemon streams progress events and returns the final domain result.
 
 ```mermaid
 sequenceDiagram
     participant CLI
     participant Daemon
     participant Tool
-    CLI->>Daemon: invoke tool(args, outputMode)
+    CLI->>Daemon: invoke tool(args)
     Daemon->>Tool: execute(args, emitProgress)
-    Tool-->>Daemon: ProgressEvent*
-    Daemon-->>CLI: ProgressEvent*
+    Tool-->>Daemon: ProgressEvent (streaming tools only)
+    Daemon-->>CLI: ProgressEvent (streaming tools only)
     Tool-->>Daemon: final DomainResult
     Daemon-->>CLI: final DomainResult
     CLI->>CLI: route by output mode
 ```
 
-## CLI routing after daemon response
-
-```mermaid
-flowchart TD
-    A[ProgressEvent from daemon] --> B{output mode}
-    B -->|text| C[render as human text]
-    B -->|jsonl| D[write NDJSON line]
-    B -->|json| E[ignore progress for stdout]
-
-    F[Final DomainResult from daemon] --> G{output mode}
-    G -->|text| H[optional final summary]
-    G -->|jsonl| I[set exit code]
-    G -->|json| J[map to structured envelope and print once]
-```
-
-## Suggested protocol shape
-
-```ts
-export type DaemonToolMessage =
-  | {
-      kind: 'progress';
-      event: ProgressEvent;
-    }
-  | {
-      kind: 'result';
-      result: ToolDomainResultBase;
-    };
-```
-
-This is better than using progress events as the only returned artifact.
+For non-streaming tools, the daemon receives no progress events — just the final domain result.
 
 ---
 
-# Long-running xcodebuild tools
+# Text rendering architecture
 
-These tools need both:
+## Single source per tool category
 
-- live progress streaming
-- a final structured result
+The key architectural rule: **text output has exactly one source per tool category.**
 
-That means they should not be forced into a buffered-only model.
+- Non-streaming tools: `renderDomainResultTextItems(result)` — always
+- Streaming tools in CLI text/jsonl: live progress stream — always
+- Streaming tools in MCP/json: `renderDomainResultTextItems(result)` — always
 
-## Flow
+There is **no filtering, deduplication, or coordination** between the live stream and domain result rendering. They never both produce text for the same invocation.
 
-```mermaid
-flowchart LR
-    A[xcodebuild process] --> B[line parser]
-    B --> C[ProgressEvent stream]
-    B --> D[accumulated domain result state]
-    C --> E[text renderer or jsonl]
-    D --> F[final BuildResult / TestResult]
-    F --> G[structured json]
-```
+## `renderDomainResultTextItems(result)`
 
-## Example
+Converts a domain result into the complete text representation. Must produce byte-identical output to what the live stream produces for the same data. This is validated by snapshot fixtures.
 
-```ts
-const buildTool: ToolExecutor<BuildArgs, BuildResult> = async (args, ctx) => {
-  const state = createBuildState();
+## Text renderer (CLI text streaming)
 
-  await runXcodebuild(args, {
-    onLine(line, stream) {
-      ctx.emitProgress({ type: 'xcodebuild-line', stream, line });
-      updateBuildStateFromLine(state, line);
-    },
-  });
-
-  return finalizeBuildResult(state);
-};
-```
-
-This preserves the clanky TTY behavior without making text rendering the canonical model.
+For streaming tools, the text renderer processes progress events one at a time:
+- Formats headers, status lines, sections, tables
+- Has an internal xcodebuild parser that converts `xcodebuild-line` events into formatted diagnostics
+- Groups compiler errors/warnings and flushes them on summary
+- Produces identical output to `renderDomainResultTextItems` for the same data
 
 ---
 
@@ -431,99 +309,79 @@ This preserves the clanky TTY behavior without making text rendering the canonic
 
 ## TDD rule
 
-The existing snapshot fixtures remain the source of truth during the refactor.
+The existing snapshot fixtures remain the source of truth.
 
-That means:
+- Text fixtures must continue to pass unchanged
+- JSON fixtures define the final structured result contracts
+- No fixture should be modified to accommodate implementation changes
 
-- text fixtures must continue to pass unchanged
-- json fixtures define the final structured result contracts
-- jsonl behavior should be validated as a progress stream, not confused with final result shape
+## Fixture coverage
 
-## Transitional compatibility
-
-During migration, `PipelineEvent` can continue to exist as an adapter target:
-
-```mermaid
-flowchart LR
-    A[Domain result + progress events] --> B[PipelineEvent adapter]
-    B --> C[current text renderer]
-    B --> D[current jsonl path if needed]
-```
-
-This lets us preserve behavior while we demote `PipelineEvent` from canonical status.
+- CLI text fixtures validate the text renderer output for streaming tools
+- MCP text fixtures validate `renderDomainResultTextItems` output for all tools
+- JSON fixtures validate the structured envelope for all tools
+- Parity between CLI and MCP fixtures validates that both rendering paths produce identical text
 
 ---
 
-# Migration plan
+# Completed phases
 
-## Phase 1
+## Phase 1 ✅
 
-Introduce domain result types and progress-event types for the main tool families:
+Introduced domain result types and progress event types for all tool families.
 
-- list results
-- app-path / bundle-id
-- launch / install / stop
-- build / build-and-run / test
+## Phase 2 ✅
 
-## Phase 2
+Refactored all tool handlers to use `ToolExecutor`, return domain results, and set `structuredOutput`.
 
-Refactor tools so they:
+## Phase 3 ✅
 
-- return domain results
-- emit progress events during execution
+Adapted output routing:
+- `--output json` from domain results via `StructuredOutputEnvelope`
+- `--output jsonl` streams `ProgressEvent` as NDJSON
+- `--output text` via progress-based rendering
+- Daemon v3 streaming protocol
 
-## Phase 3
+## Phase 4 ✅
 
-Adapt outputs:
-
-- `json` from domain results
-- `jsonl` from progress events
-- `text` from progress-event rendering
-
-## Phase 4
-
-Keep `PipelineEvent` only as a compatibility adapter for legacy rendering code until it can be removed or renamed.
-
-## Phase 5
-
-Once the renderer stack is fully moved over, either:
-
-- remove `PipelineEvent`, or
-- rename it to something honest like `ProgressEvent` or `RenderEvent`
+Removed `PipelineEvent` entirely. `ProgressEvent` is the sole event type.
 
 ---
 
-# Recommended naming
+# Remaining phases
 
-If we keep the current concept, I would steer toward:
+## Phase 5: Eliminate dual-path rendering
 
-- `ToolDomainResult`
-- `ProgressEvent`
-- `StructuredOutputEnvelope`
-- `ProgressRenderer`
+Remove the architectural issue where streaming tools render diagnostics from both the live progress stream AND the domain result during finalize.
 
-I would avoid treating `PipelineEvent` as the core abstraction in new code.
+### 5a: Non-streaming tools stop emitting progress events
 
----
+- Remove all `ctx.emitProgress()` calls from non-streaming tool executors
+- These tools return a domain result only
+- `renderDomainResultTextItems` must produce the complete text for every non-streaming tool
+- Validate against all text fixtures (CLI + MCP)
 
-# Final recommendation
+### 5b: Streaming tools emit the complete stream
 
-Use this architecture:
+- Streaming tool executors emit the full event sequence including tail events (summary, build log path, test discovery)
+- The text renderer processes the stream in a single pass with no finalize-time domain result rendering
+- `shouldRenderStructuredOutput` returns false for streaming tool results when the live stream was active
+- Remove `filterStructuredOutputItems` — it is no longer needed
 
-```mermaid
-flowchart TD
-    A[Tool execution] --> B[Parse raw tool output]
-    B --> C[Domain result]
-    B --> D[Progress events]
-    C --> E[Structured JSON]
-    D --> F[Text rendering]
-    D --> G[JSONL streaming]
-```
+### 5c: Streaming mode gating
 
-In plain terms:
+- Streaming only activates for CLI text and CLI jsonl
+- For MCP, CLI json, and daemon consumers, streaming tools run without emitting progress and `renderDomainResultTextItems` produces the text from the domain result
+- The executor receives a flag or the `ToolExecutionContext` indicates whether streaming is active
 
-- `json` is the final domain result
-- `jsonl` is the machine-readable progress stream
-- `text` is the human rendering of that same progress stream
-- domain data comes first
-- presentation comes second
+### 5d: Remove dead rendering code
+
+- Remove any remaining dual-path coordination logic
+- Remove unused structured output rendering paths for streaming tools
+- Ensure `renderDomainResultTextItems` handles both streaming and non-streaming result types correctly (it must produce complete text for streaming tools when used in MCP/json mode)
+
+### 5e: Snapshot validation
+
+- Run all text snapshot fixtures (CLI + MCP) — must pass unchanged
+- Run all JSON fixture parity tests — must pass unchanged
+- Verify no fixture modifications were needed

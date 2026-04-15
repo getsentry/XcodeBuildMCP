@@ -295,6 +295,7 @@ describe('session-set-defaults tool', () => {
     });
 
     it('returns error when profile does not exist and createIfNotExists is false', async () => {
+      const before = sessionStore.getAll();
       const result = await runLogic(() =>
         sessionSetDefaultsLogic(
           {
@@ -306,7 +307,8 @@ describe('session-set-defaults tool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('Profile "missing" does not exist');
+      expect(sessionStore.getAll()).toEqual(before);
+      expect(sessionStore.getActiveProfile()).toBeNull();
     });
 
     it('creates profile when createIfNotExists is true and activates it', async () => {

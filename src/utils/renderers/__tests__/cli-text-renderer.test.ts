@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StructuredToolOutput } from '../../../rendering/types.ts';
-import { createCliTextRenderer } from '../cli-text-renderer.ts';
+import { createCliTextRenderer, renderCliTextTranscript } from '../cli-text-renderer.ts';
 
 const reporter = {
   update: vi.fn<(message: string) => void>(),
@@ -316,5 +316,51 @@ describe('cli-text-renderer', () => {
     expect(nextStepsIndex).toBeGreaterThan(footerIndex);
     expect(output).toContain('\u{2705} Build & Run complete');
     expect(output).toContain('\u2514 App Path: /tmp/build/MyApp.app');
+  });
+
+  it('renders structured output for non-streaming app-path results', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.app-path',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'app-path',
+          didError: false,
+          error: null,
+          artifacts: { appPath: '/tmp/MyApp.app' },
+        },
+      },
+    });
+
+    expect(output).toContain('🔍 Get App Path');
+    expect(output).toContain('✅ Success');
+    expect(output).toContain('└ App Path: /tmp/MyApp.app');
+  });
+
+  it('renders clean-style build results when no live xcodebuild output was seen', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: {
+            workspacePath: '/tmp/MyApp.xcworkspace',
+            scheme: 'MyApp',
+            configuration: 'Debug',
+            platform: 'iOS',
+          },
+          diagnostics: { warnings: [], errors: [] },
+        },
+      },
+    });
+
+    expect(output).toContain('🧹 Clean');
+    expect(output).toContain('Scheme: MyApp');
+    expect(output).toContain('Workspace: /tmp/MyApp.xcworkspace');
+    expect(output).toContain('✅ Clean successful');
   });
 });

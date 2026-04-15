@@ -9,26 +9,17 @@ import {
   persistActiveSessionDefaultsProfile,
   persistSessionDefaultsPatch,
 } from '../../../utils/config-store.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { removeUndefined } from '../../../utils/remove-undefined.ts';
 import { scheduleSimulatorDefaultsRefresh } from '../../../utils/simulator-defaults-refresh.ts';
 import { sessionStore, type SessionDefaults } from '../../../utils/session-store.ts';
-import {
-  sessionDefaultsSchema,
-  sessionDefaultKeys,
-} from '../../../utils/session-defaults-schema.ts';
+import { sessionDefaultsSchema } from '../../../utils/session-defaults-schema.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { header, statusLine, detailTree, section } from '../../../utils/tool-event-builders.ts';
-import {
-  formatProfileLabel,
-  formatProfileAnnotation,
-  buildFullDetailTree,
-} from './session-format-helpers.ts';
+import { formatProfileLabel } from './session-format-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const schemaObj = sessionDefaultsSchema.extend({
@@ -54,23 +45,11 @@ type SessionSetDefaultsContext = {
   executor: CommandExecutor;
 };
 
-const PARAM_LABEL_MAP: Record<string, string> = {
-  projectPath: 'Project Path',
-  workspacePath: 'Workspace Path',
-  scheme: 'Scheme',
-  configuration: 'Configuration',
-  simulatorName: 'Simulator Name',
-  simulatorId: 'Simulator ID',
-  simulatorPlatform: 'Simulator Platform',
-  deviceId: 'Device ID',
-  useLatestOS: 'Use Latest OS',
-  arch: 'Architecture',
-  suppressWarnings: 'Suppress Warnings',
-  derivedDataPath: 'Derived Data Path',
-  preferXcodebuild: 'Prefer xcodebuild',
-  platform: 'Platform',
-  bundleId: 'Bundle ID',
-  env: 'Environment',
+type SessionSetDefaultsResult = SessionDefaultsDomainResult & {
+  operation?: {
+    type: 'set';
+    activatedProfile?: string;
+  };
 };
 
 function createSessionDefaultsProfile(defaults: SessionDefaults): SessionDefaultsProfile {
@@ -94,7 +73,7 @@ function createSessionDefaultsProfile(defaults: SessionDefaults): SessionDefault
   };
 }
 
-function createSessionDefaultsResult(error?: string): SessionDefaultsDomainResult {
+function createSessionDefaultsResult(error?: string): SessionSetDefaultsResult {
   const profiles: SessionDefaultsDomainResult['profiles'] = {
     '(default)': createSessionDefaultsProfile(sessionStore.getAllForProfile(null)),
   };
@@ -112,7 +91,7 @@ function createSessionDefaultsResult(error?: string): SessionDefaultsDomainResul
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDomainResult): void {
+function setStructuredOutput(ctx: ToolHandlerContext, result: SessionSetDefaultsResult): void {
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-defaults',
@@ -122,8 +101,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDom
 
 export function createSessionSetDefaultsExecutor(
   context: SessionSetDefaultsContext,
-): ToolExecutor<Params, SessionDefaultsDomainResult> {
-  return async (params, ctx) => {
+): ToolExecutor<Params, SessionSetDefaultsResult> {
+  return async (params) => {
     try {
       let activeProfile = sessionStore.getActiveProfile();
       const { persist, profile: rawProfile, createIfNotExists = false, ...rawParams } = params;
@@ -231,47 +210,23 @@ export async function sessionSetDefaultsLogic(
   context: SessionSetDefaultsContext,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSessionSetDefaults = createSessionSetDefaultsExecutor(context);
-  const result = await executeSessionSetDefaults(params, executionContext);
+  const result = await executeSessionSetDefaults(params, { emitProgress() {} });
   const {
     profile: rawProfile,
     persist: _persist,
     createIfNotExists: _createIfNotExists,
-    ...rawParams
+    ..._rawParams
   } = params;
 
+  if (!result.didError) {
+    result.operation = {
+      type: 'set',
+      ...(rawProfile !== undefined ? { activatedProfile: rawProfile.trim() } : {}),
+    };
+  }
+
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-
-  if (result.didError) {
-    ctx.emit(header('Set Defaults'));
-    ctx.emit(statusLine('error', result.error ?? 'Failed to update session defaults.'));
-    return;
-  }
-
-  const updated = sessionStore.getAll();
-  const activeProfile = sessionStore.getActiveProfile();
-
-  const headerParams: Array<{ label: string; value: string }> = [];
-  for (const [key, value] of Object.entries(rawParams)) {
-    if (value !== undefined) {
-      const label = PARAM_LABEL_MAP[key] ?? key;
-      headerParams.push({ label, value: String(value) });
-    }
-  }
-  headerParams.push({ label: 'Profile', value: formatProfileLabel(activeProfile) });
-
-  const profileAnnotation = formatProfileAnnotation(activeProfile);
-  ctx.emit(header('Set Defaults', headerParams));
-  ctx.emit(statusLine('success', `Session defaults updated ${profileAnnotation}`));
-  ctx.emit(detailTree(buildFullDetailTree(updated)));
-
-  if (rawProfile !== undefined) {
-    ctx.emit(section('Notices', [`Activated profile "${rawProfile.trim()}".`]));
-  }
 }
 
 export const schema = schemaObj.shape;

@@ -11,18 +11,13 @@ import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const stopAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -40,21 +35,10 @@ export async function stop_app_deviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Stop App', [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'PID', value: params.processId.toString() },
-    ]),
-  );
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeStopAppDevice = createStopAppDeviceExecutor(executor);
-  const result = await executeStopAppDevice(params, executionContext);
+  const result = await executeStopAppDevice(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error stopping app on device: ${result.error ?? 'Unknown error'}`);
@@ -109,7 +93,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: StopAppDeviceResul
 export function createStopAppDeviceExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<StopAppDeviceParams, StopAppDeviceResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     log('info', `Stopping app with PID ${params.processId} on device ${params.deviceId}`);
 
     try {
@@ -131,16 +115,12 @@ export function createStopAppDeviceExecutor(
 
       if (!result.success) {
         const message = `Failed to stop app: ${result.error}`;
-        ctx.emitProgress(statusLine('error', message));
         return createStopAppDeviceErrorResult(params, message);
       }
-
-      ctx.emitProgress(statusLine('success', 'App stopped successfully'));
 
       return createStopAppDeviceResult(params);
     } catch (error) {
       const message = `Failed to stop app on device: ${toErrorMessage(error)}`;
-      ctx.emitProgress(statusLine('error', message));
       return createStopAppDeviceErrorResult(params, message);
     }
   };

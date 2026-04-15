@@ -7,6 +7,7 @@ import type {
   TestDiscoveryProgressEvent,
   TestFailureProgressEvent,
   TestProgressProgressEvent,
+  SummaryProgressEvent,
 } from '../types/progress-events.ts';
 import { STAGE_RANK } from '../types/progress-events.ts';
 
@@ -35,7 +36,7 @@ export interface XcodebuildRunState {
 export interface RunStateOptions {
   operation: XcodebuildOperation;
   minimumStage?: XcodebuildStage;
-  onEvent?: (event: XcodebuildRunStateEvent) => void;
+  onEvent?: (event: XcodebuildRunStateEvent | SummaryProgressEvent) => void;
 }
 
 function normalizeDiagnosticKey(location: string | undefined, message: string): string {
@@ -75,6 +76,30 @@ export interface XcodebuildRunStateHandle {
   finalize(succeeded: boolean, durationMs?: number): XcodebuildRunState;
   snapshot(): Readonly<XcodebuildRunState>;
   highestStageRank(): number;
+}
+
+function createTestSummaryEvent(
+  state: XcodebuildRunState,
+  durationMs?: number,
+): SummaryProgressEvent {
+  const failedTests = Math.max(state.failedTests, state.testFailures.length);
+  const passedTests = Math.max(0, state.completedTests - failedTests - state.skippedTests);
+  const totalTests = passedTests + failedTests + state.skippedTests;
+
+  return {
+    type: 'summary',
+    operation: 'TEST',
+    status: state.finalStatus ?? 'FAILED',
+    ...(totalTests > 0
+      ? {
+          totalTests,
+          passedTests,
+          failedTests,
+          skippedTests: state.skippedTests,
+        }
+      : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  };
 }
 
 export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRunStateHandle {
@@ -182,6 +207,10 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
     finalize(succeeded: boolean, durationMs?: number): XcodebuildRunState {
       state.finalStatus = succeeded ? 'SUCCEEDED' : 'FAILED';
       state.wallClockDurationMs = durationMs ?? null;
+
+      if (operation === 'TEST') {
+        onEvent?.(createTestSummaryEvent(state, durationMs));
+      }
 
       return {
         ...state,

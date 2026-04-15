@@ -45,7 +45,7 @@ import {
   handler as variablesHandler,
   debug_variablesLogic,
 } from '../debug_variables.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 function createMockBackend(overrides: Partial<DebuggerBackend> = {}): DebuggerBackend {
   return {
@@ -802,5 +802,63 @@ describe('debug_variables', () => {
 
       expect(result.isError).toBeFalsy();
     });
+  });
+});
+
+describe('debugging tools non-streaming output', () => {
+  beforeEach(() => {
+    sessionStore.clear();
+  });
+
+  it('does not emit progress events for migrated handlers', async () => {
+    const attachCtx = createTestContext();
+    const attach = await runToolLogic(() =>
+      debug_attach_simLogic(
+        {
+          simulatorId: 'test-sim-uuid',
+          pid: 1234,
+          continueOnAttach: true,
+          makeCurrent: true,
+        },
+        attachCtx,
+      ),
+    );
+    expect(attach.result.events).toHaveLength(0);
+    expect(attach.result.text()).toContain('Attached');
+
+    const { ctx, session } = await createSessionAndContext();
+
+    const breakpointAdd = await runToolLogic(() =>
+      debug_breakpoint_addLogic({ debugSessionId: session.id, file: 'main.swift', line: 42 }, ctx),
+    );
+    expect(breakpointAdd.result.events).toHaveLength(0);
+
+    const breakpointRemove = await runToolLogic(() =>
+      debug_breakpoint_removeLogic({ debugSessionId: session.id, breakpointId: 1 }, ctx),
+    );
+    expect(breakpointRemove.result.events).toHaveLength(0);
+
+    const debugContinue = await runToolLogic(() =>
+      debug_continueLogic({ debugSessionId: session.id }, ctx),
+    );
+    expect(debugContinue.result.events).toHaveLength(0);
+
+    const debugDetach = await runToolLogic(() =>
+      debug_detachLogic({ debugSessionId: session.id }, ctx),
+    );
+    expect(debugDetach.result.events).toHaveLength(0);
+
+    const lldb = await runToolLogic(() =>
+      debug_lldb_commandLogic({ debugSessionId: session.id, command: 'bt' }, ctx),
+    );
+    expect(lldb.result.events).toHaveLength(0);
+
+    const stack = await runToolLogic(() => debug_stackLogic({ debugSessionId: session.id }, ctx));
+    expect(stack.result.events).toHaveLength(0);
+
+    const variables = await runToolLogic(() =>
+      debug_variablesLogic({ debugSessionId: session.id }, ctx),
+    );
+    expect(variables.result.events).toHaveLength(0);
   });
 });

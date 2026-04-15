@@ -193,6 +193,8 @@ describe('launch_mac_app plugin', () => {
       );
 
       expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain('App launched successfully');
+      expect(allText(result)).not.toContain('App launched successfully.');
     });
 
     it('should handle launch failure with Error object', async () => {

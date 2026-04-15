@@ -22,6 +22,7 @@ import type { ToolExecutor } from '../types/tool-execution.ts';
 import {
   createToolExecutionContext,
   createProgressStreamingPipeline,
+  createTestDiscoveryProgressEvent,
   createTestDomainResult,
 } from './xcodebuild-domain-results.ts';
 import { getHandlerContext } from './typed-tool-factory.ts';
@@ -111,6 +112,11 @@ export function createTestExecutor(
       packageCachePath: params.packageCachePath,
       logPrefix: 'Test Run',
     };
+    const discoveryEvent = createTestDiscoveryProgressEvent(options?.preflight);
+
+    if (discoveryEvent) {
+      started.pipeline.emitEvent(discoveryEvent);
+    }
 
     try {
       if (shouldUseTwoPhaseSimulatorExecution) {

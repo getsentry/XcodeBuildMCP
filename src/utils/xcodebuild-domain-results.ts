@@ -12,7 +12,7 @@ import type {
   TestResultDomainResult,
   TestSelectionInfo,
 } from '../types/domain-results.js';
-import type { XcodebuildOperation } from '../types/progress-events.js';
+import type { TestDiscoveryProgressEvent, XcodebuildOperation } from '../types/progress-events.js';
 import type { ToolExecutionContext } from '../types/tool-execution.js';
 import { finalizeInlineXcodebuild, type ErrorFallbackPolicy } from './xcodebuild-output.js';
 import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
@@ -155,21 +155,44 @@ function hasTestCounts(state: XcodebuildRunState): boolean {
   );
 }
 
+export function createTestDiscoveryProgressEvent(
+  preflight?: TestPreflightResult,
+): TestDiscoveryProgressEvent | null {
+  if (!preflight || preflight.totalTests === 0) {
+    return null;
+  }
+
+  const discoveredItems = collectResolvedTestSelectors(preflight).slice(0, MAX_DISCOVERED_TESTS);
+
+  return {
+    type: 'test-discovery',
+    operation: 'TEST',
+    total: preflight.totalTests,
+    tests: discoveredItems,
+    truncated: discoveredItems.length < preflight.totalTests,
+  };
+}
+
 function createTestSelectionInfo(preflight?: TestPreflightResult): TestSelectionInfo | undefined {
   if (!preflight || preflight.totalTests === 0) {
     return undefined;
   }
 
   const discoveredItems = collectResolvedTestSelectors(preflight);
+  const discoveryEvent = createTestDiscoveryProgressEvent(preflight);
   const hasExplicitSelection =
     preflight.selectors.onlyTesting.length > 0 || preflight.selectors.skipTesting.length > 0;
 
   return {
     ...(hasExplicitSelection ? { selected: discoveredItems } : {}),
-    discovered: {
-      total: preflight.totalTests,
-      items: discoveredItems.slice(0, MAX_DISCOVERED_TESTS),
-    },
+    ...(discoveryEvent
+      ? {
+          discovered: {
+            total: discoveryEvent.total,
+            items: discoveryEvent.tests,
+          },
+        }
+      : {}),
   };
 }
 
@@ -204,13 +227,13 @@ export interface ProgressStreamingXcodebuildExecution extends StartedPipeline {
 export function createProgressStreamingPipeline(
   toolName: string,
   operation: XcodebuildOperation,
-  _ctx: ToolExecutionContext,
+  ctx: ToolExecutionContext,
 ): ProgressStreamingXcodebuildExecution {
   const innerPipeline = createXcodebuildPipeline({
     operation,
     toolName,
     params: {},
-    emit: () => {},
+    emit: (event) => ctx.emitProgress(event),
   });
 
   const stdoutState: LineStreamState = { remainder: '', lines: [] };

@@ -83,6 +83,8 @@ describe('xcodebuild-pipeline', () => {
     expect(eventTypes).toContain('header');
     expect(eventTypes).toContain('build-stage');
     expect(eventTypes).toContain('test-progress');
+    expect(eventTypes).toContain('summary');
+    expect(text.match(/1 test failed, 1 passed, 0 skipped/g)).toHaveLength(1);
   });
 
   it('handles build output with warnings and errors', () => {
@@ -201,7 +203,7 @@ describe('xcodebuild-pipeline', () => {
       },
     });
     expect(text).toContain('Discovered 3 test(s):');
-    expect(text).toContain('✅ 3 tests passed');
+    expect(text).toContain('✅ Test succeeded.');
   });
 
   it('renders test discovery in cli-text mode', () => {

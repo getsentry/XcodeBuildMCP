@@ -6,9 +6,7 @@ import type {
   DebugThread,
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -141,19 +139,6 @@ function parseStackOutput(output: string, params: DebugStackParams): DebugThread
   return threads;
 }
 
-function formatStackLines(threads: DebugThread[]): string[] {
-  const lines: string[] = [];
-
-  for (const thread of threads) {
-    lines.push(`Thread ${thread.threadId} (${thread.name})`);
-    for (const frame of thread.frames) {
-      lines.push(`frame #${frame.index}: ${frame.symbol} at ${frame.displayLocation}`);
-    }
-  }
-
-  return lines;
-}
-
 export function createDebugStackExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugStackParams, DebugStackResult> {
@@ -181,27 +166,11 @@ export async function debug_stackLogic(
   params: DebugStackParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('Stack Trace');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugStack = createDebugStackExecutor(ctx.debugger);
-  const result = await executeDebugStack(params, executionContext);
+  const result = await executeDebugStack(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
-  if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to get stack'));
-    return;
-  }
-
-  handlerCtx.emit(statusLine('success', 'Stack trace retrieved'));
-  if ('threads' in result && result.threads.length > 0) {
-    handlerCtx.emit(section('Frames:', formatStackLines(result.threads)));
-  }
 }
 
 export const schema = debugStackSchema.shape;

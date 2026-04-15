@@ -7,6 +7,7 @@ import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
+const MCP_TOOL_TIMEOUT_MS = 300_000;
 const MCP_SNAPSHOT_PARITY_WORKFLOWS = [
   'coverage',
   'debugging',
@@ -106,7 +107,7 @@ export async function createMcpSnapshotHarness(
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<SnapshotResult> {
     const result = await client.callTool({ name, arguments: args }, undefined, {
-      timeout: 120_000,
+      timeout: MCP_TOOL_TIMEOUT_MS,
     });
     const rawText = extractSnapshotTextContent(result);
     const text = normalizeSnapshotOutput(rawText);

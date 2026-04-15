@@ -85,9 +85,50 @@ interface XcodebuildParserState {
 
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
+function hasBuildLogTail(result: StructuredToolOutput['result']): boolean {
+  return (
+    'artifacts' in result &&
+    !!result.artifacts &&
+    'buildLogPath' in result.artifacts &&
+    typeof result.artifacts.buildLogPath === 'string'
+  );
+}
+
+function filterStructuredOutputItems(
+  output: StructuredToolOutput,
+  items: TextRenderableItem[],
+  opts: {
+    sawLiveTestDiscovery: boolean;
+    sawLiveTestFailure: boolean;
+    sawLiveTestSummary: boolean;
+  },
+): TextRenderableItem[] {
+  if (output.result.kind !== 'test-result') {
+    return items;
+  }
+
+  return items.filter((item) => {
+    switch (item.type) {
+      case 'test-discovery':
+        return !opts.sawLiveTestDiscovery;
+      case 'test-failure':
+        return !opts.sawLiveTestFailure;
+      case 'summary':
+        return !opts.sawLiveTestSummary;
+      default:
+        return true;
+    }
+  });
+}
+
 function shouldRenderStructuredOutput(
   output: StructuredToolOutput | undefined,
-  opts: { sawXcodebuildLine: boolean },
+  opts: {
+    sawXcodebuildLine: boolean;
+    sawLiveTestDiscovery: boolean;
+    sawLiveTestFailure: boolean;
+    sawLiveTestSummary: boolean;
+  },
 ): boolean {
   if (!output) {
     return false;
@@ -95,29 +136,23 @@ function shouldRenderStructuredOutput(
 
   switch (output.result.kind) {
     case 'build-result':
-      if (
-        'artifacts' in output.result &&
-        output.result.artifacts &&
-        'buildLogPath' in output.result.artifacts &&
-        typeof output.result.artifacts.buildLogPath === 'string'
-      ) {
-        return true;
-      }
-      return false;
+      return !opts.sawXcodebuildLine || hasBuildLogTail(output.result);
     case 'build-run-result':
-    case 'test-result':
       return true;
-    case 'device-list':
-    case 'simulator-list':
-      return true;
-    case 'build-settings':
-    case 'scheme-list':
-      return false;
-    case 'app-path':
-    case 'bundle-id':
-      return false;
+    case 'test-result': {
+      const hasDiscovery =
+        !!output.result.tests?.discovered && output.result.tests.discovered.total > 0;
+      const hasFailures = output.result.diagnostics.testFailures.length > 0;
+
+      return (
+        hasBuildLogTail(output.result) ||
+        (hasDiscovery && !opts.sawLiveTestDiscovery) ||
+        (hasFailures && !opts.sawLiveTestFailure) ||
+        !opts.sawLiveTestSummary
+      );
+    }
     default:
-      return false;
+      return true;
   }
 }
 
@@ -137,6 +172,9 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let nextSteps: readonly NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
+  let sawLiveTestDiscovery = false;
+  let sawLiveTestFailure = false;
+  let sawLiveTestSummary = false;
 
   function writeDurable(text: string): void {
     sink.clearTransient();
@@ -155,6 +193,40 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
     if (pendingTransientRuntimeLine) {
       writeDurable(pendingTransientRuntimeLine);
     }
+  }
+
+  function flushGroupedDiagnostics(includeCompilerErrors: boolean): boolean {
+    const diagOpts = { baseDir: diagnosticBaseDir ?? undefined };
+    const diagnosticSections: string[] = [];
+
+    if (groupedTestFailures.length > 0) {
+      diagnosticSections.push(formatGroupedTestFailures(groupedTestFailures, diagOpts));
+      groupedTestFailures.length = 0;
+    }
+    if (groupedWarnings.length > 0) {
+      diagnosticSections.push(formatGroupedWarnings(groupedWarnings, diagOpts));
+      groupedWarnings.length = 0;
+    }
+    if (includeCompilerErrors && groupedCompilerErrors.length > 0) {
+      diagnosticSections.push(formatGroupedCompilerErrors(groupedCompilerErrors, diagOpts));
+      groupedCompilerErrors.length = 0;
+    }
+
+    if (diagnosticSections.length === 0) {
+      return false;
+    }
+
+    const diagnosticsBlock = diagnosticSections.join('\n\n');
+    if (pendingTransientRuntimeLine) {
+      writeSection(`${pendingTransientRuntimeLine}\n\n${diagnosticsBlock}`);
+      pendingTransientRuntimeLine = null;
+    } else if (hasDurableRuntimeContent) {
+      writeSection(diagnosticsBlock);
+    } else {
+      writeDurable(diagnosticsBlock);
+    }
+
+    return true;
   }
 
   function processItem(item: TextRenderableItem): void {
@@ -245,6 +317,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-discovery': {
+        sawLiveTestDiscovery = true;
         writeDurable(formatTestDiscoveryEvent(item));
         lastVisibleEventType = 'test-discovery';
         lastStatusLineLevel = null;
@@ -261,38 +334,16 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-failure': {
+        sawLiveTestFailure = true;
         groupedTestFailures.push(item);
         break;
       }
 
       case 'summary': {
-        const diagOpts = { baseDir: diagnosticBaseDir ?? undefined };
-        const diagnosticSections: string[] = [];
+        sawLiveTestSummary = true;
+        const renderedDiagnostics = flushGroupedDiagnostics(item.status === 'FAILED');
 
-        if (groupedTestFailures.length > 0) {
-          diagnosticSections.push(formatGroupedTestFailures(groupedTestFailures, diagOpts));
-          groupedTestFailures.length = 0;
-        }
-        if (groupedWarnings.length > 0) {
-          diagnosticSections.push(formatGroupedWarnings(groupedWarnings, diagOpts));
-          groupedWarnings.length = 0;
-        }
-        if (item.status === 'FAILED' && groupedCompilerErrors.length > 0) {
-          diagnosticSections.push(formatGroupedCompilerErrors(groupedCompilerErrors, diagOpts));
-          groupedCompilerErrors.length = 0;
-        }
-
-        if (diagnosticSections.length > 0) {
-          const diagnosticsBlock = diagnosticSections.join('\n\n');
-          if (pendingTransientRuntimeLine) {
-            writeSection(`${pendingTransientRuntimeLine}\n\n${diagnosticsBlock}`);
-            pendingTransientRuntimeLine = null;
-          } else if (hasDurableRuntimeContent) {
-            writeSection(diagnosticsBlock);
-          } else {
-            writeDurable(diagnosticsBlock);
-          }
-        } else if (item.status === 'FAILED') {
+        if (!renderedDiagnostics && item.status === 'FAILED') {
           flushPendingTransientRuntimeLine();
         }
 
@@ -392,12 +443,26 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       flushParserStates();
       if (
         structuredOutput &&
-        shouldRenderStructuredOutput(structuredOutput, { sawXcodebuildLine })
+        shouldRenderStructuredOutput(structuredOutput, {
+          sawXcodebuildLine,
+          sawLiveTestDiscovery,
+          sawLiveTestFailure,
+          sawLiveTestSummary,
+        })
       ) {
-        for (const item of renderDomainResultTextItems(structuredOutput.result)) {
+        for (const item of filterStructuredOutputItems(
+          structuredOutput,
+          renderDomainResultTextItems(structuredOutput.result),
+          {
+            sawLiveTestDiscovery,
+            sawLiveTestFailure,
+            sawLiveTestSummary,
+          },
+        )) {
           processItem(item);
         }
       }
+      flushGroupedDiagnostics(true);
       const nextStepsBlock = createNextStepsBlock(nextSteps, nextStepsRuntime);
       if (nextStepsBlock && !sawProgressNextSteps) {
         processItem(nextStepsBlock);
@@ -414,6 +479,9 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       nextStepsRuntime = undefined;
       parserStates.clear();
       sawProgressNextSteps = false;
+      sawLiveTestDiscovery = false;
+      sawLiveTestFailure = false;
+      sawLiveTestSummary = false;
     },
   };
 }

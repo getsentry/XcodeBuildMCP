@@ -13,7 +13,6 @@ import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
-  DefaultToolExecutionContext,
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
@@ -21,7 +20,6 @@ import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine, section, fileRef } from '../../../utils/tool-event-builders.ts';
 
 const getFileCoverageSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -34,7 +32,9 @@ const getFileCoverageSchema = z.object({
 });
 
 type GetFileCoverageParams = z.infer<typeof getFileCoverageSchema>;
-type GetFileCoverageResult = CoverageResultDomainResult;
+type GetFileCoverageResult = CoverageResultDomainResult & {
+  uncoveredLineRanges?: LineRange[];
+};
 
 interface CoverageFunction {
   coveredLines: number;
@@ -107,6 +107,7 @@ function createFileCoverageResult(params: {
   executableLines?: number;
   functions?: NonNullable<GetFileCoverageResult['functions']>;
   diagnosticsMessage?: string;
+  uncoveredLineRanges?: LineRange[];
 }): GetFileCoverageResult {
   return {
     kind: 'coverage-result',
@@ -128,6 +129,9 @@ function createFileCoverageResult(params: {
     },
     ...(params.functions ? { functions: params.functions } : {}),
     ...(params.diagnosticsMessage ? { diagnostics: createDiagnostics(params.diagnosticsMessage) } : {}),
+    ...(params.uncoveredLineRanges !== undefined
+      ? { uncoveredLineRanges: params.uncoveredLineRanges }
+      : {}),
   };
 }
 
@@ -137,12 +141,6 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetFileCoverageRes
     schema: 'xcodebuildmcp.output.coverage-result',
     schemaVersion: '1',
   };
-}
-
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
 }
 
 function buildCoverageFunctions(entry: FileFunctionCoverage): NonNullable<GetFileCoverageResult['functions']> {
@@ -184,7 +182,7 @@ function buildCoverageFunctions(entry: FileFunctionCoverage): NonNullable<GetFil
 export function createGetFileCoverageExecutor(
   context: GetFileCoverageContext,
 ): ToolExecutor<GetFileCoverageParams, GetFileCoverageResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const { xcresultPath, file, showLines } = params;
 
     const fileExistsValidation = validateFileExists(xcresultPath, context.fileSystem);
@@ -259,6 +257,7 @@ export function createGetFileCoverageExecutor(
 
     const entry = fileEntries[0];
     const functions = buildCoverageFunctions(entry);
+    let uncoveredLineRanges: LineRange[] | undefined;
 
     if (showLines) {
       const filePath = entry.filePath !== 'unknown' ? entry.filePath : file;
@@ -269,29 +268,7 @@ export function createGetFileCoverageExecutor(
       );
 
       if (archiveResult.success && archiveResult.output) {
-        const uncoveredRanges = parseUncoveredLines(archiveResult.output);
-        if (uncoveredRanges.length > 0) {
-          const rangeLines = uncoveredRanges.map((range) =>
-            range.start === range.end ? `L${range.start}` : `L${range.start}-${range.end}`,
-          );
-          ctx.emitProgress({
-            type: 'status',
-            level: 'info',
-            message: `Uncovered line ranges (${filePath})\n${rangeLines.join('\n')}`,
-          });
-        } else {
-          ctx.emitProgress({
-            type: 'status',
-            level: 'info',
-            message: 'All executable lines are covered.',
-          });
-        }
-      } else {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'warning',
-          message: 'Could not retrieve line-level coverage from archive.',
-        });
+        uncoveredLineRanges = parseUncoveredLines(archiveResult.output);
       }
     }
 
@@ -304,6 +281,7 @@ export function createGetFileCoverageExecutor(
       coveredLines: entry.coveredLines,
       executableLines: entry.executableLines,
       functions,
+      ...(uncoveredLineRanges !== undefined ? { uncoveredLineRanges } : {}),
     });
   };
 }
@@ -313,71 +291,16 @@ export async function get_file_coverageLogic(
   context: GetFileCoverageContext,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const { xcresultPath, file } = params;
-
-  const headerEvent = header('File Coverage', [
-    { label: 'xcresult', value: xcresultPath },
-    { label: 'File', value: file },
-  ]);
-  const executionContext = createToolExecutionContext(ctx);
+  const { xcresultPath } = params;
   const executeGetFileCoverage = createGetFileCoverageExecutor(context);
-
-  ctx.emit(headerEvent);
-  const result = await executeGetFileCoverage(params, executionContext);
+  const result = await executeGetFileCoverage(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to get file coverage'));
-    return;
+  if (!result.didError) {
+    ctx.nextStepParams = {
+      get_coverage_report: { xcresultPath },
+    };
   }
-
-  const sourceFilePath = result.artifacts.sourceFilePath ?? file;
-  ctx.emit(fileRef(sourceFilePath, 'File'));
-  ctx.emit(
-    statusLine(
-      'info',
-      `Coverage: ${result.summary.coveragePct?.toFixed(1) ?? '0.0'}% (${result.summary.coveredLines ?? 0}/${result.summary.executableLines ?? 0} lines)`,
-    ),
-  );
-
-  if (result.functions?.notCovered && result.functions.notCovered.length > 0) {
-    ctx.emit(
-      section(
-        `Not Covered (${result.functions.notCoveredFunctionCount} ${result.functions.notCoveredFunctionCount === 1 ? 'function' : 'functions'}, ${result.functions.notCoveredLineCount} lines)`,
-        result.functions.notCovered.map(
-          (fn) => `L${fn.line}  ${fn.name} -- 0/${fn.executableLines} lines`,
-        ),
-        { icon: 'red-circle' },
-      ),
-    );
-  }
-
-  if (result.functions?.partialCoverage && result.functions.partialCoverage.length > 0) {
-    ctx.emit(
-      section(
-        `Partial Coverage (${result.functions.partialCoverageFunctionCount} ${result.functions.partialCoverageFunctionCount === 1 ? 'function' : 'functions'})`,
-        result.functions.partialCoverage.map(
-          (fn) =>
-            `L${fn.line}  ${fn.name} -- ${fn.coveragePct.toFixed(1)}% (${fn.coveredLines}/${fn.executableLines} lines)`,
-        ),
-        { icon: 'yellow-circle' },
-      ),
-    );
-  }
-
-  if ((result.functions?.fullCoverageCount ?? 0) > 0) {
-    ctx.emit(
-      section(
-        `Full Coverage (${result.functions?.fullCoverageCount ?? 0} ${(result.functions?.fullCoverageCount ?? 0) === 1 ? 'function' : 'functions'}) -- all at 100%`,
-        [],
-        { icon: 'green-circle' },
-      ),
-    );
-  }
-
-  ctx.nextStepParams = {
-    get_coverage_report: { xcresultPath },
-  };
 }
 
 /**

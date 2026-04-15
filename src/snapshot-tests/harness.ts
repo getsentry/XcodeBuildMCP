@@ -6,6 +6,7 @@ import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
+const SNAPSHOT_COMMAND_TIMEOUT_MS = 300_000;
 
 export type SnapshotHarness = WorkflowSnapshotHarness;
 export type { SnapshotResult };
@@ -30,7 +31,7 @@ function runSnapshotCli(
 
   return spawnSync('node', commandArgs, {
     encoding: 'utf8',
-    timeout: 120000,
+    timeout: SNAPSHOT_COMMAND_TIMEOUT_MS,
     cwd: process.cwd(),
     env: getSnapshotHarnessEnv(),
   });

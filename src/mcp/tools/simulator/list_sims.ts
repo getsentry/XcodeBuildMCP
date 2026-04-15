@@ -4,10 +4,7 @@ import type { SimulatorListDomainResult } from '../../../types/domain-results.ts
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -190,19 +187,14 @@ export async function list_simsLogic(
   log('info', 'Starting xcrun simctl list devices request');
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeListSims = createListSimsExecutor(executor);
-  const result = await executeListSims(params, executionContext);
+  const result = await executeListSims(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error listing simulators: ${result.error ?? 'Unknown error'}`);
   }
-
-  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = { ...NEXT_STEP_PARAMS };

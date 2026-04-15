@@ -205,7 +205,7 @@ describe('stop_app_sim tool', () => {
       expect(text).toContain('Stop App');
       expect(text).toContain('io.sentry.App');
       expect(text).toContain('stopped successfully');
-      expect(text).toContain('"iPhone 17" (resolved-uuid)');
+      expect(text).toContain('resolved-uuid');
     });
 
     it('should surface terminate failures', async () => {

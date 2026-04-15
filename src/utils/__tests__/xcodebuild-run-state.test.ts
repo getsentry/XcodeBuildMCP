@@ -242,7 +242,7 @@ describe('xcodebuild-run-state', () => {
     expect(forwarded).toHaveLength(2);
   });
 
-  it('finalize sets final status and duration without synthesizing summary events', () => {
+  it('finalize emits a summary event for test runs', () => {
     const forwarded: ProgressEvent[] = [];
     const state = createXcodebuildRunState({
       operation: 'TEST',
@@ -264,6 +264,16 @@ describe('xcodebuild-run-state', () => {
     expect(finalState.completedTests).toBe(5);
     expect(finalState.failedTests).toBe(2);
     expect(finalState.skippedTests).toBe(0);
+    expect(forwarded.at(-1)).toEqual({
+      type: 'summary',
+      operation: 'TEST',
+      status: 'FAILED',
+      totalTests: 5,
+      passedTests: 3,
+      failedTests: 2,
+      skippedTests: 0,
+      durationMs: 1234,
+    });
   });
 
   it('preserves explicit test failures alongside raw progress counts', () => {

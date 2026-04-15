@@ -108,15 +108,17 @@ describe('session-clear-defaults tool', () => {
     });
 
     it('should error when the specified profile does not exist', async () => {
+      const before = sessionStore.getAll();
       const result = await runLogic(() => sessionClearDefaultsLogic({ profile: 'missing' }));
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('does not exist');
+      expect(sessionStore.getAll()).toEqual(before);
     });
 
     it('should reject all=true when combined with scoped arguments', async () => {
+      const before = sessionStore.getAll();
       const result = await runLogic(() => sessionClearDefaultsLogic({ all: true, profile: 'ios' }));
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('cannot be combined');
+      expect(sessionStore.getAll()).toEqual(before);
     });
 
     it('should validate keys enum', async () => {

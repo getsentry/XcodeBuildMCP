@@ -4,13 +4,9 @@ import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const stopMacAppSchema = z.object({
   appName: z.string().optional(),
@@ -27,36 +23,15 @@ export async function stop_mac_appLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeStopMacApp = createStopMacAppExecutor(executor);
-  const result = await executeStopMacApp(params, executionContext);
+  const result = await executeStopMacApp(params, { emitProgress: () => {} });
 
-  if (params.appName || params.processId !== undefined) {
-    setStructuredOutput(ctx, result);
-  }
-
-  executionContext.emitResult(result);
-  ctx.emit(
-    header('Stop macOS App', [
-      {
-        label: 'App',
-        value:
-          params.processId !== undefined
-            ? `PID ${params.processId}`
-            : (params.appName ?? '(missing)'),
-      },
-    ]),
-  );
+  setStructuredOutput(ctx, result);
 
   if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to stop macOS app'));
     log('error', `Error stopping macOS app: ${result.error ?? 'Unknown error'}`);
     return;
   }
-
-  ctx.emit(statusLine('success', 'App stopped successfully'));
 }
 
 function createStopMacAppArtifacts(params: StopMacAppParams) {

@@ -3,12 +3,10 @@ import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SessionProfileDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { persistActiveSessionDefaultsProfile } from '../../../utils/config-store.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
-import { formatProfileLabel, formatProfileAnnotation } from './session-format-helpers.ts';
+import { formatProfileLabel } from './session-format-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const schemaObj = z.object({
@@ -25,6 +23,9 @@ const schemaObj = z.object({
 });
 
 type Params = z.input<typeof schemaObj>;
+type SessionUseDefaultsProfileResult = SessionProfileDomainResult & {
+  persisted?: boolean;
+};
 
 function resolveProfileToActivate(params: Params): string | null | undefined {
   if (params.global === true) return null;
@@ -36,17 +37,22 @@ function createSessionProfileResult(params: {
   previousProfile: string | null;
   currentProfile: string | null;
   error?: string;
-}): SessionProfileDomainResult {
+  persisted?: boolean;
+}): SessionUseDefaultsProfileResult {
   return {
     kind: 'session-profile',
     didError: typeof params.error === 'string',
     error: params.error ?? null,
     previousProfile: formatProfileLabel(params.previousProfile),
     currentProfile: formatProfileLabel(params.currentProfile),
+    ...(params.persisted ? { persisted: params.persisted } : {}),
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: SessionProfileDomainResult): void {
+function setStructuredOutput(
+  ctx: ToolHandlerContext,
+  result: SessionUseDefaultsProfileResult,
+): void {
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-profile',
@@ -56,7 +62,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionProfileDoma
 
 export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
   Params,
-  SessionProfileDomainResult
+  SessionUseDefaultsProfileResult
 > {
   return async (params) => {
     const beforeProfile = sessionStore.getActiveProfile();
@@ -101,6 +107,7 @@ export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
       return createSessionProfileResult({
         previousProfile: beforeProfile,
         currentProfile: active,
+        ...(params.persist ? { persisted: true } : {}),
       });
     } catch (error) {
       return createSessionProfileResult({
@@ -114,30 +121,10 @@ export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
 
 export async function sessionUseDefaultsProfileLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSessionUseDefaultsProfile = createSessionUseDefaultsProfileExecutor();
-  const result = await executeSessionUseDefaultsProfile(params, executionContext);
+  const result = await executeSessionUseDefaultsProfile(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-  ctx.emit(
-    header('Use Defaults Profile', [{ label: 'Current profile', value: result.previousProfile }]),
-  );
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to activate defaults profile.'));
-    return;
-  }
-
-  if (params.persist) {
-    ctx.emit(section('Notices', ['Persisted active profile selection.']));
-  }
-
-  const active = sessionStore.getActiveProfile();
-  const profileAnnotation = formatProfileAnnotation(active);
-  ctx.emit(statusLine('success', `Activated profile ${profileAnnotation}`));
 }
 
 export const schema = schemaObj.shape;

@@ -172,6 +172,17 @@ export interface TestFailureProgressEvent {
   durationMs?: number;
 }
 
+export interface SummaryProgressEvent {
+  type: 'summary';
+  operation?: XcodebuildOperation;
+  status: 'SUCCEEDED' | 'FAILED';
+  totalTests?: number;
+  passedTests?: number;
+  failedTests?: number;
+  skippedTests?: number;
+  durationMs?: number;
+}
+
 export type ProgressEvent =
   | HeaderProgressEvent
   | StatusProgressEvent
@@ -188,4 +199,5 @@ export type ProgressEvent =
   | CompilerErrorProgressEvent
   | TestDiscoveryProgressEvent
   | TestProgressProgressEvent
-  | TestFailureProgressEvent;
+  | TestFailureProgressEvent
+  | SummaryProgressEvent;

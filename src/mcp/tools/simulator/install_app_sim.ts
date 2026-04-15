@@ -5,19 +5,14 @@ import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnSimulator } from '../../../utils/simulator-steps.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -59,24 +54,10 @@ export async function install_app_simLogic(
   fileSystem?: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const simulatorDisplayName = params.simulatorName
-    ? `"${params.simulatorName}" (${params.simulatorId})`
-    : params.simulatorId;
-  ctx.emit(
-    header('Install App', [
-      { label: 'Simulator', value: simulatorDisplayName },
-      { label: 'App Path', value: displayPath(params.appPath) },
-    ]),
-  );
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeInstallAppSim = createInstallAppSimExecutor(executor, fileSystem);
-  const result = await executeInstallAppSim(params, executionContext);
+  const result = await executeInstallAppSim(params, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log(
@@ -166,11 +147,10 @@ export function createInstallAppSimExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
 ): ToolExecutor<InstallAppSimParams, InstallAppSimResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const appPathExistsValidation = validateFileExists(params.appPath, fileSystem);
     if (!appPathExistsValidation.isValid) {
       const message = appPathExistsValidation.errorMessage ?? `File not found: '${params.appPath}'`;
-      ctx.emitProgress(statusLine('error', message));
       return createInstallAppSimErrorResult(params, message);
     }
 
@@ -185,16 +165,12 @@ export function createInstallAppSimExecutor(
 
       if (!installResult.success) {
         const message = `Install app in simulator operation failed: ${installResult.error}`;
-        ctx.emitProgress(statusLine('error', message));
         return createInstallAppSimErrorResult(params, message);
       }
-
-      ctx.emitProgress(statusLine('success', 'App installed successfully'));
 
       return createInstallAppSimResult(params);
     } catch (error) {
       const message = `Install app in simulator operation failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress(statusLine('error', message));
       return createInstallAppSimErrorResult(params, message);
     }
   };

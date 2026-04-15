@@ -6,7 +6,6 @@ import { log } from '../../../utils/logging/index.ts';
 import { SystemError } from '../../../utils/errors.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
-  DefaultToolExecutionContext,
   getDefaultFileSystemExecutor,
   getDefaultCommandExecutor,
 } from '../../../utils/execution/index.ts';
@@ -15,7 +14,6 @@ import {
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import {
@@ -23,6 +21,7 @@ import {
   createCaptureSuccessResult,
   setCaptureStructuredOutput,
 } from './shared/domain-result.ts';
+import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const LOG_PREFIX = '[Screenshot]';
 
@@ -360,9 +359,6 @@ export async function screenshotLogic(
   uuidUtils: { v4: () => string } = { v4: uuidv4 },
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeScreenshot = createScreenshotExecutor({
     executor,
     fileSystemExecutor,
@@ -370,34 +366,9 @@ export async function screenshotLogic(
     uuidUtils,
     onAttachment: (attachment) => ctx.attach(attachment),
   });
-  const result = await executeScreenshot(params, executionContext);
+  const result = await executeScreenshot(params, noopToolExecutionContext);
 
   setCaptureStructuredOutput(ctx, result);
-
-  const headerEvent = header('Screenshot', [{ label: 'Simulator', value: params.simulatorId }]);
-  ctx.emit(headerEvent);
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Screenshot failed'));
-    return;
-  }
-
-  ctx.emit(statusLine('success', 'Screenshot captured'));
-
-  const capture = result.capture;
-  const items: Array<{ label: string; value: string }> = [];
-  if (result.artifacts.screenshotPath) {
-    items.push({ label: 'Screenshot', value: result.artifacts.screenshotPath });
-  }
-  if (capture && 'format' in capture) {
-    items.push({ label: 'Format', value: capture.format });
-    if (capture.width > 0 && capture.height > 0) {
-      items.push({ label: 'Size', value: `${capture.width}x${capture.height}px` });
-    }
-  }
-  if (items.length > 0) {
-    ctx.emit(detailTree(items));
-  }
 }
 
 export const schema = getSessionAwareToolSchemaShape({

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as z from 'zod';
-import { schema, runDoctor, type DoctorDependencies } from '../doctor.ts';
+import { createDoctorExecutor, schema, runDoctor, type DoctorDependencies } from '../doctor.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { allText } from '../../../../test-utils/test-helpers.ts';
 
@@ -132,6 +132,16 @@ describe('doctor tool', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
+    it('does not emit progress events from the executor', async () => {
+      const executeDoctor = createDoctorExecutor(createDeps());
+      const emitProgress = vi.fn();
+
+      const result = await executeDoctor({}, { emitProgress });
+
+      expect(emitProgress).not.toHaveBeenCalled();
+      expect(result.didError).toBe(false);
+    });
+
     it('should handle successful doctor execution', async () => {
       const deps = createDeps();
       const result = await runDoctor({}, deps);

@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -93,7 +89,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: BootSimResult): vo
 export function createBootSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<BootSimParams, BootSimResult> {
-  return async (params, _ctx) => {
+  return async (params) => {
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'boot', params.simulatorId],
@@ -134,25 +130,15 @@ export async function boot_simLogic(
   log('info', `Starting xcrun simctl boot request for simulator ${params.simulatorId}`);
 
   const ctx = getHandlerContext();
-  const headerEvent = header('Boot Simulator', [{ label: 'Simulator', value: params.simulatorId }]);
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeBootSim = createBootSimExecutor(executor);
-
-  ctx.emit(headerEvent);
-
-  const result = await executeBootSim(params, executionContext);
+  const result = await executeBootSim(params, { emitProgress: () => {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error during boot simulator operation: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Boot simulator operation failed'));
     return;
   }
 
-  ctx.emit(statusLine('success', 'Simulator booted successfully'));
   ctx.nextStepParams = {
     open_sim: {},
     install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },

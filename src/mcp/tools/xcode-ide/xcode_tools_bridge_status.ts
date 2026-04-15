@@ -18,7 +18,6 @@ type Params = z.infer<typeof schemaObject>;
 
 export function createXcodeToolsBridgeStatusExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeStatusDomainResult>({
-    progressMessage: 'Fetching bridge status',
     callback: (bridge) => bridge.statusTool(),
     toDomainResult: (bridgeResult) => toBridgeStatusDomainResult(bridgeResult, 'status'),
   });
@@ -28,9 +27,7 @@ export async function xcodeToolsBridgeStatusLogic(params: Params): Promise<void>
   log('info', 'Starting bridge status request');
 
   const ctx = getHandlerContext();
-  const executionContext = new BridgeToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
+  const executionContext = new BridgeToolExecutionContext();
   const executeBridgeStatus = createXcodeToolsBridgeStatusExecutor();
   const result = await executeBridgeStatus(params, executionContext);
 

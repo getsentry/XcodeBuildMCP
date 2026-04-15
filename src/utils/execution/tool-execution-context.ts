@@ -1,39 +1,10 @@
 import type { ToolDomainResult } from '../../types/domain-results.js';
 import type { ProgressEvent, XcodebuildOperation } from '../../types/progress-events.js';
 import type { ToolAttachment, ToolExecutionContext } from '../../types/tool-execution.js';
-import { renderDomainResultTextItems } from '../renderers/domain-result-text.js';
 
 export interface DefaultToolExecutionContextOptions {
   xcodebuildOperation?: XcodebuildOperation;
   progressSink?: (event: ProgressEvent) => void;
-}
-
-function isProgressEvent(
-  item: ReturnType<typeof renderDomainResultTextItems>[number],
-): item is ProgressEvent {
-  return item.type !== 'summary';
-}
-
-function shouldAdaptResult(result: ToolDomainResult): boolean {
-  switch (result.kind) {
-    case 'doctor-report':
-    case 'ui-action-result':
-    case 'xcode-bridge-status':
-    case 'xcode-bridge-sync':
-    case 'xcode-bridge-tool-list':
-    case 'xcode-bridge-call-result':
-      return true;
-    default:
-      return false;
-  }
-}
-
-function adaptDomainResultToProgressEvents(result: ToolDomainResult): ProgressEvent[] {
-  if (!shouldAdaptResult(result)) {
-    return [];
-  }
-
-  return renderDomainResultTextItems(result).filter(isProgressEvent);
 }
 
 export class DefaultToolExecutionContext implements ToolExecutionContext {
@@ -57,9 +28,6 @@ export class DefaultToolExecutionContext implements ToolExecutionContext {
 
   emitResult(result: ToolDomainResult): void {
     this.result = result;
-    for (const event of adaptDomainResultToProgressEvents(result)) {
-      this.emitProgress(event);
-    }
   }
 
   getProgressEvents(): readonly ProgressEvent[] {

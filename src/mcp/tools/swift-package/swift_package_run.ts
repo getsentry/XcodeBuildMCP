@@ -5,10 +5,7 @@ import type { BuildRunResultDomainResult } from '../../../types/domain-results.t
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, CommandResponse } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { addProcess } from './active-processes.ts';
 import {
   createSessionAwareTool,
@@ -19,7 +16,7 @@ import { acquireDaemonActivity } from '../../../daemon/activity-registry.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { createBuildRunDomainResult } from '../../../utils/xcodebuild-domain-results.ts';
 import { createXcodebuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
 
 const baseSchemaObject = z.object({
   packagePath: z.string(),
@@ -82,22 +79,10 @@ export async function swift_package_runLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSwiftPackageRun = createSwiftPackageRunExecutor(executor);
-  const result = await executeSwiftPackageRun(params, executionContext);
+  const result = await executeSwiftPackageRun(params, noopToolExecutionContext);
 
   setStructuredOutput(ctx, result);
-  const resolvedPath = path.resolve(params.packagePath);
-  ctx.emit(
-    header('Swift Package Run', [
-      { label: 'Package', value: resolvedPath },
-      ...(params.executableName ? [{ label: 'Executable', value: params.executableName }] : []),
-    ]),
-  );
-
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Swift run failed: ${result.error ?? 'Unknown error'}`);

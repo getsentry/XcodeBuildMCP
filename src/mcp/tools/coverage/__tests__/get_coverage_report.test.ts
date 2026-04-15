@@ -6,7 +6,7 @@ import {
   __clearTestExecutorOverrides,
 } from '../../../../utils/execution/index.ts';
 import { schema, handler, get_coverage_reportLogic } from '../get_coverage_report.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 
 
@@ -284,13 +284,15 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargetsWithFiles),
       });
 
-      const result = await runLogic(() => get_coverage_reportLogic(
-        { xcresultPath: '/tmp/test.xcresult', showFiles: true },
-        { executor: mockExecutor, fileSystem: mockFileSystem },
-      ));
+      const { result } = await runToolLogic(() =>
+        get_coverage_reportLogic(
+          { xcresultPath: '/tmp/test.xcresult', showFiles: true },
+          { executor: mockExecutor, fileSystem: mockFileSystem },
+        ),
+      );
 
-      expect(result.isError).toBeUndefined();
-      const text = allText(result);
+      expect(result.events).toHaveLength(0);
+      const text = result.text();
       expect(text.includes('AppDelegate.swift')).toBe(true);
       expect(text.includes('ViewModel.swift')).toBe(true);
       expect(text.includes('Service.swift')).toBe(true);

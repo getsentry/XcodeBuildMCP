@@ -162,11 +162,6 @@ describe('get_sim_app_path tool', () => {
       expect(result.isError).toBeFalsy();
       const text = allText(result);
       expect(text).toContain('Get App Path');
-      expect(text).toContain('MyScheme');
-      expect(text).toContain('/path/to/workspace.xcworkspace');
-      expect(text).toContain('Debug');
-      expect(text).toContain('iOS Simulator');
-      expect(text).toContain('iPhone 17');
       expect(text).toContain('/tmp/DerivedData/Build/MyApp.app');
       expect(result.nextStepParams).toBeDefined();
     });
@@ -192,7 +187,6 @@ describe('get_sim_app_path tool', () => {
       expect(result.isError).toBe(true);
       const text = allText(result);
       expect(text).toContain('Get App Path');
-      expect(text).toContain('MyScheme');
       expect(text).toContain('Errors (1):');
       expect(text).toContain('✗ Failed to run xcodebuild');
       expect(text).toContain('Failed to get app path');

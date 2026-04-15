@@ -5,13 +5,11 @@ import type {
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import { sessionDefaultKeys } from '../../../utils/session-defaults-schema.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
-import { formatProfileLabel, formatProfileAnnotation } from './session-format-helpers.ts';
+import { formatProfileLabel } from './session-format-helpers.ts';
 
 const keys = sessionDefaultKeys;
 
@@ -31,6 +29,14 @@ const schemaObj = z.object({
 });
 
 type Params = z.infer<typeof schemaObj>;
+type SessionClearDefaultsResult = SessionDefaultsDomainResult & {
+  operation?: {
+    type: 'clear';
+    scope: 'all' | 'profile';
+    profile?: string;
+    clearedKeys?: string[];
+  };
+};
 
 function createSessionDefaultsProfile(profile: Record<string, unknown>): SessionDefaultsProfile {
   return {
@@ -55,7 +61,7 @@ function createSessionDefaultsProfile(profile: Record<string, unknown>): Session
   };
 }
 
-function createSessionDefaultsResult(error?: string): SessionDefaultsDomainResult {
+function createSessionDefaultsResult(error?: string): SessionClearDefaultsResult {
   const profiles: SessionDefaultsDomainResult['profiles'] = {
     '(default)': createSessionDefaultsProfile(sessionStore.getAllForProfile(null)),
   };
@@ -73,7 +79,7 @@ function createSessionDefaultsResult(error?: string): SessionDefaultsDomainResul
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDomainResult): void {
+function setStructuredOutput(ctx: ToolHandlerContext, result: SessionClearDefaultsResult): void {
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-defaults',
@@ -83,7 +89,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionDefaultsDom
 
 export function createSessionClearDefaultsExecutor(): ToolExecutor<
   Params,
-  SessionDefaultsDomainResult
+  SessionClearDefaultsResult
 > {
   return async (params) => {
     if (params.all) {
@@ -127,41 +133,25 @@ export function createSessionClearDefaultsExecutor(): ToolExecutor<
 export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
   const activeProfileBefore = sessionStore.getActiveProfile();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSessionClearDefaults = createSessionClearDefaultsExecutor();
-  const result = await executeSessionClearDefaults(params, executionContext);
+  const result = await executeSessionClearDefaults(params, { emitProgress() {} });
+
+  if (!result.didError) {
+    result.operation = params.all
+      ? {
+          type: 'clear',
+          scope: 'all',
+          ...(params.keys ? { clearedKeys: params.keys } : {}),
+        }
+      : {
+          type: 'clear',
+          scope: 'profile',
+          profile: params.profile?.trim() ?? formatProfileLabel(activeProfileBefore),
+          ...(params.keys ? { clearedKeys: params.keys } : {}),
+        };
+  }
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
-
-  if (result.didError) {
-    ctx.emit(header('Clear Defaults'));
-    ctx.emit(statusLine('error', result.error ?? 'Failed to clear session defaults.'));
-    return;
-  }
-
-  if (params.all) {
-    ctx.emit(header('Clear Defaults'));
-    ctx.emit(statusLine('success', 'All session defaults cleared.'));
-    return;
-  }
-
-  const profile = params.profile?.trim();
-  if (profile !== undefined) {
-    ctx.emit(header('Clear Defaults', [{ label: 'Profile', value: profile }]));
-    ctx.emit(statusLine('success', `Session defaults cleared for profile "${profile}".`));
-    return;
-  }
-
-  const profileAnnotation = formatProfileAnnotation(activeProfileBefore);
-  ctx.emit(
-    header('Clear Defaults', [
-      { label: 'Profile', value: formatProfileLabel(activeProfileBefore) },
-    ]),
-  );
-  ctx.emit(statusLine('success', `Session defaults cleared ${profileAnnotation}`));
 }
 
 export const schema = schemaObj.shape;

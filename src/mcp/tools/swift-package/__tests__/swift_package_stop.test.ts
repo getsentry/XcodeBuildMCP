@@ -63,7 +63,7 @@ describe('swift_package_stop plugin', () => {
       expect(terminateTrackedProcess).toHaveBeenCalledWith(12345, 5000);
       expect(result.isError).toBeUndefined();
       const text = allText(result);
-      expect(text).toContain('Stopped executable');
+      expect(text).toContain('Swift package process stopped successfully');
     });
 
     it('returns error response when termination reports an error', async () => {

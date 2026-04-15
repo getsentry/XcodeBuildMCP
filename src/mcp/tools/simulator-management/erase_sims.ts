@@ -4,17 +4,13 @@ import type { SimulatorActionResultDomainResult } from '../../../types/domain-re
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const eraseSimsSchema = z
   .object({
@@ -68,10 +64,6 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: EraseSimsResult): 
     schema: 'xcodebuildmcp.output.simulator-action-result',
     schemaVersion: '1',
   };
-}
-
-function shouldShowBootedHint(error: string, shutdownFirst?: boolean): boolean {
-  return /Unable to erase contents and settings.*Booted/i.test(error) && shutdownFirst !== true;
 }
 
 export function createEraseSimsExecutor(
@@ -132,15 +124,8 @@ export async function erase_simsLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const simulatorId = params.simulatorId;
-  const headerEvent = header('Erase Simulator', [
-    { label: 'Simulator', value: simulatorId },
-    ...(params.shutdownFirst ? [{ label: 'Shutdown First', value: 'true' }] : []),
-  ]);
 
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeEraseSims = createEraseSimsExecutor(executor);
 
   log(
@@ -148,26 +133,12 @@ export async function erase_simsLogic(
     `Erasing simulator ${simulatorId}${params.shutdownFirst ? ' (shutdownFirst=true)' : ''}`,
   );
 
-  ctx.emit(headerEvent);
-
-  const result = await executeEraseSims(params, executionContext);
+  const result = await executeEraseSims(params, { emitProgress() {} });
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 
   if (result.didError) {
     log('error', `Error erasing simulators: ${result.error ?? 'Unknown error'}`);
-    ctx.emit(statusLine('error', result.error ?? 'Failed to erase simulator'));
-    if (result.error && shouldShowBootedHint(result.error, params.shutdownFirst)) {
-      ctx.emit(
-        section('Hint', [
-          `The simulator appears to be Booted. Re-run erase_sims with { simulatorId: '${simulatorId}', shutdownFirst: true } to shut it down before erasing.`,
-        ]),
-      );
-    }
-    return;
   }
-
-  ctx.emit(statusLine('success', 'Simulators were erased successfully'));
 }
 
 const publicSchemaObject = eraseSimsSchema.omit({ simulatorId: true } as const).passthrough();

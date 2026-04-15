@@ -1,10 +1,7 @@
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
 import type { DebuggerManager } from '../../../utils/debugger/debugger-manager.ts';
 import { guardUiAutomationAgainstStoppedDebugger } from '../../../utils/debugger/ui-automation-guard.ts';
@@ -23,6 +20,7 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
+import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const keyPressSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -94,15 +92,10 @@ export async function key_pressLogic(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeKeyPress = createKeyPressExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeKeyPress(params, executionContext);
+  const result = await executeKeyPress(params, noopToolExecutionContext);
 
   setUiActionStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
 }
 
 const publicSchemaObject = z.strictObject(

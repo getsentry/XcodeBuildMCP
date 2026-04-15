@@ -6,9 +6,7 @@ import type {
   DebugVariablesResultDomainResult,
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -181,59 +179,6 @@ function parseVariablesOutput(output: string) {
   return scopes;
 }
 
-function formatVariable(variable: DebugVariable): string {
-  const name = String(variable.name ?? '');
-  const type = String(variable.type ?? '<no-type>');
-  const value = String(variable.value ?? '');
-  return `${name} (${type}) = ${value}`;
-}
-
-function formatVariablesLines(
-  scopes: NonNullable<Extract<DebugVariablesResult, { scopes: unknown }>['scopes']>,
-): string[] {
-  const lines: string[] = [];
-  const appendScope = (label: string, values: string[]) => {
-    lines.push(`${label}:`);
-    if (values.length === 0) {
-      lines.push('  (no variables)');
-    } else {
-      for (const value of values) {
-        lines.push(`  ${value}`);
-      }
-    }
-    lines.push('');
-  };
-
-  appendScope(
-    'Locals',
-    scopes.locals.variables.map((variable) => formatVariable(variable)),
-  );
-  appendScope(
-    'Globals',
-    scopes.globals.variables.map((variable) => formatVariable(variable)),
-  );
-  const registerLines: string[] = [];
-  for (const group of scopes.registers.groups) {
-    if (group.variables.length === 0) {
-      registerLines.push(`${group.name} (<no-type>) =`);
-      continue;
-    }
-
-    registerLines.push(`${group.name}:`);
-    for (const variable of group.variables) {
-      registerLines.push(`  ${formatVariable(variable)}`);
-    }
-  }
-
-  appendScope('Registers', registerLines);
-
-  while (lines[lines.length - 1] === '') {
-    lines.pop();
-  }
-
-  return lines;
-}
-
 export function createDebugVariablesExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugVariablesParams, DebugVariablesResult> {
@@ -260,27 +205,11 @@ export async function debug_variablesLogic(
   params: DebugVariablesParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('Variables');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugVariables = createDebugVariablesExecutor(ctx.debugger);
-  const result = await executeDebugVariables(params, executionContext);
+  const result = await executeDebugVariables(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
-  if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to get variables'));
-    return;
-  }
-
-  handlerCtx.emit(statusLine('success', 'Variables retrieved'));
-  if ('scopes' in result) {
-    handlerCtx.emit(section('Values:', formatVariablesLines(result.scopes)));
-  }
 }
 
 export const schema = debugVariablesSchema.shape;

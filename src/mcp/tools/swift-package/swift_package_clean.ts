@@ -7,9 +7,8 @@ import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
-import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
 
@@ -87,21 +86,10 @@ export async function swift_package_cleanLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const resolvedPath = path.resolve(params.packagePath);
-
-  ctx.emit(header('Swift Package Clean', [{ label: 'Package', value: resolvedPath }]));
-
-  const executionContext = createToolExecutionContext(ctx);
   const executeSwiftPackageClean = createSwiftPackageCleanExecutor(executor);
-  const result = await executeSwiftPackageClean(params, executionContext);
+  const result = await executeSwiftPackageClean(params, noopToolExecutionContext);
 
   setStructuredOutput(ctx, result);
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Swift package clean failed'));
-    return;
-  }
-
-  ctx.emit(statusLine('success', 'Swift package cleaned successfully'));
 }
 
 export const schema = swiftPackageCleanSchema.shape;

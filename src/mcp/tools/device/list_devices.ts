@@ -4,10 +4,7 @@ import type { DeviceListDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -91,12 +88,6 @@ interface ListedDevice {
 interface DeviceDiscoveryOutcome {
   devices: ListedDevice[];
   xctraceOutput?: string;
-}
-
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
 }
 
 function createDeviceListResult(devices: ListedDevice[]): ListDevicesResult {
@@ -309,47 +300,13 @@ export function createListDevicesExecutor(
     unlink?: (path: string) => Promise<void>;
   },
 ): ToolExecutor<ListDevicesParams, ListDevicesResult> {
-  return async (_params, ctx) => {
+  return async (_params) => {
     try {
       const discovery = await discoverDevices(executor, pathDeps, fsDeps);
 
-      if (typeof discovery.xctraceOutput === 'string') {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: 'Device listing (xctrace output)',
-        });
-
-        if (discovery.xctraceOutput.length > 0) {
-          ctx.emitProgress({
-            type: 'status',
-            level: 'info',
-            message: discovery.xctraceOutput,
-          });
-        }
-
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message:
-            'For better device information, please upgrade to Xcode 15 or later which supports the modern devicectl command.',
-        });
-      }
-
       return createDeviceListResult(discovery.devices);
     } catch (error) {
-      const result = createDeviceListErrorResult(toErrorMessage(error));
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: result.error ?? 'Failed to list devices',
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Make sure Xcode is installed and devices are connected and trusted.',
-      });
-      return result;
+      return createDeviceListErrorResult(toErrorMessage(error));
     }
   };
 }
@@ -366,17 +323,14 @@ export async function list_devicesLogic(
   log('info', 'Starting device discovery');
 
   const ctx = getHandlerContext();
-  const executionContext = createToolExecutionContext(ctx);
   const executeListDevices = createListDevicesExecutor(executor, pathDeps, fsDeps);
-  const result = await executeListDevices({}, executionContext);
+  const result = await executeListDevices({}, { emitProgress: () => {} });
 
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error listing devices: ${result.error ?? 'Unknown error'}`);
   }
-
-  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = { ...NEXT_STEP_PARAMS };

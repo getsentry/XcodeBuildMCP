@@ -2,9 +2,7 @@ import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugSessionActionDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -76,29 +74,11 @@ export async function debug_continueLogic(
   params: DebugContinueParams,
   ctx: DebuggerToolContext,
 ): Promise<void> {
-  const headerEvent = header('Continue');
   const handlerCtx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerCtx.emitProgress,
-  });
   const executeDebugContinue = createDebugContinueExecutor(ctx.debugger);
-  const result = await executeDebugContinue(params, executionContext);
+  const result = await executeDebugContinue(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerCtx, result);
-  executionContext.emitResult(result);
-
-  handlerCtx.emit(headerEvent);
-  if (result.didError) {
-    handlerCtx.emit(statusLine('error', result.error ?? 'Failed to resume debugger'));
-    return;
-  }
-
-  handlerCtx.emit(
-    statusLine(
-      'success',
-      `Resumed debugger session${result.session ? ` ${result.session.debugSessionId}` : ''}`,
-    ),
-  );
 }
 
 export const schema = debugContinueSchema.shape;

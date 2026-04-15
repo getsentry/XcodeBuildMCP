@@ -3,12 +3,11 @@ import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { getProcess, terminateTrackedProcess, type ProcessInfo } from './active-processes.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
 
 const swiftPackageStopSchema = z.object({
   pid: z.number(),
@@ -48,23 +47,10 @@ export async function swift_package_stopLogic(
   timeout: number = 5000,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
   const executeSwiftPackageStop = createSwiftPackageStopExecutor(processManager, timeout);
-  const result = await executeSwiftPackageStop(params, executionContext);
+  const result = await executeSwiftPackageStop(params, noopToolExecutionContext);
 
   setStructuredOutput(ctx, result);
-
-  executionContext.emitResult(result);
-  ctx.emit(header('Swift Package Stop', [{ label: 'PID', value: String(params.pid) }]));
-
-  if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to stop process'));
-    return;
-  }
-
-  ctx.emit(statusLine('success', 'Stopped executable'));
 }
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.stop-result';

@@ -15,11 +15,12 @@ import type { ToolExecutionContext, ToolExecutor } from '../../../types/tool-exe
 import { getServer } from '../../../server/server-state.ts';
 import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tools-bridge/index.ts';
 import type { ImageAttachment, ToolHandlerContext } from '../../../rendering/types.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 
-export class BridgeToolExecutionContext extends DefaultToolExecutionContext {
+export class BridgeToolExecutionContext implements ToolExecutionContext {
   private nextStepParams?: NextStepParamsMap;
   private readonly bridgeImages: ImageAttachment[] = [];
+
+  emitProgress(): void {}
 
   setNextStepParams(nextStepParams?: NextStepParamsMap): void {
     this.nextStepParams = nextStepParams;
@@ -39,17 +40,10 @@ export class BridgeToolExecutionContext extends DefaultToolExecutionContext {
 }
 
 export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult>(options: {
-  progressMessage: string;
   callback: (bridge: XcodeToolsBridgeToolHandler, args: TArgs) => Promise<BridgeToolResult>;
   toDomainResult: (bridgeResult: BridgeToolResult, args: TArgs) => TResult;
 }): ToolExecutor<TArgs, TResult> {
   return async (args, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: options.progressMessage,
-    });
-
     const bridge = getXcodeToolsBridgeToolHandler(getServer());
     const bridgeResult: BridgeToolResult = bridge
       ? await options.callback(bridge, args)
@@ -91,8 +85,6 @@ export function finalizeBridgeToolExecution(
   if (nextStepParams) {
     ctx.nextStepParams = nextStepParams;
   }
-
-  executionContext.emitResult(result);
 }
 
 export function toBridgeStatusDomainResult(

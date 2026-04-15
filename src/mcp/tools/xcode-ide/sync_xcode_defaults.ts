@@ -7,10 +7,7 @@ import type {
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
-import {
-  DefaultToolExecutionContext,
-  getDefaultCommandExecutor,
-} from '../../../utils/execution/index.ts';
+import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
@@ -18,11 +15,7 @@ import {
 import { sessionStore } from '../../../utils/session-store.ts';
 import { readXcodeIdeState } from '../../../utils/xcode-state-reader.ts';
 import { lookupBundleId } from '../../../utils/xcode-state-watcher.ts';
-import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
-import {
-  formatProfileAnnotation,
-  formatProfileLabel,
-} from '../session-management/session-format-helpers.ts';
+import { formatProfileLabel } from '../session-management/session-format-helpers.ts';
 
 const schemaObj = z.object({});
 
@@ -97,7 +90,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SyncXcodeDefaultsR
 export function createSyncXcodeDefaultsExecutor(
   context: SyncXcodeDefaultsContext,
 ): ToolExecutor<Params, SyncXcodeDefaultsResult> {
-  return async (_params, ctx) => {
+  return async () => {
     const projectPath = resolveOptionalPath(context.cwd, context.projectPath);
     const workspacePath = resolveOptionalPath(context.cwd, context.workspacePath);
 
@@ -151,44 +144,10 @@ export async function syncXcodeDefaultsLogic(
   context: SyncXcodeDefaultsContext,
 ): Promise<void> {
   const handlerContext = getHandlerContext();
-  const executionContext = new DefaultToolExecutionContext({
-    progressSink: handlerContext.emitProgress,
-  });
   const executeSyncXcodeDefaults = createSyncXcodeDefaultsExecutor(context);
-  const result = await executeSyncXcodeDefaults(params, executionContext);
+  const result = await executeSyncXcodeDefaults(params, { emitProgress: () => {} });
 
   setStructuredOutput(handlerContext, result);
-
-  const headerEvent = header('Sync Xcode Defaults');
-  if (result.didError) {
-    handlerContext.emit(headerEvent);
-    handlerContext.emit(statusLine('error', result.error ?? 'Failed to read Xcode IDE state.'));
-    return;
-  }
-
-  const currentDefaults = sessionStore.getAll();
-  const items = [
-    ...(currentDefaults.scheme ? [{ label: 'scheme', value: currentDefaults.scheme }] : []),
-    ...(currentDefaults.simulatorId
-      ? [{ label: 'simulatorId', value: currentDefaults.simulatorId }]
-      : []),
-    ...(currentDefaults.bundleId ? [{ label: 'bundleId', value: currentDefaults.bundleId }] : []),
-  ];
-
-  handlerContext.emit(headerEvent);
-  if (items.length === 0) {
-    handlerContext.emit(
-      statusLine('info', 'No scheme or simulator selection detected in Xcode IDE state.'),
-    );
-    return;
-  }
-
-  const activeProfile = sessionStore.getActiveProfile();
-  const profileAnnotation = formatProfileAnnotation(activeProfile);
-  handlerContext.emit(
-    statusLine('success', `Synced session defaults from Xcode IDE ${profileAnnotation}`),
-  );
-  handlerContext.emit(detailTree(items));
 }
 
 export const schema = schemaObj.shape;

@@ -6,10 +6,8 @@ import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
-import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
   const result = await executor(['/bin/sh', '-c', command], 'macOS Bundle ID Extraction');
@@ -25,12 +23,6 @@ const getMacBundleIdSchema = z.object({
 
 type GetMacBundleIdParams = z.infer<typeof getMacBundleIdSchema>;
 type GetMacBundleIdResult = BundleIdDomainResult;
-
-function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
-  return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
-  });
-}
 
 function createBundleIdResult(
   appPath: string,
@@ -111,23 +103,16 @@ export async function get_mac_bundle_idLogic(
   log('info', `Starting bundle ID extraction for macOS app: ${appPath}`);
 
   const ctx = getHandlerContext();
-  const executionContext = createToolExecutionContext(ctx);
   const executeGetMacBundleId = createGetMacBundleIdExecutor(executor, fileSystemExecutor);
-  const result = await executeGetMacBundleId(params, executionContext);
+  const result = await executeGetMacBundleId(params, { emitProgress() {} });
 
   setStructuredOutput(ctx, result);
-  ctx.emit(header('Get macOS Bundle ID', [{ label: 'App', value: appPath }]));
 
   if (result.didError) {
-    ctx.emit(statusLine('error', result.error ?? 'Failed to get macOS bundle ID'));
     log('error', `Error extracting macOS bundle ID: ${result.error ?? 'Unknown error'}`);
   } else if (result.artifacts.bundleId) {
-    ctx.emit(statusLine('success', 'Bundle ID'));
-    ctx.emit({ type: 'text-block', text: `  └ ${result.artifacts.bundleId}` });
     log('info', `Extracted macOS bundle ID: ${result.artifacts.bundleId}`);
   }
-
-  executionContext.emitResult(result);
 
   if (!result.didError && result.artifacts.bundleId) {
     ctx.nextStepParams = {
