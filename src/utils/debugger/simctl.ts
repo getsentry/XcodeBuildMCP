@@ -1,5 +1,23 @@
 import type { CommandExecutor } from '../execution/index.ts';
 
+function normalizeSimctlError(message: string | undefined): string {
+  if (!message) {
+    return 'Failed to read simulator process list';
+  }
+
+  const invalidDeviceMatch = message.match(/Invalid device:[^\n]*/);
+  if (invalidDeviceMatch) {
+    return invalidDeviceMatch[0].trim();
+  }
+
+  const lines = message
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.at(-1) ?? 'Failed to read simulator process list';
+}
+
 export async function resolveSimulatorAppPid(opts: {
   executor: CommandExecutor;
   simulatorId: string;
@@ -12,7 +30,7 @@ export async function resolveSimulatorAppPid(opts: {
   );
 
   if (!result.success) {
-    throw new Error(result.error ?? 'Failed to read simulator process list');
+    throw new Error(normalizeSimctlError(result.error));
   }
 
   const lines = result.output.split('\n');

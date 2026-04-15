@@ -28,13 +28,7 @@ interface LineStreamState {
   lines: string[];
 }
 
-function emitChunkLines(
-  ctx: ToolExecutionContext,
-  operation: XcodebuildOperation,
-  stream: 'stdout' | 'stderr',
-  state: LineStreamState,
-  chunk: string,
-): void {
+function emitChunkLines(state: LineStreamState, chunk: string): void {
   const combined = `${state.remainder}${chunk}`;
   const normalized = combined.replace(/\r\n/g, '\n');
   const parts = normalized.split('\n');
@@ -46,32 +40,15 @@ function emitChunkLines(
     }
 
     state.lines.push(line);
-    ctx.emitProgress({
-      type: 'xcodebuild-line',
-      operation,
-      stream,
-      line,
-    });
   }
 }
 
-function flushChunkLines(
-  ctx: ToolExecutionContext,
-  operation: XcodebuildOperation,
-  stream: 'stdout' | 'stderr',
-  state: LineStreamState,
-): void {
+function flushChunkLines(state: LineStreamState): void {
   if (state.remainder.length === 0) {
     return;
   }
 
   state.lines.push(state.remainder);
-  ctx.emitProgress({
-    type: 'xcodebuild-line',
-    operation,
-    stream,
-    line: state.remainder,
-  });
   state.remainder = '';
 }
 
@@ -129,6 +106,7 @@ function collectFallbackDiagnosticEntries(
 
 function createBasicDiagnostics(
   state: XcodebuildRunState,
+  didError: boolean,
   fallbackErrorMessages?: readonly string[],
 ): BasicDiagnostics {
   const warnings = state.warnings.map((warning) => ({
@@ -136,8 +114,9 @@ function createBasicDiagnostics(
     location: warning.location,
   }));
 
-  const errors =
-    state.errors.length > 0
+  const errors = !didError
+    ? []
+    : state.errors.length > 0
       ? state.errors.map((error) => ({
           message: error.message,
           location: error.location,
@@ -149,12 +128,17 @@ function createBasicDiagnostics(
 
 function createTestDiagnostics(
   state: XcodebuildRunState,
+  didError: boolean,
   fallbackErrorMessages?: readonly string[],
 ): TestDiagnostics {
   return {
-    ...createBasicDiagnostics(state, fallbackErrorMessages),
+    ...createBasicDiagnostics(
+      state,
+      didError,
+      state.testFailures.length === 0 ? fallbackErrorMessages : undefined,
+    ),
     testFailures: state.testFailures.map((failure) => ({
-      suite: failure.suite ?? 'Unknown Suite',
+      suite: failure.suite ?? '(Unknown Suite)',
       test: failure.test ?? 'test',
       message: failure.message,
       location: failure.location,
@@ -220,7 +204,7 @@ export interface ProgressStreamingXcodebuildExecution extends StartedPipeline {
 export function createProgressStreamingPipeline(
   toolName: string,
   operation: XcodebuildOperation,
-  ctx: ToolExecutionContext,
+  _ctx: ToolExecutionContext,
 ): ProgressStreamingXcodebuildExecution {
   const innerPipeline = createXcodebuildPipeline({
     operation,
@@ -235,12 +219,12 @@ export function createProgressStreamingPipeline(
   const pipeline: XcodebuildPipeline = {
     onStdout(chunk: string): void {
       innerPipeline.onStdout(chunk);
-      emitChunkLines(ctx, operation, 'stdout', stdoutState, chunk);
+      emitChunkLines(stdoutState, chunk);
     },
 
     onStderr(chunk: string): void {
       innerPipeline.onStderr(chunk);
-      emitChunkLines(ctx, operation, 'stderr', stderrState, chunk);
+      emitChunkLines(stderrState, chunk);
     },
 
     emitEvent(event): void {
@@ -248,8 +232,8 @@ export function createProgressStreamingPipeline(
     },
 
     finalize(succeeded, durationMs, options) {
-      flushChunkLines(ctx, operation, 'stdout', stdoutState);
-      flushChunkLines(ctx, operation, 'stderr', stderrState);
+      flushChunkLines(stdoutState);
+      flushChunkLines(stderrState);
       return innerPipeline.finalize(succeeded, durationMs, options);
     },
 
@@ -295,7 +279,11 @@ export function createBuildDomainResult(options: {
       target: options.target,
     },
     artifacts: options.artifacts,
-    diagnostics: createBasicDiagnostics(pipelineResult.state, options.fallbackErrorMessages),
+    diagnostics: createBasicDiagnostics(
+      pipelineResult.state,
+      !options.succeeded,
+      options.fallbackErrorMessages,
+    ),
   };
 }
 
@@ -321,7 +309,11 @@ export function createBuildRunDomainResult(options: {
       target: options.target,
     },
     artifacts: options.artifacts,
-    diagnostics: createBasicDiagnostics(pipelineResult.state, options.fallbackErrorMessages),
+    diagnostics: createBasicDiagnostics(
+      pipelineResult.state,
+      !options.succeeded,
+      options.fallbackErrorMessages,
+    ),
     ...(options.output ? { output: options.output } : {}),
   };
 }
@@ -361,7 +353,7 @@ export function createTestDomainResult(options: {
         : {}),
     },
     artifacts: options.artifacts,
-    diagnostics: createTestDiagnostics(state, options.fallbackErrorMessages),
+    diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
     ...(createTestSelectionInfo(options.preflight)
       ? { tests: createTestSelectionInfo(options.preflight) }
       : {}),

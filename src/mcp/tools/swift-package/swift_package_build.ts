@@ -82,13 +82,6 @@ export function createSwiftPackageBuildExecutor(
       });
 
       const failureMessage = result.error || result.output || 'Unknown error';
-      if (!result.success) {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message: `Swift package build failed: ${failureMessage}`,
-        });
-      }
       return createBuildDomainResult({
         started,
         succeeded: result.success,
@@ -101,11 +94,6 @@ export function createSwiftPackageBuildExecutor(
       });
     } catch (error) {
       const message = toErrorMessage(error);
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: `Failed to execute swift build: ${message}`,
-      });
       return createBuildDomainResult({
         started,
         succeeded: false,

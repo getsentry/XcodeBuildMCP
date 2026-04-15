@@ -85,20 +85,37 @@ interface XcodebuildParserState {
 
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
-function shouldRenderStructuredOutput(output: StructuredToolOutput | undefined): boolean {
+function shouldRenderStructuredOutput(
+  output: StructuredToolOutput | undefined,
+  opts: { sawXcodebuildLine: boolean },
+): boolean {
   if (!output) {
     return false;
   }
 
   switch (output.result.kind) {
-    case 'app-path':
     case 'build-result':
+      if (
+        'artifacts' in output.result &&
+        output.result.artifacts &&
+        'buildLogPath' in output.result.artifacts &&
+        typeof output.result.artifacts.buildLogPath === 'string'
+      ) {
+        return true;
+      }
+      return false;
     case 'build-run-result':
-    case 'build-settings':
-    case 'bundle-id':
-    case 'scheme-list':
     case 'test-result':
       return true;
+    case 'device-list':
+    case 'simulator-list':
+      return true;
+    case 'build-settings':
+    case 'scheme-list':
+      return false;
+    case 'app-path':
+    case 'bundle-id':
+      return false;
     default:
       return false;
   }
@@ -116,6 +133,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let lastVisibleEventType: TextRenderableItem['type'] | null = null;
   let lastStatusLineLevel: StatusProgressEvent['level'] | null = null;
   let structuredOutput: StructuredToolOutput | undefined;
+  let sawXcodebuildLine = false;
   let nextSteps: readonly NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
@@ -301,6 +319,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'xcodebuild-line': {
+        sawXcodebuildLine = true;
         const state = ensureParserState(item.operation);
         const chunk = `${item.line}\n`;
         if (item.stream === 'stderr') {
@@ -371,7 +390,10 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
 
     finalize(): void {
       flushParserStates();
-      if (structuredOutput && shouldRenderStructuredOutput(structuredOutput)) {
+      if (
+        structuredOutput &&
+        shouldRenderStructuredOutput(structuredOutput, { sawXcodebuildLine })
+      ) {
         for (const item of renderDomainResultTextItems(structuredOutput.result)) {
           processItem(item);
         }
@@ -387,6 +409,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       lastVisibleEventType = null;
       lastStatusLineLevel = null;
       structuredOutput = undefined;
+      sawXcodebuildLine = false;
       nextSteps = [];
       nextStepsRuntime = undefined;
       parserStates.clear();

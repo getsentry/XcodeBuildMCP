@@ -5,10 +5,13 @@ import type {
   ToolDomainResult,
 } from '../../types/domain-results.ts';
 import type {
+  CompilerErrorProgressEvent,
+  CompilerWarningProgressEvent,
   HeaderProgressEvent,
   ProgressEvent,
   StatusProgressEvent,
   TestDiscoveryProgressEvent,
+  TestFailureProgressEvent,
   XcodebuildOperation,
 } from '../../types/progress-events.ts';
 import { displayPath } from '../build-preflight.ts';
@@ -134,6 +137,21 @@ interface SimulatorPlatformInfo {
   order: number;
 }
 
+interface DevicePlatformInfo {
+  label: string;
+  emoji: string;
+  order: number;
+}
+
+const DEVICE_PLATFORM_MAP: Record<string, DevicePlatformInfo> = {
+  iOS: { label: 'iOS Devices', emoji: '\u{1F4F1}', order: 0 },
+  iPadOS: { label: 'iPadOS Devices', emoji: '\u{1F4F1}', order: 1 },
+  watchOS: { label: 'watchOS Devices', emoji: '\u{231A}\u{FE0F}', order: 2 },
+  tvOS: { label: 'tvOS Devices', emoji: '\u{1F4FA}', order: 3 },
+  visionOS: { label: 'visionOS Devices', emoji: '\u{1F97D}', order: 4 },
+  macOS: { label: 'macOS Devices', emoji: '\u{1F4BB}', order: 5 },
+};
+
 const SIMULATOR_PLATFORM_MAP: Record<string, SimulatorPlatformInfo> = {
   iOS: { label: 'iOS Simulators', emoji: '\u{1F4F1}', order: 0 },
   visionOS: { label: 'visionOS Simulators', emoji: '\u{1F97D}', order: 1 },
@@ -156,6 +174,71 @@ function getSimulatorPlatformInfo(platform: string): SimulatorPlatformInfo {
       order: 99,
     }
   );
+}
+
+function getDevicePlatformInfo(platform: string): DevicePlatformInfo {
+  return (
+    DEVICE_PLATFORM_MAP[platform] ?? {
+      label: `${platform} Devices`,
+      emoji: '\u{1F4F1}',
+      order: 99,
+    }
+  );
+}
+
+function createDeviceListItems(
+  result: Extract<ToolDomainResult, { kind: 'device-list' }>,
+): TextRenderableItem[] {
+  const header = createHeader('List Devices');
+  if (result.didError) {
+    return [header, createStatus('error', result.error ?? 'Failed to list devices')];
+  }
+
+  const groupedByPlatform = new Map<string, typeof result.devices>();
+  for (const device of result.devices) {
+    const platformGroup = groupedByPlatform.get(device.platform) ?? [];
+    platformGroup.push(device);
+    groupedByPlatform.set(device.platform, platformGroup);
+  }
+
+  const platformCounts: Record<string, number> = {};
+  let totalCount = 0;
+  const items: TextRenderableItem[] = [header];
+  const sortedPlatforms = [...groupedByPlatform.entries()].sort(
+    ([left], [right]) => getDevicePlatformInfo(left).order - getDevicePlatformInfo(right).order,
+  );
+
+  for (const [platform, devices] of sortedPlatforms) {
+    const info = getDevicePlatformInfo(platform);
+    const lines: string[] = [''];
+
+    for (const device of devices) {
+      if (lines.length > 1) {
+        lines.push('');
+      }
+      const marker = device.isAvailable ? '\u2713' : '\u2717';
+      lines.push(`${info.emoji} [${marker}] ${device.name}`);
+      lines.push(`  OS: ${device.osVersion}`);
+      lines.push(`  UDID: ${device.deviceId}`);
+    }
+
+    platformCounts[platform] = devices.length;
+    totalCount += devices.length;
+    items.push(createSection(`${info.label}:`, lines));
+  }
+
+  const countParts = sortedPlatforms
+    .map(([platform]) => `${platformCounts[platform]} ${platform}`)
+    .join(', ');
+  items.push(createStatus('success', `${totalCount} physical devices discovered (${countParts}).`));
+  items.push(
+    createSection('Hints', [
+      'Use the device ID/UDID from above when required by other tools.',
+      "Save a default device with session-set-defaults { deviceId: 'DEVICE_UDID' }.",
+      'Before running build/run/test/UI automation tools, set the desired device identifier in session defaults.',
+    ]),
+  );
+  return items;
 }
 
 function createSimulatorListItems(
@@ -364,6 +447,75 @@ function createTestDiscoveryProgress(
   };
 }
 
+function createCompilerWarningEvent(
+  operation: XcodebuildOperation,
+  entry: { message: string; location?: string },
+): CompilerWarningProgressEvent {
+  return {
+    type: 'compiler-warning',
+    operation,
+    message: entry.message,
+    location: entry.location,
+    rawLine: entry.location ? `${entry.location}: warning: ${entry.message}` : entry.message,
+  };
+}
+
+function createCompilerErrorEvent(
+  operation: XcodebuildOperation,
+  entry: { message: string; location?: string },
+): CompilerErrorProgressEvent {
+  return {
+    type: 'compiler-error',
+    operation,
+    message: entry.message,
+    location: entry.location,
+    rawLine: entry.location ? `${entry.location}: error: ${entry.message}` : entry.message,
+  };
+}
+
+function createTestFailureEvent(entry: {
+  suite: string;
+  test: string;
+  message: string;
+  location?: string;
+}): TestFailureProgressEvent {
+  return {
+    type: 'test-failure',
+    operation: 'TEST',
+    suite: entry.suite,
+    test: entry.test,
+    message: entry.message,
+    location: entry.location,
+  };
+}
+
+function createBuildLikeDiagnosticEvents(
+  result: Extract<ToolDomainResult, { kind: 'build-result' | 'build-run-result' | 'test-result' }>,
+): TextRenderableItem[] {
+  const operation = inferXcodebuildOperation(result) ?? 'BUILD';
+  const items: TextRenderableItem[] = [];
+
+  if (!('diagnostics' in result) || !result.diagnostics) {
+    return items;
+  }
+
+  for (const warning of result.diagnostics.warnings) {
+    items.push(createCompilerWarningEvent(operation, warning));
+  }
+
+  for (const error of result.diagnostics.errors) {
+    items.push(createCompilerErrorEvent(operation, error));
+  }
+
+  if (result.kind === 'test-result' && 'testFailures' in result.diagnostics) {
+    for (const failure of result.diagnostics.testFailures) {
+      items.push(createTestFailureEvent(failure));
+    }
+  }
+
+  return items;
+}
+
 function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[] {
   switch (result.kind) {
     case 'build-result': {
@@ -379,8 +531,15 @@ function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[
     }
     case 'build-run-result': {
       const items: DetailTreeTextBlock['items'] = [];
-      if ('appPath' in result.artifacts && typeof result.artifacts.appPath === 'string') {
-        items.push({ label: 'App Path', value: displayPath(result.artifacts.appPath) });
+      const appLikePath =
+        'appPath' in result.artifacts && typeof result.artifacts.appPath === 'string'
+          ? result.artifacts.appPath
+          : 'executablePath' in result.artifacts &&
+              typeof result.artifacts.executablePath === 'string'
+            ? result.artifacts.executablePath
+            : undefined;
+      if (typeof appLikePath === 'string') {
+        items.push({ label: 'App Path', value: displayPath(appLikePath) });
       }
       if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
         items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
@@ -401,10 +560,19 @@ function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[
         items.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
       }
       if (items.length === 0) return [];
-      return [
+      const tailItems: TextRenderableItem[] = [
         ...(!result.didError ? [createStatus('success', 'Build & Run complete')] : []),
         createDetailTree(items),
       ];
+      const outputLines = result.output
+        ? result.output.stdout.length > 0
+          ? result.output.stdout
+          : result.output.stderr
+        : [];
+      if (outputLines.length > 0) {
+        tailItems.push(createSection('Output', outputLines));
+      }
+      return tailItems;
     }
     case 'test-result': {
       if (!('artifacts' in result) || !result.artifacts) return [];
@@ -434,6 +602,8 @@ function createSpecialCaseItems(result: ToolDomainResult): TextRenderableItem[] 
   switch (result.kind) {
     case 'simulator-list':
       return createSimulatorListItems(result);
+    case 'device-list':
+      return createDeviceListItems(result);
     case 'doctor-report':
       return createDoctorReportItems(result);
     case 'workflow-selection':
@@ -463,7 +633,9 @@ function createSpecialCaseItems(result: ToolDomainResult): TextRenderableItem[] 
           items.push(
             createSection(
               'Details',
-              details.map((entry) => `Error: ${entry.message}`),
+              details.map((entry) =>
+                entry.message.startsWith('Error: ') ? entry.message : `Error: ${entry.message}`,
+              ),
             ),
           );
         }
@@ -602,12 +774,26 @@ export function renderDomainResultTextItems(result: ToolDomainResult): TextRende
   }
 
   const items: TextRenderableItem[] = [];
-  if (result.kind === 'test-result') {
-    const discovery = createTestDiscoveryProgress(result);
-    if (discovery) {
-      items.push(discovery);
+  if (
+    result.kind === 'build-result' ||
+    result.kind === 'build-run-result' ||
+    result.kind === 'test-result'
+  ) {
+    if (result.kind === 'test-result') {
+      const discovery = createTestDiscoveryProgress(result);
+      if (discovery) {
+        items.push(discovery);
+      }
     }
+    items.push(...createBuildLikeDiagnosticEvents(result));
+    const summary = createSummaryBlock(result);
+    if (summary) {
+      items.push(summary);
+    }
+    items.push(...createBuildLikeTailItems(result));
+    return items;
   }
+
   items.push(...createDiagnosticSections(result));
   const summary = createSummaryBlock(result);
   if (summary) {

@@ -88,13 +88,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SimStatusbarResult
 export function createSimStatusbarExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<SimStatusbarParams, SimStatusbarResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Setting simulator ${params.simulatorId} status bar data network to ${params.dataNetwork}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const command =
         params.dataNetwork === 'clear'

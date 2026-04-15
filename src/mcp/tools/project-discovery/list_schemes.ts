@@ -15,6 +15,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -113,42 +114,14 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ListSchemesResult)
 export function createListSchemesExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<ListSchemesParams, ListSchemesResult> {
-  return async (params, ctx) => {
+  return async (params, _ctx) => {
     const pathValue = params.projectPath ?? params.workspacePath ?? '';
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Listing schemes',
-    });
 
     try {
       const schemes = await listSchemes(params, executor);
-
-      if (schemes.length > 0) {
-        ctx.emitProgress({
-          type: 'table',
-          name: 'schemes',
-          columns: ['scheme'],
-          rows: schemes.map((scheme) => ({ scheme })),
-        });
-      } else {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: '(none)',
-        });
-      }
-
       return createListSchemesResult(pathValue, schemes);
     } catch (error) {
-      const result = createListSchemesErrorResult(pathValue, toErrorMessage(error));
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: result.error ?? 'Failed to list schemes',
-      });
-      return result;
+      return createListSchemesErrorResult(pathValue, toErrorMessage(error));
     }
   };
 }
@@ -164,6 +137,11 @@ export async function listSchemesLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('List Schemes', [
+      { label: hasProjectPath ? 'Project' : 'Workspace', value: pathValue! },
+    ]),
+  );
   const executionContext = createToolExecutionContext(ctx);
   const executeListSchemes = createListSchemesExecutor(executor);
   const result = await executeListSchemes(params, executionContext);
@@ -172,6 +150,10 @@ export async function listSchemesLogic(
 
   if (result.didError) {
     log('error', `Error listing schemes: ${result.error ?? 'Unknown error'}`);
+    ctx.emit(statusLine('error', result.error ?? 'Failed to list schemes'));
+  } else {
+    ctx.emit(statusLine('success', `Found ${result.schemes.length} schemes`));
+    ctx.emit(section('Schemes:', result.schemes.length > 0 ? result.schemes : ['(none)']));
   }
 
   executionContext.emitResult(result);

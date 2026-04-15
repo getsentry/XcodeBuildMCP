@@ -77,14 +77,8 @@ function shouldShowBootedHint(error: string, shutdownFirst?: boolean): boolean {
 export function createEraseSimsExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<EraseSimsParams, EraseSimsResult> {
-  return async (params, ctx) => {
+  return async (params, _ctx) => {
     const simulatorId = params.simulatorId;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Erasing simulator ${simulatorId}`,
-    });
 
     try {
       if (params.shutdownFirst) {
@@ -117,11 +111,6 @@ export function createEraseSimsExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Simulators were erased successfully',
-      });
       return createEraseSimsResult({
         simulatorId,
         didError: false,

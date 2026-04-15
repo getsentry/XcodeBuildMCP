@@ -24,6 +24,7 @@ import {
 import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchAppOnDevice } from '../../../utils/device-steps.ts';
+import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -50,6 +51,12 @@ export async function launch_app_deviceLogic(
   fileSystem: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Launch App', [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'Bundle ID', value: params.bundleId },
+    ]),
+  );
   const executionContext = new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
   });
@@ -112,26 +119,6 @@ function createLaunchAppDeviceErrorResult(
   };
 }
 
-function emitLaunchAppDeviceProgress(
-  ctx: Parameters<ToolExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult>>[1],
-  params: LaunchAppDeviceParams,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Launch App',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'Bundle ID', value: params.bundleId },
-    ],
-  });
-}
-
 function getProcessId(result: LaunchAppDeviceResult): number | undefined {
   return 'processId' in result.artifacts ? result.artifacts.processId : undefined;
 }
@@ -149,7 +136,6 @@ export function createLaunchAppDeviceExecutor(
   fileSystem: FileSystemExecutor,
 ): ToolExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult> {
   return async (params, ctx) => {
-    emitLaunchAppDeviceProgress(ctx, params);
     log('info', `Launching app ${params.bundleId} on device ${params.deviceId}`);
 
     try {
@@ -165,37 +151,22 @@ export function createLaunchAppDeviceExecutor(
 
       if (!launchResult.success) {
         const message = `Failed to launch app: ${launchResult.error}`;
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
+        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppDeviceErrorResult(params, message);
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App launched successfully.',
-      });
+      ctx.emitProgress(statusLine('success', 'App launched successfully'));
 
       if (launchResult.processId !== undefined) {
-        ctx.emitProgress({
-          type: 'table',
-          name: 'Details',
-          columns: ['label', 'value'],
-          rows: [{ label: 'Process ID', value: String(launchResult.processId) }],
-        });
+        ctx.emitProgress(
+          detailTree([{ label: 'Process ID', value: String(launchResult.processId) }]),
+        );
       }
 
       return createLaunchAppDeviceResult(params, launchResult.processId);
     } catch (error) {
       const message = `Failed to launch app on device: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
+      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppDeviceErrorResult(params, message);
     }
   };

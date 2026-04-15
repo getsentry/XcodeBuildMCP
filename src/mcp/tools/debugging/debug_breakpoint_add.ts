@@ -107,17 +107,8 @@ function formatBreakpointAddOutput(result: DebugBreakpointAddResult): string[] {
 export function createDebugBreakpointAddExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugBreakpointAddParams, DebugBreakpointAddResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const spec = createBreakpointSpec(params);
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message:
-        spec.kind === 'function'
-          ? `Adding function breakpoint for ${spec.name}`
-          : `Adding file breakpoint for ${spec.file}:${spec.line}`,
-    });
 
     try {
       const result = await debuggerManager.addBreakpoint(params.debugSessionId, spec, {

@@ -47,10 +47,19 @@ export function registerDebuggingSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 30_000);
 
       it('add-breakpoint - error no session', async () => {
-        const { text, isError } = await harness.invoke('debugging', 'add-breakpoint', {
-          file: 'test.swift',
-          line: 1,
-        });
+        const { text, isError } = await harness.invoke(
+          'debugging',
+          'add-breakpoint',
+          runtime === 'json'
+            ? {
+                file: 'ContentView.swift',
+                line: 42,
+              }
+            : {
+                file: 'test.swift',
+                line: 1,
+              },
+        );
         expect(isError).toBe(true);
         expectFixture(text, 'add-breakpoint--error-no-session');
       }, 30_000);
@@ -65,7 +74,7 @@ export function registerDebuggingSnapshotSuite(runtime: SnapshotRuntime): void {
 
       it('lldb-command - error no session', async () => {
         const { text, isError } = await harness.invoke('debugging', 'lldb-command', {
-          command: 'bt',
+          command: runtime === 'json' ? 'breakpoint list' : 'bt',
         });
         expect(isError).toBe(true);
         expectFixture(text, 'lldb-command--error-no-session');

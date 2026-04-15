@@ -60,13 +60,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: OpenSimResult): vo
 export function createOpenSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<OpenSimParams, OpenSimResult> {
-  return async (_params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Opening Simulator.app',
-    });
-
+  return async (_params, _ctx) => {
     try {
       const result = await executor(['open', '-a', 'Simulator'], 'Open Simulator', false);
 
@@ -79,11 +73,6 @@ export function createOpenSimExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Simulator opened successfully',
-      });
       return createOpenSimResult({ didError: false });
     } catch (error) {
       const diagnosticMessage = toErrorMessage(error);

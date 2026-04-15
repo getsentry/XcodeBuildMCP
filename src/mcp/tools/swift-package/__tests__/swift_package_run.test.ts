@@ -292,7 +292,8 @@ describe('swift_package_run plugin', () => {
       expect(executorCalls.length).toBeGreaterThan(0);
       expect(executorCalls[0].detached).toBe(true);
       const text = result.text();
-      expect(text).toContain('Started executable in background');
+      expect(text).toContain('Build & Run complete');
+      expect(text).toContain('Process ID: 12345');
     });
   });
 
@@ -320,7 +321,8 @@ describe('swift_package_run plugin', () => {
       );
 
       const text = result.text();
-      expect(text).toContain('Started executable in background');
+      expect(text).toContain('Build & Run complete');
+      expect(text).toContain('Process ID: 12345');
     });
 
     it('should return success response for successful execution', async () => {
@@ -368,7 +370,7 @@ describe('swift_package_run plugin', () => {
 
       expect(result.isError()).toBe(true);
       const text = result.text();
-      expect(text).toContain('Failed to execute swift run');
+      expect(text).toContain('Build failed.');
       expect(text).toContain('Command not found');
     });
   });

@@ -6,6 +6,7 @@ import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-fa
 import { getDefaultCommandExecutor } from '../../../utils/command.ts';
 import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { activeProcesses } from './active-processes.ts';
+import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 type ListProcessInfo = {
   executableName?: string;
@@ -32,7 +33,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ProcessListDomainR
 export function createSwiftPackageListExecutor(
   dependencies: ProcessListDependencies = {},
 ): ToolExecutor<SwiftPackageListParams, ProcessListDomainResult> {
-  return async (_params, ctx) => {
+  return async () => {
     const processMap =
       dependencies.processMap ??
       new Map<number, ListProcessInfo>(
@@ -60,32 +61,6 @@ export function createSwiftPackageListExecutor(
         displayPackagePath: info.packagePath ?? 'unknown package',
       };
     });
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Swift Package Processes',
-    });
-
-    if (processes.length === 0) {
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'No Swift Package processes currently running.',
-      });
-    } else {
-      ctx.emitProgress({
-        type: 'table',
-        name: `Running Processes (${processes.length}):`,
-        columns: ['name', 'processId', 'uptime', 'packagePath'],
-        rows: processes.map((processInfo) => ({
-          name: processInfo.name,
-          processId: String(processInfo.processId),
-          uptime: `${processInfo.uptimeSeconds}s`,
-          packagePath: processInfo.displayPackagePath,
-        })),
-      });
-    }
 
     return {
       kind: 'process-list',
@@ -116,6 +91,24 @@ export async function swift_package_listLogic(
   setStructuredOutput(ctx, result);
 
   executionContext.emitResult(result);
+  ctx.emit(header('Swift Package Processes'));
+
+  if (result.processes.length === 0) {
+    ctx.emit(statusLine('info', 'No Swift Package processes currently running.'));
+    return;
+  }
+
+  ctx.emit(
+    section(
+      `Running Processes (${result.processes.length}):`,
+      result.processes.flatMap((processInfo) => [
+        `🟢 ${processInfo.name}`,
+        `   PID: ${processInfo.processId} | Uptime: ${processInfo.uptimeSeconds}s`,
+        `   Package: ${processInfo.artifacts?.packagePath ?? 'unknown package'}`,
+      ]),
+      { blankLineAfterTitle: true },
+    ),
+  );
 }
 
 const swiftPackageListSchema = z.object({});

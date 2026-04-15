@@ -7,7 +7,7 @@ import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -61,7 +61,7 @@ function createSwiftPackageCleanResult(
 export function createSwiftPackageCleanExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<SwiftPackageCleanParams, SwiftPackageCleanResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const resolvedPath = path.resolve(params.packagePath);
     const swiftArgs = ['package', '--package-path', resolvedPath, 'clean'];
 
@@ -71,37 +71,12 @@ export function createSwiftPackageCleanExecutor(
       const result = await executor(['swift', ...swiftArgs], 'Swift Package Clean', false);
       if (!result.success) {
         const errorMessage = result.error || result.output || 'Unknown error';
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message: `Swift package clean failed: ${errorMessage}`,
-        });
         return createSwiftPackageCleanResult(resolvedPath, false, errorMessage);
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'success',
-        message: 'Swift package cleaned successfully',
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Package cleaned successfully',
-      });
       return createSwiftPackageCleanResult(resolvedPath, true);
     } catch (error) {
       const errorMessage = toErrorMessage(error);
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: `Failed to execute swift package clean: ${errorMessage}`,
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: `Swift package clean failed: ${errorMessage}`,
-      });
       return createSwiftPackageCleanResult(resolvedPath, false, errorMessage);
     }
   };
@@ -121,6 +96,12 @@ export async function swift_package_cleanLogic(
   const result = await executeSwiftPackageClean(params, executionContext);
 
   setStructuredOutput(ctx, result);
+  if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Swift package clean failed'));
+    return;
+  }
+
+  ctx.emit(statusLine('success', 'Swift package cleaned successfully'));
 }
 
 export const schema = swiftPackageCleanSchema.shape;

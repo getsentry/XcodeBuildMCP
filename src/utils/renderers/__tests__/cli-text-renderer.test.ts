@@ -20,7 +20,7 @@ function buildOutput(overrides: Partial<StructuredToolOutput['result']>): Struct
       didError: false,
       error: null,
       summary: { status: 'SUCCEEDED' },
-      artifacts: { scheme: 'MyApp' },
+      artifacts: { scheme: 'MyApp', buildLogPath: '/tmp/build.log' },
       diagnostics: { warnings: [], errors: [] },
       ...overrides,
     } as StructuredToolOutput['result'],

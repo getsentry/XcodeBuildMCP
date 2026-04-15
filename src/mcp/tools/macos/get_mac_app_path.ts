@@ -18,6 +18,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
@@ -87,26 +88,6 @@ function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
   };
 }
 
-function emitAppPathProgress(
-  ctx: Parameters<ToolExecutor<GetMacosAppPathParams, AppPathDomainResult>>[1],
-  headerParams: Array<{ label: string; value: string }>,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Get App Path',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: headerParams.map((param) => ({
-      label: param.label,
-      value: param.value,
-    })),
-  });
-}
-
 function getAppPath(result: AppPathDomainResult): string | null {
   if ('artifacts' in result && result.artifacts && 'appPath' in result.artifacts) {
     return result.artifacts.appPath;
@@ -126,7 +107,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: AppPathDomainResul
 export function createGetMacAppPathExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<GetMacosAppPathParams, AppPathDomainResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const configuration = params.configuration ?? 'Debug';
 
     const headerParams: Array<{ label: string; value: string }> = [
@@ -144,7 +125,6 @@ export function createGetMacAppPathExecutor(
     }
 
     log('info', `Getting app path for scheme ${params.scheme} on platform macOS`);
-    emitAppPathProgress(ctx, headerParams);
 
     try {
       const destination = params.arch ? `platform=macOS,arch=${params.arch}` : undefined;
@@ -163,39 +143,8 @@ export function createGetMacAppPathExecutor(
         executor,
       );
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Success',
-      });
-      ctx.emitProgress({
-        type: 'artifact',
-        name: 'App Path',
-        path: appPath,
-      });
-
       return createAppPathResult(appPath);
     } catch (error) {
-      const messages = getErrorMessages(toErrorMessage(error));
-
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Errors (${messages.length}):`,
-      });
-      for (const message of messages) {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: `✗ ${message}`,
-        });
-      }
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: 'Query failed.',
-      });
-
       return createAppPathErrorResult(toErrorMessage(error));
     }
   };
@@ -215,17 +164,44 @@ export async function get_mac_app_pathLogic(
   setStructuredOutput(ctx, result);
 
   executionContext.emitResult(result);
+  ctx.emit(
+    header('Get App Path', [
+      { label: 'Scheme', value: params.scheme },
+      ...(params.workspacePath ? [{ label: 'Workspace', value: params.workspacePath }] : []),
+      ...(params.projectPath ? [{ label: 'Project', value: params.projectPath }] : []),
+      { label: 'Configuration', value: params.configuration ?? 'Debug' },
+      { label: 'Platform', value: 'macOS' },
+      ...(params.arch ? [{ label: 'Architecture', value: params.arch }] : []),
+    ]),
+  );
 
   if (result.didError) {
+    const errors = result.diagnostics?.errors ?? [];
+    if (errors.length > 0) {
+      const lines = [`Errors (${errors.length}):`, ''];
+      for (const entry of errors) {
+        lines.push(`  ✗ ${entry.message}`);
+        lines.push('');
+      }
+      while (lines.at(-1) === '') {
+        lines.pop();
+      }
+      ctx.emit({ type: 'text-block', text: lines.join('\n') });
+    }
+    ctx.emit(statusLine('error', 'Query failed.'));
     log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);
     return;
   }
 
   const appPath = getAppPath(result);
   if (!appPath) {
+    ctx.emit(statusLine('error', 'Failed to get app path'));
     log('error', 'Error retrieving app path: missing appPath artifact in successful result');
     return;
   }
+
+  ctx.emit(statusLine('success', 'Success'));
+  ctx.emit(detailTree([{ label: 'App Path', value: appPath }]));
 
   ctx.nextStepParams = {
     get_mac_bundle_id: { appPath },

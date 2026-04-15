@@ -173,7 +173,7 @@ describe('swift_package_test plugin', () => {
 
       expect(result.isError()).toBe(true);
       const text = result.text();
-      expect(text).toContain('Failed to execute swift test');
+      expect(text).toContain('Test failed.');
       expect(text).toContain('spawn ENOENT');
     });
 

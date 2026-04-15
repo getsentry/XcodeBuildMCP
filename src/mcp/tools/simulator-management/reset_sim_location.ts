@@ -70,13 +70,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ResetSimulatorLoca
 export function createResetSimulatorLocationExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<ResetSimulatorLocationParams, ResetSimulatorLocationResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Resetting location for simulator ${params.simulatorId}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'location', params.simulatorId, 'clear'],
@@ -94,11 +88,6 @@ export function createResetSimulatorLocationExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Location successfully reset to default',
-      });
       return createResetSimulatorLocationResult({
         simulatorId: params.simulatorId,
         didError: false,

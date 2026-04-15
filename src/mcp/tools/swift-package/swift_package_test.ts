@@ -11,7 +11,7 @@ import {
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
 import {
   createToolExecutionContext,
   createProgressStreamingPipeline,
@@ -107,13 +107,6 @@ export function createSwiftPackageTestExecutor(
 
       const failureMessage = result.error || result.output || 'Unknown error';
       const shouldIncludePackagePath = /chdir error/i.test(failureMessage);
-      if (!result.success) {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message: `Swift package test failed: ${failureMessage}`,
-        });
-      }
 
       return createTestDomainResult({
         started,
@@ -127,11 +120,6 @@ export function createSwiftPackageTestExecutor(
       });
     } catch (error) {
       const message = toErrorMessage(error);
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: `Failed to execute swift test: ${message}`,
-      });
       return createTestDomainResult({
         started,
         succeeded: false,
@@ -155,11 +143,14 @@ export async function swift_package_testLogic(
   const resolvedPath = path.resolve(params.packagePath);
 
   ctx.emit(
-    header('Swift Package Test', [
-      { label: 'Package', value: resolvedPath },
-      ...(params.testProduct ? [{ label: 'Test Product', value: params.testProduct }] : []),
-      ...(params.configuration ? [{ label: 'Configuration', value: params.configuration }] : []),
-    ]),
+    createBuildHeaderEvent(
+      {
+        scheme: path.basename(resolvedPath),
+        configuration: (params.configuration ?? 'debug').toLowerCase(),
+        platform: 'Swift Package',
+      },
+      'Swift Package Test',
+    ),
   );
 
   const executionContext = createToolExecutionContext(ctx, 'TEST');

@@ -109,14 +109,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugAttachSimResu
 export function createDebugAttachSimExecutor(
   toolContext: DebuggerToolContext,
 ): ToolExecutor<DebugAttachSimParams, DebugAttachSimResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const { executor, debugger: debuggerManager } = toolContext;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Resolving simulator and process for debugger attach',
-    });
 
     const simResult = await determineSimulatorUuid(
       { simulatorId: params.simulatorId, simulatorName: params.simulatorName },

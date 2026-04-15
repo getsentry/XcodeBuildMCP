@@ -98,12 +98,6 @@ export function createSyncXcodeDefaultsExecutor(
   context: SyncXcodeDefaultsContext,
 ): ToolExecutor<Params, SyncXcodeDefaultsResult> {
   return async (_params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Reading Xcode IDE state',
-    });
-
     const projectPath = resolveOptionalPath(context.cwd, context.projectPath);
     const workspacePath = resolveOptionalPath(context.cwd, context.workspacePath);
 
@@ -116,11 +110,6 @@ export function createSyncXcodeDefaultsExecutor(
 
     if (xcodeState.error) {
       const message = `Failed to read Xcode IDE state: ${xcodeState.error}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createSyncXcodeDefaultsResult(message);
     }
 
@@ -150,17 +139,7 @@ export function createSyncXcodeDefaultsExecutor(
     }
 
     if (Object.keys(synced).length === 0) {
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'No scheme or simulator selection detected in Xcode IDE state.',
-      });
-    } else {
-      ctx.emitProgress({
-        type: 'status',
-        level: 'success',
-        message: 'Synced session defaults from Xcode IDE',
-      });
+      return createSyncXcodeDefaultsResult();
     }
 
     return createSyncXcodeDefaultsResult();
@@ -179,7 +158,6 @@ export async function syncXcodeDefaultsLogic(
   const result = await executeSyncXcodeDefaults(params, executionContext);
 
   setStructuredOutput(handlerContext, result);
-  executionContext.emitResult(result);
 
   const headerEvent = header('Sync Xcode Defaults');
   if (result.didError) {

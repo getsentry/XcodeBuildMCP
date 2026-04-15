@@ -8,6 +8,7 @@ import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const swiftPackageStopSchema = z.object({
   pid: z.number(),
@@ -56,6 +57,14 @@ export async function swift_package_stopLogic(
   setStructuredOutput(ctx, result);
 
   executionContext.emitResult(result);
+  ctx.emit(header('Swift Package Stop', [{ label: 'PID', value: String(params.pid) }]));
+
+  if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Failed to stop process'));
+    return;
+  }
+
+  ctx.emit(statusLine('success', 'Stopped executable'));
 }
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.stop-result';
@@ -91,23 +100,6 @@ function createSwiftPackageStopErrorResult(
   };
 }
 
-function emitSwiftPackageStopProgress(
-  ctx: Parameters<ToolExecutor<SwiftPackageStopParams, SwiftPackageStopResult>>[1],
-  params: SwiftPackageStopParams,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Swift Package Stop',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [{ label: 'PID', value: String(params.pid) }],
-  });
-}
-
 function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageStopResult): void {
   ctx.structuredOutput = {
     result,
@@ -120,47 +112,24 @@ export function createSwiftPackageStopExecutor(
   processManager: ProcessManager = getDefaultProcessManager(),
   timeout = 5000,
 ): ToolExecutor<SwiftPackageStopParams, SwiftPackageStopResult> {
-  return async (params, ctx) => {
-    emitSwiftPackageStopProgress(ctx, params);
-
+  return async (params) => {
     const processInfo = processManager.getProcess(params.pid);
     if (!processInfo) {
       const message = `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createSwiftPackageStopErrorResult(params, message);
     }
 
     const result = await processManager.terminateTrackedProcess(params.pid, timeout);
     if (result.status === 'not-found') {
       const message = `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createSwiftPackageStopErrorResult(params, message);
     }
 
     if (result.error) {
       const message = `Failed to stop process: ${result.error}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createSwiftPackageStopErrorResult(params, message);
     }
 
-    const startedAt = result.startedAt ?? processInfo.startedAt;
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Stopped executable (was running since ${startedAt.toISOString()})`,
-    });
     return createSwiftPackageStopResult(params);
   };
 }

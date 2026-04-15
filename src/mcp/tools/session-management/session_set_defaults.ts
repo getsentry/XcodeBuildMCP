@@ -124,12 +124,6 @@ export function createSessionSetDefaultsExecutor(
   context: SessionSetDefaultsContext,
 ): ToolExecutor<Params, SessionDefaultsDomainResult> {
   return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Updating session defaults',
-    });
-
     try {
       let activeProfile = sessionStore.getActiveProfile();
       const { persist, profile: rawProfile, createIfNotExists = false, ...rawParams } = params;

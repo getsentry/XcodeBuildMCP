@@ -26,7 +26,7 @@ describe('simulators resource', () => {
 
       expect(result.contents).toHaveLength(1);
       const text = result.contents[0].text;
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('List Simulators');
       expect(text).toContain('iPhone 15 Pro');
       expect(text).toContain('iOS 17.0');
     });
@@ -76,7 +76,7 @@ describe('simulators resource', () => {
       const result = await simulatorsResourceLogic(mockExecutor);
 
       expect(result.contents).toHaveLength(1);
-      expect(result.contents[0].text).toContain('Querying simulators');
+      expect(result.contents[0].text).toContain('0 simulators available');
     });
 
     it('should handle booted simulators correctly', async () => {
@@ -150,7 +150,7 @@ describe('simulators resource', () => {
       const result = await simulatorsResourceLogic(mockExecutor);
 
       const text = result.contents[0].text;
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('List Simulators');
       expect(text).toContain('iPhone 15 Pro');
     });
   });

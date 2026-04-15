@@ -1,4 +1,6 @@
-export type SnapshotRuntime = 'cli' | 'mcp';
+import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
+
+export type SnapshotRuntime = 'cli' | 'mcp' | 'json';
 
 export interface FixtureKey {
   runtime: SnapshotRuntime;
@@ -10,6 +12,7 @@ export interface SnapshotResult {
   text: string;
   rawText: string;
   isError: boolean;
+  structuredEnvelope?: StructuredOutputEnvelope<unknown> | null;
 }
 
 export interface WorkflowSnapshotHarness {

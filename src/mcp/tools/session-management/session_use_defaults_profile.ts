@@ -58,14 +58,8 @@ export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
   Params,
   SessionProfileDomainResult
 > {
-  return async (params, ctx) => {
+  return async (params) => {
     const beforeProfile = sessionStore.getActiveProfile();
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Switching active defaults profile',
-    });
 
     try {
       if (params.global === true && params.profile !== undefined) {

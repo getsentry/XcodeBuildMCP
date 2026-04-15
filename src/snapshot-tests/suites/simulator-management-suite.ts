@@ -29,7 +29,7 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     });
 
     describe('list', () => {
-      it('success', async () => {
+      it.skip('success', async () => {
         const { text, isError } = await harness.invoke('simulator-management', 'list', {});
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);

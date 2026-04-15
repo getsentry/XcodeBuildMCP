@@ -78,7 +78,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SetSimulatorLocati
 export function createSetSimulatorLocationExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<SetSimulatorLocationParams, SetSimulatorLocationResult> {
-  return async (params, ctx) => {
+  return async (params, _ctx) => {
     const coords = `${params.latitude},${params.longitude}`;
 
     if (params.latitude < -90 || params.latitude > 90) {
@@ -103,12 +103,6 @@ export function createSetSimulatorLocationExecutor(
       });
     }
 
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Setting simulator ${params.simulatorId} location to ${coords}`,
-    });
-
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'location', params.simulatorId, 'set', coords],
@@ -128,11 +122,6 @@ export function createSetSimulatorLocationExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Location set successfully',
-      });
       return createSetSimulatorLocationResult({
         simulatorId: params.simulatorId,
         latitude: params.latitude,

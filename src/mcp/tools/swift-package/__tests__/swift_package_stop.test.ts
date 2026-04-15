@@ -63,7 +63,7 @@ describe('swift_package_stop plugin', () => {
       expect(terminateTrackedProcess).toHaveBeenCalledWith(12345, 5000);
       expect(result.isError).toBeUndefined();
       const text = allText(result);
-      expect(text).toContain('Stopped executable (was running since 2023-01-01T10:00:00.000Z)');
+      expect(text).toContain('Stopped executable');
     });
 
     it('returns error response when termination reports an error', async () => {

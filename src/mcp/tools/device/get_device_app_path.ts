@@ -25,6 +25,7 @@ import { mapDevicePlatform } from './build-settings.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { detailTree, header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -90,24 +91,22 @@ function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
   };
 }
 
-function emitAppPathProgress(
-  ctx: Parameters<ToolExecutor<GetDeviceAppPathParams, AppPathDomainResult>>[1],
-  headerParams: Array<{ label: string; value: string }>,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Get App Path',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: headerParams.map((param) => ({
-      label: param.label,
-      value: param.value,
-    })),
-  });
+function buildHeaderParams(
+  params: GetDeviceAppPathParams,
+  configuration: string,
+  platform: string,
+): Array<{ label: string; value: string }> {
+  const headerParams: Array<{ label: string; value: string }> = [
+    { label: 'Scheme', value: params.scheme },
+  ];
+  if (params.workspacePath) {
+    headerParams.push({ label: 'Workspace', value: params.workspacePath });
+  } else if (params.projectPath) {
+    headerParams.push({ label: 'Project', value: params.projectPath });
+  }
+  headerParams.push({ label: 'Configuration', value: configuration });
+  headerParams.push({ label: 'Platform', value: platform });
+  return headerParams;
 }
 
 function getAppPath(result: AppPathDomainResult): string | null {
@@ -133,19 +132,7 @@ export function createGetDeviceAppPathExecutor(
     const platform = mapDevicePlatform(params.platform);
     const configuration = params.configuration ?? 'Debug';
 
-    const headerParams: Array<{ label: string; value: string }> = [
-      { label: 'Scheme', value: params.scheme },
-    ];
-    if (params.workspacePath) {
-      headerParams.push({ label: 'Workspace', value: params.workspacePath });
-    } else if (params.projectPath) {
-      headerParams.push({ label: 'Project', value: params.projectPath });
-    }
-    headerParams.push({ label: 'Configuration', value: configuration });
-    headerParams.push({ label: 'Platform', value: platform });
-
     log('info', `Getting app path for scheme ${params.scheme} on platform ${platform}`);
-    emitAppPathProgress(ctx, headerParams);
 
     try {
       const appPath = await resolveAppPathFromBuildSettings(
@@ -159,38 +146,21 @@ export function createGetDeviceAppPathExecutor(
         executor,
       );
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Success',
-      });
-      ctx.emitProgress({
-        type: 'artifact',
-        name: 'App Path',
-        path: appPath,
-      });
+      ctx.emitProgress(statusLine('success', 'Success'));
+      ctx.emitProgress(detailTree([{ label: 'App Path', value: appPath }]));
 
       return createAppPathResult(appPath);
     } catch (error) {
       const messages = getErrorMessages(toErrorMessage(error));
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Errors (${messages.length}):`,
-      });
-      for (const message of messages) {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: `✗ ${message}`,
-        });
-      }
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: 'Query failed.',
-      });
+      ctx.emitProgress(
+        section(
+          `Errors (${messages.length}):`,
+          messages.map((message) => `✗ ${message}`),
+          { blankLineAfterTitle: true },
+        ),
+      );
+      ctx.emitProgress(statusLine('error', 'Query failed.'));
 
       return createAppPathErrorResult(toErrorMessage(error));
     }
@@ -202,6 +172,9 @@ export async function get_device_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const configuration = params.configuration ?? 'Debug';
+  const platform = mapDevicePlatform(params.platform);
+  ctx.emit(header('Get App Path', buildHeaderParams(params, configuration, platform)));
   const executionContext = new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
   });

@@ -27,6 +27,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { detailTree, header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const SIMULATOR_PLATFORMS = [
   XcodePlatform.iOSSimulator,
@@ -116,24 +117,26 @@ function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
   };
 }
 
-function emitAppPathProgress(
-  ctx: Parameters<ToolExecutor<GetSimulatorAppPathParams, AppPathDomainResult>>[1],
-  headerParams: Array<{ label: string; value: string }>,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Get App Path',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: headerParams.map((param) => ({
-      label: param.label,
-      value: param.value,
-    })),
-  });
+function buildHeaderParams(
+  params: GetSimulatorAppPathParams,
+  configuration: string,
+): Array<{ label: string; value: string }> {
+  const headerParams: Array<{ label: string; value: string }> = [
+    { label: 'Scheme', value: params.scheme },
+  ];
+  if (params.workspacePath) {
+    headerParams.push({ label: 'Workspace', value: params.workspacePath });
+  } else if (params.projectPath) {
+    headerParams.push({ label: 'Project', value: params.projectPath });
+  }
+  headerParams.push({ label: 'Configuration', value: configuration });
+  headerParams.push({ label: 'Platform', value: params.platform });
+  if (params.simulatorName) {
+    headerParams.push({ label: 'Simulator', value: params.simulatorName });
+  } else if (params.simulatorId) {
+    headerParams.push({ label: 'Simulator', value: params.simulatorId });
+  }
+  return headerParams;
 }
 
 function getAppPath(result: AppPathDomainResult): string | null {
@@ -168,24 +171,6 @@ export function createGetSimAppPathExecutor(
 
     log('info', `Getting app path for scheme ${params.scheme} on platform ${params.platform}`);
 
-    const headerParams: Array<{ label: string; value: string }> = [
-      { label: 'Scheme', value: params.scheme },
-    ];
-    if (params.workspacePath) {
-      headerParams.push({ label: 'Workspace', value: params.workspacePath });
-    } else if (params.projectPath) {
-      headerParams.push({ label: 'Project', value: params.projectPath });
-    }
-    headerParams.push({ label: 'Configuration', value: configuration });
-    headerParams.push({ label: 'Platform', value: params.platform });
-    if (params.simulatorName) {
-      headerParams.push({ label: 'Simulator', value: params.simulatorName });
-    } else if (params.simulatorId) {
-      headerParams.push({ label: 'Simulator', value: params.simulatorId });
-    }
-
-    emitAppPathProgress(ctx, headerParams);
-
     const startedAt = Date.now();
 
     try {
@@ -208,38 +193,21 @@ export function createGetSimAppPathExecutor(
       const durationMs = Date.now() - startedAt;
       const durationStr = (durationMs / 1000).toFixed(1);
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Get app path successful (⏱️ ${durationStr}s)`,
-      });
-      ctx.emitProgress({
-        type: 'artifact',
-        name: 'App Path',
-        path: appPath,
-      });
+      ctx.emitProgress(statusLine('success', `Get app path successful (⏱️ ${durationStr}s)`));
+      ctx.emitProgress(detailTree([{ label: 'App Path', value: appPath }]));
 
       return createAppPathResult(appPath);
     } catch (error) {
       const messages = getErrorMessages(toErrorMessage(error));
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Errors (${messages.length}):`,
-      });
-      for (const message of messages) {
-        ctx.emitProgress({
-          type: 'status',
-          level: 'info',
-          message: `✗ ${message}`,
-        });
-      }
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: 'Failed to get app path',
-      });
+      ctx.emitProgress(
+        section(
+          `Errors (${messages.length}):`,
+          messages.map((message) => `✗ ${message}`),
+          { blankLineAfterTitle: true },
+        ),
+      );
+      ctx.emitProgress(statusLine('error', 'Failed to get app path'));
 
       return createAppPathErrorResult(toErrorMessage(error));
     }
@@ -254,6 +222,8 @@ export async function get_sim_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const configuration = params.configuration ?? 'Debug';
+  ctx.emit(header('Get App Path', buildHeaderParams(params, configuration)));
   const executionContext = new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
   });

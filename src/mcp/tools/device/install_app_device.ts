@@ -23,6 +23,7 @@ import {
 import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnDevice } from '../../../utils/device-steps.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const installAppDeviceSchema = z.object({
   deviceId: z
@@ -44,6 +45,12 @@ export async function install_app_deviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Install App', [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'App', value: params.appPath },
+    ]),
+  );
   const executionContext = new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
   });
@@ -96,26 +103,6 @@ function createInstallAppDeviceErrorResult(
   };
 }
 
-function emitInstallAppDeviceProgress(
-  ctx: Parameters<ToolExecutor<InstallAppDeviceParams, InstallAppDeviceResult>>[1],
-  params: InstallAppDeviceParams,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Install App',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'App', value: params.appPath },
-    ],
-  });
-}
-
 function setStructuredOutput(ctx: ToolHandlerContext, result: InstallAppDeviceResult): void {
   ctx.structuredOutput = {
     result,
@@ -128,7 +115,6 @@ export function createInstallAppDeviceExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<InstallAppDeviceParams, InstallAppDeviceResult> {
   return async (params, ctx) => {
-    emitInstallAppDeviceProgress(ctx, params);
     log('info', `Installing app on device ${params.deviceId}`);
 
     try {
@@ -136,28 +122,16 @@ export function createInstallAppDeviceExecutor(
 
       if (!installResult.success) {
         const message = `Failed to install app: ${installResult.error}`;
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
+        ctx.emitProgress(statusLine('error', message));
         return createInstallAppDeviceErrorResult(params, message);
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App installed successfully.',
-      });
+      ctx.emitProgress(statusLine('success', 'App installed successfully'));
 
       return createInstallAppDeviceResult(params);
     } catch (error) {
       const message = `Failed to install app on device: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
+      ctx.emitProgress(statusLine('error', message));
       return createInstallAppDeviceErrorResult(params, message);
     }
   };

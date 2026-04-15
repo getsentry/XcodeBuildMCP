@@ -12,6 +12,7 @@ import {
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchMacApp } from '../../../utils/macos-steps.ts';
+import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const launchMacAppSchema = z.object({
   appPath: z.string(),
@@ -38,9 +39,24 @@ export async function launch_mac_appLogic(
   setStructuredOutput(ctx, result);
 
   executionContext.emitResult(result);
+  ctx.emit(header('Launch macOS App', [{ label: 'App', value: params.appPath }]));
 
   if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Failed to launch macOS app'));
     log('error', `Error during launch macOS app operation: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  ctx.emit(statusLine('success', 'App launched successfully'));
+  const details: Array<{ label: string; value: string }> = [];
+  if ('bundleId' in result.artifacts && result.artifacts.bundleId) {
+    details.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+  }
+  if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
+    details.push({ label: 'Process ID', value: String(result.artifacts.processId) });
+  }
+  if (details.length > 0) {
+    ctx.emit(detailTree(details));
   }
 }
 
@@ -84,23 +100,6 @@ function createLaunchMacAppErrorResult(
   };
 }
 
-function emitLaunchMacAppProgress(
-  ctx: Parameters<ToolExecutor<LaunchMacAppParams, LaunchMacAppResult>>[1],
-  params: LaunchMacAppParams,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Launch macOS App',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [{ label: 'App', value: params.appPath }],
-  });
-}
-
 function setStructuredOutput(ctx: ToolHandlerContext, result: LaunchMacAppResult): void {
   ctx.structuredOutput = {
     result,
@@ -113,17 +112,10 @@ export function createLaunchMacAppExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
 ): ToolExecutor<LaunchMacAppParams, LaunchMacAppResult> {
-  return async (params, ctx) => {
-    emitLaunchMacAppProgress(ctx, params);
-
+  return async (params) => {
     const fileExistsValidation = validateFileExists(params.appPath, fileSystem);
     if (!fileExistsValidation.isValid) {
       const message = fileExistsValidation.errorMessage ?? `File not found: '${params.appPath}'`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createLaunchMacAppErrorResult(params, message);
     }
 
@@ -134,44 +126,12 @@ export function createLaunchMacAppExecutor(
 
       if (!result.success) {
         const message = `Launch macOS app operation failed: ${result.error}`;
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
         return createLaunchMacAppErrorResult(params, message);
-      }
-
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App launched successfully',
-      });
-
-      const detailRows: Array<{ label: string; value: string }> = [];
-      if (result.bundleId) {
-        detailRows.push({ label: 'Bundle ID', value: result.bundleId });
-      }
-      if (result.processId !== undefined) {
-        detailRows.push({ label: 'Process ID', value: String(result.processId) });
-      }
-      if (detailRows.length > 0) {
-        ctx.emitProgress({
-          type: 'table',
-          name: 'Details',
-          columns: ['label', 'value'],
-          rows: detailRows,
-        });
       }
 
       return createLaunchMacAppResult(params, result);
     } catch (error) {
       const message = `Launch macOS app operation failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createLaunchMacAppErrorResult(params, message);
     }
   };

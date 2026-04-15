@@ -146,7 +146,9 @@ export async function snapshot_uiLogic(
       ctx.emit(
         section(
           'Details',
-          details.map((entry) => `Error: ${entry.message}`),
+          details.map((entry) =>
+            entry.message.startsWith('Error: ') ? entry.message : `Error: ${entry.message}`,
+          ),
         ),
       );
     }

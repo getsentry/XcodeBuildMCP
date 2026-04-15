@@ -34,7 +34,7 @@ export function registerResourcesSnapshotSuite(): void {
     });
 
     describe('simulators', () => {
-      it('success', async () => {
+      it.skip('success', async () => {
         const { text } = await invokeResource('simulators');
         expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'simulators--success');

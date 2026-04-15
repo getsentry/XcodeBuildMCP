@@ -73,13 +73,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SetSimAppearanceRe
 export function createSetSimAppearanceExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<SetSimAppearanceParams, SetSimAppearanceResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Setting simulator ${params.simulatorId} appearance to ${params.mode}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'ui', params.simulatorId, 'appearance', params.mode],
@@ -98,11 +92,6 @@ export function createSetSimAppearanceExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Appearance successfully set to ${params.mode} mode`,
-      });
       return createSetSimAppearanceResult({
         simulatorId: params.simulatorId,
         mode: params.mode,

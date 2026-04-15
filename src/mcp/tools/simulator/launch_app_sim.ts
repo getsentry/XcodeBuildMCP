@@ -19,6 +19,7 @@ import {
 } from '../../../utils/simulator-steps.ts';
 import { displayPath } from '../../../utils/build-preflight.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -64,6 +65,15 @@ export async function launch_app_simLogic(
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const simulatorDisplayName = params.simulatorName
+    ? `"${params.simulatorName}" (${params.simulatorId})`
+    : params.simulatorId;
+  ctx.emit(
+    header('Launch App', [
+      { label: 'Simulator', value: simulatorDisplayName },
+      { label: 'Bundle ID', value: params.bundleId },
+    ]),
+  );
   const executionContext = new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
   });
@@ -131,30 +141,6 @@ function createLaunchAppSimErrorResult(
   };
 }
 
-function emitLaunchAppSimProgress(
-  ctx: Parameters<ToolExecutor<LaunchAppSimParams, LaunchAppSimResult>>[1],
-  params: LaunchAppSimParams,
-): void {
-  const simulatorDisplayName = params.simulatorName
-    ? `"${params.simulatorName}" (${params.simulatorId})`
-    : params.simulatorId;
-
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Launch App',
-  });
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [
-      { label: 'Simulator', value: simulatorDisplayName },
-      { label: 'Bundle ID', value: params.bundleId },
-    ],
-  });
-}
-
 function setStructuredOutput(ctx: ToolHandlerContext, result: LaunchAppSimResult): void {
   ctx.structuredOutput = {
     result,
@@ -168,7 +154,6 @@ export function createLaunchAppSimExecutor(
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
 ): ToolExecutor<LaunchAppSimParams, LaunchAppSimResult> {
   return async (params, ctx) => {
-    emitLaunchAppSimProgress(ctx, params);
     log('info', `Starting xcrun simctl launch request for simulator ${params.simulatorId}`);
 
     try {
@@ -188,21 +173,13 @@ export function createLaunchAppSimExecutor(
       if (!getAppContainerResult.success) {
         const message =
           'App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
+        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppSimErrorResult(params, message);
       }
     } catch {
       const message =
         'App is not installed on the simulator (check failed). Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
+      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppSimErrorResult(params, message);
     }
 
@@ -214,55 +191,30 @@ export function createLaunchAppSimExecutor(
 
       if (!launchResult.success) {
         const message = `Launch app in simulator operation failed: ${launchResult.error}`;
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
+        ctx.emitProgress(statusLine('error', message));
         return createLaunchAppSimErrorResult(params, message);
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App launched successfully',
-      });
+      ctx.emitProgress(statusLine('success', 'App launched successfully'));
 
       const detailRows: Array<{ label: string; value: string }> = [];
       if (launchResult.processId !== undefined) {
         detailRows.push({ label: 'Process ID', value: String(launchResult.processId) });
       }
-      if (detailRows.length > 0) {
-        ctx.emitProgress({
-          type: 'table',
-          name: 'Details',
-          columns: ['label', 'value'],
-          rows: detailRows,
-        });
-      }
       if (launchResult.logFilePath) {
-        ctx.emitProgress({
-          type: 'artifact',
-          name: 'Runtime Logs',
-          path: displayPath(launchResult.logFilePath),
-        });
+        detailRows.push({ label: 'Runtime Logs', value: displayPath(launchResult.logFilePath) });
       }
       if (launchResult.osLogPath) {
-        ctx.emitProgress({
-          type: 'artifact',
-          name: 'OSLog',
-          path: displayPath(launchResult.osLogPath),
-        });
+        detailRows.push({ label: 'OSLog', value: displayPath(launchResult.osLogPath) });
+      }
+      if (detailRows.length > 0) {
+        ctx.emitProgress(detailTree(detailRows));
       }
 
       return createLaunchAppSimResult(params, launchResult);
     } catch (error) {
       const message = `Launch app in simulator operation failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
+      ctx.emitProgress(statusLine('error', message));
       return createLaunchAppSimErrorResult(params, message);
     }
   };

@@ -323,13 +323,7 @@ export function createScaffoldMacOSProjectExecutor(
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): ToolExecutor<ScaffoldMacOSProjectParams, ScaffoldMacOSProjectResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Scaffolding macOS project ${params.projectName}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const projectParams = { ...params, platform: 'macOS' as const };
       const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);

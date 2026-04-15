@@ -237,13 +237,7 @@ function formatVariablesLines(
 export function createDebugVariablesExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugVariablesParams, DebugVariablesResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Retrieving variables',
-    });
-
+  return async (params) => {
     try {
       const output = await debuggerManager.getVariables(params.debugSessionId, {
         frameIndex: params.frameIndex,

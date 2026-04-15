@@ -85,13 +85,7 @@ export function createSessionClearDefaultsExecutor(): ToolExecutor<
   Params,
   SessionDefaultsDomainResult
 > {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Updating session defaults',
-    });
-
+  return async (params) => {
     if (params.all) {
       if (params.profile !== undefined || params.keys !== undefined) {
         return createSessionDefaultsResult('all=true cannot be combined with profile or keys.');

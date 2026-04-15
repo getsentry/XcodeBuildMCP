@@ -93,13 +93,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: BootSimResult): vo
 export function createBootSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<BootSimParams, BootSimResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Booting simulator ${params.simulatorId}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'boot', params.simulatorId],
@@ -117,11 +111,6 @@ export function createBootSimExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Simulator booted successfully',
-      });
       return createBootSimResult({
         simulatorId: params.simulatorId,
         didError: false,

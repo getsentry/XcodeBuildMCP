@@ -208,7 +208,7 @@ describe('swift_package_build plugin', () => {
 
       expect(result.isError()).toBe(true);
       const text = result.text();
-      expect(text).toContain('Swift package build failed');
+      expect(text).toContain('Build failed.');
       expect(text).toContain('Compilation failed: error in main.swift');
     });
 
@@ -229,7 +229,7 @@ describe('swift_package_build plugin', () => {
 
       expect(result.isError()).toBe(true);
       const text = result.text();
-      expect(text).toContain('Swift package build failed');
+      expect(text).toContain('Build failed.');
       expect(text).toContain("cannot find type 'DOESNOTEXIST' in scope");
     });
 
@@ -247,7 +247,7 @@ describe('swift_package_build plugin', () => {
 
       expect(result.isError()).toBe(true);
       const text = result.text();
-      expect(text).toContain('Failed to execute swift build');
+      expect(text).toContain('Build failed.');
       expect(text).toContain('spawn ENOENT');
     });
 

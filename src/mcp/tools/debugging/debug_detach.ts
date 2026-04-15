@@ -53,14 +53,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugDetachResult)
 export function createDebugDetachExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugDetachParams, DebugDetachResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const targetId = params.debugSessionId ?? debuggerManager.getCurrentSessionId() ?? undefined;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Detaching debugger session${targetId ? ` ${targetId}` : ''}`,
-    });
 
     try {
       await debuggerManager.detachSession(targetId);

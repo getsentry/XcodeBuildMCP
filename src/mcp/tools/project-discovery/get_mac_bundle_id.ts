@@ -9,6 +9,7 @@ import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
   const result = await executor(['/bin/sh', '-c', command], 'macOS Bundle ID Extraction');
@@ -59,7 +60,7 @@ export function createGetMacBundleIdExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): ToolExecutor<GetMacBundleIdParams, GetMacBundleIdResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const appPath = params.appPath;
 
     if (!fileSystemExecutor.existsSync(appPath)) {
@@ -68,19 +69,8 @@ export function createGetMacBundleIdExecutor(
         undefined,
         `File not found: '${appPath}'. Please check the path and try again.`,
       );
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: result.error ?? 'Bundle ID extraction failed',
-      });
       return result;
     }
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Reading bundle identifier from ${appPath}`,
-    });
 
     try {
       let bundleId: string;
@@ -104,24 +94,9 @@ export function createGetMacBundleIdExecutor(
       }
 
       const trimmedBundleId = bundleId.trim();
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: `Bundle ID\n  \u2514 ${trimmedBundleId}`,
-      });
       return createBundleIdResult(appPath, trimmedBundleId);
     } catch (error) {
       const result = createBundleIdResult(appPath, undefined, toErrorMessage(error));
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: result.error ?? 'Bundle ID extraction failed',
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Make sure the path points to a valid macOS app bundle (.app directory).',
-      });
       return result;
     }
   };
@@ -141,10 +116,14 @@ export async function get_mac_bundle_idLogic(
   const result = await executeGetMacBundleId(params, executionContext);
 
   setStructuredOutput(ctx, result);
+  ctx.emit(header('Get macOS Bundle ID', [{ label: 'App', value: appPath }]));
 
   if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Failed to get macOS bundle ID'));
     log('error', `Error extracting macOS bundle ID: ${result.error ?? 'Unknown error'}`);
   } else if (result.artifacts.bundleId) {
+    ctx.emit(statusLine('success', 'Bundle ID'));
+    ctx.emit({ type: 'text-block', text: `  └ ${result.artifacts.bundleId}` });
     log('info', `Extracted macOS bundle ID: ${result.artifacts.bundleId}`);
   }
 

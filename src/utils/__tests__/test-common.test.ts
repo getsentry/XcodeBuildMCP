@@ -120,9 +120,7 @@ describe('handleTestLogic (pipeline)', () => {
 
     const renderedText = finalizeAndGetText(result);
 
-    expect(renderedText).toContain('Resolving packages');
-    expect(renderedText).toContain('Compiling');
-    expect(renderedText).toContain('Running tests');
+    expect(renderedText).toContain('Scheme: App');
     expect(renderedText).toContain('AppTests');
     expect(renderedText).toContain('testFailure:');
     expect(renderedText).toContain('XCTAssertEqual failed');
@@ -241,9 +239,8 @@ describe('handleTestLogic (pipeline)', () => {
     const renderedText = finalizeAndGetText(result);
     expect(renderedText).toContain('   Selective Testing:');
     expect(renderedText).toContain('     AppTests');
-    expect(renderedText).toContain('Resolving packages');
-    expect(renderedText).toContain('Compiling');
-    expect(renderedText).toContain('Running tests');
+    expect(renderedText).toContain('Discovered 1 test(s):');
+    expect(renderedText).toContain('XCTAssertEqual failed');
   });
 
   it('passes -resultBundlePath only to test-without-building during simulator two-phase execution', async () => {
@@ -408,8 +405,7 @@ describe('handleTestLogic (pipeline)', () => {
     expectPendingTestResponse(result, true);
 
     const renderedText = finalizeAndGetText(result);
-    expect(renderedText).toContain('Resolving packages');
-    expect(renderedText).toContain('Compiling');
+    expect(renderedText).toContain('Compiler Errors (2):');
     expect(renderedText).toContain("cannot convert value of type 'String' to specified type 'Int'");
     expect(renderedText).toContain('emit-module command failed with exit code 1');
     expect(renderedText).toContain('Test failed.');

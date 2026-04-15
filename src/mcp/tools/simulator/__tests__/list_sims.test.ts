@@ -129,7 +129,7 @@ describe('list_sims tool', () => {
       });
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('List Simulators');
       expect(text).toContain('iOS 17.0');
       expect(text).toContain('iPhone 15');
       expect(text).toContain('Shutdown');
@@ -184,7 +184,7 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('List Simulators');
       expect(text).toContain('iOS 17.0');
       expect(text).toContain('iPhone 15');
       expect(text).toContain('Booted');
@@ -211,7 +211,7 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('Failed to list simulators: Command failed');
       expect(result.isError).toBe(true);
       expect(result.structuredOutput).toEqual({
         schema: 'xcodebuildmcp.output.simulator-list',
@@ -235,7 +235,7 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('Failed to list simulators:');
       expect(result.isError).toBe(true);
     });
 
@@ -245,7 +245,7 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('Failed to list simulators: Command execution failed');
       expect(result.isError).toBe(true);
     });
 
@@ -255,7 +255,7 @@ describe('list_sims tool', () => {
       const result = await runListSimsLogic({ enabled: true }, mockExecutor);
 
       const text = result.content.map((c) => c.text).join('\n');
-      expect(text).toContain('Querying simulators');
+      expect(text).toContain('Failed to list simulators: String error');
       expect(result.isError).toBe(true);
     });
 
@@ -281,26 +281,7 @@ describe('list_sims tool', () => {
 
       const result = await executeListSims({}, ctx);
 
-      expect(ctx.getProgressEvents()).toEqual([
-        {
-          type: 'status',
-          level: 'info',
-          message: 'Querying simulators',
-        },
-        {
-          type: 'table',
-          name: 'simulators',
-          columns: ['name', 'runtime', 'state', 'isAvailable'],
-          rows: [
-            {
-              name: 'iPhone 15',
-              runtime: 'iOS 17.0',
-              state: 'Shutdown',
-              isAvailable: 'true',
-            },
-          ],
-        },
-      ]);
+      expect(ctx.getProgressEvents()).toEqual([]);
       expect(result).toEqual({
         kind: 'simulator-list',
         didError: false,

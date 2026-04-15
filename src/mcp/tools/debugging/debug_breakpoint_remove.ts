@@ -49,13 +49,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugBreakpointRem
 export function createDebugBreakpointRemoveExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugBreakpointRemoveParams, DebugBreakpointRemoveResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Removing breakpoint ${params.breakpointId}`,
-    });
-
+  return async (params) => {
     try {
       await debuggerManager.removeBreakpoint(params.debugSessionId, params.breakpointId);
       return createDebugBreakpointRemoveResult({

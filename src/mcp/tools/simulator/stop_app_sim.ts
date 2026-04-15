@@ -89,14 +89,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: StopAppSimResult):
 export function createStopAppSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<StopAppSimParams, StopAppSimResult> {
-  return async (params, ctx) => {
+  return async (params, _ctx) => {
     const simulatorId = params.simulatorId;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Stopping ${params.bundleId} in simulator ${simulatorId}`,
-    });
 
     try {
       const terminateResult = await executor(
@@ -128,11 +122,6 @@ export function createStopAppSimExecutor(
         });
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App stopped successfully',
-      });
       return createStopAppSimResult({
         simulatorId,
         bundleId: params.bundleId,

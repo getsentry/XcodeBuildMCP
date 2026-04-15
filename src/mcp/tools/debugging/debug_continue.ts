@@ -54,14 +54,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugContinueResul
 export function createDebugContinueExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugContinueParams, DebugContinueResult> {
-  return async (params, ctx) => {
+  return async (params) => {
     const targetId = params.debugSessionId ?? debuggerManager.getCurrentSessionId() ?? undefined;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Resuming debugger session${targetId ? ` ${targetId}` : ''}`,
-    });
 
     try {
       await debuggerManager.resumeSession(targetId);

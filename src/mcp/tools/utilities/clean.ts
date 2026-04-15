@@ -240,20 +240,9 @@ function extractCleanErrors(output: string): string[] {
 export function createCleanExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<CleanParams, CleanResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Running clean',
-    });
-
+  return async (params) => {
     const prepared = prepareCleanCommand(params);
     if (typeof prepared === 'string') {
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: prepared,
-      });
       return createCleanResult(
         params,
         'FAILED',
@@ -265,12 +254,6 @@ export function createCleanExecutor(
       );
     }
 
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Cleaning ${String(prepared.cleanPlatform)} (${prepared.configuration})`,
-    });
-
     try {
       const response = await executor(prepared.command, 'Clean', false, {
         cwd: prepared.projectDir,
@@ -281,12 +264,6 @@ export function createCleanExecutor(
         const errors = extractCleanErrors(combinedOutput);
         const summaryError = errors.length > 0 ? errors.join('; ') : 'Unknown error';
         const errorMessage = `Clean failed: ${summaryError}`;
-
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message: errorMessage,
-        });
 
         return createCleanResult(
           params,
@@ -305,12 +282,6 @@ export function createCleanExecutor(
         );
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'success',
-        message: 'Clean successful',
-      });
-
       return createCleanResult(
         params,
         'SUCCEEDED',
@@ -326,11 +297,6 @@ export function createCleanExecutor(
       );
     } catch (error) {
       const message = `Clean failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createCleanResult(
         params,
         'FAILED',

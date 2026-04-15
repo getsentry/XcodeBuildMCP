@@ -157,13 +157,7 @@ function formatStackLines(threads: DebugThread[]): string[] {
 export function createDebugStackExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugStackParams, DebugStackResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Retrieving stack trace',
-    });
-
+  return async (params) => {
     try {
       const output = await debuggerManager.getStack(params.debugSessionId, {
         threadIndex: params.threadIndex,

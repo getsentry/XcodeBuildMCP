@@ -103,7 +103,6 @@ describe('swift_package_clean plugin', () => {
       const text = allText(result);
       expect(text).toContain('Swift Package Clean');
       expect(text).toContain('Swift package cleaned successfully');
-      expect(text).toContain('Package cleaned successfully');
     });
 
     it('should return successful clean response with no output', async () => {
@@ -164,7 +163,7 @@ describe('swift_package_clean plugin', () => {
 
       expect(result.isError).toBe(true);
       const text = allText(result);
-      expect(text).toContain('Failed to execute swift package clean');
+      expect(text).toContain('Swift package clean failed: spawn ENOENT');
       expect(text).toContain('spawn ENOENT');
     });
   });

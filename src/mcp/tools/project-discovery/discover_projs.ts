@@ -16,6 +16,7 @@ import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { DefaultToolExecutionContext } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const DEFAULT_MAX_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['build', 'DerivedData', 'Pods', '.git', 'node_modules']);
@@ -314,54 +315,18 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DiscoverProjsResul
 export function createDiscoverProjectsExecutor(
   fileSystemExecutor: FileSystemExecutor,
 ): ToolExecutor<DiscoverProjsParams, DiscoverProjsResult> {
-  return async (params, ctx) => {
+  return async (params, _ctx) => {
     const computation = await discoverProjectsOrError(params, fileSystemExecutor);
     const context = computation.context;
 
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Scanning ${context.scanPath} for projects and workspaces`,
-    });
-
     if (typeof computation.error === 'string' || !computation.result) {
-      const result = createDiscoverProjectsErrorResult(
+      return createDiscoverProjectsErrorResult(
         context,
         computation.error ?? 'Failed to discover projects',
       );
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: result.error ?? 'Failed to discover projects',
-      });
-      return result;
     }
 
     const discoveryResult = computation.result;
-
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Found ${discoveryResult.projects.length} projects and ${discoveryResult.workspaces.length} workspaces`,
-    });
-
-    if (discoveryResult.projects.length > 0) {
-      ctx.emitProgress({
-        type: 'table',
-        name: 'projects',
-        columns: ['path'],
-        rows: discoveryResult.projects.map((projectPath) => ({ path: projectPath })),
-      });
-    }
-
-    if (discoveryResult.workspaces.length > 0) {
-      ctx.emitProgress({
-        type: 'table',
-        name: 'workspaces',
-        columns: ['path'],
-        rows: discoveryResult.workspaces.map((workspacePath) => ({ path: workspacePath })),
-      });
-    }
 
     return createDiscoverProjectsResult(context, discoveryResult);
   };
@@ -376,6 +341,19 @@ export async function discover_projsLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const workspaceRoot = path.resolve(params.workspaceRoot);
+  const scanPath = path.resolve(
+    workspaceRoot,
+    resolveScanBase(params.workspaceRoot, params.scanPath),
+  );
+  const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
+  ctx.emit(
+    header('Discover Projects', [
+      { label: 'Workspace root', value: workspaceRoot },
+      { label: 'Scan path', value: scanPath },
+      { label: 'Max depth', value: String(maxDepth) },
+    ]),
+  );
   const executionContext = createToolExecutionContext(ctx);
   const executeDiscoverProjects = createDiscoverProjectsExecutor(fileSystemExecutor);
   const result = await executeDiscoverProjects(params, executionContext);
@@ -384,11 +362,34 @@ export async function discover_projsLogic(
 
   if (result.didError) {
     log('error', `Error discovering projects: ${result.error ?? 'Unknown error'}`);
+    ctx.emit(statusLine('error', result.error ?? 'Failed to discover projects'));
   } else {
     log(
       'info',
       `Discovery finished. Found ${result.projects.length} projects and ${result.workspaces.length} workspaces.`,
     );
+    ctx.emit(
+      statusLine(
+        'success',
+        `Found ${result.projects.length} project${result.projects.length === 1 ? '' : 's'} and ${result.workspaces.length} workspace${result.workspaces.length === 1 ? '' : 's'}`,
+      ),
+    );
+    if (result.projects.length > 0) {
+      ctx.emit(
+        section(
+          'Projects:',
+          result.projects.map((project) => project.path),
+        ),
+      );
+    }
+    if (result.workspaces.length > 0) {
+      ctx.emit(
+        section(
+          'Workspaces:',
+          result.workspaces.map((workspace) => workspace.path),
+        ),
+      );
+    }
   }
 
   executionContext.emitResult(result);

@@ -74,14 +74,7 @@ export function createSessionShowDefaultsExecutor(): ToolExecutor<
   SessionShowDefaultsParams,
   SessionDefaultsDomainResult
 > {
-  return async (_params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Reading session defaults',
-    });
-    return createSessionDefaultsResult();
-  };
+  return async () => createSessionDefaultsResult();
 }
 
 export async function sessionShowDefaultsLogic(): Promise<void> {

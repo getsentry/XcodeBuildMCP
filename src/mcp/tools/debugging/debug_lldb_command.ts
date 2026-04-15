@@ -57,13 +57,7 @@ function splitOutputLines(output: string): string[] {
 export function createDebugLldbCommandExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
 ): ToolExecutor<DebugLldbCommandParams, DebugLldbCommandResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Running LLDB command: ${params.command}`,
-    });
-
+  return async (params) => {
     try {
       const output = await debuggerManager.runCommand(params.debugSessionId, params.command, {
         timeoutMs: params.timeoutMs,

@@ -35,6 +35,11 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
     describe('shared snapshots', () => {
       beforeEach(async () => {
+        if (runtime === 'json') {
+          await harness.invoke('session-management', 'clear-defaults', { all: true });
+          return;
+        }
+
         await seedSessionDefaults();
       });
 
@@ -52,6 +57,10 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-show-defaults', () => {
         it('success', async () => {
+          if (runtime === 'json') {
+            await seedSessionDefaults();
+          }
+
           const { text, isError } = await harness.invoke('session-management', 'show-defaults', {});
           expect(isError).toBe(false);
           expectFixture(text, 'session-show-defaults--success');
@@ -60,6 +69,13 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-clear-defaults', () => {
         it('success', async () => {
+          if (runtime === 'json') {
+            await harness.invoke('session-management', 'set-defaults', {
+              workspacePath: WORKSPACE,
+              scheme: 'CalculatorApp',
+            });
+          }
+
           const { text, isError } = await harness.invoke(
             'session-management',
             'clear-defaults',
@@ -72,6 +88,10 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-use-defaults-profile', () => {
         it('success', async () => {
+          if (runtime === 'json') {
+            await seedSessionDefaults();
+          }
+
           const { text } = await harness.invoke('session-management', 'use-defaults-profile', {
             profile: 'MyCustomProfile',
           });
@@ -81,7 +101,14 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
       });
 
       describe('session-sync-xcode-defaults', () => {
-        it('success', async () => {
+        (runtime === 'json' ? it.skip : it)('success', async () => {
+          if (runtime === 'json') {
+            await harness.invoke('project-discovery', 'show-build-settings', {
+              workspacePath: WORKSPACE,
+              scheme: 'CalculatorApp',
+            });
+          }
+
           const { text } = await harness.invoke('session-management', 'sync-xcode-defaults', {});
           expect(text.length).toBeGreaterThan(0);
           expectFixture(text, 'session-sync-xcode-defaults--success');
@@ -89,7 +116,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
       });
     });
 
-    if (runtime === 'mcp') {
+    if (runtime !== 'cli') {
       describe('mcp-only extras', () => {
         beforeEach(async () => {
           await harness.invoke('session-management', 'clear-defaults', { all: true });

@@ -349,13 +349,7 @@ export function createScaffoldIOSProjectExecutor(
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): ToolExecutor<ScaffoldIOSProjectParams, ScaffoldIOSProjectResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Scaffolding iOS project ${params.projectName}`,
-    });
-
+  return async (params, _ctx) => {
     try {
       const projectParams = { ...params, platform: 'iOS' };
       const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);

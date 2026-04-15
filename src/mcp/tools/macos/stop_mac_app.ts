@@ -10,6 +10,7 @@ import {
 } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const stopMacAppSchema = z.object({
   appName: z.string().optional(),
@@ -37,10 +38,25 @@ export async function stop_mac_appLogic(
   }
 
   executionContext.emitResult(result);
+  ctx.emit(
+    header('Stop macOS App', [
+      {
+        label: 'App',
+        value:
+          params.processId !== undefined
+            ? `PID ${params.processId}`
+            : (params.appName ?? '(missing)'),
+      },
+    ]),
+  );
 
   if (result.didError) {
+    ctx.emit(statusLine('error', result.error ?? 'Failed to stop macOS app'));
     log('error', `Error stopping macOS app: ${result.error ?? 'Unknown error'}`);
+    return;
   }
+
+  ctx.emit(statusLine('success', 'App stopped successfully'));
 }
 
 function createStopMacAppArtifacts(params: StopMacAppParams) {
@@ -84,26 +100,6 @@ function createStopMacAppErrorResult(params: StopMacAppParams, message: string):
   };
 }
 
-function emitStopMacAppProgress(
-  ctx: Parameters<ToolExecutor<StopMacAppParams, StopMacAppResult>>[1],
-  params: StopMacAppParams,
-): void {
-  ctx.emitProgress({
-    type: 'status',
-    level: 'info',
-    message: 'Stop macOS App',
-  });
-
-  const target =
-    params.processId !== undefined ? `PID ${params.processId}` : (params.appName ?? '(missing)');
-  ctx.emitProgress({
-    type: 'table',
-    name: 'Parameters',
-    columns: ['label', 'value'],
-    rows: [{ label: 'App', value: target }],
-  });
-}
-
 function setStructuredOutput(ctx: ToolHandlerContext, result: StopMacAppResult): void {
   ctx.structuredOutput = {
     result,
@@ -115,16 +111,9 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: StopMacAppResult):
 export function createStopMacAppExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<StopMacAppParams, StopMacAppResult> {
-  return async (params, ctx) => {
-    emitStopMacAppProgress(ctx, params);
-
+  return async (params) => {
     if (!params.appName && params.processId === undefined) {
       const message = 'Either appName or processId must be provided.';
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createStopMacAppErrorResult(params, message);
     }
 
@@ -140,27 +129,12 @@ export function createStopMacAppExecutor(
 
       if (!result.success) {
         const message = `Stop macOS app operation failed: ${result.error ?? 'Unknown error'}`;
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message,
-        });
         return createStopMacAppErrorResult(params, message);
       }
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'App stopped successfully',
-      });
       return createStopMacAppResult(params);
     } catch (error) {
       const message = `Stop macOS app operation failed: ${toErrorMessage(error)}`;
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message,
-      });
       return createStopMacAppErrorResult(params, message);
     }
   };

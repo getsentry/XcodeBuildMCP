@@ -15,6 +15,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -66,6 +67,19 @@ function parseBuildSettingsEntries(output: string): Array<{ key: string; value: 
     });
 }
 
+function dedupeRepeatedErrorMessage(message: string): string {
+  const normalized = message.replace(/\r\n/g, '\n').trimEnd();
+  const lines = normalized.split('\n');
+  if (lines.length % 2 !== 0) {
+    return normalized;
+  }
+
+  const midpoint = lines.length / 2;
+  const firstHalf = lines.slice(0, midpoint).join('\n');
+  const secondHalf = lines.slice(midpoint).join('\n');
+  return firstHalf === secondHalf ? firstHalf : normalized;
+}
+
 function createToolExecutionContext(ctx: ToolHandlerContext): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
     progressSink: ctx.emitProgress ?? ctx.emit,
@@ -94,10 +108,11 @@ function createShowBuildSettingsErrorResult(
   scheme: string,
   message: string,
 ): ShowBuildSettingsResult {
+  const normalizedMessage = dedupeRepeatedErrorMessage(message);
   return {
     kind: 'build-settings',
     didError: true,
-    error: message,
+    error: normalizedMessage,
     artifacts: {
       workspacePath: pathValue,
       scheme,
@@ -121,12 +136,6 @@ export function createShowBuildSettingsExecutor(
     const hasProjectPath = typeof params.projectPath === 'string';
     const pathValue = hasProjectPath ? params.projectPath! : params.workspacePath!;
 
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: `Showing build settings for scheme ${params.scheme}`,
-    });
-
     try {
       const command = ['xcodebuild', '-showBuildSettings'];
 
@@ -140,47 +149,23 @@ export function createShowBuildSettingsExecutor(
 
       const result = await executor(command, 'Show Build Settings', false);
       if (!result.success) {
-        const errorResult = createShowBuildSettingsErrorResult(
+        return createShowBuildSettingsErrorResult(
           pathValue,
           params.scheme,
           result.error || 'Unknown error',
         );
-        ctx.emitProgress({
-          type: 'status',
-          level: 'error',
-          message: errorResult.error ?? 'Failed to show build settings',
-        });
-        return errorResult;
       }
 
       const settingsOutput = stripXcodebuildPreamble(
         result.output || 'Build settings retrieved successfully.',
       );
 
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: 'Build settings retrieved',
-      });
-      ctx.emitProgress({
-        type: 'status',
-        level: 'info',
-        message: settingsOutput,
-      });
+      ctx.emitProgress(statusLine('success', 'Build settings retrieved'));
+      ctx.emitProgress(section('Settings', settingsOutput.split('\n')));
 
       return createShowBuildSettingsResult(pathValue, params.scheme, settingsOutput);
     } catch (error) {
-      const errorResult = createShowBuildSettingsErrorResult(
-        pathValue,
-        params.scheme,
-        toErrorMessage(error),
-      );
-      ctx.emitProgress({
-        type: 'status',
-        level: 'error',
-        message: errorResult.error ?? 'Failed to show build settings',
-      });
-      return errorResult;
+      return createShowBuildSettingsErrorResult(pathValue, params.scheme, toErrorMessage(error));
     }
   };
 }
@@ -195,6 +180,12 @@ export async function showBuildSettingsLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Show Build Settings', [
+      { label: 'Scheme', value: params.scheme },
+      { label: hasProjectPath ? 'Project' : 'Workspace', value: pathValue! },
+    ]),
+  );
   const executionContext = createToolExecutionContext(ctx);
   const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
   const result = await executeShowBuildSettings(params, executionContext);
@@ -203,6 +194,7 @@ export async function showBuildSettingsLogic(
 
   if (result.didError) {
     log('error', `Error showing build settings: ${result.error ?? 'Unknown error'}`);
+    ctx.emit(statusLine('error', result.error ?? 'Failed to show build settings'));
   }
 
   executionContext.emitResult(result);

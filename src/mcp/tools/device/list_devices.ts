@@ -310,12 +310,6 @@ export function createListDevicesExecutor(
   },
 ): ToolExecutor<ListDevicesParams, ListDevicesResult> {
   return async (_params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Querying physical Apple devices',
-    });
-
     try {
       const discovery = await discoverDevices(executor, pathDeps, fsDeps);
 
@@ -339,19 +333,6 @@ export function createListDevicesExecutor(
           level: 'info',
           message:
             'For better device information, please upgrade to Xcode 15 or later which supports the modern devicectl command.',
-        });
-      } else if (discovery.devices.length > 0) {
-        ctx.emitProgress({
-          type: 'table',
-          name: 'devices',
-          columns: ['platform', 'name', 'osVersion', 'state', 'deviceId'],
-          rows: discovery.devices.map((device) => ({
-            platform: `${getDeviceEmoji(device.platform)} ${device.platform}`,
-            name: device.name,
-            osVersion: device.osVersion,
-            state: device.state,
-            deviceId: device.deviceId,
-          })),
         });
       }
 

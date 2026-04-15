@@ -164,27 +164,9 @@ function createSimulatorListErrorResult(message: string): SimulatorListResult {
 export function createListSimsExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<ListSimsParams, SimulatorListResult> {
-  return async (params, ctx) => {
-    ctx.emitProgress({
-      type: 'status',
-      level: 'info',
-      message: 'Querying simulators',
-    });
-
+  return async (params, _ctx) => {
     try {
       const simulators = await listSimulators(executor, params);
-
-      ctx.emitProgress({
-        type: 'table',
-        name: 'simulators',
-        columns: ['name', 'runtime', 'state', 'isAvailable'],
-        rows: simulators.map((simulator) => ({
-          name: simulator.name,
-          runtime: formatRuntimeName(simulator.runtime),
-          state: simulator.state,
-          isAvailable: String(simulator.isAvailable),
-        })),
-      });
 
       return createSimulatorListResult(simulators);
     } catch (error) {
