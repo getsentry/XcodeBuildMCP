@@ -66,7 +66,8 @@ function createTextRenderSession(): RenderSession {
 }
 
 function createCliTextRenderSession(options: { interactive: boolean }): RenderSession {
-  const renderer = createCliTextRenderer(options);
+  const showTestResults = sessionStore.get('showTestResults');
+  const renderer = createCliTextRenderer({ ...options, showTestResults: showTestResults ?? false });
 
   return createBaseRenderSession({
     onEmit: (event) => renderer.onEvent(event),
