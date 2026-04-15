@@ -155,4 +155,15 @@ describe('SessionStore', () => {
 
     expect(path1).not.toBe(path2);
   });
+
+  it('recomputes derivedDataPath when workspacePath changes', () => {
+    sessionStore.setDefaults({ workspacePath: '/clone-1/MyApp.xcworkspace' });
+    const path1 = sessionStore.getAll().derivedDataPath;
+
+    sessionStore.setDefaults({ workspacePath: '/clone-2/MyApp.xcworkspace' });
+    const path2 = sessionStore.getAll().derivedDataPath;
+
+    expect(path1).not.toBe(path2);
+    expect(path2).toMatch(/MyApp-[a-f0-9]{12}$/);
+  });
 });

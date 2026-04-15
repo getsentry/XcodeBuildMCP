@@ -79,7 +79,7 @@ class SessionStore {
   }
 
   setDefaultsForProfile(profile: string | null, partial: Partial<SessionDefaults>): void {
-    const previous = this.getAllForProfile(profile);
+    const previous = this.getRawForProfile(profile);
     const next = { ...previous, ...partial };
     this.setDefaultsForResolvedProfile(profile, next);
     this.revision += 1;
@@ -117,7 +117,7 @@ class SessionStore {
       return;
     }
 
-    const next = this.getAllForProfile(profile);
+    const next = this.getRawForProfile(profile);
     for (const k of keys) delete next[k];
 
     this.setDefaultsForResolvedProfile(profile, next);
@@ -135,8 +135,7 @@ class SessionStore {
   }
 
   getAllForProfile(profile: string | null): SessionDefaults {
-    const defaults = profile === null ? this.globalDefaults : (this.profiles[profile] ?? {});
-    const result = this.cloneDefaults(defaults);
+    const result = this.getRawForProfile(profile);
 
     if (!result.derivedDataPath) {
       const anchor = result.workspacePath ?? result.projectPath;
@@ -149,6 +148,11 @@ class SessionStore {
     }
 
     return result;
+  }
+
+  private getRawForProfile(profile: string | null): SessionDefaults {
+    const defaults = profile === null ? this.globalDefaults : (this.profiles[profile] ?? {});
+    return this.cloneDefaults(defaults);
   }
 
   listProfiles(): string[] {
