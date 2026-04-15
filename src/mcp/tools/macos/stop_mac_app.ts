@@ -7,6 +7,7 @@ import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const stopMacAppSchema = z.object({
   appName: z.string().optional(),
@@ -23,8 +24,19 @@ export async function stop_mac_appLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Stop macOS App', [
+      {
+        label: 'App',
+        value: params.appName ?? (params.processId !== undefined ? `PID ${params.processId}` : ''),
+      },
+    ]),
+  );
   const executeStopMacApp = createStopMacAppExecutor(executor);
-  const result = await executeStopMacApp(params, { emitProgress: () => {} });
+  const result = await executeStopMacApp(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

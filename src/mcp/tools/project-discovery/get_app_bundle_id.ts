@@ -92,7 +92,10 @@ export async function get_app_bundle_idLogic(
 
   const ctx = getHandlerContext();
   const executeGetAppBundleId = createGetAppBundleIdExecutor(executor, fileSystemExecutor);
-  const result = await executeGetAppBundleId(params, { emitProgress() {} });
+  const result = await executeGetAppBundleId(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 

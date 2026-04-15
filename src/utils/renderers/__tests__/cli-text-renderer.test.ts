@@ -148,6 +148,12 @@ describe('cli-text-renderer', () => {
       message: 'No available simulator matched: INVALID-SIM-ID-123',
       rawLine: 'No available simulator matched: INVALID-SIM-ID-123',
     });
+    renderer.onProgress({
+      type: 'summary',
+      operation: 'BUILD',
+      status: 'FAILED',
+      durationMs: 1200,
+    });
 
     renderer.setStructuredOutput(
       buildOutput({ didError: true, summary: { status: 'FAILED', durationMs: 1200 } }),
@@ -156,6 +162,7 @@ describe('cli-text-renderer', () => {
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain('Errors (1):');
+    expect(output).not.toContain('Errors (2):');
     expect(output).toContain('  \u2717 No available simulator matched: INVALID-SIM-ID-123');
     expect(output).toContain('\u{274C} Build failed. (\u{23F1}\u{FE0F} 1.2s)');
   });
@@ -187,6 +194,12 @@ describe('cli-text-renderer', () => {
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
+    });
+    renderer.onProgress({
+      type: 'summary',
+      operation: 'BUILD',
+      status: 'FAILED',
+      durationMs: 4000,
     });
 
     renderer.setStructuredOutput(
@@ -222,6 +235,12 @@ describe('cli-text-renderer', () => {
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
+    });
+    renderer.onProgress({
+      type: 'summary',
+      operation: 'BUILD',
+      status: 'FAILED',
+      durationMs: 2000,
     });
 
     renderer.setStructuredOutput(
@@ -265,6 +284,12 @@ describe('cli-text-renderer', () => {
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
+    });
+    renderer.onProgress({
+      type: 'summary',
+      operation: 'BUILD',
+      status: 'FAILED',
+      durationMs: 4000,
     });
 
     renderer.setStructuredOutput(
@@ -316,6 +341,33 @@ describe('cli-text-renderer', () => {
     expect(nextStepsIndex).toBeGreaterThan(footerIndex);
     expect(output).toContain('\u{2705} Build & Run complete');
     expect(output).toContain('\u2514 App Path: /tmp/build/MyApp.app');
+  });
+
+  it('replays buffered build failures once when only a header was emitted', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          type: 'header',
+          operation: 'Build',
+          params: [{ label: 'Scheme', value: 'MyApp' }],
+        },
+      ],
+      structuredOutput: buildOutput({
+        didError: true,
+        error: 'Build failed',
+        summary: { status: 'FAILED', durationMs: 900 },
+        diagnostics: {
+          warnings: [],
+          errors: [{ message: 'No available simulator matched: INVALID-SIM-ID-123' }],
+        },
+      }),
+    });
+
+    expect(output).toContain('🔨 Build');
+    expect(output).toContain('Errors (1):');
+    expect(output).not.toContain('Errors (2):');
+    expect(output).toContain('No available simulator matched: INVALID-SIM-ID-123');
+    expect(output).toContain('❌ Build failed. (⏱️ 0.9s)');
   });
 
   it('renders structured output for non-streaming app-path results', () => {

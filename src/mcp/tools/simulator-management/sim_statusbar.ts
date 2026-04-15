@@ -142,7 +142,10 @@ export async function sim_statusbarLogic(
   const ctx = getHandlerContext();
   const executeSimStatusbar = createSimStatusbarExecutor(executor);
 
-  const result = await executeSimStatusbar(params, { emitProgress() {} });
+  const result = await executeSimStatusbar(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

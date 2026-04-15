@@ -70,13 +70,20 @@ function createSyncXcodeDefaultsResult(error?: string): SyncXcodeDefaultsResult 
     profiles[profile] = createSessionDefaultsProfile(sessionStore.getAllForProfile(profile));
   }
 
-  return {
+  const result: SyncXcodeDefaultsResult = {
     kind: 'session-defaults',
     didError: typeof error === 'string',
     error: error ?? null,
     currentProfile: formatProfileLabel(sessionStore.getActiveProfile()),
     profiles,
   };
+
+  Object.defineProperty(result, 'operation', {
+    value: { type: 'sync-xcode' },
+    enumerable: false,
+  });
+
+  return result;
 }
 
 function setStructuredOutput(ctx: ToolHandlerContext, result: SyncXcodeDefaultsResult): void {
@@ -145,7 +152,10 @@ export async function syncXcodeDefaultsLogic(
 ): Promise<void> {
   const handlerContext = getHandlerContext();
   const executeSyncXcodeDefaults = createSyncXcodeDefaultsExecutor(context);
-  const result = await executeSyncXcodeDefaults(params, { emitProgress: () => {} });
+  const result = await executeSyncXcodeDefaults(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerContext, result);
 }

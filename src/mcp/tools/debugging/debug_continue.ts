@@ -76,7 +76,10 @@ export async function debug_continueLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugContinue = createDebugContinueExecutor(ctx.debugger);
-  const result = await executeDebugContinue(params, { emitProgress: () => {} });
+  const result = await executeDebugContinue(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
 }

@@ -19,7 +19,7 @@ describe('swift package non-streaming tools', () => {
     expect(result.text()).toContain('No Swift Package processes currently running.');
   });
 
-  it('does not emit progress events for swift_package_clean', async () => {
+  it('emits only a durable header for swift_package_clean', async () => {
     const { result } = await runToolLogic(() =>
       swift_package_cleanLogic(
         { packagePath: '/test/package' },
@@ -27,19 +27,36 @@ describe('swift package non-streaming tools', () => {
       ),
     );
 
-    expect(result.events).toEqual([]);
+    expect(result.events).toEqual([
+      {
+        type: 'header',
+        operation: 'Swift Package Clean',
+        params: [{ label: 'Package', value: '/test/package' }],
+      },
+    ]);
     expect(result.text()).toContain('Swift package cleaned successfully');
   });
 
-  it('does not emit progress events for swift_package_run', async () => {
-    const { result } = await runToolLogic(() =>
-      swift_package_runLogic(
-        { packagePath: '/test/package' },
-        createMockExecutor({ success: true, output: 'Hello, World!' }),
-      ),
+  it('emits only a durable header for swift_package_run', async () => {
+    const { result } = await runToolLogic(
+      () =>
+        swift_package_runLogic(
+          { packagePath: '/test/package' },
+          createMockExecutor({ success: true, output: 'Hello, World!' }),
+        ),
+      { liveProgressEnabled: false },
     );
 
-    expect(result.events).toEqual([]);
+    expect(result.events).toEqual([
+      {
+        type: 'header',
+        operation: 'Swift Package Run',
+        params: [
+          { label: 'Package', value: '/test/package' },
+          { label: 'Executable', value: 'package' },
+        ],
+      },
+    ]);
     expect(result.text()).toContain('Build & Run complete');
   });
 

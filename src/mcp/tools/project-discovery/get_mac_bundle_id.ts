@@ -8,6 +8,8 @@ import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../.
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
   const result = await executor(['/bin/sh', '-c', command], 'macOS Bundle ID Extraction');
@@ -103,8 +105,12 @@ export async function get_mac_bundle_idLogic(
   log('info', `Starting bundle ID extraction for macOS app: ${appPath}`);
 
   const ctx = getHandlerContext();
+  ctx.emit(header('Get macOS Bundle ID', [{ label: 'App', value: displayPath(appPath) }]));
   const executeGetMacBundleId = createGetMacBundleIdExecutor(executor, fileSystemExecutor);
-  const result = await executeGetMacBundleId(params, { emitProgress() {} });
+  const result = await executeGetMacBundleId(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 

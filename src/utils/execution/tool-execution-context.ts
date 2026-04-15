@@ -5,9 +5,11 @@ import type { ToolAttachment, ToolExecutionContext } from '../../types/tool-exec
 export interface DefaultToolExecutionContextOptions {
   xcodebuildOperation?: XcodebuildOperation;
   progressSink?: (event: ProgressEvent) => void;
+  liveProgressEnabled?: boolean;
 }
 
 export class DefaultToolExecutionContext implements ToolExecutionContext {
+  readonly liveProgressEnabled: boolean;
   private readonly progressEvents: ProgressEvent[] = [];
   private readonly attachments: ToolAttachment[] = [];
   private readonly progressSink?: (event: ProgressEvent) => void;
@@ -15,9 +17,14 @@ export class DefaultToolExecutionContext implements ToolExecutionContext {
 
   constructor(options: DefaultToolExecutionContextOptions = {}) {
     this.progressSink = options.progressSink;
+    this.liveProgressEnabled = options.liveProgressEnabled ?? true;
   }
 
   emitProgress(event: ProgressEvent): void {
+    if (!this.liveProgressEnabled) {
+      return;
+    }
+
     this.progressEvents.push(event);
     this.progressSink?.(event);
   }

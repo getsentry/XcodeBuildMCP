@@ -17,6 +17,8 @@ import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tool
 import type { ImageAttachment, ToolHandlerContext } from '../../../rendering/types.ts';
 
 export class BridgeToolExecutionContext implements ToolExecutionContext {
+  readonly liveProgressEnabled = false;
+
   private nextStepParams?: NextStepParamsMap;
   private readonly bridgeImages: ImageAttachment[] = [];
 

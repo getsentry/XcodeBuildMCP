@@ -85,75 +85,12 @@ interface XcodebuildParserState {
 
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
-function hasBuildLogTail(result: StructuredToolOutput['result']): boolean {
+function isBuildLikeResult(output: StructuredToolOutput | undefined): boolean {
   return (
-    'artifacts' in result &&
-    !!result.artifacts &&
-    'buildLogPath' in result.artifacts &&
-    typeof result.artifacts.buildLogPath === 'string'
+    output?.result.kind === 'build-result' ||
+    output?.result.kind === 'build-run-result' ||
+    output?.result.kind === 'test-result'
   );
-}
-
-function filterStructuredOutputItems(
-  output: StructuredToolOutput,
-  items: TextRenderableItem[],
-  opts: {
-    sawLiveTestDiscovery: boolean;
-    sawLiveTestFailure: boolean;
-    sawLiveTestSummary: boolean;
-  },
-): TextRenderableItem[] {
-  if (output.result.kind !== 'test-result') {
-    return items;
-  }
-
-  return items.filter((item) => {
-    switch (item.type) {
-      case 'test-discovery':
-        return !opts.sawLiveTestDiscovery;
-      case 'test-failure':
-        return !opts.sawLiveTestFailure;
-      case 'summary':
-        return !opts.sawLiveTestSummary;
-      default:
-        return true;
-    }
-  });
-}
-
-function shouldRenderStructuredOutput(
-  output: StructuredToolOutput | undefined,
-  opts: {
-    sawXcodebuildLine: boolean;
-    sawLiveTestDiscovery: boolean;
-    sawLiveTestFailure: boolean;
-    sawLiveTestSummary: boolean;
-  },
-): boolean {
-  if (!output) {
-    return false;
-  }
-
-  switch (output.result.kind) {
-    case 'build-result':
-      return !opts.sawXcodebuildLine || hasBuildLogTail(output.result);
-    case 'build-run-result':
-      return true;
-    case 'test-result': {
-      const hasDiscovery =
-        !!output.result.tests?.discovered && output.result.tests.discovered.total > 0;
-      const hasFailures = output.result.diagnostics.testFailures.length > 0;
-
-      return (
-        hasBuildLogTail(output.result) ||
-        (hasDiscovery && !opts.sawLiveTestDiscovery) ||
-        (hasFailures && !opts.sawLiveTestFailure) ||
-        !opts.sawLiveTestSummary
-      );
-    }
-    default:
-      return true;
-  }
 }
 
 function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRenderer {
@@ -168,13 +105,11 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let lastVisibleEventType: TextRenderableItem['type'] | null = null;
   let lastStatusLineLevel: StatusProgressEvent['level'] | null = null;
   let structuredOutput: StructuredToolOutput | undefined;
-  let sawXcodebuildLine = false;
+  let sawIncomingHeaderEvent = false;
+  let sawIncomingNonHeaderEvent = false;
   let nextSteps: readonly NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
-  let sawLiveTestDiscovery = false;
-  let sawLiveTestFailure = false;
-  let sawLiveTestSummary = false;
 
   function writeDurable(text: string): void {
     sink.clearTransient();
@@ -317,7 +252,6 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-discovery': {
-        sawLiveTestDiscovery = true;
         writeDurable(formatTestDiscoveryEvent(item));
         lastVisibleEventType = 'test-discovery';
         lastStatusLineLevel = null;
@@ -334,13 +268,11 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-failure': {
-        sawLiveTestFailure = true;
         groupedTestFailures.push(item);
         break;
       }
 
       case 'summary': {
-        sawLiveTestSummary = true;
         const renderedDiagnostics = flushGroupedDiagnostics(item.status === 'FAILED');
 
         if (!renderedDiagnostics && item.status === 'FAILED') {
@@ -370,7 +302,6 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'xcodebuild-line': {
-        sawXcodebuildLine = true;
         const state = ensureParserState(item.operation);
         const chunk = `${item.line}\n`;
         if (item.stream === 'stderr') {
@@ -427,6 +358,12 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
 
   return {
     onProgress(event: ProgressEvent): void {
+      if (event.type === 'header') {
+        sawIncomingHeaderEvent = true;
+      }
+      if (event.type !== 'header') {
+        sawIncomingNonHeaderEvent = true;
+      }
       processItem(event);
     },
 
@@ -441,24 +378,15 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
 
     finalize(): void {
       flushParserStates();
-      if (
-        structuredOutput &&
-        shouldRenderStructuredOutput(structuredOutput, {
-          sawXcodebuildLine,
-          sawLiveTestDiscovery,
-          sawLiveTestFailure,
-          sawLiveTestSummary,
-        })
-      ) {
-        for (const item of filterStructuredOutputItems(
-          structuredOutput,
-          renderDomainResultTextItems(structuredOutput.result),
-          {
-            sawLiveTestDiscovery,
-            sawLiveTestFailure,
-            sawLiveTestSummary,
-          },
-        )) {
+      const shouldReplayStructured =
+        !!structuredOutput && (!isBuildLikeResult(structuredOutput) || !sawIncomingNonHeaderEvent);
+      if (shouldReplayStructured && structuredOutput) {
+        const structuredItems = renderDomainResultTextItems(structuredOutput.result);
+        const replayItems =
+          sawIncomingHeaderEvent && structuredItems[0]?.type === 'header'
+            ? structuredItems.slice(1)
+            : structuredItems;
+        for (const item of replayItems) {
           processItem(item);
         }
       }
@@ -474,14 +402,12 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       lastVisibleEventType = null;
       lastStatusLineLevel = null;
       structuredOutput = undefined;
-      sawXcodebuildLine = false;
+      sawIncomingHeaderEvent = false;
+      sawIncomingNonHeaderEvent = false;
       nextSteps = [];
       nextStepsRuntime = undefined;
       parserStates.clear();
       sawProgressNextSteps = false;
-      sawLiveTestDiscovery = false;
-      sawLiveTestFailure = false;
-      sawLiveTestSummary = false;
     },
   };
 }

@@ -15,6 +15,7 @@ import type {
 import type { TestDiscoveryProgressEvent, XcodebuildOperation } from '../types/progress-events.js';
 import type { ToolExecutionContext } from '../types/tool-execution.js';
 import { finalizeInlineXcodebuild, type ErrorFallbackPolicy } from './xcodebuild-output.js';
+import { displayPath } from './build-preflight.js';
 import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
 import { createXcodebuildPipeline } from './xcodebuild-pipeline.js';
 import type { XcodebuildRunState } from './xcodebuild-run-state.js';
@@ -200,6 +201,7 @@ interface FinalizeXcodebuildResultOptions {
   started: StartedPipeline;
   succeeded: boolean;
   responseContent?: Array<{ type: 'text'; text: string }>;
+  fallbackErrorMessages?: readonly string[];
   errorFallbackPolicy?: ErrorFallbackPolicy;
 }
 
@@ -209,7 +211,10 @@ function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
     started: options.started,
     succeeded: options.succeeded,
     durationMs,
-    responseContent: options.responseContent,
+    responseContent:
+      options.responseContent ??
+      options.fallbackErrorMessages?.map((text) => ({ type: 'text' as const, text })),
+    emit: (event) => options.started.pipeline.emitEvent(event),
     errorFallbackPolicy: options.errorFallbackPolicy,
   });
 
@@ -217,6 +222,100 @@ function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
     durationMs,
     pipelineResult,
   };
+}
+
+function emitBuildLikeTailEvents(
+  started: StartedPipeline,
+  result: BuildResultDomainResult | BuildRunResultDomainResult | TestResultDomainResult,
+): void {
+  switch (result.kind) {
+    case 'build-result': {
+      if (!('artifacts' in result) || !result.artifacts) {
+        return;
+      }
+
+      const items: Array<{ label: string; value: string }> = [];
+      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
+        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+      }
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+      }
+
+      if (items.length > 0) {
+        started.pipeline.emitEvent({ type: 'detail-tree', items });
+      }
+      return;
+    }
+
+    case 'build-run-result': {
+      if (!result.didError) {
+        started.pipeline.emitEvent({
+          type: 'status',
+          level: 'success',
+          message: 'Build & Run complete',
+        });
+      }
+
+      const items: Array<{ label: string; value: string }> = [];
+      if ('appPath' in result.artifacts && typeof result.artifacts.appPath === 'string') {
+        items.push({ label: 'App Path', value: displayPath(result.artifacts.appPath) });
+      } else if (
+        'executablePath' in result.artifacts &&
+        typeof result.artifacts.executablePath === 'string'
+      ) {
+        items.push({ label: 'App Path', value: displayPath(result.artifacts.executablePath) });
+      }
+      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
+        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+      }
+      if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
+        items.push({ label: 'Process ID', value: String(result.artifacts.processId) });
+      }
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+      }
+      if (
+        'runtimeLogPath' in result.artifacts &&
+        typeof result.artifacts.runtimeLogPath === 'string'
+      ) {
+        items.push({ label: 'Runtime Logs', value: displayPath(result.artifacts.runtimeLogPath) });
+      }
+      if ('osLogPath' in result.artifacts && typeof result.artifacts.osLogPath === 'string') {
+        items.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
+      }
+
+      if (items.length > 0) {
+        started.pipeline.emitEvent({ type: 'detail-tree', items });
+      }
+
+      const outputLines =
+        result.output?.stdout.length && result.output.stdout.length > 0
+          ? result.output.stdout
+          : (result.output?.stderr ?? []);
+      if (outputLines.length > 0) {
+        started.pipeline.emitEvent({
+          type: 'section',
+          title: 'Output',
+          lines: outputLines,
+        });
+      }
+      return;
+    }
+
+    case 'test-result': {
+      if (!('artifacts' in result) || !result.artifacts) {
+        return;
+      }
+
+      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+        started.pipeline.emitEvent({
+          type: 'detail-tree',
+          items: [{ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) }],
+        });
+      }
+    }
+  }
 }
 
 export interface ProgressStreamingXcodebuildExecution extends StartedPipeline {
@@ -291,8 +390,7 @@ export function createBuildDomainResult(options: {
   errorFallbackPolicy?: ErrorFallbackPolicy;
 }): BuildResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
-
-  return {
+  const result: BuildResultDomainResult = {
     kind: 'build-result',
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
@@ -308,6 +406,9 @@ export function createBuildDomainResult(options: {
       options.fallbackErrorMessages,
     ),
   };
+
+  emitBuildLikeTailEvents(options.started, result);
+  return result;
 }
 
 export function createBuildRunDomainResult(options: {
@@ -321,8 +422,7 @@ export function createBuildRunDomainResult(options: {
   output?: BuildRunResultDomainResult['output'];
 }): BuildRunResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
-
-  return {
+  const result: BuildRunResultDomainResult = {
     kind: 'build-run-result',
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
@@ -339,6 +439,9 @@ export function createBuildRunDomainResult(options: {
     ),
     ...(options.output ? { output: options.output } : {}),
   };
+
+  emitBuildLikeTailEvents(options.started, result);
+  return result;
 }
 
 export function createTestDomainResult(options: {
@@ -356,8 +459,7 @@ export function createTestDomainResult(options: {
   const failed = Math.max(state.failedTests, state.testFailures.length);
   const skipped = state.skippedTests;
   const passed = Math.max(0, state.completedTests - failed - skipped);
-
-  return {
+  const result: TestResultDomainResult = {
     kind: 'test-result',
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Tests failed',
@@ -381,6 +483,9 @@ export function createTestDomainResult(options: {
       ? { tests: createTestSelectionInfo(options.preflight) }
       : {}),
   };
+
+  emitBuildLikeTailEvents(options.started, result);
+  return result;
 }
 
 export { createToolExecutionContext };

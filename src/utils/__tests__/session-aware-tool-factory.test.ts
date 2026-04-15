@@ -35,11 +35,13 @@ function invokeAndCollect(
   const session = createRenderSession('text');
   const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
+    liveProgressEnabled: false,
     emit: (event) => {
       items.push(event);
       session.emit(event);
     },
     attach: (image) => session.attach(image),
+    emitProgress: () => {},
   };
   return handler(args, ctx).then(() => ({
     text: renderCliTextTranscript({ items }),

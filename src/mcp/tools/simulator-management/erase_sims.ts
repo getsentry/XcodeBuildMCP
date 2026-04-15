@@ -133,7 +133,10 @@ export async function erase_simsLogic(
     `Erasing simulator ${simulatorId}${params.shutdownFirst ? ' (shutdownFirst=true)' : ''}`,
   );
 
-  const result = await executeEraseSims(params, { emitProgress() {} });
+  const result = await executeEraseSims(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

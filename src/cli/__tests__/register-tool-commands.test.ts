@@ -2,6 +2,7 @@ import yargs from 'yargs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 import type { ToolCatalog, ToolDefinition } from '../../runtime/types.ts';
+import type { ToolHandlerContext } from '../../rendering/types.ts';
 import { DefaultToolInvoker } from '../../runtime/tool-invoker.ts';
 import type { ResolvedRuntimeConfig } from '../../utils/config-store.ts';
 import { registerToolCommands } from '../register-tool-commands.ts';
@@ -87,7 +88,7 @@ function mockInvokeDirectThroughHandler() {
   return vi
     .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
     .mockImplementation(async (tool, args, opts) => {
-      const handlerContext = opts.handlerContext ?? {
+      const handlerContext: ToolHandlerContext = opts.handlerContext ?? {
         emit: (event) => {
           if (!('timestamp' in event)) {
             opts.renderSession?.emit(event);
@@ -96,9 +97,12 @@ function mockInvokeDirectThroughHandler() {
         attach: (image) => {
           opts.renderSession?.attach(image);
         },
+        liveProgressEnabled: false,
+        emitProgress: () => {},
       };
 
       if (opts.onProgress) {
+        handlerContext.liveProgressEnabled = true;
         handlerContext.emitProgress = opts.onProgress;
       }
 

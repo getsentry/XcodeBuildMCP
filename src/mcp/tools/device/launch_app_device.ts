@@ -22,6 +22,8 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchAppOnDevice } from '../../../utils/device-steps.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -48,8 +50,17 @@ export async function launch_app_deviceLogic(
   fileSystem: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Launch App', [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'Bundle ID', value: params.bundleId },
+    ]),
+  );
   const executeLaunchAppDevice = createLaunchAppDeviceExecutor(executor, fileSystem);
-  const result = await executeLaunchAppDevice(params, { emitProgress: () => {} });
+  const result = await executeLaunchAppDevice(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

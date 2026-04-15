@@ -102,6 +102,18 @@ function createTestSummaryEvent(
   };
 }
 
+function createBuildSummaryEvent(
+  state: XcodebuildRunState,
+  durationMs?: number,
+): SummaryProgressEvent {
+  return {
+    type: 'summary',
+    operation: 'BUILD',
+    status: state.finalStatus ?? 'FAILED',
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  };
+}
+
 export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRunStateHandle {
   const { operation, onEvent } = options;
 
@@ -210,6 +222,8 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
 
       if (operation === 'TEST') {
         onEvent?.(createTestSummaryEvent(state, durationMs));
+      } else if (operation === 'BUILD') {
+        onEvent?.(createBuildSummaryEvent(state, durationMs));
       }
 
       return {

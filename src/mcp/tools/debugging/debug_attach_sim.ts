@@ -242,7 +242,10 @@ export async function debug_attach_simLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugAttachSim = createDebugAttachSimExecutor(ctx);
-  const result = await executeDebugAttachSim(params, { emitProgress: () => {} });
+  const result = await executeDebugAttachSim(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
   if (result.didError) {

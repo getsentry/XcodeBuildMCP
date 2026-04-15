@@ -55,7 +55,10 @@ export async function install_app_simLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeInstallAppSim = createInstallAppSimExecutor(executor, fileSystem);
-  const result = await executeInstallAppSim(params, { emitProgress: () => {} });
+  const result = await executeInstallAppSim(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

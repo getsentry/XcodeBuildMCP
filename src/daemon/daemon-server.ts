@@ -184,13 +184,14 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
               };
 
               const handlerContext: ToolHandlerContext = {
+                liveProgressEnabled: false,
                 emit: (event) => {
                   if (!('timestamp' in event)) {
                     streamProgress(event);
                   }
                 },
                 attach: () => {},
-                emitProgress: streamProgress,
+                emitProgress: () => {},
               };
 
               await invoker.invokeDirect(resolved.tool, params.args ?? {}, {

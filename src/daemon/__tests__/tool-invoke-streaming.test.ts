@@ -57,7 +57,7 @@ describe('daemon tool.invoke streaming', () => {
     );
   });
 
-  it('streams progress events and returns a terminal structured result', async () => {
+  it('does not stream progress events outside live CLI contexts and returns a terminal structured result', async () => {
     const tool: ToolDefinition = {
       cliName: 'stream-tool',
       mcpName: 'stream_tool',
@@ -111,7 +111,7 @@ describe('daemon tool.invoke streaming', () => {
       },
     );
 
-    expect(progress).toEqual(['status', 'artifact']);
+    expect(progress).toEqual([]);
     expect(result).toEqual({
       structuredOutput: {
         schema: 'xcodebuildmcp.output.simulator-list',

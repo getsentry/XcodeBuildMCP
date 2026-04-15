@@ -15,6 +15,8 @@ import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../.
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const DEFAULT_MAX_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['build', 'DerivedData', 'Pods', '.git', 'node_modules']);
@@ -177,6 +179,28 @@ function resolveScanBase(workspaceRoot: string, scanPath?: string): string {
   return '.';
 }
 
+function createDiscoverProjectsHeaderParams(
+  params: DiscoverProjectsParams,
+): Array<{ label: string; value: string }> {
+  const workspaceRoot = path.resolve(params.workspaceRoot);
+  const scanBase = resolveScanBase(params.workspaceRoot, params.scanPath);
+  const requestedScanPath = path.resolve(params.workspaceRoot, scanBase);
+  const workspaceBoundary = path.resolve(
+    isBundleLikePath(params.workspaceRoot)
+      ? path.dirname(params.workspaceRoot)
+      : params.workspaceRoot,
+  );
+  const scanPath = path.normalize(requestedScanPath).startsWith(path.normalize(workspaceBoundary))
+    ? requestedScanPath
+    : workspaceBoundary;
+
+  return [
+    { label: 'Workspace root', value: displayPath(workspaceRoot) },
+    { label: 'Scan path', value: displayPath(scanPath) },
+    { label: 'Max depth', value: String(params.maxDepth ?? DEFAULT_MAX_DEPTH) },
+  ];
+}
+
 async function discoverProjectsOrError(
   params: DiscoverProjectsParams,
   fileSystemExecutor: FileSystemExecutor,
@@ -333,8 +357,12 @@ export async function discover_projsLogic(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(header('Discover Projects', createDiscoverProjectsHeaderParams(params)));
   const executeDiscoverProjects = createDiscoverProjectsExecutor(fileSystemExecutor);
-  const result = await executeDiscoverProjects(params, { emitProgress() {} });
+  const result = await executeDiscoverProjects(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 

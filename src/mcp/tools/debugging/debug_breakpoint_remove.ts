@@ -70,7 +70,10 @@ export async function debug_breakpoint_removeLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugBreakpointRemove = createDebugBreakpointRemoveExecutor(ctx.debugger);
-  const result = await executeDebugBreakpointRemove(params, { emitProgress: () => {} });
+  const result = await executeDebugBreakpointRemove(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
 }

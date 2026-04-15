@@ -19,6 +19,9 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnDevice } from '../../../utils/device-steps.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const installAppDeviceSchema = z.object({
   deviceId: z
@@ -40,8 +43,17 @@ export async function install_app_deviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Install App', [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'App', value: displayPath(params.appPath) },
+    ]),
+  );
   const executeInstallAppDevice = createInstallAppDeviceExecutor(executor);
-  const result = await executeInstallAppDevice(params, { emitProgress: () => {} });
+  const result = await executeInstallAppDevice(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

@@ -147,7 +147,10 @@ export async function set_sim_locationLogic(
   const ctx = getHandlerContext();
   const executeSetSimulatorLocation = createSetSimulatorLocationExecutor(executor);
 
-  const result = await executeSetSimulatorLocation(params, { emitProgress() {} });
+  const result = await executeSetSimulatorLocation(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

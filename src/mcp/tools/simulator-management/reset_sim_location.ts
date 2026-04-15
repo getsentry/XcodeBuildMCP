@@ -109,7 +109,10 @@ export async function reset_sim_locationLogic(
   const ctx = getHandlerContext();
   const executeResetSimulatorLocation = createResetSimulatorLocationExecutor(executor);
 
-  const result = await executeResetSimulatorLocation(params, { emitProgress() {} });
+  const result = await executeResetSimulatorLocation(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

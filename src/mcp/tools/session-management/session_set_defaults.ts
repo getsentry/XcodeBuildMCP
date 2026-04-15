@@ -211,7 +211,10 @@ export async function sessionSetDefaultsLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSessionSetDefaults = createSessionSetDefaultsExecutor(context);
-  const result = await executeSessionSetDefaults(params, { emitProgress() {} });
+  const result = await executeSessionSetDefaults(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   const {
     profile: rawProfile,
     persist: _persist,

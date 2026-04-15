@@ -207,7 +207,10 @@ export async function debug_variablesLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugVariables = createDebugVariablesExecutor(ctx.debugger);
-  const result = await executeDebugVariables(params, { emitProgress: () => {} });
+  const result = await executeDebugVariables(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
 }

@@ -105,6 +105,15 @@ describe('xcodebuild-pipeline', () => {
     expect(result.state.warnings).toHaveLength(1);
     expect(result.state.errors).toHaveLength(1);
     expect(result.state.finalStatus).toBe('FAILED');
+    expect(
+      emittedEvents.some(
+        (event) =>
+          event.type === 'summary' &&
+          event.operation === 'BUILD' &&
+          event.status === 'FAILED' &&
+          event.durationMs === 500,
+      ),
+    ).toBe(true);
   });
 
   it('supports multi-phase with minimumStage', () => {

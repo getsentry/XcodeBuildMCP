@@ -7,7 +7,8 @@ export function createToolExecutionContext(
   xcodebuildOperation?: XcodebuildOperation,
 ): DefaultToolExecutionContext {
   return new DefaultToolExecutionContext({
-    progressSink: ctx.emitProgress ?? ctx.emit,
+    progressSink: ctx.emitProgress,
+    liveProgressEnabled: ctx.liveProgressEnabled,
     xcodebuildOperation,
   });
 }

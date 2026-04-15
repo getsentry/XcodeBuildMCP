@@ -188,7 +188,10 @@ export async function list_simsLogic(
 
   const ctx = getHandlerContext();
   const executeListSims = createListSimsExecutor(executor);
-  const result = await executeListSims(params, { emitProgress: () => {} });
+  const result = await executeListSims(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

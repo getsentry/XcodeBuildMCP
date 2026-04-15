@@ -9,6 +9,8 @@ import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchMacApp } from '../../../utils/macos-steps.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const launchMacAppSchema = z.object({
   appPath: z.string(),
@@ -26,8 +28,12 @@ export async function launch_mac_appLogic(
   fileSystem?: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(header('Launch macOS App', [{ label: 'App', value: displayPath(params.appPath) }]));
   const executeLaunchMacApp = createLaunchMacAppExecutor(executor, fileSystem);
-  const result = await executeLaunchMacApp(params, { emitProgress: () => {} });
+  const result = await executeLaunchMacApp(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

@@ -91,7 +91,7 @@ describe('xcodebuild-output', () => {
     );
   });
 
-  it('returns finalized state without synthesizing footer events', () => {
+  it('returns finalized state without synthesizing footer events beyond the build summary', () => {
     const emitted: ProgressEvent[] = [];
     const started = startPipeline((event) => emitted.push(event));
     emitted.length = 0;
@@ -105,7 +105,14 @@ describe('xcodebuild-output', () => {
 
     expect(result.state.finalStatus).toBe('SUCCEEDED');
     expect(result.state.wallClockDurationMs).toBe(100);
-    expect(emitted).toEqual([]);
+    expect(emitted).toEqual([
+      {
+        type: 'summary',
+        operation: 'BUILD',
+        status: 'SUCCEEDED',
+        durationMs: 100,
+      },
+    ]);
     expect(started.pipeline.logPath).toContain('build_run_macos_');
   });
 });

@@ -14,9 +14,12 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { acquireDaemonActivity } from '../../../daemon/activity-registry.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { createBuildRunDomainResult } from '../../../utils/xcodebuild-domain-results.ts';
-import { createXcodebuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
-import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
+import {
+  createBuildRunDomainResult,
+  createProgressStreamingPipeline,
+  createToolExecutionContext,
+} from '../../../utils/xcodebuild-domain-results.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   packagePath: z.string(),
@@ -79,8 +82,15 @@ export async function swift_package_runLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const resolvedPath = path.resolve(params.packagePath);
+  ctx.emit(
+    header('Swift Package Run', [
+      { label: 'Package', value: resolvedPath },
+      { label: 'Executable', value: params.executableName ?? path.basename(resolvedPath) },
+    ]),
+  );
   const executeSwiftPackageRun = createSwiftPackageRunExecutor(executor);
-  const result = await executeSwiftPackageRun(params, noopToolExecutionContext);
+  const result = await executeSwiftPackageRun(params, createToolExecutionContext(ctx, 'BUILD'));
 
   setStructuredOutput(ctx, result);
 
@@ -114,13 +124,7 @@ export function createSwiftPackageRunExecutor(
 ): ToolExecutor<SwiftPackageRunParams, SwiftPackageRunResult> {
   return async (params, ctx) => {
     const resolvedPath = path.resolve(params.packagePath);
-    const pipeline = createXcodebuildPipeline({
-      operation: 'BUILD',
-      toolName: 'build_run_spm',
-      params: {},
-      emit: () => {},
-    });
-    const started = { pipeline, startedAt: Date.now() };
+    const started = createProgressStreamingPipeline('build_run_spm', 'BUILD', ctx);
     const timeout = Math.min(params.timeout ?? 30, 300) * 1000;
     const swiftArgs = ['run', '--package-path', resolvedPath];
     const executableName = params.executableName ?? path.basename(resolvedPath);
@@ -182,6 +186,7 @@ export function createSwiftPackageRunExecutor(
             target: 'swift-package',
             artifacts: {
               packagePath: resolvedPath,
+              buildLogPath: started.pipeline.logPath,
             },
             fallbackErrorMessages: [result.error ?? result.output ?? 'Unknown error'],
           });
@@ -216,6 +221,7 @@ export function createSwiftPackageRunExecutor(
               packagePath: resolvedPath,
               ...(executablePath ? { executablePath } : {}),
               processId: result.process.pid,
+              buildLogPath: started.pipeline.logPath,
             },
             output: { stdout: [], stderr: [] },
           });
@@ -228,6 +234,7 @@ export function createSwiftPackageRunExecutor(
           artifacts: {
             packagePath: resolvedPath,
             ...(executablePath ? { executablePath } : {}),
+            buildLogPath: started.pipeline.logPath,
           },
           output: { stdout: [], stderr: [] },
         });
@@ -272,6 +279,7 @@ export function createSwiftPackageRunExecutor(
           target: 'swift-package',
           artifacts: {
             packagePath: resolvedPath,
+            buildLogPath: started.pipeline.logPath,
           },
           fallbackErrorMessages: [result.error],
           errorFallbackPolicy: 'always',
@@ -292,6 +300,7 @@ export function createSwiftPackageRunExecutor(
           target: 'swift-package',
           artifacts: {
             packagePath: resolvedPath,
+            buildLogPath: started.pipeline.logPath,
           },
           fallbackErrorMessages: [result.error ?? result.output ?? 'Unknown error'],
         });
@@ -330,6 +339,7 @@ export function createSwiftPackageRunExecutor(
         target: 'swift-package',
         artifacts: {
           packagePath: resolvedPath,
+          buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [toErrorMessage(error)],
         errorFallbackPolicy: 'always',

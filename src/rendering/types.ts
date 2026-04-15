@@ -33,7 +33,8 @@ export interface StructuredToolOutput {
 export interface ToolHandlerContext {
   emit: (event: ProgressEvent) => void;
   attach: (image: ImageAttachment) => void;
-  emitProgress?: (event: ProgressEvent) => void;
+  emitProgress: (event: ProgressEvent) => void;
+  liveProgressEnabled: boolean;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;

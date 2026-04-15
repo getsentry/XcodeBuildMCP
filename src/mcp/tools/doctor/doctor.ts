@@ -695,7 +695,10 @@ export async function doctorToolLogic(
   const ctx = getHandlerContext();
   const deps = createDoctorDependencies(executor);
   const executeDoctor = createDoctorExecutor(deps);
-  const result = await executeDoctor(params, { emitProgress: () => {} });
+  const result = await executeDoctor(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 }

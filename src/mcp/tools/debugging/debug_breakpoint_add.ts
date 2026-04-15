@@ -116,7 +116,10 @@ export async function debug_breakpoint_addLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugBreakpointAdd = createDebugBreakpointAddExecutor(ctx.debugger);
-  const result = await executeDebugBreakpointAdd(params, { emitProgress: () => {} });
+  const result = await executeDebugBreakpointAdd(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
 }

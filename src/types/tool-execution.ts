@@ -6,6 +6,7 @@ export interface ToolAttachment {
   mimeType: string;
 }
 export interface ToolExecutionContext {
+  liveProgressEnabled: boolean;
   emitProgress(event: ProgressEvent): void;
   attach?(image: ToolAttachment): void;
 }

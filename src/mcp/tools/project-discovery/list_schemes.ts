@@ -128,7 +128,10 @@ export async function listSchemesLogic(
 
   const ctx = getHandlerContext();
   const executeListSchemes = createListSchemesExecutor(executor);
-  const result = await executeListSchemes(params, { emitProgress() {} });
+  const result = await executeListSchemes(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 

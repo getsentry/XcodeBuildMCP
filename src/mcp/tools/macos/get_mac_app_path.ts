@@ -15,6 +15,8 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
@@ -137,8 +139,23 @@ export async function get_mac_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Get App Path', [
+      { label: 'Scheme', value: params.scheme },
+      ...(params.workspacePath
+        ? [{ label: 'Workspace', value: displayPath(params.workspacePath) }]
+        : params.projectPath
+          ? [{ label: 'Project', value: displayPath(params.projectPath) }]
+          : []),
+      { label: 'Configuration', value: params.configuration ?? 'Debug' },
+      { label: 'Platform', value: 'macOS' },
+    ]),
+  );
   const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
-  const result = await executeGetMacAppPath(params, { emitProgress: () => {} });
+  const result = await executeGetMacAppPath(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

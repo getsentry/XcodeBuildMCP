@@ -181,6 +181,10 @@ describe('text render parity', () => {
           skippedTests: 0,
           durationMs: 2200,
         },
+        {
+          type: 'detail-tree',
+          items: [{ label: 'Build Logs', value: '/tmp/Test.log' }],
+        },
       ],
       structuredOutput: {
         schema: 'xcodebuildmcp.output.test-result',

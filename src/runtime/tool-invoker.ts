@@ -460,11 +460,15 @@ export class DefaultToolInvoker implements ToolInvoker {
             }
 
             const ctx: ToolHandlerContext = {
+              liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
               emit: (event) => {
                 opts.renderSession!.emit(event);
               },
               attach: (image) => opts.renderSession!.attach(image),
-              emitProgress: (event) => opts.renderSession!.emit(event),
+              emitProgress:
+                opts.handlerContext?.liveProgressEnabled === true
+                  ? (event) => opts.renderSession!.emit(event)
+                  : () => {},
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
             };
@@ -508,11 +512,15 @@ export class DefaultToolInvoker implements ToolInvoker {
             }
 
             const ctx: ToolHandlerContext = {
+              liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
               emit: (event) => {
                 session.emit(event);
               },
               attach: (image) => session.attach(image),
-              emitProgress: (event) => session.emit(event),
+              emitProgress:
+                opts.handlerContext?.liveProgressEnabled === true
+                  ? (event) => session.emit(event)
+                  : () => {},
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
               structuredOutput: daemonResult.structuredOutput ?? undefined,
@@ -533,6 +541,7 @@ export class DefaultToolInvoker implements ToolInvoker {
     const session = opts.renderSession!;
     try {
       const ctx: ToolHandlerContext = opts.handlerContext ?? {
+        liveProgressEnabled: false,
         emit: (event) => {
           session.emit(event);
           opts.onProgress?.(event);
@@ -540,11 +549,8 @@ export class DefaultToolInvoker implements ToolInvoker {
         attach: (image) => {
           session.attach(image);
         },
+        emitProgress: () => {},
       };
-
-      if (!ctx.emitProgress) {
-        ctx.emitProgress = ctx.emit;
-      }
 
       await tool.handler(args, ctx);
 

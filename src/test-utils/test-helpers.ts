@@ -37,7 +37,11 @@ export interface MockToolHandlerResult {
   isError(): boolean;
 }
 
-export function createMockToolHandlerContext(): {
+export function createMockToolHandlerContext(
+  options: {
+    liveProgressEnabled?: boolean;
+  } = {},
+): {
   ctx: ToolHandlerContext;
   result: MockToolHandlerResult;
   run: <T>(fn: () => Promise<T>) => Promise<T>;
@@ -45,11 +49,19 @@ export function createMockToolHandlerContext(): {
   const events: ProgressEvent[] = [];
   const attachments: ImageAttachment[] = [];
   const ctx: ToolHandlerContext = {
+    liveProgressEnabled: options.liveProgressEnabled ?? true,
     emit: (event) => {
       events.push(event);
     },
     attach: (image) => {
       attachments.push(image);
+    },
+    emitProgress: (event) => {
+      if (!ctx.liveProgressEnabled) {
+        return;
+      }
+
+      events.push(event);
     },
   };
   const resultObj: MockToolHandlerResult = {
@@ -85,11 +97,16 @@ export function createMockToolHandlerContext(): {
   };
 }
 
-export async function runToolLogic<T>(logic: () => Promise<T>): Promise<{
+export async function runToolLogic<T>(
+  logic: () => Promise<T>,
+  options: {
+    liveProgressEnabled?: boolean;
+  } = {},
+): Promise<{
   response: T;
   result: MockToolHandlerResult;
 }> {
-  const { result, run } = createMockToolHandlerContext();
+  const { result, run } = createMockToolHandlerContext(options);
   const response = await run(logic);
   return { response, result };
 }
@@ -154,11 +171,16 @@ export async function callHandler(
   const session = createRenderSession('text');
   const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
+    liveProgressEnabled: true,
     emit: (event) => {
       items.push(event);
       session.emit(event);
     },
     attach: (image) => session.attach(image),
+    emitProgress: (event) => {
+      items.push(event);
+      session.emit(event);
+    },
   };
   await handler(args, ctx);
   if (ctx.structuredOutput) {

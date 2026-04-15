@@ -324,7 +324,13 @@ export async function list_devicesLogic(
 
   const ctx = getHandlerContext();
   const executeListDevices = createListDevicesExecutor(executor, pathDeps, fsDeps);
-  const result = await executeListDevices({}, { emitProgress: () => {} });
+  const result = await executeListDevices(
+    {},
+    {
+      liveProgressEnabled: false,
+      emitProgress: () => {},
+    },
+  );
 
   setStructuredOutput(ctx, result);
 

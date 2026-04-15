@@ -21,11 +21,13 @@ export async function simulatorsResourceLogic(
   const session = createRenderSession('text');
   const items: ProgressEvent[] = [];
   const ctx: ToolHandlerContext = {
+    liveProgressEnabled: false,
     emit: (event) => {
       items.push(event);
       session.emit(event);
     },
     attach: () => {},
+    emitProgress: () => {},
   };
 
   try {

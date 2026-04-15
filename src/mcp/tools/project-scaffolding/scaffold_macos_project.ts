@@ -360,7 +360,10 @@ export async function scaffold_macos_projectLogic(
     commandExecutor,
     fileSystemExecutor,
   );
-  const result = await executeScaffoldMacOSProject(params, { emitProgress() {} });
+  const result = await executeScaffoldMacOSProject(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setScaffoldStructuredOutput(ctx, result);
 

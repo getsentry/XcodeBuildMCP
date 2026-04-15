@@ -131,7 +131,10 @@ export async function boot_simLogic(
 
   const ctx = getHandlerContext();
   const executeBootSim = createBootSimExecutor(executor);
-  const result = await executeBootSim(params, { emitProgress: () => {} });
+  const result = await executeBootSim(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

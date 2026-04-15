@@ -93,6 +93,8 @@ function createValidatedHandler<TParams, TContext>(
           attach: (image) => {
             session!.attach(image);
           },
+          liveProgressEnabled: false,
+          emitProgress: () => {},
         };
     const context =
       providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();
@@ -231,6 +233,8 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
           attach: (image) => {
             session!.attach(image);
           },
+          liveProgressEnabled: false,
+          emitProgress: () => {},
         };
     const context =
       providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();

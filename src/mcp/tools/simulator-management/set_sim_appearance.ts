@@ -115,7 +115,10 @@ export async function set_sim_appearanceLogic(
   const ctx = getHandlerContext();
   const executeSetSimAppearance = createSetSimAppearanceExecutor(executor);
 
-  const result = await executeSetSimAppearance(params, { emitProgress() {} });
+  const result = await executeSetSimAppearance(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

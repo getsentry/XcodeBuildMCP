@@ -293,7 +293,10 @@ export async function get_file_coverageLogic(
   const ctx = getHandlerContext();
   const { xcresultPath } = params;
   const executeGetFileCoverage = createGetFileCoverageExecutor(context);
-  const result = await executeGetFileCoverage(params, { emitProgress: () => {} });
+  const result = await executeGetFileCoverage(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
   if (!result.didError) {

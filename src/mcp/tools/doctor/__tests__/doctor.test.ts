@@ -136,7 +136,13 @@ describe('doctor tool', () => {
       const executeDoctor = createDoctorExecutor(createDeps());
       const emitProgress = vi.fn();
 
-      const result = await executeDoctor({}, { emitProgress });
+      const result = await executeDoctor(
+        {},
+        {
+          liveProgressEnabled: false,
+          emitProgress,
+        },
+      );
 
       expect(emitProgress).not.toHaveBeenCalled();
       expect(result.didError).toBe(false);

@@ -309,7 +309,10 @@ export function createCleanExecutor(
 export async function cleanLogic(params: CleanParams, executor: CommandExecutor): Promise<void> {
   const ctx = getHandlerContext();
   const executeClean = createCleanExecutor(executor);
-  const result = await executeClean(params, { emitProgress() {} });
+  const result = await executeClean(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 }

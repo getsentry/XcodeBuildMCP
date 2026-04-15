@@ -113,6 +113,7 @@ type CoverageResultWithOptionalRanges = Extract<ToolDomainResult, { kind: 'cover
 
 type SessionDefaultsOperation =
   | { type: 'show' }
+  | { type: 'sync-xcode' }
   | {
       type: 'set';
       changedKeys: string[];
@@ -270,6 +271,7 @@ function inferSessionDefaultsMode(
   result: SessionDefaultsResultWithOperation,
 ): 'show' | 'set' | 'clear' | 'sync-xcode' {
   if (result.operation?.type === 'show') return 'show';
+  if (result.operation?.type === 'sync-xcode') return 'sync-xcode';
   if (result.operation?.type === 'set') return 'set';
   if (result.operation?.type === 'clear') return 'clear';
 
@@ -816,9 +818,16 @@ function createBuildSettingsItems(
   items.push(
     createSection(
       'Settings',
-      result.entries.map((entry) =>
-        entry.value.length > 0 ? `    ${entry.key} = ${entry.value}` : entry.key,
-      ),
+      result.entries.map((entry) => {
+        const renderableEntry = entry as typeof entry & {
+          __hasEquals?: boolean;
+          __renderValue?: string;
+        };
+        if (renderableEntry.__hasEquals === false) {
+          return entry.key;
+        }
+        return `    ${entry.key} =${renderableEntry.__renderValue ?? ` ${entry.value}`}`;
+      }),
     ),
   );
   return items;

@@ -12,6 +12,8 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -48,18 +50,28 @@ function parseBuildSettingsEntries(output: string): Array<{ key: string; value: 
     .map((line) => line.trimEnd())
     .filter((line) => line.trim().length > 0)
     .map((line) => {
-      const match = line.match(/^\s*([^=]+?)\s*=\s*(.*)$/);
+      const match = line.match(/^\s*([^=]+?)\s*=(.*)$/);
       if (match) {
-        return {
+        const entry = {
           key: match[1].trim(),
           value: match[2].trim(),
         };
+        Object.defineProperties(entry, {
+          __hasEquals: { value: true, enumerable: false },
+          __renderValue: { value: match[2], enumerable: false },
+        });
+        return entry;
       }
 
-      return {
+      const entry = {
         key: line.trim(),
         value: '',
       };
+      Object.defineProperties(entry, {
+        __hasEquals: { value: false, enumerable: false },
+        __renderValue: { value: '', enumerable: false },
+      });
+      return entry;
     });
 }
 
@@ -167,8 +179,20 @@ export async function showBuildSettingsLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Show Build Settings', [
+      { label: 'Scheme', value: params.scheme },
+      {
+        label: hasProjectPath ? 'Project' : 'Workspace',
+        value: displayPath(pathValue!),
+      },
+    ]),
+  );
   const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
-  const result = await executeShowBuildSettings(params, { emitProgress() {} });
+  const result = await executeShowBuildSettings(params, {
+    liveProgressEnabled: false,
+    emitProgress() {},
+  });
 
   setStructuredOutput(ctx, result);
 

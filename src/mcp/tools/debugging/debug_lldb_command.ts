@@ -82,7 +82,10 @@ export async function debug_lldb_commandLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
-  const result = await executeDebugLldbCommand(params, { emitProgress: () => {} });
+  const result = await executeDebugLldbCommand(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(handlerCtx, result);
 }

@@ -78,7 +78,13 @@ export function createSessionShowDefaultsExecutor(): ToolExecutor<
 export async function sessionShowDefaultsLogic(): Promise<void> {
   const ctx = getHandlerContext();
   const executeSessionShowDefaults = createSessionShowDefaultsExecutor();
-  const result = await executeSessionShowDefaults({}, { emitProgress() {} });
+  const result = await executeSessionShowDefaults(
+    {},
+    {
+      liveProgressEnabled: false,
+      emitProgress() {},
+    },
+  );
 
   setStructuredOutput(ctx, result);
 }

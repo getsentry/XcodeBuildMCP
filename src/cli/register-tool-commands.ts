@@ -71,7 +71,7 @@ function setEnvScoped(key: string, value: string): () => void {
 
 function createBufferedHandlerContext(
   session: RenderSession,
-  opts?: { onProgress?: (event: ProgressEvent) => void },
+  opts: { liveProgressEnabled: boolean; onProgress?: (event: ProgressEvent) => void },
 ): ToolHandlerContext {
   const emit = (event: ProgressEvent): void => {
     session.emit(event);
@@ -79,11 +79,12 @@ function createBufferedHandlerContext(
   };
 
   return {
+    liveProgressEnabled: opts.liveProgressEnabled,
     emit,
     attach: (image) => {
       session.attach(image);
     },
-    emitProgress: emit,
+    emitProgress: opts.liveProgressEnabled ? emit : () => {},
   };
 }
 
@@ -350,6 +351,7 @@ function registerToolSubcommand(
               ? createRenderSession('text')
               : createRenderSession('text');
         const handlerContext = createBufferedHandlerContext(session, {
+          liveProgressEnabled: outputFormat === 'text' || outputFormat === 'jsonl',
           onProgress:
             outputFormat === 'jsonl'
               ? (event) => {

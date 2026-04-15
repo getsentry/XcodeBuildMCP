@@ -9,6 +9,7 @@ import { log } from '../../../utils/logging/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
 
@@ -86,6 +87,9 @@ export async function swift_package_cleanLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Swift Package Clean', [{ label: 'Package', value: path.resolve(params.packagePath) }]),
+  );
   const executeSwiftPackageClean = createSwiftPackageCleanExecutor(executor);
   const result = await executeSwiftPackageClean(params, noopToolExecutionContext);
 

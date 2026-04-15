@@ -18,6 +18,8 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const stopAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -35,8 +37,17 @@ export async function stop_app_deviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Stop App', [
+      { label: 'Device', value: formatDeviceId(params.deviceId) },
+      { label: 'PID', value: String(params.processId) },
+    ]),
+  );
   const executeStopAppDevice = createStopAppDeviceExecutor(executor);
-  const result = await executeStopAppDevice(params, { emitProgress: () => {} });
+  const result = await executeStopAppDevice(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

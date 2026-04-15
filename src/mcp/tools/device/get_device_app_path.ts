@@ -22,6 +22,8 @@ import { mapDevicePlatform } from './build-settings.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -136,8 +138,25 @@ export async function get_device_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const configuration = params.configuration ?? 'Debug';
+  const platform = String(mapDevicePlatform(params.platform));
+  ctx.emit(
+    header('Get App Path', [
+      { label: 'Scheme', value: params.scheme },
+      ...(params.workspacePath
+        ? [{ label: 'Workspace', value: displayPath(params.workspacePath) }]
+        : params.projectPath
+          ? [{ label: 'Project', value: displayPath(params.projectPath) }]
+          : []),
+      { label: 'Configuration', value: configuration },
+      { label: 'Platform', value: platform },
+    ]),
+  );
   const executeGetDeviceAppPath = createGetDeviceAppPathExecutor(executor);
-  const result = await executeGetDeviceAppPath(params, { emitProgress: () => {} });
+  const result = await executeGetDeviceAppPath(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

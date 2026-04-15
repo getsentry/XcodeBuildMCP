@@ -245,7 +245,10 @@ export async function record_sim_videoLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeRecordSimVideo = createRecordSimVideoExecutor(executor, axe, video, fs);
-  const result = await executeRecordSimVideo(params, { emitProgress: () => {} });
+  const result = await executeRecordSimVideo(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
   if (result.didError) {

@@ -146,7 +146,10 @@ export async function stop_app_simLogic(
 
   const ctx = getHandlerContext();
   const executeStopAppSim = createStopAppSimExecutor(executor);
-  const result = await executeStopAppSim(params, { emitProgress: () => {} });
+  const result = await executeStopAppSim(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

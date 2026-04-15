@@ -24,6 +24,8 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import { header } from '../../../utils/tool-event-builders.ts';
 
 const SIMULATOR_PLATFORMS = [
   XcodePlatform.iOSSimulator,
@@ -177,8 +179,28 @@ export async function get_sim_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  ctx.emit(
+    header('Get App Path', [
+      { label: 'Scheme', value: params.scheme },
+      ...(params.workspacePath
+        ? [{ label: 'Workspace', value: displayPath(params.workspacePath) }]
+        : params.projectPath
+          ? [{ label: 'Project', value: displayPath(params.projectPath) }]
+          : []),
+      { label: 'Configuration', value: params.configuration ?? 'Debug' },
+      { label: 'Platform', value: params.platform },
+      ...(params.simulatorName
+        ? [{ label: 'Simulator', value: params.simulatorName }]
+        : params.simulatorId
+          ? [{ label: 'Simulator', value: params.simulatorId }]
+          : []),
+    ]),
+  );
   const executeGetSimAppPath = createGetSimAppPathExecutor(executor);
-  const result = await executeGetSimAppPath(params, { emitProgress: () => {} });
+  const result = await executeGetSimAppPath(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

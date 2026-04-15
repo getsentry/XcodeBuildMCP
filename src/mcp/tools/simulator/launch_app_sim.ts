@@ -61,7 +61,10 @@ export async function launch_app_simLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeLaunchAppSim = createLaunchAppSimExecutor(executor, launcher);
-  const result = await executeLaunchAppSim(params, { emitProgress: () => {} });
+  const result = await executeLaunchAppSim(params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
 
   setStructuredOutput(ctx, result);
 

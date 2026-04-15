@@ -301,12 +301,14 @@ export async function applyWorkflowSelectionFromManifest(
             try {
               const session = createRenderSession('text');
               const ctx: ToolHandlerContext = {
+                liveProgressEnabled: false,
                 emit: (event) => {
                   if (!('timestamp' in event)) {
                     session.emit(event);
                   }
                 },
                 attach: session.attach,
+                emitProgress: () => {},
               };
               await toolModule.handler(args as Record<string, unknown>, ctx);
 

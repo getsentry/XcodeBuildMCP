@@ -89,7 +89,10 @@ export async function open_simLogic(
 
   const ctx = getHandlerContext();
   const executeOpenSim = createOpenSimExecutor(executor);
-  const result = await executeOpenSim(_params, { emitProgress: () => {} });
+  const result = await executeOpenSim(_params, {
+    liveProgressEnabled: false,
+    emitProgress: () => {},
+  });
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
