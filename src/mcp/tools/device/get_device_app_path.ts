@@ -23,7 +23,7 @@ import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { displayPath } from '../../../utils/build-preflight.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -87,6 +87,17 @@ function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
       errors: messages.map((message) => ({ message })),
     },
   };
+}
+
+function formatDiagnosticsBlock(messages: string[]): string {
+  const lines = [`Errors (${messages.length}):`, ''];
+  messages.forEach((message, index) => {
+    lines.push(`  ✗ ${message}`);
+    if (index < messages.length - 1) {
+      lines.push('');
+    }
+  });
+  return lines.join('\n');
 }
 
 function getAppPath(result: AppPathDomainResult): string | null {
@@ -161,6 +172,11 @@ export async function get_device_app_pathLogic(
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
+    const messages = result.diagnostics?.errors.map((entry) => entry.message) ?? [];
+    if (messages.length > 0) {
+      ctx.emit({ type: 'text-block', text: formatDiagnosticsBlock(messages) });
+    }
+    ctx.emit(statusLine('error', 'Query failed.'));
     log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);
     return;
   }
@@ -170,6 +186,9 @@ export async function get_device_app_pathLogic(
     log('error', 'Error retrieving app path: missing appPath artifact in successful result');
     return;
   }
+
+  ctx.emit(statusLine('success', 'Success'));
+  ctx.emit(detailTree([{ label: 'App Path', value: displayPath(appPath) }]));
 
   ctx.nextStepParams = {
     get_app_bundle_id: { appPath },

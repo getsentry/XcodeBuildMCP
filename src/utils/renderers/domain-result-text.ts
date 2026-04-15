@@ -211,6 +211,10 @@ function createTextBlock(text: string): Extract<ProgressEvent, { type: 'text-blo
   return { type: 'text-block', text };
 }
 
+function formatDurationSeconds(durationMs: number): string {
+  return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
 function formatDiagnosticEntry(entry: { message: string; location?: string }): string {
   return entry.location ? `${entry.location}: ${entry.message}` : entry.message;
 }
@@ -595,17 +599,43 @@ function createAppPathItems(
     items.push(
       createStatus(
         'error',
-        result.error === 'Query failed' ? 'Query failed.' : (result.error ?? 'Query failed.'),
+        result.error === 'Query failed'
+          ? 'Query failed.'
+          : result.error === 'Failed to get app path'
+            ? 'Failed to get app path'
+            : (result.error ?? 'Query failed.'),
       ),
     );
     return items;
   }
 
+  const durationMs =
+    'summary' in result &&
+    result.summary &&
+    typeof result.summary === 'object' &&
+    'durationMs' in result.summary &&
+    typeof result.summary.durationMs === 'number'
+      ? result.summary.durationMs
+      : undefined;
   const appPath =
     'artifacts' in result && result.artifacts && 'appPath' in result.artifacts
       ? result.artifacts.appPath
       : undefined;
-  items.push(createStatus('success', 'Success'));
+  const isSimulatorAppPath =
+    typeof appPath === 'string' &&
+    /(iphonesimulator|watchsimulator|appletvsimulator|xrsimulator|visionossimulator)/i.test(
+      appPath,
+    );
+  items.push(
+    createStatus(
+      'success',
+      isSimulatorAppPath && durationMs !== undefined
+        ? `Get app path successful (⏱️ ${formatDurationSeconds(durationMs)})`
+        : isSimulatorAppPath
+          ? 'Get app path successful'
+          : 'Success',
+    ),
+  );
   if (appPath) {
     items.push(createDetailTree([{ label: 'App Path', value: displayPath(appPath) }]));
   }
@@ -1116,7 +1146,8 @@ function createCaptureResultItems(
   }
 
   const isUiHierarchy =
-    result.capture && 'type' in result.capture && result.capture.type === 'ui-hierarchy';
+    (result.capture && 'type' in result.capture && result.capture.type === 'ui-hierarchy') ||
+    result.error?.includes('accessibility hierarchy') === true;
   const title = isUiHierarchy ? 'Snapshot UI' : 'Screenshot';
   const items: TextRenderableItem[] = [
     createHeader(title, [
@@ -1153,18 +1184,16 @@ function createCaptureResultItems(
     items.push(createStatus('success', 'Accessibility hierarchy retrieved successfully.'));
     const uiHierarchy = (result.capture as { type: 'ui-hierarchy'; uiHierarchy: unknown[] })
       .uiHierarchy;
+    const uiHierarchyLines = formatUiHierarchyJsonLines(uiHierarchy);
     items.push(
-      createSection('Accessibility Hierarchy', [
-        '```json',
-        ...JSON.stringify(uiHierarchy, null, 2).split('\n'),
-        '```',
-      ]),
+      createSection('Accessibility Hierarchy', ['```json', ...uiHierarchyLines.slice(0, -1)]),
     );
+    items.push(createTextBlock((uiHierarchyLines.at(-1) ?? ']') + '\n  ```'));
     items.push(
       createSection('Tips', [
-        'Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
-        'If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
-        'Screenshots are for visual verification only',
+        '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
+        '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
+        '- Screenshots are for visual verification only',
       ]),
     );
     result.diagnostics?.warnings.forEach((warning) =>
@@ -1730,6 +1759,154 @@ function createBuildLikeDiagnosticEvents(
   return items;
 }
 
+function createBuildRunSyntheticStepItems(
+  result: Extract<ToolDomainResult, { kind: 'build-run-result' }>,
+): TextRenderableItem[] {
+  if (result.didError) {
+    return [];
+  }
+
+  const target =
+    result.summary.target ??
+    ('simulatorId' in result.artifacts
+      ? 'simulator'
+      : 'deviceId' in result.artifacts
+        ? 'device'
+        : 'packagePath' in result.artifacts
+          ? 'swift-package'
+          : 'macos');
+
+  const stepsByTarget: Record<
+    string,
+    Array<{ level: StatusProgressEvent['level']; message: string }>
+  > = {
+    device: [
+      { level: 'info', message: 'Resolving app path' },
+      { level: 'success', message: 'Resolving app path' },
+      { level: 'info', message: 'Installing app' },
+      { level: 'success', message: 'Installing app' },
+      { level: 'info', message: 'Launching app' },
+    ],
+    macos: [
+      { level: 'info', message: 'Resolving app path' },
+      { level: 'success', message: 'Resolving app path' },
+      { level: 'info', message: 'Launching app' },
+      { level: 'success', message: 'Launching app' },
+    ],
+    simulator: [
+      { level: 'info', message: 'Resolving app path' },
+      { level: 'success', message: 'Resolving app path' },
+      { level: 'info', message: 'Booting simulator' },
+      { level: 'success', message: 'Booting simulator' },
+      { level: 'info', message: 'Installing app' },
+      { level: 'success', message: 'Installing app' },
+      { level: 'info', message: 'Launching app' },
+    ],
+  };
+
+  return (stepsByTarget[target] ?? []).map((step) => createStatus(step.level, step.message));
+}
+
+function appendCommaToLastContentLine(lines: string[]): void {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index] && lines[index]!.length > 0) {
+      lines[index] = `${lines[index]},`;
+      return;
+    }
+  }
+}
+
+function formatUiHierarchyJsonLines(value: unknown, indentLevel = 0): string[] {
+  const indent = ' '.repeat(indentLevel);
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return [`${indent}[`, '', `${indent}]`];
+    }
+
+    const lines = [`${indent}[`];
+    value.forEach((item, index) => {
+      const itemLines = formatUiHierarchyJsonLines(item, indentLevel);
+      if (index < value.length - 1) {
+        appendCommaToLastContentLine(itemLines);
+      }
+      lines.push(...itemLines);
+    });
+    lines.push(`${indent}]`);
+    return lines;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+      return [`${indent}{}`];
+    }
+
+    const lines = [`${indent}{`];
+    entries.forEach(([key, entryValue], index) => {
+      const propertyLines = formatUiHierarchyJsonPropertyLines(key, entryValue, indentLevel + 2);
+      if (index < entries.length - 1) {
+        appendCommaToLastContentLine(propertyLines);
+      }
+      lines.push(...propertyLines);
+    });
+    lines.push(`${indent}}`);
+    return lines;
+  }
+
+  return [`${indent}${JSON.stringify(value)}`];
+}
+
+function formatUiHierarchyJsonPropertyLines(
+  key: string,
+  value: unknown,
+  indentLevel: number,
+): string[] {
+  const indent = ' '.repeat(indentLevel);
+  const prefix = `${indent}${JSON.stringify(key)} : `;
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return [`${prefix}[`, '', `${indent}]`];
+    }
+
+    const lines = [`${prefix}[`];
+    value.forEach((item, index) => {
+      const itemLines = formatUiHierarchyJsonLines(item, indentLevel + 2);
+      if (index < value.length - 1) {
+        appendCommaToLastContentLine(itemLines);
+      }
+      lines.push(...itemLines);
+    });
+    lines.push(`${indent}]`);
+    return lines;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+      return [`${prefix}{}`];
+    }
+
+    const lines = [`${prefix}{`];
+    entries.forEach(([childKey, childValue], index) => {
+      const propertyLines = formatUiHierarchyJsonPropertyLines(
+        childKey,
+        childValue,
+        indentLevel + 2,
+      );
+      if (index < entries.length - 1) {
+        appendCommaToLastContentLine(propertyLines);
+      }
+      lines.push(...propertyLines);
+    });
+    lines.push(`${indent}}`);
+    return lines;
+  }
+
+  return [`${prefix}${JSON.stringify(value)}`];
+}
+
 function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[] {
   switch (result.kind) {
     case 'build-result': {
@@ -1761,7 +1938,11 @@ function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[
       if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
         items.push({ label: 'Process ID', value: String(result.artifacts.processId) });
       }
-      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
+      if (
+        'buildLogPath' in result.artifacts &&
+        typeof result.artifacts.buildLogPath === 'string' &&
+        !(result.didError && result.summary.target === 'swift-package')
+      ) {
         items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
       }
       if (
@@ -2042,6 +2223,9 @@ export function renderDomainResultTextItems(result: ToolDomainResult): TextRende
       }
     }
     items.push(...createBuildLikeDiagnosticEvents(result));
+    if (result.kind === 'build-run-result') {
+      items.push(...createBuildRunSyntheticStepItems(result));
+    }
     const summary = createSummaryBlock(result);
     if (summary) {
       items.push(summary);

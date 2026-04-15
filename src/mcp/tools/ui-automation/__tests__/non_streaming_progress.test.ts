@@ -161,6 +161,6 @@ describe('ui automation non-streaming tools', () => {
     expect(result.events).toEqual([]);
     expect(result.text()).toContain('Accessibility hierarchy retrieved successfully.');
     expect(result.text()).toContain('Accessibility Hierarchy');
-    expect(result.text()).toContain('"type": "Button"');
+    expect(result.text()).toContain('"type" : "Button"');
   });
 });

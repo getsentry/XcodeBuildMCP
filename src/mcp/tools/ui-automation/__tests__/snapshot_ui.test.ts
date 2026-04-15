@@ -90,8 +90,8 @@ describe('Snapshot UI Plugin', () => {
       const text = allText(result);
       expect(text).toContain('Accessibility hierarchy retrieved successfully.');
       expect(text).toContain('Accessibility Hierarchy');
-      expect(text).toContain('"type": "Button"');
-      expect(text).toContain('"width": 50');
+      expect(text).toContain('"type" : "Button"');
+      expect(text).toContain('"width" : 50');
       expect(text).toContain('Use frame coordinates for tap/swipe');
       expect(result.nextStepParams).toEqual({
         snapshot_ui: { simulatorId: '12345678-1234-4234-8234-123456789012' },

@@ -85,14 +85,6 @@ interface XcodebuildParserState {
 
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
-function isBuildLikeResult(output: StructuredToolOutput | undefined): boolean {
-  return (
-    output?.result.kind === 'build-result' ||
-    output?.result.kind === 'build-run-result' ||
-    output?.result.kind === 'test-result'
-  );
-}
-
 function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRenderer {
   const { interactive, sink, suppressWarnings } = options;
   const groupedCompilerErrors: CompilerErrorProgressEvent[] = [];
@@ -378,8 +370,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
 
     finalize(): void {
       flushParserStates();
-      const shouldReplayStructured =
-        !!structuredOutput && (!isBuildLikeResult(structuredOutput) || !sawIncomingNonHeaderEvent);
+      const shouldReplayStructured = !!structuredOutput && !sawIncomingNonHeaderEvent;
       if (shouldReplayStructured && structuredOutput) {
         const structuredItems = renderDomainResultTextItems(structuredOutput.result);
         const replayItems =

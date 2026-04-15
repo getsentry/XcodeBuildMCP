@@ -107,6 +107,10 @@ export function normalizeSnapshotOutput(text: string): string {
     new RegExp(escapeRegex(tmpDir) + '/[A-Za-z0-9._-]+(?=/|[^A-Za-z0-9._/-]|$)', 'g'),
     '<TMPDIR>',
   );
+  normalized = normalized.replace(
+    /(Build Logs: )(?:<TMPDIR>|<HOME>\/Library\/Developer\/XcodeBuildMCP)\/logs\//g,
+    '$1<HOME>/Library/Developer/XcodeBuildMCP/logs/',
+  );
 
   normalized = normalized.replace(DERIVED_DATA_HASH_REGEX, '$1-<HASH>');
   normalized = normalized.replace(ISO_TIMESTAMP_REGEX, '<TIMESTAMP>');
@@ -170,8 +174,11 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = sortLinesInBlock(normalized, /^[◇✔✘] Test "/);
 
-  normalized = normalized.replace(/(?<=Workspace root: )<ROOT>\/[^\n]+/g, '<PATH>');
-  normalized = normalized.replace(/(?<=Scan path: )<ROOT>\/[^\n]+/g, '<PATH>');
+  normalized = normalized.replace(
+    /(?<=Workspace root: )(?:<ROOT>\/[^\n]+|(?!\/)[^\n]+)/g,
+    '<PATH>',
+  );
+  normalized = normalized.replace(/(?<=Scan path: )(?:<ROOT>\/[^\n]+|(?!\/)[^\n]+)/g, '<PATH>');
 
   // Doctor-specific sanitization for volatile system information
   normalized = normalized.replace(/  version: v[\d.]+/g, '  version: <NODE_VERSION>');
