@@ -121,4 +121,38 @@ describe('SessionStore', () => {
     const stored = sessionStore.getAll();
     expect(stored.env).toEqual({ API_KEY: 'secret' });
   });
+
+  it('computes a workspace-scoped derivedDataPath when workspacePath is set', () => {
+    sessionStore.setDefaults({ workspacePath: '/Users/dev/clone-1/MyApp.xcworkspace' });
+
+    const defaults = sessionStore.getAll();
+    expect(defaults.derivedDataPath).toMatch(/MyApp-[a-f0-9]{12}$/);
+  });
+
+  it('computes a project-scoped derivedDataPath when projectPath is set', () => {
+    sessionStore.setDefaults({ projectPath: '/Users/dev/clone-2/MyApp.xcodeproj' });
+
+    const defaults = sessionStore.getAll();
+    expect(defaults.derivedDataPath).toMatch(/MyApp-[a-f0-9]{12}$/);
+  });
+
+  it('does not override an explicitly set derivedDataPath', () => {
+    sessionStore.setDefaults({
+      workspacePath: '/Users/dev/clone-1/MyApp.xcworkspace',
+      derivedDataPath: '/custom/path',
+    });
+
+    expect(sessionStore.getAll().derivedDataPath).toBe('/custom/path');
+  });
+
+  it('produces different hashes for different workspace paths', () => {
+    sessionStore.setDefaults({ workspacePath: '/clone-1/MyApp.xcworkspace' });
+    const path1 = sessionStore.getAll().derivedDataPath;
+
+    sessionStore.clearAll();
+    sessionStore.setDefaults({ workspacePath: '/clone-2/MyApp.xcworkspace' });
+    const path2 = sessionStore.getAll().derivedDataPath;
+
+    expect(path1).not.toBe(path2);
+  });
 });

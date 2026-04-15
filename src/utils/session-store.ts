@@ -1,3 +1,6 @@
+import * as crypto from 'node:crypto';
+import * as path from 'node:path';
+import { DERIVED_DATA_DIR } from './log-paths.ts';
 import { log } from './logger.ts';
 
 export type SessionDefaults = {
@@ -133,7 +136,19 @@ class SessionStore {
 
   getAllForProfile(profile: string | null): SessionDefaults {
     const defaults = profile === null ? this.globalDefaults : (this.profiles[profile] ?? {});
-    return this.cloneDefaults(defaults);
+    const result = this.cloneDefaults(defaults);
+
+    if (!result.derivedDataPath) {
+      const anchor = result.workspacePath ?? result.projectPath;
+      if (anchor) {
+        const resolved = path.resolve(anchor);
+        const hash = crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12);
+        const name = path.basename(resolved, path.extname(resolved));
+        result.derivedDataPath = path.join(DERIVED_DATA_DIR, `${name}-${hash}`);
+      }
+    }
+
+    return result;
   }
 
   listProfiles(): string[] {
