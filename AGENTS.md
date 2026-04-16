@@ -57,6 +57,7 @@ Use these sections under `## [Unreleased]`:
 - Pattern: `DEVICE_ID=... npm run test:snapshot 2>&1 | tee /tmp/snapshot-results.txt` then read `/tmp/snapshot-results.txt` with the native read tool.
 - If you need a summary, read the log file and grep/filter it — the full output is always preserved.
 - Snapshot test command: `DEVICE_ID=33689F72-9B74-5406-9842-1CC6A6A96A88 npm run test:snapshot`
+- If physical-device snapshot tests hang after the final test summary, the likely cause is Apple post-failure diagnostics invoking `devicectl diagnose`, which may prompt for a macOS password and wedge in automated runs; see `docs/dev/device-snapshot-password-hang-rca.md`.
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the native read tool.
