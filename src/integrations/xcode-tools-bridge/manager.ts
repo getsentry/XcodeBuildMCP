@@ -24,12 +24,16 @@ export class XcodeToolsBridgeManager {
   private workflowEnabled = false;
   private lastError: string | null = null;
   private syncInFlight: Promise<ProxySyncResult> | null = null;
+  private suppressListChangedSync = false;
 
   constructor(server: McpServer) {
     this.server = server;
     this.registry = new XcodeToolsProxyRegistry(server);
     this.service = new XcodeIdeToolService({
       onToolCatalogInvalidated: (): void => {
+        if (this.suppressListChangedSync) {
+          return;
+        }
         void this.syncTools({ reason: 'listChanged' });
       },
     });
@@ -59,6 +63,10 @@ export class XcodeToolsBridgeManager {
   }): Promise<ProxySyncResult> {
     if (!this.workflowEnabled) {
       throw new Error('xcode-ide workflow is not enabled');
+    }
+
+    if (opts.reason !== 'listChanged') {
+      this.suppressListChangedSync = false;
     }
 
     if (this.syncInFlight) return this.syncInFlight;
@@ -107,6 +115,7 @@ export class XcodeToolsBridgeManager {
   }
 
   async disconnect(): Promise<void> {
+    this.suppressListChangedSync = true;
     this.registry.clear();
     this.server.sendToolListChanged();
     await this.service.disconnect();

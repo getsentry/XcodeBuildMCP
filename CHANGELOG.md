@@ -23,6 +23,10 @@
 
 - Auto-scope DerivedData per workspace/project path at xcodebuild invocation time when no explicit `derivedDataPath` is configured. Session defaults remain raw, while build/test/app-path commands derive a stable hashed subdirectory under the global DerivedData root from the resolved workspace or project path. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
 
+### Fixed
+
+- Fixed `xcode_tools_bridge_disconnect` immediately re-syncing proxied tools after a manual disconnect ([#343](https://github.com/getsentry/XcodeBuildMCP/issues/343)).
+
 ## [2.3.2]
 
 ### Fixed
@@ -449,5 +453,3 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-
-
