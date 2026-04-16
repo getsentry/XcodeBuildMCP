@@ -19,7 +19,7 @@ export function registerCoverageSnapshotSuite(runtime: SnapshotRuntime): void {
     beforeAll(async () => {
       vi.setConfig({ testTimeout: 120_000 });
       harness = await createHarnessForRuntime(runtime);
-      await ensureSimulatorBooted('iPhone 17');
+      await ensureSimulatorBooted('iPhone 17 Pro');
 
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coverage-snapshot-'));
       xcresultPath = path.join(tmpDir, 'TestResults.xcresult');

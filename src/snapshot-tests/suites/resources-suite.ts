@@ -7,7 +7,7 @@ export function registerResourcesSnapshotSuite(): void {
 
   describe('mcp resources', () => {
     beforeAll(async () => {
-      await ensureSimulatorBooted('iPhone 17');
+      await ensureSimulatorBooted('iPhone 17 Pro');
     }, 30_000);
     describe('devices', () => {
       it('success', async () => {
@@ -34,7 +34,7 @@ export function registerResourcesSnapshotSuite(): void {
     });
 
     describe('simulators', () => {
-      it.skip('success', async () => {
+      it('success', async () => {
         const { text } = await invokeResource('simulators');
         expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'simulators--success');

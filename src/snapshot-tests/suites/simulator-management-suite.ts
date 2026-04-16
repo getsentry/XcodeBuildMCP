@@ -8,8 +8,8 @@ import {
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
-const PRIMARY_SIMULATOR_NAME = 'iPhone 17';
-const THROWAWAY_SIMULATOR_NAME = 'iPhone 17 Pro';
+const PRIMARY_SIMULATOR_NAME = 'iPhone 17 Pro';
+const THROWAWAY_SIMULATOR_NAME = 'iPhone 17';
 const IOS_26_4_RUNTIME_IDENTIFIER = 'com.apple.CoreSimulator.SimRuntime.iOS-26-4';
 
 export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntime): void {
@@ -29,7 +29,7 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     });
 
     describe('list', () => {
-      it.skip('success', async () => {
+      it('success', async () => {
         const { text, isError } = await harness.invoke('simulator-management', 'list', {});
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);

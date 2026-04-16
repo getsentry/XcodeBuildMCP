@@ -3,21 +3,21 @@
 
 iOS Devices:
 
-  📱 [✓] Cameron’s iPhone 16 Pro Max
+  📱 [<STATUS>] Cameron’s iPhone 16 Pro Max
     OS: 26.3.1 (a)
     UDID: <UUID>
 
-  📱 [✗] iPhone
+  📱 [<STATUS>] iPhone
     OS: 26.1
     UDID: <UUID>
 
 watchOS Devices:
 
-  ⌚️ [✗] Cameron’s Apple Watch
+  ⌚️ [<STATUS>] Cameron’s Apple Watch
     OS: 10.6.1
     UDID: <UUID>
 
-  ⌚️ [✓] Cameron’s Apple Watch
+  ⌚️ [<STATUS>] Cameron’s Apple Watch
     OS: 26.3
     UDID: <UUID>
 

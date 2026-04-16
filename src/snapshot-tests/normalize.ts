@@ -128,6 +128,24 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(CLI_PROCESS_ID_ARG_REGEX, '--process-id "<PID>"');
   normalized = normalized.replace(MCP_PROCESS_ID_ARG_REGEX, '$1<PID>');
   normalized = normalized.replace(UPTIME_REGEX, 'Uptime: <UPTIME>');
+
+  // Normalize simulator/device state markers and boot state text
+  normalized = normalized.replace(/\[✓\]/g, '[<STATUS>]');
+  normalized = normalized.replace(/\[✗\]/g, '[<STATUS>]');
+  normalized = normalized.replace(/\(Booted\)/g, '(<SIM_STATE>)');
+  normalized = normalized.replace(/\(Shutdown\)/g, '(<SIM_STATE>)');
+
+  // Normalize floating-point frame coordinates in accessibility hierarchy
+  // Round to nearest integer: "162.00616404810239" -> "162", "77.987671903795217" -> "78"
+  normalized = normalized.replace(/"AXFrame"\s*:\s*"[^"]*"/g, (match) => {
+    return match.replace(/(\d+)\.\d+/g, (_, intPart) => intPart);
+  });
+  // Normalize frame object values: "162.0" -> "162", "77.987..." -> "78"
+  normalized = normalized.replace(
+    /("(?:x|y|width|height)"\s*:\s*)(\d+(?:\.\d+)?)/g,
+    (_, prefix, num) => `${prefix}${Math.round(parseFloat(num))}`,
+  );
+
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
   normalized = normalized.replace(LLDB_FRAME_OFFSET_REGEX, '$1:<OFFSET>');

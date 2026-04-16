@@ -57,6 +57,10 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
     }
   }
 
+  if (key === 'state' && path.includes('simulators')) {
+    return '<SIM_STATE>';
+  }
+
   if (key === 'test' || path.includes('selected')) {
     result = result.replace(/\(\)$/, '');
   }
