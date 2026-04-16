@@ -14,8 +14,12 @@
       "type": "ui-hierarchy",
       "uiHierarchy": [
         {
-          "normalized": true,
-          "elementCount": 1
+          "frame": { "x": 0, "y": 0, "width": 402, "height": 874 },
+          "type": "Application",
+          "role": "AXApplication",
+          "children": [],
+          "enabled": true,
+          "custom_actions": []
         }
       ]
     }
