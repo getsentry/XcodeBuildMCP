@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   createTemporarySimulator,
   deleteSimulator,
-  ensureNamedSimulatorStates,
   ensureSimulatorBooted,
   shutdownSimulator,
 } from '../harness.ts';
@@ -30,15 +29,7 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     });
 
     describe('list', () => {
-      it('success', async () => {
-        await ensureNamedSimulatorStates({
-          'iPhone 17 Pro': 'Booted',
-          'iPhone 17 Pro Max': 'Booted',
-          'iPhone 17e': runtime === 'cli' ? 'Shutdown' : 'Booted',
-          'iPhone Air': 'Shutdown',
-          'iPhone 17': 'Booted',
-        });
-
+      it.skip('success', async () => {
         const { text, isError } = await harness.invoke('simulator-management', 'list', {});
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);

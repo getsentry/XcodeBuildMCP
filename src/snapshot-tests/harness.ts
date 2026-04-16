@@ -126,36 +126,15 @@ async function waitForSimulatorState(
   );
 }
 
-export async function ensureSimulatorState(
-  simulatorName: string,
-  expectedState: SimulatorState,
-): Promise<string> {
+export async function ensureSimulatorBooted(simulatorName: string): Promise<string> {
   const device = findAvailableDeviceByName(simulatorName);
 
-  if (expectedState === 'Booted') {
-    if (device.state !== 'Booted') {
-      execSync(`xcrun simctl boot ${device.udid}`, { encoding: 'utf8' });
-      execSync(`xcrun simctl bootstatus ${device.udid} -b`, { encoding: 'utf8' });
-    }
-  } else if (device.state === 'Booted') {
-    execSync(`xcrun simctl shutdown ${device.udid}`, {
-      encoding: 'utf8',
-    });
+  if (device.state !== 'Booted') {
+    execSync(`xcrun simctl boot ${device.udid}`, { encoding: 'utf8' });
+    execSync(`xcrun simctl bootstatus ${device.udid} -b`, { encoding: 'utf8' });
   }
 
-  return (await waitForSimulatorState(simulatorName, expectedState)).udid;
-}
-
-export async function ensureNamedSimulatorStates(
-  states: Record<string, SimulatorState>,
-): Promise<void> {
-  for (const [simulatorName, expectedState] of Object.entries(states)) {
-    await ensureSimulatorState(simulatorName, expectedState);
-  }
-}
-
-export async function ensureSimulatorBooted(simulatorName: string): Promise<string> {
-  return ensureSimulatorState(simulatorName, 'Booted');
+  return (await waitForSimulatorState(simulatorName, 'Booted')).udid;
 }
 
 export async function createTemporarySimulator(
