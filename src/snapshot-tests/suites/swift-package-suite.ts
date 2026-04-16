@@ -135,6 +135,21 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
     });
 
     describe('list', () => {
+      beforeAll(async () => {
+        // Stop daemon to clear stale process records from prior test suites
+        try {
+          const { execSync } = await import('node:child_process');
+          execSync('node build/cli.js daemon stop 2>/dev/null || true', {
+            encoding: 'utf8',
+            cwd: process.cwd(),
+          });
+          execSync("pkill -f 'example_projects/spm' 2>/dev/null || true", { encoding: 'utf8' });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch {
+          // Ignore
+        }
+      });
+
       it('no processes', async () => {
         await stopAllRunningSwiftPackageProcesses();
         const { text, isError } = await harness.invoke('swift-package', 'list', {});
