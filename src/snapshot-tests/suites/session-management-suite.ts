@@ -101,8 +101,9 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
       });
 
       describe('session-sync-xcode-defaults', () => {
-        (runtime === 'json' ? it.skip : it)('success', async () => {
+        it('success', async () => {
           if (runtime === 'json') {
+            await seedSessionDefaults();
             await harness.invoke('project-discovery', 'show-build-settings', {
               workspacePath: WORKSPACE,
               scheme: 'CalculatorApp',

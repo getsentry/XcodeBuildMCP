@@ -8,7 +8,7 @@
     "profiles": {
       "(default)": {
         "projectPath": null,
-        "workspacePath": null,
+        "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
         "scheme": "CalculatorApp",
         "configuration": null,
         "simulatorName": null,

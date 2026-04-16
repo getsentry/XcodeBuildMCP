@@ -26,7 +26,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
     });
 
     describe('list', () => {
-      (runtime === 'json' ? it.skip : it)('success', async () => {
+      it('success', async () => {
         const { text, isError } = await harness.invoke('device', 'list', {});
         expect(isError).toBe(false);
         expectFixture(text, 'list--success');
@@ -76,7 +76,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
     });
 
     describe('install', () => {
-      (runtime === 'json' ? it.skip : it)('error - invalid app path', async () => {
+      it('error - invalid app path', async () => {
         const { text, isError } = await harness.invoke('device', 'install', {
           deviceId: '00000000-0000-0000-0000-000000000000',
           appPath: '/tmp/nonexistent.app',
@@ -87,7 +87,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
     });
 
     describe('launch', () => {
-      (runtime === 'json' ? it.skip : it)('error - invalid bundle', async () => {
+      it('error - invalid bundle', async () => {
         const { text, isError } = await harness.invoke('device', 'launch', {
           deviceId: '00000000-0000-0000-0000-000000000000',
           bundleId: 'com.nonexistent.app',
@@ -98,7 +98,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
     });
 
     describe('stop', () => {
-      (runtime === 'json' ? it.skip : it)('error - no app', async () => {
+      it('error - no app', async () => {
         const { text, isError } = await harness.invoke('device', 'stop', {
           deviceId: '00000000-0000-0000-0000-000000000000',
           processId: 99999,

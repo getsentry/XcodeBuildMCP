@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vites
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureSimulatorBooted } from '../harness.ts';
+import { ensureNamedSimulatorStates, ensureSimulatorBooted } from '../harness.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
@@ -176,9 +176,17 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
     });
 
     describe('list', () => {
-      it.skip(
+      it(
         'success',
         async () => {
+          await ensureNamedSimulatorStates({
+            'iPhone 17 Pro': 'Booted',
+            'iPhone 17 Pro Max': 'Booted',
+            'iPhone 17e': 'Shutdown',
+            'iPhone Air': 'Shutdown',
+            'iPhone 17': 'Booted',
+          });
+
           const { text, isError } = await harness.invoke('simulator', 'list', {});
           expect(isError).toBe(false);
           expect(text.length).toBeGreaterThan(10);
@@ -212,7 +220,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         TEST_TIMEOUT_MS,
       );
 
-      (runtime === 'json' ? it.skip : it)(
+      it(
         'error - invalid app',
         async () => {
           const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-install-'));
@@ -247,7 +255,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         TEST_TIMEOUT_MS,
       );
 
-      (runtime === 'json' ? it.skip : it)(
+      it(
         'error - not installed',
         async () => {
           const { text, isError } = await harness.invoke('simulator', 'launch-app', {
@@ -308,7 +316,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         TEST_TIMEOUT_MS,
       );
 
-      (runtime === 'json' ? it.skip : it)(
+      it(
         'error - no app',
         async () => {
           const { text, isError } = await harness.invoke('simulator', 'stop', {
@@ -331,7 +339,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         // MCP disables session-default hydration in the snapshot harness, while the CLI surface
         // validates and hydrates arguments differently. This makes the empty-args build failure
         // a transport-specific MCP snapshot rather than a shared CLI/MCP parity case.
-        (runtime === 'json' ? it.skip : it)('build -- error missing params', async () => {
+        it('build -- error missing params', async () => {
+          if (runtime === 'json') {
+            await expect(harness.invoke('simulator', 'build', {})).rejects.toThrow(
+              'Structured output missing for simulator/build',
+            );
+            return;
+          }
+
           const { text, isError } = await harness.invoke('simulator', 'build', {});
           expect(isError).toBe(true);
           expectFixture(text, 'build--error-missing-params');

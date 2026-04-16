@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { clearAllProcesses } from '../../mcp/tools/swift-package/active-processes.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import { createJsonSnapshotHarness } from '../json-harness.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const PACKAGE_PATH = 'example_projects/spm';
@@ -11,12 +12,38 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
   describe(`${runtime} swift-package workflow`, () => {
     let harness: WorkflowSnapshotHarness;
 
+    async function stopAllRunningSwiftPackageProcesses(): Promise<void> {
+      const jsonHarness = await createJsonSnapshotHarness();
+
+      try {
+        while (true) {
+          const { text } = await jsonHarness.invoke('swift-package', 'list', {});
+          const envelope = JSON.parse(text) as {
+            data?: { processes?: Array<{ processId: number }> };
+          };
+          const processIds = envelope.data?.processes?.map((process) => process.processId) ?? [];
+
+          if (processIds.length === 0) {
+            return;
+          }
+
+          for (const processId of processIds) {
+            await jsonHarness.invoke('swift-package', 'stop', { pid: processId });
+          }
+        }
+      } finally {
+        clearAllProcesses();
+        await jsonHarness.cleanup();
+      }
+    }
+
     beforeAll(async () => {
       vi.setConfig({ testTimeout: 120_000 });
       harness = await createHarnessForRuntime(runtime);
     }, 120_000);
 
     afterAll(async () => {
+      await stopAllRunningSwiftPackageProcesses();
       await harness.cleanup();
     });
 
@@ -109,13 +136,15 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('list', () => {
       it('no processes', async () => {
-        clearAllProcesses();
+        await stopAllRunningSwiftPackageProcesses();
         const { text, isError } = await harness.invoke('swift-package', 'list', {});
         expect(isError).toBe(false);
         expectFixture(text, 'list--no-processes');
       });
 
       it('success', async () => {
+        await stopAllRunningSwiftPackageProcesses();
+
         await harness.invoke('swift-package', 'run', {
           packagePath: PACKAGE_PATH,
           executableName: 'spm',
@@ -127,7 +156,7 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
           expect(isError).toBe(false);
           expectFixture(text, 'list--success');
         } finally {
-          clearAllProcesses();
+          await stopAllRunningSwiftPackageProcesses();
         }
       }, 120_000);
     });

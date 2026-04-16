@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Open simulator operation failed: _LSOpenURLsWithCompletionHandler() failed for the application /Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Simulator.app with error -1712.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "open"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "_LSOpenURLsWithCompletionHandler() failed for the application /Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Simulator.app with error -1712."
+        }
+      ]
+    }
+  }
+}

@@ -7,6 +7,8 @@ import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
 const SNAPSHOT_COMMAND_TIMEOUT_MS = 300_000;
+const SIMULATOR_STATE_WAIT_TIMEOUT_MS = 15_000;
+const SIMULATOR_STATE_POLL_INTERVAL_MS = 250;
 
 export type SnapshotHarness = WorkflowSnapshotHarness;
 export type { SnapshotResult };
@@ -69,8 +71,12 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
   return { invoke, cleanup };
 }
 
+type SimulatorState = 'Booted' | 'Shutdown';
+
+type SimctlAvailableDevice = { udid: string; name: string; state: string };
+
 type SimctlAvailableDevices = {
-  devices: Record<string, Array<{ udid: string; name: string; state: string }>>;
+  devices: Record<string, SimctlAvailableDevice[]>;
 };
 
 function getAvailableDevices(): SimctlAvailableDevices {
@@ -81,21 +87,75 @@ function getAvailableDevices(): SimctlAvailableDevices {
   return JSON.parse(listOutput) as SimctlAvailableDevices;
 }
 
-export async function ensureSimulatorBooted(simulatorName: string): Promise<string> {
+function findAvailableDeviceByName(simulatorName: string): SimctlAvailableDevice {
   const data = getAvailableDevices();
 
   for (const runtime of Object.values(data.devices)) {
     for (const device of runtime) {
       if (device.name === simulatorName) {
-        if (device.state !== 'Booted') {
-          execSync(`xcrun simctl boot ${device.udid}`, { encoding: 'utf8' });
-        }
-        return device.udid;
+        return device;
       }
     }
   }
 
   throw new Error(`Simulator "${simulatorName}" not found`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForSimulatorState(
+  simulatorName: string,
+  expectedState: SimulatorState,
+): Promise<SimctlAvailableDevice> {
+  const deadline = Date.now() + SIMULATOR_STATE_WAIT_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const device = findAvailableDeviceByName(simulatorName);
+    if (device.state === expectedState) {
+      return device;
+    }
+
+    await sleep(SIMULATOR_STATE_POLL_INTERVAL_MS);
+  }
+
+  const device = findAvailableDeviceByName(simulatorName);
+  throw new Error(
+    `Simulator "${simulatorName}" did not reach state "${expectedState}" (current: "${device.state}")`,
+  );
+}
+
+export async function ensureSimulatorState(
+  simulatorName: string,
+  expectedState: SimulatorState,
+): Promise<string> {
+  const device = findAvailableDeviceByName(simulatorName);
+
+  if (expectedState === 'Booted') {
+    if (device.state !== 'Booted') {
+      execSync(`xcrun simctl boot ${device.udid}`, { encoding: 'utf8' });
+      execSync(`xcrun simctl bootstatus ${device.udid} -b`, { encoding: 'utf8' });
+    }
+  } else if (device.state === 'Booted') {
+    execSync(`xcrun simctl shutdown ${device.udid}`, {
+      encoding: 'utf8',
+    });
+  }
+
+  return (await waitForSimulatorState(simulatorName, expectedState)).udid;
+}
+
+export async function ensureNamedSimulatorStates(
+  states: Record<string, SimulatorState>,
+): Promise<void> {
+  for (const [simulatorName, expectedState] of Object.entries(states)) {
+    await ensureSimulatorState(simulatorName, expectedState);
+  }
+}
+
+export async function ensureSimulatorBooted(simulatorName: string): Promise<string> {
+  return ensureSimulatorState(simulatorName, 'Booted');
 }
 
 export async function createTemporarySimulator(

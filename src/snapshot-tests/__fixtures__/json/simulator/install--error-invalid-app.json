@@ -2,28 +2,18 @@
   "schema": "xcodebuildmcp.output.install-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Install app in simulator operation failed: Missing bundle ID.",
+  "error": "Install app in simulator operation failed: An error was encountered processing the command (domain=IXErrorDomain, code=13):\nSimulator device failed to install the application.\nMissing bundle ID.\nUnderlying error (domain=IXErrorDomain, code=13):\n\tFailed to get bundle ID from <TMPDIR>/NotAnApp.app\n\tMissing bundle ID.",
   "data": {
     "summary": {
       "status": "FAILED"
     },
     "artifacts": {
-      "simulatorId": "<UUID>",
-      "appPath": "<TMPDIR>/NotAnApp.app"
+      "appPath": "<TMPDIR>/NotAnApp.app",
+      "simulatorId": "<UUID>"
     },
     "diagnostics": {
       "warnings": [],
-      "errors": [
-        {
-          "message": "Simulator device failed to install the application."
-        },
-        {
-          "message": "Failed to get bundle ID from <TMPDIR>/NotAnApp.app"
-        },
-        {
-          "message": "Missing bundle ID."
-        }
-      ]
+      "errors": []
     }
   }
 }

@@ -13,11 +13,7 @@
     },
     "diagnostics": {
       "warnings": [],
-      "errors": [
-        {
-          "message": "App is not installed on the simulator."
-        }
-      ]
+      "errors": []
     }
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { invokeResource } from '../resource-harness.ts';
 import { createWorkflowFixtureMatcher } from './helpers.ts';
-import { ensureSimulatorBooted } from '../harness.ts';
+import { ensureNamedSimulatorStates, ensureSimulatorBooted } from '../harness.ts';
 export function registerResourcesSnapshotSuite(): void {
   const expectFixture = createWorkflowFixtureMatcher('mcp', 'resources');
 
@@ -34,7 +34,15 @@ export function registerResourcesSnapshotSuite(): void {
     });
 
     describe('simulators', () => {
-      it.skip('success', async () => {
+      it('success', async () => {
+        await ensureNamedSimulatorStates({
+          'iPhone 17 Pro': 'Booted',
+          'iPhone 17 Pro Max': 'Booted',
+          'iPhone 17e': 'Booted',
+          'iPhone Air': 'Booted',
+          'iPhone 17': 'Booted',
+        });
+
         const { text } = await invokeResource('simulators');
         expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'simulators--success');

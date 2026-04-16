@@ -47,6 +47,16 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
     result = result.replace(/^<ROOT>\//, '');
   }
 
+  if (key === 'state' && path.includes('devices')) {
+    if (result === 'Available') {
+      return 'connected';
+    }
+
+    if (result === 'Paired (not connected)') {
+      return 'disconnected';
+    }
+  }
+
   if (key === 'test' || path.includes('selected')) {
     result = result.replace(/\(\)$/, '');
   }
