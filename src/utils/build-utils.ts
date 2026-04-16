@@ -154,10 +154,13 @@ export async function executeXcodeBuildCommand(
 
     command.push('-destination', destinationString);
 
-    if (
-      ['test', 'build-for-testing', 'test-without-building'].includes(buildAction) &&
-      isSimulatorPlatform
-    ) {
+    const isTestAction = ['test', 'build-for-testing', 'test-without-building'].includes(
+      buildAction,
+    );
+
+    command.push('-collect-test-diagnostics', 'never');
+
+    if (isTestAction && isSimulatorPlatform) {
       command.push('COMPILER_INDEX_STORE_ENABLE=NO');
       command.push('ONLY_ACTIVE_ARCH=YES');
       command.push(

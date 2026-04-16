@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
+import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import {
   createMockExecutor,
   createMockFileSystemExecutor,
@@ -21,6 +22,21 @@ const runTestDeviceLogic = (
   executor: Parameters<typeof testDeviceLogic>[1],
   fileSystemExecutor: Parameters<typeof testDeviceLogic>[2],
 ) => runToolLogic(() => testDeviceLogic(params, executor, fileSystemExecutor));
+
+function createSpyExecutor(): {
+  commandCalls: Array<{ args: string[]; logPrefix?: string }>;
+  executor: ReturnType<typeof createMockExecutor>;
+} {
+  const commandCalls: Array<{ args: string[]; logPrefix?: string }> = [];
+  const executor = createMockExecutor({
+    success: true,
+    output: 'Test Succeeded',
+    onExecute: (command, logPrefix) => {
+      commandCalls.push({ args: command, logPrefix });
+    },
+  });
+  return { commandCalls, executor };
+}
 
 describe('test_device plugin', () => {
   beforeEach(() => {
@@ -113,6 +129,44 @@ describe('test_device plugin', () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Parameter validation failed');
       expect(result.content[0].text).toContain('Mutually exclusive parameters provided');
+    });
+  });
+
+  describe('Command generation', () => {
+    it('adds -collect-test-diagnostics never to device test commands', async () => {
+      const spy = createSpyExecutor();
+
+      await runTestDeviceLogic(
+        {
+          projectPath: '/path/to/project.xcodeproj',
+          scheme: 'MyScheme',
+          deviceId: 'test-device-123',
+          configuration: 'Debug',
+          preferXcodebuild: false,
+          platform: 'iOS',
+        },
+        spy.executor,
+        mockFs(),
+      );
+
+      expect(spy.commandCalls).toHaveLength(1);
+      expect(spy.commandCalls[0].args).toEqual([
+        'xcodebuild',
+        '-project',
+        '/path/to/project.xcodeproj',
+        '-scheme',
+        'MyScheme',
+        '-configuration',
+        'Debug',
+        '-skipMacroValidation',
+        '-destination',
+        'platform=iOS,id=test-device-123',
+        '-collect-test-diagnostics',
+        'never',
+        '-derivedDataPath',
+        DERIVED_DATA_DIR,
+        'test',
+      ]);
     });
   });
 
