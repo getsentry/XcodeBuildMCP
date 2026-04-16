@@ -8,9 +8,9 @@
       "status": "FAILED",
       "durationMs": 1234,
       "counts": {
-        "passed": 0,
-        "failed": 1,
-        "skipped": 0
+        "passed": 48,
+        "failed": 2,
+        "skipped": 2
       },
       "target": "simulator"
     },
@@ -35,9 +35,16 @@
       "errors": [],
       "testFailures": [
         {
-          "suite": "System Failures",
-          "test": "CalculatorApp encountered an error",
-          "message": "Failed to install or launch the test runner. (Underlying Error: Simulator device failed to launch io.sentry.calculatorapp. The request was denied by service delegate (SBMainWorkspace). (Underlying Error: The request to open \"io.sentry.calculatorapp\" failed. The request was denied by service delegate (SBMainWorkspace). (Underlying Error: The operation couldn’t be completed. The process failed to launch. (Underlying Error: The operation couldn’t be completed. Launch failed. (Underlying Error: Launchd job spawn failed)))))"
+          "suite": "CalculatorAppTests",
+          "test": "testCalculatorServiceFailure",
+          "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
+          "location": "example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:52"
+        },
+        {
+          "suite": "IntentionalFailureTests",
+          "test": "test",
+          "message": "XCTAssertTrue failed - This test should fail to verify error reporting",
+          "location": "example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286"
         }
       ]
     }

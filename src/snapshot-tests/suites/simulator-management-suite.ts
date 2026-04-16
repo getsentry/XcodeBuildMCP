@@ -70,11 +70,8 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
     describe('open', () => {
       it('success', async () => {
         const { text, isError } = await harness.invoke('simulator-management', 'open', {});
-        expect(isError).toBe(runtime === 'json');
-        expectFixture(
-          text,
-          runtime === 'json' ? 'open--error-launch-services-timeout' : 'open--success',
-        );
+        expect(isError).toBe(false);
+        expectFixture(text, 'open--success');
       });
     });
 
