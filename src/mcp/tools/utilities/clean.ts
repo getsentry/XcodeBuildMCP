@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type {
   BasicDiagnostics,
@@ -16,7 +15,7 @@ import {
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
-import { constructDestinationString } from '../../../utils/xcode.ts';
+import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -96,13 +95,6 @@ const SIMULATOR_TO_DEVICE_PLATFORM: Partial<Record<XcodePlatform, XcodePlatform>
   [XcodePlatform.visionOSSimulator]: XcodePlatform.visionOS,
 };
 
-interface PreparedCleanCommand {
-  command: string[];
-  projectDir: string;
-  cleanPlatform: XcodePlatform;
-  configuration: string;
-}
-
 function createCleanArtifacts(
   params: CleanParams,
   configuration: string,
@@ -123,6 +115,31 @@ function createCleanArtifacts(
 
 function createDiagnosticEntries(messages: string[]): DiagnosticEntry[] {
   return messages.map((message) => ({ message }));
+}
+
+const STDERR_NOISE_PATTERNS: readonly RegExp[] = [
+  /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+\S+\[\d+:\d+\]/u,
+  /^Command line invocation:$/u,
+  /^Build settings from command line:$/u,
+];
+
+function collectStderrDiagnosticMessages(stderrChunks: string[]): string[] {
+  if (stderrChunks.length === 0) {
+    return [];
+  }
+
+  const combined = stderrChunks.join('');
+  const seen = new Set<string>();
+  const messages: string[] = [];
+  for (const rawLine of combined.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0) continue;
+    if (STDERR_NOISE_PATTERNS.some((pattern) => pattern.test(line))) continue;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    messages.push(line);
+  }
+  return messages;
 }
 
 function createCleanResult(
@@ -165,130 +182,80 @@ function resolveCleanPlatform(params: CleanParams): XcodePlatform | null {
   return SIMULATOR_TO_DEVICE_PLATFORM[platformEnum] ?? platformEnum;
 }
 
-function prepareCleanCommand(params: CleanParams): PreparedCleanCommand | string {
-  if (params.workspacePath && !params.scheme) {
-    return 'scheme is required when workspacePath is provided.';
-  }
-
-  const cleanPlatform = resolveCleanPlatform(params);
-  if (!cleanPlatform) {
-    return `Unsupported platform: "${params.platform ?? 'iOS'}".`;
-  }
-
-  const scheme = params.scheme ?? '';
-  const configuration = params.configuration ?? 'Debug';
-  const command = ['xcodebuild'];
-  let projectDir = '';
-
-  if (params.workspacePath) {
-    const wsPath = path.isAbsolute(params.workspacePath)
-      ? params.workspacePath
-      : path.resolve(process.cwd(), params.workspacePath);
-    projectDir = path.dirname(wsPath);
-    command.push('-workspace', wsPath);
-  } else if (params.projectPath) {
-    const projPath = path.isAbsolute(params.projectPath)
-      ? params.projectPath
-      : path.resolve(process.cwd(), params.projectPath);
-    projectDir = path.dirname(projPath);
-    command.push('-project', projPath);
-  }
-
-  command.push('-scheme', scheme);
-  command.push('-configuration', configuration);
-  command.push('-destination', constructDestinationString(cleanPlatform));
-
-  if (params.derivedDataPath) {
-    const ddPath = path.isAbsolute(params.derivedDataPath)
-      ? params.derivedDataPath
-      : path.resolve(process.cwd(), params.derivedDataPath);
-    command.push('-derivedDataPath', ddPath);
-  }
-
-  if (params.extraArgs && params.extraArgs.length > 0) {
-    command.push(...params.extraArgs);
-  }
-
-  command.push('clean');
-
-  return {
-    command,
-    projectDir,
-    cleanPlatform,
-    configuration,
-  };
-}
-
-function extractCleanErrors(output: string): string[] {
-  const lines = output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const xcodebuildErrors = lines.filter((line) => /xcodebuild:\s*error:/i.test(line));
-  if (xcodebuildErrors.length > 0) {
-    return [...new Set(xcodebuildErrors)];
-  }
-
-  const errorLines = lines.filter((line) => /error:/i.test(line));
-  return [...new Set(errorLines)];
-}
-
 export function createCleanExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<CleanParams, CleanResult> {
   return async (params) => {
-    const prepared = prepareCleanCommand(params);
-    if (typeof prepared === 'string') {
+    if (params.workspacePath && !params.scheme) {
+      const message = 'scheme is required when workspacePath is provided.';
       return createCleanResult(
         params,
         'FAILED',
         {
           warnings: [],
-          errors: createDiagnosticEntries([prepared]),
+          errors: createDiagnosticEntries([message]),
         },
-        prepared,
+        message,
       );
     }
 
+    const cleanPlatform = resolveCleanPlatform(params);
+    if (!cleanPlatform) {
+      const message = `Unsupported platform: "${params.platform ?? 'iOS'}".`;
+      return createCleanResult(
+        params,
+        'FAILED',
+        {
+          warnings: [],
+          errors: createDiagnosticEntries([message]),
+        },
+        message,
+      );
+    }
+
+    const configuration = params.configuration ?? 'Debug';
+    const stderrChunks: string[] = [];
+
     try {
-      const response = await executor(prepared.command, 'Clean', false, {
-        cwd: prepared.projectDir,
-      });
-
-      if (!response.success) {
-        const combinedOutput = [response.error, response.output].filter(Boolean).join('\n').trim();
-        const errors = extractCleanErrors(combinedOutput);
-        const summaryError = errors.length > 0 ? errors.join('; ') : 'Unknown error';
-        const errorMessage = `Clean failed: ${summaryError}`;
-
-        return createCleanResult(
-          params,
-          'FAILED',
-          {
-            warnings: [],
-            errors: createDiagnosticEntries(
-              errors.length > 0 ? errors : [combinedOutput || 'Unknown error'],
-            ),
+      const response = await executeXcodeBuildCommand(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme ?? '',
+          configuration,
+          derivedDataPath: params.derivedDataPath,
+          extraArgs: params.extraArgs,
+        },
+        {
+          platform: cleanPlatform,
+          logPrefix: 'Clean',
+        },
+        params.preferXcodebuild ?? false,
+        'clean',
+        executor,
+        {
+          onStderr: (chunk) => {
+            stderrChunks.push(chunk);
           },
-          errorMessage,
-          {
-            configuration: prepared.configuration,
-            cleanPlatform: prepared.cleanPlatform,
-          },
-        );
-      }
+        },
+      );
+
+      const didError = response.isError === true;
+      const stderrMessages = collectStderrDiagnosticMessages(stderrChunks);
+      const fallbackMessages = response.content.map((item) => item.text).filter(Boolean);
+      const errorMessages = stderrMessages.length > 0 ? stderrMessages : fallbackMessages;
 
       return createCleanResult(
         params,
-        'SUCCEEDED',
+        didError ? 'FAILED' : 'SUCCEEDED',
         {
           warnings: [],
-          errors: [],
+          errors: didError ? createDiagnosticEntries(errorMessages) : [],
         },
-        null,
+        didError ? `Clean failed: ${errorMessages.join('; ') || 'Unknown error'}` : null,
         {
-          configuration: prepared.configuration,
-          cleanPlatform: prepared.cleanPlatform,
+          configuration,
+          cleanPlatform,
         },
       );
     } catch (error) {
@@ -301,6 +268,10 @@ export function createCleanExecutor(
           errors: createDiagnosticEntries([message]),
         },
         message,
+        {
+          configuration,
+          cleanPlatform,
+        },
       );
     }
   };
