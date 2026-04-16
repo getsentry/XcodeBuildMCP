@@ -11,6 +11,7 @@ import { createXcodebuildRunState } from './xcodebuild-run-state.ts';
 import type { XcodebuildRunState, XcodebuildRunStateHandle } from './xcodebuild-run-state.ts';
 import { displayPath } from './build-preflight.ts';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
+import { sessionStore } from './session-store.ts';
 import { formatDeviceId } from './device-name-resolver.ts';
 import { createLogCapture, createParserDebugCapture } from './xcodebuild-log-capture.ts';
 import { log as appLog } from './logging/index.ts';
@@ -132,7 +133,8 @@ function buildHeaderParams(
     (r) => r.label === 'Scheme' || r.label === 'Workspace' || r.label === 'Project',
   );
   if (hasXcodebuildContext && !result.some((r) => r.label === 'Derived Data')) {
-    result.push({ label: 'Derived Data', value: displayPath(resolveEffectiveDerivedDataPath()) });
+    const effectivePath = resolveEffectiveDerivedDataPath(sessionStore.get('derivedDataPath'));
+    result.push({ label: 'Derived Data', value: displayPath(effectivePath) });
   }
 
   return result;
