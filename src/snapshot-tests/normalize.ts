@@ -135,15 +135,12 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(/\(Booted\)/g, '(<SIM_STATE>)');
   normalized = normalized.replace(/\(Shutdown\)/g, '(<SIM_STATE>)');
 
-  // Normalize floating-point frame coordinates in accessibility hierarchy
-  // Round to nearest integer: "162.00616404810239" -> "162", "77.987671903795217" -> "78"
-  normalized = normalized.replace(/"AXFrame"\s*:\s*"[^"]*"/g, (match) => {
-    return match.replace(/(\d+)\.\d+/g, (_, intPart) => intPart);
-  });
-  // Normalize frame object values: "162.0" -> "162", "77.987..." -> "78"
+  // Normalize the entire accessibility hierarchy JSON block
+  // The hierarchy content is volatile (changes with simulator state/app)
+  // Replace with a stable placeholder preserving only the section structure
   normalized = normalized.replace(
-    /("(?:x|y|width|height)"\s*:\s*)(\d+(?:\.\d+)?)/g,
-    (_, prefix, num) => `${prefix}${Math.round(parseFloat(num))}`,
+    /(Accessibility Hierarchy\n\s*```json\n)\s*\[[\s\S]*?\n\s*\]\n(\s*```)/g,
+    '$1  [{ "normalized": true }]\n$2',
   );
 
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');

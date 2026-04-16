@@ -114,6 +114,11 @@ function normalizeNumber(path: string[], key: string | undefined, value: number)
 function normalizeValue(value: unknown, path: string[] = []): unknown {
   const key = path.at(-1);
 
+  // Normalize volatile UI hierarchy content to a stable placeholder
+  if (key === 'uiHierarchy' && Array.isArray(value)) {
+    return [{ normalized: true, elementCount: value.length }];
+  }
+
   if (typeof value === 'string') {
     return normalizeString(value, key, path);
   }
