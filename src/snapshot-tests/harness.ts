@@ -6,7 +6,7 @@ import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
-const SNAPSHOT_COMMAND_TIMEOUT_MS = 300_000;
+const SNAPSHOT_COMMAND_TIMEOUT_MS = 120_000;
 const SIMULATOR_STATE_WAIT_TIMEOUT_MS = 15_000;
 const SIMULATOR_STATE_POLL_INTERVAL_MS = 250;
 

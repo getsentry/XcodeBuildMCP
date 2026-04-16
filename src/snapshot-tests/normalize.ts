@@ -221,6 +221,7 @@ export function normalizeSnapshotOutput(text: string): string {
     /  mcpbridge path: \/Applications\/Xcode[^\n]+/g,
     '  mcpbridge path: <XCODE_PATH>',
   );
+  normalized = normalized.replace(/^( {2}Xcode running: ).+$/gm, '$1<XCODE_RUNNING>');
   normalized = normalized.replace(/  Total Unique Tools: \d+/g, '  Total Unique Tools: <COUNT>');
   normalized = normalized.replace(/  Workflow Count: \d+/g, '  Workflow Count: <COUNT>');
   normalized = normalized.replace(/  (\w[\w-]*): \d+ tools$/gm, '  $1: <N> tools');

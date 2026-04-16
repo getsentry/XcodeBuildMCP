@@ -102,7 +102,7 @@ Runtime Tool Registration
 Xcode IDE Bridge (mcpbridge)
   Workflow enabled: No
   mcpbridge path: <XCODE_PATH>
-  Xcode running: (unknown)
+  Xcode running: <XCODE_RUNNING>
   Connected: No
   Bridge PID: (none)
   Proxied tools: 0
