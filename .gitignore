@@ -97,6 +97,9 @@ xcuserdata/
 .claude/
 **/.claude/settings.local.json
 
+# Worktrees
+.worktrees/
+
 # incremental builds
 Makefile
 buildServer.json
