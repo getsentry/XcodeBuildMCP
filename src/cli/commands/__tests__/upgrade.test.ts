@@ -301,6 +301,15 @@ describe('upgrade command', () => {
       ).toBe('older');
     });
 
+    it('compares prerelease identifiers in ASCII order (uppercase before lowercase)', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'Alpha' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'alpha' },
+        ),
+      ).toBe('older');
+    });
+
     it('numeric prerelease identifier is less than string identifier', () => {
       expect(
         compareVersions(

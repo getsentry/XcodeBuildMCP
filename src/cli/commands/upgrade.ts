@@ -100,7 +100,7 @@ function comparePrereleaseIdentifiers(a: string, b: string): number {
     if (aIsNum) return -1;
     if (bIsNum) return 1;
 
-    const cmp = aParts[i].localeCompare(bParts[i]);
+    const cmp = aParts[i] < bParts[i] ? -1 : aParts[i] > bParts[i] ? 1 : 0;
     if (cmp !== 0) return cmp;
   }
 
