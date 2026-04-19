@@ -34,13 +34,17 @@ export interface ParsedVersion {
 
 export type VersionComparison = 'older' | 'equal' | 'newer';
 
-export interface LatestReleaseInfo {
-  tagName: string;
-  version: string;
-  name: string | undefined;
+export interface ReleaseNotes {
   body: string;
   htmlUrl: string;
+  name: string | undefined;
   publishedAt: string | undefined;
+}
+
+export interface ChannelLookupResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
 }
 
 export interface UpgradeDependencies {
@@ -48,7 +52,9 @@ export interface UpgradeDependencies {
   packageName: string;
   repositoryOwner: string;
   repositoryName: string;
-  fetchLatestRelease: () => Promise<LatestReleaseInfo>;
+  fetchLatestVersionForChannel: (channel: InstallMethod['kind']) => Promise<string>;
+  fetchReleaseNotesForTag: (tag: string) => Promise<ReleaseNotes | null>;
+  runChannelLookupCommand: (argv: string[]) => Promise<ChannelLookupResult>;
   detectInstallMethod: () => InstallMethod;
   spawnUpgradeProcess: (commands: string[][]) => Promise<number>;
   isInteractive: () => boolean;
@@ -198,7 +204,7 @@ export function detectInstallMethodFromPaths(
   };
 }
 
-// --- Release fetch ---
+// --- Channel version lookup ---
 
 interface GitHubReleaseResponse {
   tag_name?: string;
@@ -208,11 +214,84 @@ interface GitHubReleaseResponse {
   published_at?: string;
 }
 
-export async function fetchLatestReleaseFromGitHub(
+async function fetchLatestVersionFromNpm(
+  pkgName: string,
+  run: (argv: string[]) => Promise<ChannelLookupResult>,
+): Promise<string> {
+  let result: ChannelLookupResult;
+  try {
+    result = await run(['npm', 'view', `${pkgName}@latest`, 'version', '--json']);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`couldn't determine latest version from npm: ${reason}`);
+  }
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `couldn't determine latest version from npm: command exited with code ${result.exitCode}`,
+    );
+  }
+
+  let version: unknown;
+  try {
+    version = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("couldn't determine latest version from npm: invalid JSON output");
+  }
+
+  if (typeof version !== 'string') {
+    throw new Error("couldn't determine latest version from npm: unexpected output format");
+  }
+
+  return version;
+}
+
+async function fetchLatestVersionFromHomebrew(
+  pkgName: string,
+  run: (argv: string[]) => Promise<ChannelLookupResult>,
+): Promise<string> {
+  let result: ChannelLookupResult;
+  try {
+    result = await run(['brew', 'info', '--json=v2', pkgName]);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`couldn't determine latest version from Homebrew: ${reason}`);
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("couldn't determine latest version from Homebrew: invalid JSON output");
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error("couldn't determine latest version from Homebrew: unexpected output format");
+  }
+
+  const formulae = (data as Record<string, unknown>).formulae;
+  if (!Array.isArray(formulae) || formulae.length === 0) {
+    throw new Error(`couldn't find ${pkgName} in Homebrew (is the tap installed?)`);
+  }
+
+  const versions = (formulae[0] as Record<string, unknown>)?.versions;
+  if (!versions || typeof versions !== 'object') {
+    throw new Error("couldn't determine latest version from Homebrew: missing versions field");
+  }
+
+  const stable = (versions as Record<string, unknown>).stable;
+  if (typeof stable !== 'string') {
+    throw new Error("couldn't determine latest version from Homebrew: missing versions.stable");
+  }
+
+  return stable;
+}
+
+async function fetchLatestVersionFromGitHub(
   owner: string,
   name: string,
   pkgVersion: string,
-): Promise<LatestReleaseInfo> {
+): Promise<string> {
   const url = `https://api.github.com/repos/${owner}/${name}/releases/latest`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -229,37 +308,105 @@ export async function fetchLatestReleaseFromGitHub(
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('Request timed out after 10 seconds');
+        throw new Error("couldn't determine latest version from GitHub: request timed out");
       }
-      throw error;
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`couldn't determine latest version from GitHub: ${reason}`);
     }
 
     if (response.status === 403 || response.status === 429) {
-      throw new Error('GitHub API rate limit exceeded. Try again later.');
+      throw new Error("couldn't determine latest version from GitHub: rate limit exceeded");
     }
 
     if (!response.ok) {
-      throw new Error(`GitHub API returned HTTP ${response.status}`);
+      throw new Error(`couldn't determine latest version from GitHub: HTTP ${response.status}`);
     }
 
     const data = (await response.json()) as GitHubReleaseResponse;
 
     if (!data.tag_name) {
-      throw new Error('GitHub release response missing tag_name');
+      throw new Error("couldn't determine latest version from GitHub: missing tag_name");
     }
 
-    if (!data.html_url) {
-      throw new Error('GitHub release response missing html_url');
+    return data.tag_name.startsWith('v') ? data.tag_name.slice(1) : data.tag_name;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+interface ChannelFetcherDeps {
+  runChannelLookupCommand: (argv: string[]) => Promise<ChannelLookupResult>;
+  packageName: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  currentVersion: string;
+}
+
+function defaultFetchLatestVersionForChannel(
+  channel: InstallMethod['kind'],
+  deps: ChannelFetcherDeps,
+): Promise<string> {
+  switch (channel) {
+    case 'npm-global':
+    case 'npx':
+      return fetchLatestVersionFromNpm(deps.packageName, deps.runChannelLookupCommand);
+    case 'homebrew':
+      return fetchLatestVersionFromHomebrew(deps.packageName, deps.runChannelLookupCommand);
+    case 'unknown':
+      return fetchLatestVersionFromGitHub(
+        deps.repositoryOwner,
+        deps.repositoryName,
+        deps.currentVersion,
+      );
+  }
+}
+
+// --- Release notes fetch ---
+
+interface NotesFetcherDeps {
+  repositoryOwner: string;
+  repositoryName: string;
+  currentVersion: string;
+}
+
+async function defaultFetchReleaseNotesForTag(
+  tag: string,
+  deps: NotesFetcherDeps,
+): Promise<ReleaseNotes | null> {
+  const url = `https://api.github.com/repos/${deps.repositoryOwner}/${deps.repositoryName}/releases/tags/${tag}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `xcodebuildmcp/${deps.currentVersion}`,
+        },
+        signal: controller.signal,
+      });
+    } catch {
+      return null;
     }
 
-    const version = data.tag_name.startsWith('v') ? data.tag_name.slice(1) : data.tag_name;
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as GitHubReleaseResponse;
 
     return {
-      tagName: data.tag_name,
-      version,
-      name: data.name ?? undefined,
       body: data.body ?? '',
-      htmlUrl: data.html_url,
+      htmlUrl:
+        data.html_url ??
+        `https://github.com/${deps.repositoryOwner}/${deps.repositoryName}/releases/tag/${tag}`,
+      name: data.name ?? undefined,
       publishedAt: data.published_at ?? undefined,
     };
   } finally {
@@ -305,7 +452,44 @@ export function truncateReleaseNotes(body: string, releaseUrl: string): string {
   return result;
 }
 
-// --- Spawn runner ---
+// --- Spawn runners ---
+
+function defaultRunChannelLookupCommand(argv: string[]): Promise<ChannelLookupResult> {
+  return new Promise((resolve, reject) => {
+    const [cmd, ...args] = argv;
+    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, 15_000);
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      if (timedOut) {
+        reject(new Error(`Command timed out after 15 seconds: ${cmd}`));
+        return;
+      }
+      resolve({ stdout, stderr, exitCode: code ?? 1 });
+    });
+  });
+}
 
 function defaultSpawnUpgradeProcess(commands: string[][]): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -355,20 +539,36 @@ function defaultSpawnUpgradeProcess(commands: string[][]): Promise<number> {
   });
 }
 
-// --- Default dependencies ---
+// --- Dependency factory ---
 
-function createDefaultDependencies(): UpgradeDependencies {
-  return {
+function resolveDependencies(overrides?: Partial<UpgradeDependencies>): UpgradeDependencies {
+  const base: UpgradeDependencies = {
     currentVersion,
     packageName,
     repositoryOwner,
     repositoryName,
-    fetchLatestRelease: () =>
-      fetchLatestReleaseFromGitHub(repositoryOwner, repositoryName, currentVersion),
+    runChannelLookupCommand: defaultRunChannelLookupCommand,
+    fetchLatestVersionForChannel: undefined!,
+    fetchReleaseNotesForTag: undefined!,
     detectInstallMethod: () => detectInstallMethodFromPaths(packageName, collectCandidatePaths()),
     spawnUpgradeProcess: defaultSpawnUpgradeProcess,
     isInteractive: isInteractiveTTY,
   };
+
+  if (overrides) {
+    Object.assign(base, overrides);
+  }
+
+  if (!overrides?.fetchLatestVersionForChannel) {
+    base.fetchLatestVersionForChannel = (channel) =>
+      defaultFetchLatestVersionForChannel(channel, base);
+  }
+
+  if (!overrides?.fetchReleaseNotesForTag) {
+    base.fetchReleaseNotesForTag = (tag) => defaultFetchReleaseNotesForTag(tag, base);
+  }
+
+  return base;
 }
 
 // --- Helpers ---
@@ -391,7 +591,7 @@ export async function runUpgradeCommand(
   options: UpgradeOptions,
   deps?: Partial<UpgradeDependencies>,
 ): Promise<number> {
-  const d = { ...createDefaultDependencies(), ...deps };
+  const d = resolveDependencies(deps);
   const isTTY = d.isInteractive();
 
   if (isTTY) {
@@ -400,26 +600,26 @@ export async function runUpgradeCommand(
 
   const installMethod = d.detectInstallMethod();
 
-  let release: LatestReleaseInfo;
+  let latestVersion: string;
   try {
     if (isTTY) {
       const s = clack.spinner();
       s.start('Checking for updates...');
       try {
-        release = await d.fetchLatestRelease();
+        latestVersion = await d.fetchLatestVersionForChannel(installMethod.kind);
         s.stop('Update check complete.');
       } catch (error) {
         s.stop('Update check failed.');
         throw error;
       }
     } else {
-      release = await d.fetchLatestRelease();
+      latestVersion = await d.fetchLatestVersionForChannel(installMethod.kind);
     }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
     if (isTTY) {
-      clack.log.error(`Failed to check for updates: ${reason}`);
+      clack.log.error(reason);
       clack.log.info(`Current version: ${d.currentVersion}`);
       clack.log.info(`Install method: ${installMethod.kind}`);
       if (isAutoUpgradeMethod(installMethod)) {
@@ -427,7 +627,7 @@ export async function runUpgradeCommand(
       }
       clack.outro('');
     } else {
-      writeError(`Failed to check for updates: ${reason}`);
+      writeError(reason);
       writeLine(`Current version: ${d.currentVersion}`);
       writeLine(`Install method: ${installMethod.kind}`);
       if (isAutoUpgradeMethod(installMethod)) {
@@ -439,10 +639,10 @@ export async function runUpgradeCommand(
   }
 
   const parsedCurrent = parseVersion(d.currentVersion);
-  const parsedLatest = parseVersion(release.version);
+  const parsedLatest = parseVersion(latestVersion);
 
   if (!parsedCurrent || !parsedLatest) {
-    const msg = `Cannot compare versions: current=${d.currentVersion}, latest=${release.version}`;
+    const msg = `Cannot compare versions: current=${d.currentVersion}, latest=${latestVersion}`;
     if (isTTY) {
       clack.log.error(msg);
       clack.outro('');
@@ -466,7 +666,7 @@ export async function runUpgradeCommand(
   }
 
   if (comparison === 'newer') {
-    const msg = `Local version (${d.currentVersion}) is ahead of latest release (${release.version}).`;
+    const msg = `Local version (${d.currentVersion}) is ahead of latest release (${latestVersion}).`;
     if (isTTY) {
       clack.log.info(msg);
       clack.outro('');
@@ -476,24 +676,41 @@ export async function runUpgradeCommand(
     return 0;
   }
 
-  const versionLine = `${d.currentVersion} → ${release.version}`;
-  const releaseName = release.name ? ` — ${release.name}` : '';
-  const publishedLine = release.publishedAt
-    ? `Published: ${release.publishedAt.split('T')[0]}`
+  const releaseUrl = `https://github.com/${d.repositoryOwner}/${d.repositoryName}/releases/tag/v${latestVersion}`;
+  let releaseNotes: ReleaseNotes | null = null;
+  try {
+    releaseNotes = await d.fetchReleaseNotesForTag(`v${latestVersion}`);
+  } catch {
+    // Non-fatal — notes unavailable
+  }
+
+  const versionLine = `${d.currentVersion} → ${latestVersion}`;
+  const releaseName = releaseNotes?.name ? ` — ${releaseNotes.name}` : '';
+  const publishedLine = releaseNotes?.publishedAt
+    ? `Published: ${releaseNotes.publishedAt.split('T')[0]}`
     : '';
-  const notes = truncateReleaseNotes(release.body, release.htmlUrl);
 
   if (isTTY) {
     clack.log.step(`Update available: ${versionLine}${releaseName}`);
     if (publishedLine) clack.log.info(publishedLine);
     clack.log.info(`Install method: ${installMethod.kind}`);
-    clack.note(notes, 'Release Notes');
+
+    if (releaseNotes && releaseNotes.body.trim().length > 0) {
+      clack.note(truncateReleaseNotes(releaseNotes.body, releaseNotes.htmlUrl), 'Release Notes');
+    } else {
+      clack.log.info(`Release notes: ${releaseUrl}`);
+    }
   } else {
     writeLine(`Update available: ${versionLine}${releaseName}`);
     if (publishedLine) writeLine(publishedLine);
     writeLine(`Install method: ${installMethod.kind}`);
     writeLine('');
-    writeLine(notes);
+
+    if (releaseNotes && releaseNotes.body.trim().length > 0) {
+      writeLine(truncateReleaseNotes(releaseNotes.body, releaseNotes.htmlUrl));
+    } else {
+      writeLine(`Release notes: ${releaseUrl}`);
+    }
     writeLine('');
   }
 

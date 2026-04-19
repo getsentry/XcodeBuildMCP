@@ -54,6 +54,10 @@ xcodebuildmcp upgrade --yes
 
 When both `--check` and `--yes` are supplied, `--check` wins.
 
+### Channel-aware version lookup
+
+The version check queries the source of truth for your install channel — `brew info` for Homebrew, `npm view` for npm/npx, or GitHub Releases for unknown installs. This avoids misleading results when release channels drift (e.g. GitHub may publish a version before the Homebrew tap bumps). If the channel-specific lookup fails, the command does not fall back to another source; it reports the error and exits 1.
+
 ### Install method behavior
 
 The command detects how XcodeBuildMCP was installed and adapts accordingly:
@@ -73,9 +77,9 @@ When stdin is not a TTY (CI, pipes, scripts):
 - `--yes` runs the upgrade for Homebrew and npm-global installs.
 - Without `--check` or `--yes`, the command prints the manual upgrade command and exits 1 (it cannot prompt for confirmation).
 
-### GitHub API failures
+### Lookup failures
 
-If the release check fails (network error, rate limit, timeout), the command prints the detected install method and manual upgrade instructions, then exits 1.
+If the channel-specific version check fails (network error, rate limit, timeout, missing formula), the command prints the detected install method and manual upgrade instructions, then exits 1.
 
 ## Tool Options
 
