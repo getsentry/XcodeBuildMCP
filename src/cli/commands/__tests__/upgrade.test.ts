@@ -1,0 +1,820 @@
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+
+vi.mock('@clack/prompts', () => ({
+  intro: vi.fn(),
+  outro: vi.fn(),
+  spinner: vi.fn(() => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+  })),
+  log: {
+    info: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    step: vi.fn(),
+    message: vi.fn(),
+    warn: vi.fn(),
+  },
+  note: vi.fn(),
+  confirm: vi.fn().mockResolvedValue(true),
+  isCancel: vi.fn(() => false),
+}));
+
+import * as clack from '@clack/prompts';
+import {
+  runUpgradeCommand,
+  parseVersion,
+  compareVersions,
+  detectInstallMethodFromPaths,
+  truncateReleaseNotes,
+  type LatestReleaseInfo,
+  type UpgradeDependencies,
+  type InstallMethod,
+} from '../upgrade.ts';
+
+const mockedConfirm = vi.mocked(clack.confirm);
+const mockedIsCancel = vi.mocked(clack.isCancel);
+
+// --- Fixtures ---
+
+function createMockRelease(overrides?: Partial<LatestReleaseInfo>): LatestReleaseInfo {
+  return {
+    tagName: 'v3.0.0',
+    version: '3.0.0',
+    name: 'Release 3.0.0',
+    body: 'Bug fixes and improvements.',
+    htmlUrl: 'https://github.com/getsentry/XcodeBuildMCP/releases/tag/v3.0.0',
+    publishedAt: '2025-01-15T12:00:00Z',
+    ...overrides,
+  };
+}
+
+function homebrewMethod(): InstallMethod {
+  return {
+    kind: 'homebrew',
+    manualCommand: 'brew update && brew upgrade xcodebuildmcp',
+    autoCommands: [
+      ['brew', 'update'],
+      ['brew', 'upgrade', 'xcodebuildmcp'],
+    ],
+  };
+}
+
+function npmGlobalMethod(): InstallMethod {
+  return {
+    kind: 'npm-global',
+    manualCommand: 'npm install -g xcodebuildmcp@latest',
+    autoCommands: [['npm', 'install', '-g', 'xcodebuildmcp@latest']],
+  };
+}
+
+function npxMethod(): InstallMethod {
+  return {
+    kind: 'npx',
+    manualInstructions: [
+      'npx always fetches the latest version by default when using @latest.',
+      'If you pinned a specific version, update the version in your MCP client config.',
+    ],
+  };
+}
+
+function unknownMethod(): InstallMethod {
+  return {
+    kind: 'unknown',
+    manualInstructions: [
+      'Homebrew:   brew update && brew upgrade xcodebuildmcp',
+      'npm:        npm install -g xcodebuildmcp@latest',
+      'npx:        npx always fetches the latest when using @latest',
+    ],
+  };
+}
+
+function baseDeps(overrides?: Partial<UpgradeDependencies>): Partial<UpgradeDependencies> {
+  return {
+    currentVersion: '2.0.0',
+    packageName: 'xcodebuildmcp',
+    repositoryOwner: 'getsentry',
+    repositoryName: 'XcodeBuildMCP',
+    fetchLatestRelease: vi.fn(async () => createMockRelease()),
+    detectInstallMethod: vi.fn(() => homebrewMethod()),
+    spawnUpgradeProcess: vi.fn(async () => 0),
+    isInteractive: vi.fn(() => false),
+    ...overrides,
+  };
+}
+
+function collectStdout(spy: ReturnType<typeof vi.spyOn>): string {
+  return spy.mock.calls.map((c) => String(c[0])).join('');
+}
+
+function collectStderr(spy: ReturnType<typeof vi.spyOn>): string {
+  return spy.mock.calls.map((c) => String(c[0])).join('');
+}
+
+// --- Tests ---
+
+describe('upgrade command', () => {
+  let stdoutSpy: MockInstance;
+  let stderrSpy: MockInstance;
+
+  beforeEach(() => {
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    mockedConfirm.mockResolvedValue(true);
+    mockedIsCancel.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  // ── Pure helpers ──────────────────────────────────────────────────────
+
+  describe('parseVersion', () => {
+    it('parses standard version', () => {
+      expect(parseVersion('1.2.3')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: undefined,
+      });
+    });
+
+    it('strips leading v', () => {
+      expect(parseVersion('v1.2.3')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: undefined,
+      });
+    });
+
+    it('parses prerelease suffix', () => {
+      expect(parseVersion('1.2.3-beta.1')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: 'beta.1',
+      });
+    });
+
+    it('ignores build metadata', () => {
+      expect(parseVersion('1.2.3+build.42')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: undefined,
+      });
+    });
+
+    it('parses prerelease with build metadata', () => {
+      expect(parseVersion('1.2.3-rc.1+build')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: 'rc.1',
+      });
+    });
+
+    it.each([['not-a-version'], ['1.2'], [''], ['1.2.3.4'], ['abc.def.ghi']])(
+      'returns undefined for malformed input %j',
+      (input) => {
+        expect(parseVersion(input)).toBeUndefined();
+      },
+    );
+  });
+
+  describe('compareVersions', () => {
+    it('detects equal versions', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 2, patch: 3, prerelease: undefined },
+          { major: 1, minor: 2, patch: 3, prerelease: undefined },
+        ),
+      ).toBe('equal');
+    });
+
+    it('detects older by major', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: undefined },
+          { major: 2, minor: 0, patch: 0, prerelease: undefined },
+        ),
+      ).toBe('older');
+    });
+
+    it('detects newer by minor', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 5, patch: 0, prerelease: undefined },
+          { major: 1, minor: 3, patch: 0, prerelease: undefined },
+        ),
+      ).toBe('newer');
+    });
+
+    it('detects older by patch', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 2, patch: 3, prerelease: undefined },
+          { major: 1, minor: 2, patch: 5, prerelease: undefined },
+        ),
+      ).toBe('older');
+    });
+
+    it('prerelease is older than release at same version', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta.1' },
+          { major: 1, minor: 0, patch: 0, prerelease: undefined },
+        ),
+      ).toBe('older');
+    });
+
+    it('release is newer than prerelease at same version', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: undefined },
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta.1' },
+        ),
+      ).toBe('newer');
+    });
+
+    it('compares numeric prerelease identifiers numerically', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta.2' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta.10' },
+        ),
+      ).toBe('older');
+    });
+
+    it('compares string prerelease identifiers lexicographically', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'alpha' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta' },
+        ),
+      ).toBe('older');
+    });
+
+    it('numeric prerelease identifier is less than string identifier', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: '1' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'alpha' },
+        ),
+      ).toBe('older');
+    });
+
+    it('fewer prerelease parts is less than more parts', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'beta.1' },
+        ),
+      ).toBe('older');
+    });
+
+    it('equal prerelease identifiers are equal', () => {
+      expect(
+        compareVersions(
+          { major: 1, minor: 0, patch: 0, prerelease: 'rc.1' },
+          { major: 1, minor: 0, patch: 0, prerelease: 'rc.1' },
+        ),
+      ).toBe('equal');
+    });
+  });
+
+  describe('detectInstallMethodFromPaths', () => {
+    it('detects homebrew on Intel Mac (/usr/local/Cellar)', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/usr/local/Cellar/xcodebuildmcp/2.0.0/bin/xcodebuildmcp',
+      ]);
+      expect(method.kind).toBe('homebrew');
+    });
+
+    it('detects homebrew on Apple Silicon (/opt/homebrew/Cellar)', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/opt/homebrew/Cellar/xcodebuildmcp/2.0.0/bin/xcodebuildmcp',
+      ]);
+      expect(method.kind).toBe('homebrew');
+    });
+
+    it('produces correct homebrew auto commands', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/opt/homebrew/Cellar/xcodebuildmcp/2.0.0/bin/xcodebuildmcp',
+      ]);
+      expect(method.kind).toBe('homebrew');
+      if (method.kind === 'homebrew') {
+        expect(method.autoCommands).toEqual([
+          ['brew', 'update'],
+          ['brew', 'upgrade', 'xcodebuildmcp'],
+        ]);
+      }
+    });
+
+    it('detects npm-global install', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/usr/local/lib/node_modules/xcodebuildmcp/build/cli.js',
+      ]);
+      expect(method.kind).toBe('npm-global');
+      if (method.kind === 'npm-global') {
+        expect(method.autoCommands).toEqual([['npm', 'install', '-g', 'xcodebuildmcp@latest']]);
+      }
+    });
+
+    it('detects npx from _npx cache path', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/Users/cam/.npm/_npx/abc123/node_modules/xcodebuildmcp/build/cli.js',
+      ]);
+      expect(method.kind).toBe('npx');
+    });
+
+    it('classifies npx before npm-global when path contains _npx and node_modules', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/Users/cam/.npm/_npx/12345/node_modules/xcodebuildmcp/build/cli.js',
+      ]);
+      expect(method.kind).toBe('npx');
+    });
+
+    it('returns unknown for unrecognized paths', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/some/custom/path/xcodebuildmcp',
+      ]);
+      expect(method.kind).toBe('unknown');
+    });
+
+    it('returns unknown for empty candidate list', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', []);
+      expect(method.kind).toBe('unknown');
+    });
+
+    it('matches case-insensitively', () => {
+      const method = detectInstallMethodFromPaths('xcodebuildmcp', [
+        '/opt/Homebrew/Cellar/XcodeBuildMCP/2.0.0/bin/xcodebuildmcp',
+      ]);
+      expect(method.kind).toBe('homebrew');
+    });
+  });
+
+  describe('truncateReleaseNotes', () => {
+    const url = 'https://example.com/release';
+
+    it('returns full text when under both limits', () => {
+      const body = 'Line 1\nLine 2\nLine 3';
+      const result = truncateReleaseNotes(body, url);
+      expect(result).not.toContain('(truncated)');
+      expect(result).toContain('Line 1\nLine 2\nLine 3');
+      expect(result).toContain(`Full release notes: ${url}`);
+    });
+
+    it('truncates at 20 lines', () => {
+      const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}`);
+      const body = lines.join('\n');
+      const result = truncateReleaseNotes(body, url);
+      expect(result).toContain('... (truncated)');
+      expect(result).toContain('Line 20');
+      expect(result).not.toContain('Line 21');
+    });
+
+    it('truncates at 2000 characters', () => {
+      const longLine = 'x'.repeat(300);
+      const lines = Array.from({ length: 10 }, () => longLine);
+      const body = lines.join('\n');
+      const result = truncateReleaseNotes(body, url);
+      expect(result).toContain('... (truncated)');
+      const beforeMarker = result.split('\n\n... (truncated)')[0];
+      expect(beforeMarker.length).toBeLessThanOrEqual(2000);
+    });
+
+    it('returns only the URL for empty body', () => {
+      const result = truncateReleaseNotes('', url);
+      expect(result).toBe(`Full release notes: ${url}`);
+    });
+
+    it('normalizes CRLF line endings', () => {
+      const body = 'Line 1\r\nLine 2\r\nLine 3';
+      const result = truncateReleaseNotes(body, url);
+      expect(result).toContain('Line 1\nLine 2\nLine 3');
+      expect(result).not.toContain('\r');
+    });
+  });
+
+  // ── Command flow ──────────────────────────────────────────────────────
+
+  describe('runUpgradeCommand', () => {
+    describe('up to date', () => {
+      it('exits 0 when versions match (non-TTY)', async () => {
+        const deps = baseDeps({
+          currentVersion: '3.0.0',
+          fetchLatestRelease: vi.fn(async () => createMockRelease({ version: '3.0.0' })),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(collectStdout(stdoutSpy)).toContain('Already up to date');
+      });
+
+      it('exits 0 when versions match (TTY)', async () => {
+        const deps = baseDeps({
+          currentVersion: '3.0.0',
+          fetchLatestRelease: vi.fn(async () => createMockRelease({ version: '3.0.0' })),
+          isInteractive: vi.fn(() => true),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(clack.log.success).toHaveBeenCalledWith(
+          expect.stringContaining('Already up to date'),
+        );
+      });
+    });
+
+    describe('local version newer', () => {
+      it('exits 0 without offering a downgrade', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          currentVersion: '4.0.0',
+          fetchLatestRelease: vi.fn(async () => createMockRelease({ version: '3.0.0' })),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(collectStdout(stdoutSpy)).toContain('ahead of latest');
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('--check mode', () => {
+      it('exits 0 and shows update info without upgrading (non-TTY)', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({ spawnUpgradeProcess: spawnMock });
+
+        const code = await runUpgradeCommand({ check: true, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(collectStdout(stdoutSpy)).toContain('Update available');
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+
+      it('exits 0 in TTY mode without prompting', async () => {
+        const deps = baseDeps({ isInteractive: vi.fn(() => true) });
+
+        const code = await runUpgradeCommand({ check: true, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(clack.confirm).not.toHaveBeenCalled();
+      });
+
+      it('--check overrides --yes', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({ spawnUpgradeProcess: spawnMock });
+
+        const code = await runUpgradeCommand({ check: true, yes: true }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('homebrew install method', () => {
+      it('runs upgrade with --yes and verifies exact argv arrays', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: true }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).toHaveBeenCalledWith([
+          ['brew', 'update'],
+          ['brew', 'upgrade', 'xcodebuildmcp'],
+        ]);
+      });
+
+      it('prompts in TTY and runs upgrade when confirmed', async () => {
+        mockedConfirm.mockResolvedValue(true);
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(clack.confirm).toHaveBeenCalled();
+        expect(spawnMock).toHaveBeenCalled();
+      });
+
+      it('exits 0 without running when TTY confirm is declined', async () => {
+        mockedConfirm.mockResolvedValue(false);
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+
+      it('exits 0 without running when TTY confirm is cancelled', async () => {
+        mockedConfirm.mockResolvedValue(Symbol('cancel') as unknown as boolean);
+        mockedIsCancel.mockReturnValue(true);
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+
+      it('non-TTY without --yes exits 1 and suggests --yes', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(collectStdout(stdoutSpy)).toContain('--yes');
+      });
+
+      it('propagates non-zero exit code from upgrade process', async () => {
+        const spawnMock = vi.fn(async () => 42);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: true }, deps);
+        expect(code).toBe(42);
+      });
+    });
+
+    describe('npm-global install method', () => {
+      it('runs upgrade with --yes and verifies exact argv array', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => npmGlobalMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: true }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).toHaveBeenCalledWith([['npm', 'install', '-g', 'xcodebuildmcp@latest']]);
+      });
+
+      it('non-TTY without --yes exits 1', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => npmGlobalMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+
+      it('prompts in TTY and runs upgrade when confirmed', async () => {
+        mockedConfirm.mockResolvedValue(true);
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          detectInstallMethod: vi.fn(() => npmGlobalMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).toHaveBeenCalled();
+      });
+    });
+
+    describe('npx install method', () => {
+      it('exits 0 with --yes without spawning', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => npxMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: true }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+
+      it('explains ephemeral install limitation (non-TTY)', async () => {
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => npxMethod()),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(collectStdout(stdoutSpy)).toContain('npx always fetches the latest');
+      });
+
+      it('explains ephemeral install limitation (TTY)', async () => {
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          detectInstallMethod: vi.fn(() => npxMethod()),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(clack.log.info).toHaveBeenCalledWith(
+          expect.stringContaining('npx always fetches the latest'),
+        );
+      });
+    });
+
+    describe('unknown install method', () => {
+      it('exits 0 and shows manual options', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => unknownMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(collectStdout(stdoutSpy)).toContain('Could not detect install method');
+      });
+
+      it('no auto-run even with --yes', async () => {
+        const spawnMock = vi.fn(async () => 0);
+        const deps = baseDeps({
+          detectInstallMethod: vi.fn(() => unknownMethod()),
+          spawnUpgradeProcess: spawnMock,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: true }, deps);
+        expect(code).toBe(0);
+        expect(spawnMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('GitHub API failures', () => {
+      it('exits 1 on network error', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('fetch failed');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('fetch failed');
+      });
+
+      it('exits 1 on timeout', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('Request timed out after 10 seconds');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('timed out');
+      });
+
+      it('exits 1 on rate limit (403)', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('GitHub API rate limit exceeded. Try again later.');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('rate limit');
+      });
+
+      it('exits 1 on non-200 response', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('GitHub API returned HTTP 500');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('HTTP 500');
+      });
+
+      it('exits 1 on missing tag_name', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('GitHub release response missing tag_name');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('missing tag_name');
+      });
+
+      it('shows manual upgrade command on failure when install method is known', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('network error');
+          }),
+          detectInstallMethod: vi.fn(() => homebrewMethod()),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStdout(stdoutSpy)).toContain('brew update && brew upgrade xcodebuildmcp');
+      });
+
+      it('shows failure info via clack in TTY mode', async () => {
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          fetchLatestRelease: vi.fn(async () => {
+            throw new Error('GitHub release response missing tag_name');
+          }),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(clack.log.error).toHaveBeenCalledWith(expect.stringContaining('missing tag_name'));
+      });
+    });
+
+    describe('version parse errors', () => {
+      it('exits 1 when current version is malformed', async () => {
+        const deps = baseDeps({
+          currentVersion: 'bad',
+          fetchLatestRelease: vi.fn(async () => createMockRelease()),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('Cannot compare versions');
+      });
+
+      it('exits 1 when latest version is malformed', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () => createMockRelease({ version: 'invalid' })),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('Cannot compare versions');
+      });
+
+      it('exits 1 via clack in TTY mode for malformed versions', async () => {
+        const deps = baseDeps({
+          isInteractive: vi.fn(() => true),
+          currentVersion: 'garbage',
+          fetchLatestRelease: vi.fn(async () => createMockRelease()),
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(clack.log.error).toHaveBeenCalledWith(
+          expect.stringContaining('Cannot compare versions'),
+        );
+      });
+    });
+
+    describe('release notes in output', () => {
+      it('includes release notes and URL when update is available (non-TTY)', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () =>
+            createMockRelease({ body: 'Fixed a critical bug.' }),
+          ),
+        });
+
+        await runUpgradeCommand({ check: true, yes: false }, deps);
+        const stdout = collectStdout(stdoutSpy);
+        expect(stdout).toContain('Fixed a critical bug.');
+        expect(stdout).toContain('Full release notes:');
+      });
+
+      it('includes published date when available', async () => {
+        const deps = baseDeps({
+          fetchLatestRelease: vi.fn(async () =>
+            createMockRelease({ publishedAt: '2025-06-01T10:00:00Z' }),
+          ),
+        });
+
+        await runUpgradeCommand({ check: true, yes: false }, deps);
+        expect(collectStdout(stdoutSpy)).toContain('Published: 2025-06-01');
+      });
+    });
+  });
+});

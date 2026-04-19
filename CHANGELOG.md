@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added `xcodebuildmcp upgrade` command to check for updates and upgrade in place. Supports `--check` (report-only) and `--yes`/`-y` (skip confirmation). Detects install method (Homebrew, npm-global, npx) and runs the appropriate upgrade command. Non-interactive environments exit 1 when an auto-upgrade is possible but `--yes` was not supplied.
+
 ## [2.3.2]
 
 ### Fixed

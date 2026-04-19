@@ -62,6 +62,16 @@ Using `@latest` ensures clients resolve the newest version on each run.
 
 See [CLI.md](CLI.md) for full CLI documentation.
 
+### Checking for updates
+
+After installing, check for newer releases at any time:
+
+```bash
+xcodebuildmcp upgrade --check
+```
+
+Homebrew and npm-global installs can auto-upgrade with `xcodebuildmcp upgrade --yes`. npx users don't need to upgrade explicitly — `@latest` resolves the newest version on each run. If you pinned a specific version in your MCP client config, update the version there instead.
+
 ## Project config (optional)
 For deterministic session defaults and runtime configuration, add a config file at:
 

@@ -80,6 +80,13 @@ async function runSetupCommand(): Promise<void> {
   await app.parseAsync();
 }
 
+async function runUpgradeCommand(): Promise<void> {
+  const { registerUpgradeCommand } = await import('./cli/commands/upgrade.ts');
+  const app = await buildLightweightYargsApp();
+  registerUpgradeCommand(app);
+  await app.parseAsync();
+}
+
 async function main(): Promise<void> {
   const cliBootstrapStartedAt = Date.now();
   const earlyCommand = findTopLevelCommand(process.argv.slice(2));
@@ -93,6 +100,10 @@ async function main(): Promise<void> {
   }
   if (earlyCommand === 'setup') {
     await runSetupCommand();
+    return;
+  }
+  if (earlyCommand === 'upgrade') {
+    await runUpgradeCommand();
     return;
   }
 

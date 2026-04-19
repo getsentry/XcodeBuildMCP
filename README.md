@@ -352,6 +352,13 @@ xcodebuildmcp tools
 xcodebuildmcp simulator build --scheme MyApp --project-path ./MyApp.xcodeproj
 ```
 
+Check for updates and upgrade in place:
+
+```bash
+xcodebuildmcp upgrade --check
+xcodebuildmcp upgrade --yes
+```
+
 The CLI uses a per-workspace daemon for stateful operations (log capture, debugging, etc.) that auto-starts when needed. See [docs/CLI.md](docs/CLI.md) for full documentation.
 
 ## Documentation

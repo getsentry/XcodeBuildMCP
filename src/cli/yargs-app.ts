@@ -7,6 +7,7 @@ import { registerInitCommand } from './commands/init.ts';
 import { registerMcpCommand } from './commands/mcp.ts';
 import { registerSetupCommand } from './commands/setup.ts';
 import { registerToolsCommand } from './commands/tools.ts';
+import { registerUpgradeCommand } from './commands/upgrade.ts';
 import { registerToolCommands } from './register-tool-commands.ts';
 import { version } from '../version.ts';
 import { coerceLogLevel, setLogLevel, type LogLevel } from '../utils/logger.ts';
@@ -75,6 +76,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
   registerMcpCommand(app);
   registerInitCommand(app, { workspaceRoot: opts.workspaceRoot });
   registerSetupCommand(app);
+  registerUpgradeCommand(app);
   registerToolsCommand(app);
   registerToolCommands(app, opts.catalog, {
     workspaceRoot: opts.workspaceRoot,
