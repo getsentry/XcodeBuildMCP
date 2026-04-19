@@ -1,0 +1,12 @@
+id: toggle_connect_hardware_keyboard
+module: mcp/tools/simulator-management/toggle_connect_hardware_keyboard
+names:
+  mcp: toggle_connect_hardware_keyboard
+  cli: toggle-connect-hardware-keyboard
+description: Toggle whether the iOS Simulator receives Mac hardware keyboard input (Cmd+Shift+K). Disconnecting makes the on-screen keyboard appear for tap-based input. Requires the simulator to be booted and Accessibility permission for the MCP host.
+annotations:
+  title: Toggle Connect Hardware Keyboard
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false
+  idempotentHint: false
