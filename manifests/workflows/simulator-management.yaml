@@ -11,3 +11,5 @@ tools:
   - reset_sim_location
   - set_sim_appearance
   - sim_statusbar
+  - toggle_software_keyboard
+  - toggle_connect_hardware_keyboard
