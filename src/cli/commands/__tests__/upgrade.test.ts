@@ -202,6 +202,24 @@ describe('upgrade command', () => {
       });
     });
 
+    it('parses prerelease with hyphenated identifier', () => {
+      expect(parseVersion('1.0.0-alpha-1')).toEqual({
+        major: 1,
+        minor: 0,
+        patch: 0,
+        prerelease: 'alpha-1',
+      });
+    });
+
+    it('parses hyphenated prerelease with hyphenated build metadata', () => {
+      expect(parseVersion('1.0.0-rc-1+build-hash')).toEqual({
+        major: 1,
+        minor: 0,
+        patch: 0,
+        prerelease: 'rc-1',
+      });
+    });
+
     it.each([['not-a-version'], ['1.2'], [''], ['1.2.3.4'], ['abc.def.ghi']])(
       'returns undefined for malformed input %j',
       (input) => {
@@ -939,6 +957,19 @@ describe('upgrade command', () => {
         expect(code).toBe(1);
         expect(collectStderr(stderrSpy)).toContain('Homebrew');
         expect(collectStderr(stderrSpy)).toContain('invalid JSON');
+      });
+
+      it('homebrew: exits 1 when brew info exits non-zero', async () => {
+        const deps = channelDeps(homebrewMethod(), {
+          stdout: '',
+          stderr: 'Error: Permission denied',
+          exitCode: 1,
+        });
+
+        const code = await runUpgradeCommand({ check: false, yes: false }, deps);
+        expect(code).toBe(1);
+        expect(collectStderr(stderrSpy)).toContain('Homebrew');
+        expect(collectStderr(stderrSpy)).toContain('exited with code 1');
       });
 
       it('npm-global: exits 1 when npm view exits non-zero', async () => {

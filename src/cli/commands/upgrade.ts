@@ -69,7 +69,7 @@ export interface UpgradeOptions {
 
 export function parseVersion(raw: string): ParsedVersion | undefined {
   const stripped = raw.startsWith('v') ? raw.slice(1) : raw;
-  const match = stripped.match(/^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9.]+))?(?:\+[a-zA-Z0-9.]+)?$/);
+  const match = stripped.match(/^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9.-]+))?(?:\+[a-zA-Z0-9.-]+)?$/);
   if (!match) return undefined;
   return {
     major: Number(match[1]),
@@ -256,6 +256,12 @@ async function fetchLatestVersionFromHomebrew(
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`couldn't determine latest version from Homebrew: ${reason}`);
+  }
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `couldn't determine latest version from Homebrew: command exited with code ${result.exitCode}`,
+    );
   }
 
   let data: unknown;
