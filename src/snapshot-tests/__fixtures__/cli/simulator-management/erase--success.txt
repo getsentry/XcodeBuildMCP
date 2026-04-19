@@ -1,0 +1,6 @@
+
+🗑 Erase Simulator
+
+   Simulator: <UUID>
+
+✅ Simulators were erased successfully

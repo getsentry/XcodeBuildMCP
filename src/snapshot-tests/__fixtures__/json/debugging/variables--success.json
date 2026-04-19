@@ -1,0 +1,40 @@
+{
+  "schema": "xcodebuildmcp.output.debug-variables-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "scopes": {
+      "locals": {
+        "variables": []
+      },
+      "globals": {
+        "variables": []
+      },
+      "registers": {
+        "groups": [
+          {
+            "name": "General Purpose Registers",
+            "variables": []
+          },
+          {
+            "name": "Floating Point Registers",
+            "variables": []
+          },
+          {
+            "name": "Exception State Registers",
+            "variables": []
+          },
+          {
+            "name": "Scalable Vector Extension Registers",
+            "variables": []
+          },
+          {
+            "name": "Scalable Matrix Extension Registers",
+            "variables": []
+          }
+        ]
+      }
+    }
+  }
+}

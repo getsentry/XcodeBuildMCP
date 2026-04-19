@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -16,19 +15,13 @@ import {
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { join } from 'path';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { launchAppOnDevice } from '../../../utils/device-steps.ts';
 
-// Type for the launch JSON response
-type LaunchDataResponse = {
-  result?: {
-    process?: {
-      processIdentifier?: number;
-    };
-  };
-};
-
-// Define schema as ZodObject
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
   bundleId: z.string(),
@@ -43,114 +36,53 @@ const publicSchemaObject = launchAppDeviceSchema.omit({
   bundleId: true,
 } as const);
 
-// Use z.infer for type safety
 type LaunchAppDeviceParams = z.infer<typeof launchAppDeviceSchema>;
 
 export async function launch_app_deviceLogic(
   params: LaunchAppDeviceParams,
   executor: CommandExecutor,
   fileSystem: FileSystemExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   const { deviceId, bundleId } = params;
 
   log('info', `Launching app ${bundleId} on device ${deviceId}`);
 
-  try {
-    // Use JSON output to capture process ID
-    const tempJsonPath = join(fileSystem.tmpdir(), `launch-${Date.now()}.json`);
+  const headerEvent = header('Launch App', [
+    { label: 'Device', value: formatDeviceId(deviceId) },
+    { label: 'Bundle ID', value: bundleId },
+  ]);
 
-    const command = [
-      'xcrun',
-      'devicectl',
-      'device',
-      'process',
-      'launch',
-      '--device',
-      deviceId,
-      '--json-output',
-      tempJsonPath,
-      '--terminate-existing',
-    ];
+  const ctx = getHandlerContext();
 
-    if (params.env && Object.keys(params.env).length > 0) {
-      command.push('--environment-variables', JSON.stringify(params.env));
-    }
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const launchResult = await launchAppOnDevice(deviceId, bundleId, executor, fileSystem, {
+        env: params.env,
+      });
 
-    command.push(bundleId);
-
-    const result = await executor(
-      command,
-      'Launch app on device',
-      false, // useShell
-      undefined, // env
-    );
-
-    if (!result.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to launch app: ${result.error}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    // Parse JSON to extract process ID
-    let processId: number | undefined;
-    try {
-      const jsonContent = await fileSystem.readFile(tempJsonPath, 'utf8');
-      const parsedData: unknown = JSON.parse(jsonContent);
-
-      // Type guard to validate the parsed data structure
-      if (
-        parsedData &&
-        typeof parsedData === 'object' &&
-        'result' in parsedData &&
-        parsedData.result &&
-        typeof parsedData.result === 'object' &&
-        'process' in parsedData.result &&
-        parsedData.result.process &&
-        typeof parsedData.result.process === 'object' &&
-        'processIdentifier' in parsedData.result.process &&
-        typeof parsedData.result.process.processIdentifier === 'number'
-      ) {
-        const launchData = parsedData as LaunchDataResponse;
-        processId = launchData.result?.process?.processIdentifier;
+      if (!launchResult.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Failed to launch app: ${launchResult.error}`));
+        return;
       }
-    } catch (error) {
-      log('warn', `Failed to parse launch JSON output: ${error}`);
-    } finally {
-      await fileSystem.rm(tempJsonPath, { force: true }).catch(() => {});
-    }
 
-    const responseText = processId
-      ? `✅ App launched successfully\n\n${result.output}\n\nProcess ID: ${processId}\n\nInteract with your app on the device.`
-      : `✅ App launched successfully\n\n${result.output}`;
+      const processId = launchResult.processId;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: responseText,
-        },
-      ],
-      ...(processId ? { nextStepParams: { stop_app_device: { deviceId, processId } } } : {}),
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error launching app on device: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to launch app on device: ${errorMessage}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'App launched successfully.'));
+
+      if (processId !== undefined) {
+        ctx.emit(detailTree([{ label: 'Process ID', value: processId.toString() }]));
+        ctx.nextStepParams = { stop_app_device: { deviceId, processId } };
+      }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to launch app on device: ${message}`,
+      logMessage: ({ message }) => `Error launching app on device: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

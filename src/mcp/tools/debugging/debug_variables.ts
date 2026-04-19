@@ -1,7 +1,10 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createErrorResponse, createTextResponse } from '../../../utils/responses/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
   type DebuggerToolContext,
@@ -17,16 +20,30 @@ export type DebugVariablesParams = z.infer<typeof debugVariablesSchema>;
 export async function debug_variablesLogic(
   params: DebugVariablesParams,
   ctx: DebuggerToolContext,
-): Promise<ToolResponse> {
-  try {
-    const output = await ctx.debugger.getVariables(params.debugSessionId, {
-      frameIndex: params.frameIndex,
-    });
-    return createTextResponse(output.trim());
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to get variables', message);
-  }
+): Promise<void> {
+  const headerEvent = header('Variables');
+
+  const handlerCtx = getHandlerContext();
+
+  return withErrorHandling(
+    handlerCtx,
+    async () => {
+      const output = await ctx.debugger.getVariables(params.debugSessionId, {
+        frameIndex: params.frameIndex,
+      });
+      const trimmed = output.trim();
+
+      handlerCtx.emit(headerEvent);
+      handlerCtx.emit(statusLine('success', 'Variables retrieved'));
+      if (trimmed) {
+        handlerCtx.emit(section('Values:', trimmed.split('\n')));
+      }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to get variables: ${message}`,
+    },
+  );
 }
 
 export const schema = debugVariablesSchema.shape;

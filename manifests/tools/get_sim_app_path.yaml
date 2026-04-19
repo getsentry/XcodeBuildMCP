@@ -13,12 +13,16 @@ nextSteps:
   - label: Get bundle ID
     toolId: get_app_bundle_id
     priority: 1
+    when: success
   - label: Boot simulator
     toolId: boot_sim
     priority: 2
+    when: success
   - label: Install app
     toolId: install_app_sim
     priority: 3
+    when: success
   - label: Launch app
     toolId: launch_app_sim
     priority: 4
+    when: success

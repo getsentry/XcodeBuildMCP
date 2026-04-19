@@ -2,15 +2,18 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTextResponse, createErrorResponse } from '../../../utils/responses/index.ts';
 import { log } from '../../../utils/logging/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { startBuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
+import { finalizeInlineXcodebuild } from '../../../utils/xcodebuild-output.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
 
-// Define schema as ZodObject
 const baseSchemaObject = z.object({
   packagePath: z.string(),
   testProduct: z.string().optional(),
@@ -27,20 +30,28 @@ const publicSchemaObject = baseSchemaObject.omit({
 
 const swiftPackageTestSchema = baseSchemaObject;
 
-// Use z.infer for type safety
 type SwiftPackageTestParams = z.infer<typeof swiftPackageTestSchema>;
 
 export async function swift_package_testLogic(
   params: SwiftPackageTestParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
   const swiftArgs = ['test', '--package-path', resolvedPath];
+
+  const headerEvent = header('Swift Package Test', [
+    { label: 'Package', value: resolvedPath },
+    ...(params.testProduct ? [{ label: 'Test Product', value: params.testProduct }] : []),
+    ...(params.configuration ? [{ label: 'Configuration', value: params.configuration }] : []),
+  ]);
 
   if (params.configuration?.toLowerCase() === 'release') {
     swiftArgs.push('-c', 'release');
   } else if (params.configuration && params.configuration.toLowerCase() !== 'debug') {
-    return createTextResponse("Invalid configuration. Use 'debug' or 'release'.", true);
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('error', "Invalid configuration. Use 'debug' or 'release'."));
+    return;
   }
 
   if (params.testProduct) {
@@ -64,29 +75,49 @@ export async function swift_package_testLogic(
   }
 
   log('info', `Running swift ${swiftArgs.join(' ')}`);
-  try {
-    const result = await executor(['swift', ...swiftArgs], 'Swift Package Test', false, undefined);
-    if (!result.success) {
-      const errorMessage = result.error || result.output || 'Unknown error';
-      return createErrorResponse('Swift package tests failed', errorMessage);
-    }
 
-    return {
-      content: [
-        { type: 'text', text: '✅ Swift package tests completed.' },
-        {
-          type: 'text',
-          text: '💡 Next: Execute your app with swift_package_run if tests passed',
-        },
-        { type: 'text', text: result.output },
-      ],
-      isError: false,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log('error', `Swift package test failed: ${message}`);
-    return createErrorResponse('Failed to execute swift test', message);
-  }
+  const configText = `Swift Package Test\n  Package: ${displayPath(resolvedPath)}`;
+  const started = startBuildPipeline({
+    operation: 'TEST',
+    toolName: 'swift_package_test',
+    params: {
+      scheme: params.testProduct ?? path.basename(resolvedPath),
+      configuration: params.configuration ?? 'debug',
+      platform: 'Swift Package',
+      preflight: configText,
+    },
+    message: configText,
+  });
+
+  const { pipeline } = started;
+
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const result = await executor(['swift', ...swiftArgs], 'Swift Package Test', false, {
+        onStdout: (chunk: string) => pipeline.onStdout(chunk),
+        onStderr: (chunk: string) => pipeline.onStderr(chunk),
+      });
+
+      finalizeInlineXcodebuild({
+        started,
+        emit: ctx.emit,
+        succeeded: result.success,
+        durationMs: Date.now() - started.startedAt,
+      });
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to execute swift test: ${message}`,
+      logMessage: ({ message }) => `Swift package test failed: ${message}`,
+      mapError: ({ message, headerEvent: hdr, emit }) => {
+        if (emit) {
+          emit(hdr);
+          emit(statusLine('error', `Failed to execute swift test: ${message}`));
+        }
+      },
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

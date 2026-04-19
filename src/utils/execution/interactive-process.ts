@@ -70,12 +70,16 @@ function createInteractiveProcess(
   return new DefaultInteractiveProcess(childProcess);
 }
 
-export function getDefaultInteractiveSpawner(): InteractiveSpawner {
-  if (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test') {
-    throw new Error(
-      'Interactive process spawn blocked in tests. Inject a mock InteractiveSpawner.',
-    );
-  }
+let _testInteractiveSpawnerOverride: InteractiveSpawner | null = null;
 
-  return createInteractiveProcess;
+export function __setTestInteractiveSpawnerOverride(spawner: InteractiveSpawner | null): void {
+  _testInteractiveSpawnerOverride = spawner;
+}
+
+export function __clearTestInteractiveSpawnerOverride(): void {
+  _testInteractiveSpawnerOverride = null;
+}
+
+export function getDefaultInteractiveSpawner(): InteractiveSpawner {
+  return _testInteractiveSpawnerOverride ?? createInteractiveProcess;
 }

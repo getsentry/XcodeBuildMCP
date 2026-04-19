@@ -1,0 +1,16 @@
+
+🧪 Test
+
+   Scheme: CalculatorApp
+   Configuration: Debug
+   Platform: iOS
+   Device: <DEVICE> (<UUID>)
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Selective Testing:
+     CalculatorAppTests/CalculatorAppTests/testAddition
+
+Discovered 1 test(s):
+   CalculatorAppTests/CalculatorAppTests/testAddition
+
+✅ 1 test passed, 0 skipped (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_device_<TIMESTAMP>_pid<PID>.log

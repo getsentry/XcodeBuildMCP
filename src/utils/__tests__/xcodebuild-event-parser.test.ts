@@ -1,0 +1,307 @@
+import { describe, expect, it } from 'vitest';
+import { createXcodebuildEventParser } from '../xcodebuild-event-parser.ts';
+import type { PipelineEvent } from '../../types/pipeline-events.ts';
+
+function collectEvents(
+  operation: 'BUILD' | 'TEST',
+  lines: { source: 'stdout' | 'stderr'; text: string }[],
+): PipelineEvent[] {
+  const events: PipelineEvent[] = [];
+  const parser = createXcodebuildEventParser({
+    operation,
+    onEvent: (event) => events.push(event),
+  });
+
+  for (const { source, text } of lines) {
+    if (source === 'stdout') {
+      parser.onStdout(text);
+    } else {
+      parser.onStderr(text);
+    }
+  }
+
+  parser.flush();
+  return events;
+}
+
+describe('xcodebuild-event-parser', () => {
+  it('emits status events for package resolution', () => {
+    const events = collectEvents('TEST', [{ source: 'stdout', text: 'Resolve Package Graph\n' }]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'build-stage',
+      operation: 'TEST',
+      stage: 'RESOLVING_PACKAGES',
+      message: 'Resolving packages',
+    });
+  });
+
+  it('emits status events for compile patterns', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: 'CompileSwift normal arm64 /tmp/App.swift\n' },
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'build-stage',
+      operation: 'BUILD',
+      stage: 'COMPILING',
+      message: 'Compiling',
+    });
+  });
+
+  it('emits status events for linking', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: 'Ld /Build/Products/Debug/MyApp.app/MyApp normal arm64\n' },
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'build-stage',
+      operation: 'BUILD',
+      stage: 'LINKING',
+      message: 'Linking',
+    });
+  });
+
+  it('emits status events for test start', () => {
+    const events = collectEvents('TEST', [{ source: 'stdout', text: 'Testing started\n' }]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'build-stage',
+      stage: 'RUN_TESTS',
+    });
+  });
+
+  it('emits test-progress events with cumulative counts', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.002 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testC]' passed (0.003 seconds)\n" },
+    ]);
+
+    const progressEvents = events.filter((e) => e.type === 'test-progress');
+    expect(progressEvents).toHaveLength(3);
+    expect(progressEvents[0]).toMatchObject({ completed: 1, failed: 0, skipped: 0 });
+    expect(progressEvents[1]).toMatchObject({ completed: 2, failed: 1, skipped: 0 });
+    expect(progressEvents[2]).toMatchObject({ completed: 3, failed: 1, skipped: 0 });
+  });
+
+  it('emits test-progress from totals line', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: 'Executed 5 tests, with 2 failures (0 unexpected) in 1.234 (1.235) seconds\n',
+      },
+    ]);
+
+    const progressEvents = events.filter((e) => e.type === 'test-progress');
+    expect(progressEvents).toHaveLength(1);
+    expect(progressEvents[0]).toMatchObject({ completed: 5, failed: 2 });
+  });
+
+  it('emits test-failure events from diagnostics', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stderr',
+        text: '/tmp/Test.swift:52: error: -[Suite testB] : XCTAssertEqual failed: ("0") is not equal to ("1")\n',
+      },
+    ]);
+
+    const failures = events.filter((e) => e.type === 'test-failure');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      type: 'test-failure',
+      suite: 'Suite',
+      test: 'testB',
+      location: '/tmp/Test.swift:52',
+      message: 'XCTAssertEqual failed: ("0") is not equal to ("1")',
+    });
+  });
+
+  it('attaches failure duration when the diagnostic and failed test case lines both appear', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stderr',
+        text: '/tmp/Test.swift:52: error: -[Suite testB] : XCTAssertEqual failed: ("0") is not equal to ("1")\n',
+      },
+      { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.002 seconds)\n" },
+    ]);
+
+    const failures = events.filter((e) => e.type === 'test-failure');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      type: 'test-failure',
+      suite: 'Suite',
+      test: 'testB',
+      location: '/tmp/Test.swift:52',
+      message: 'XCTAssertEqual failed: ("0") is not equal to ("1")',
+      durationMs: 2,
+    });
+  });
+
+  it('emits error events for build errors', () => {
+    const events = collectEvents('BUILD', [
+      {
+        source: 'stdout',
+        text: "/tmp/App.swift:8:17: error: cannot convert value of type 'String' to specified type 'Int'\n",
+      },
+    ]);
+
+    const errors = events.filter((e) => e.type === 'compiler-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      type: 'compiler-error',
+      location: '/tmp/App.swift:8',
+      message: "cannot convert value of type 'String' to specified type 'Int'",
+    });
+  });
+
+  it('emits error events for non-location build errors', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: 'error: emit-module command failed with exit code 1\n' },
+    ]);
+
+    const errors = events.filter((e) => e.type === 'compiler-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      type: 'compiler-error',
+      message: 'emit-module command failed with exit code 1',
+    });
+  });
+
+  it('accumulates indented continuation lines into the preceding error', () => {
+    const events = collectEvents('BUILD', [
+      {
+        source: 'stderr',
+        text: 'xcodebuild: error: Unable to find a device matching the provided destination specifier:\n',
+      },
+      { source: 'stderr', text: '\t\t{ platform:iOS Simulator, name:iPhone 22, OS:latest }\n' },
+      { source: 'stderr', text: '\n' },
+    ]);
+
+    const errors = events.filter((e) => e.type === 'compiler-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      type: 'compiler-error',
+      message:
+        'Unable to find a device matching the provided destination specifier:\n{ platform:iOS Simulator, name:iPhone 22, OS:latest }',
+    });
+  });
+
+  it('emits warning events', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: '/tmp/App.swift:10:5: warning: variable unused\n' },
+    ]);
+
+    const warnings = events.filter((e) => e.type === 'compiler-warning');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      type: 'compiler-warning',
+      location: '/tmp/App.swift:10',
+      message: 'variable unused',
+    });
+  });
+
+  it('emits warning events for prefixed warnings', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: 'ld: warning: directory not found for option\n' },
+    ]);
+
+    const warnings = events.filter((e) => e.type === 'compiler-warning');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      type: 'compiler-warning',
+      message: 'directory not found for option',
+    });
+  });
+
+  it('handles split chunks across buffer boundaries', () => {
+    const events: PipelineEvent[] = [];
+    const parser = createXcodebuildEventParser({
+      operation: 'TEST',
+      onEvent: (event) => events.push(event),
+    });
+
+    parser.onStdout('Resolve Pack');
+    parser.onStdout('age Graph\n');
+    parser.flush();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: 'build-stage', stage: 'RESOLVING_PACKAGES' });
+  });
+
+  it('attaches swift-testing failure duration when the issue and failed result lines both appear', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: '✘ Test "IntentionalFailureSuite/test" recorded an issue at /tmp/SimpleTests.swift:48:5: Expectation failed: true == false\n',
+      },
+      {
+        source: 'stdout',
+        text: '✘ Test "IntentionalFailureSuite/test" failed after 0.003 seconds with 1 issue.\n',
+      },
+    ]);
+
+    const failures = events.filter((e) => e.type === 'test-failure');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      type: 'test-failure',
+      suite: 'IntentionalFailureSuite',
+      test: 'test',
+      location: '/tmp/SimpleTests.swift:48',
+      message: 'Expectation failed: true == false',
+      durationMs: 3,
+    });
+  });
+
+  it('processes full test lifecycle', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: 'Resolve Package Graph\n' },
+      { source: 'stdout', text: 'CompileSwift normal arm64 /tmp/App.swift\n' },
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.002 seconds)\n" },
+      {
+        source: 'stderr',
+        text: '/tmp/Test.swift:52: error: -[Suite testB] : XCTAssertEqual failed: ("0") is not equal to ("1")\n',
+      },
+      {
+        source: 'stdout',
+        text: 'Executed 2 tests, with 1 failures (0 unexpected) in 0.123 (0.124) seconds\n',
+      },
+    ]);
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain('build-stage');
+    expect(types).toContain('test-progress');
+    expect(types).toContain('test-failure');
+  });
+
+  it('increments counts by caseCount for parameterized Swift Testing results', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: '✔ Test "Parameterized test" with 3 test cases passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const progress = events.filter((e) => e.type === 'test-progress');
+    expect(progress).toHaveLength(1);
+    if (progress[0].type === 'test-progress') {
+      expect(progress[0].completed).toBe(3);
+    }
+  });
+
+  it('skips Test Suite and Testing started noise lines without emitting events', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: "Test Suite 'All tests' started at 2025-01-01 00:00:00.000.\n" },
+      { source: 'stdout', text: "Test Suite 'All tests' passed at 2025-01-01 00:00:01.000.\n" },
+    ]);
+
+    // Test Suite 'All tests' started triggers RUN_TESTS status; 'passed' is noise
+    const statusEvents = events.filter((e) => e.type === 'build-stage');
+    expect(statusEvents.length).toBeLessThanOrEqual(1);
+  });
+});

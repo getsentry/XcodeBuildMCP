@@ -1,0 +1,30 @@
+
+📊 File Coverage
+
+   xcresult: <TMPDIR>/TestResults.xcresult
+   File: CalculatorService.swift
+
+File: example_projects/iOS_Calculator/CalculatorAppPackage/Sources/CalculatorAppFeature/CalculatorService.swift
+
+ℹ️ Coverage: 77.8% (147/189 lines)
+
+🔴 Not Covered (8 functions, 27 lines)
+   L159  CalculatorService.deleteLastDigit() -- 0/16 lines
+   L178  CalculatorService.setError(_:) -- 0/5 lines
+   L58  implicit closure #2 in CalculatorService.inputNumber(_:) -- 0/1 lines
+   L98  implicit closure #3 in CalculatorService.calculate() -- 0/1 lines
+   L99  implicit closure #4 in CalculatorService.calculate() -- 0/1 lines
+   L162  implicit closure #1 in CalculatorService.deleteLastDigit() -- 0/1 lines
+   L172  implicit closure #2 in CalculatorService.deleteLastDigit() -- 0/1 lines
+   L214  implicit closure #4 in CalculatorService.formatNumber(_:) -- 0/1 lines
+
+🟡 Partial Coverage (4 functions)
+   L63  CalculatorService.inputDecimal() -- 71.4% (10/14 lines)
+   L184  CalculatorService.updateExpressionDisplay() -- 80.0% (8/10 lines)
+   L93  CalculatorService.calculate() -- 84.2% (32/38 lines)
+   L195  CalculatorService.formatNumber(_:) -- 85.7% (18/21 lines)
+
+🟢 Full Coverage (27 functions) -- all at 100%
+
+Next steps:
+1. View overall coverage: get_coverage_report({ xcresultPath: "<TMPDIR>/TestResults.xcresult" })

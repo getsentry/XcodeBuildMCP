@@ -1,0 +1,11 @@
+
+🔍 Get macOS Bundle ID
+
+   App: <TMPDIR>/BundleTest.app
+
+✅ Bundle ID
+  └ com.test.snapshot
+
+Next steps:
+1. Launch the app: launch_mac_app({ appPath: "<TMPDIR>/BundleTest.app" })
+2. Build again: build_macos({ scheme: "SCHEME_NAME" })

@@ -63,6 +63,17 @@ extension CalculatorAppTests {
         
         XCTAssertEqual(service.display, "8", "5 + 3 should equal 8")
     }
+
+    func testAddition() throws {
+        let service = CalculatorService()
+
+        service.inputNumber("5")
+        service.setOperation(.add)
+        service.inputNumber("3")
+        service.calculate()
+
+        XCTAssertEqual(service.display, "8", "5 + 3 should equal 8")
+    }
     
     func testCalculatorServiceChainedOperations() throws {
         let service = CalculatorService()
@@ -266,6 +277,13 @@ extension CalculatorAppTests {
         service.inputNumber("9")
         
         XCTAssertEqual(service.display, "1.59", "Multiple decimal points should be ignored")
+    }
+}
+
+final class IntentionalFailureTests: XCTestCase {
+
+    func test() throws {
+        XCTAssertTrue(false, "This test should fail to verify error reporting")
     }
 }
 

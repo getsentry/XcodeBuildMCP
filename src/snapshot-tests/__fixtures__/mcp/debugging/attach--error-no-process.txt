@@ -1,0 +1,4 @@
+
+🐛 Attach Debugger
+
+❌ Failed to resolve simulator PID: Invalid device: <UUID>

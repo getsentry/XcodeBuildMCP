@@ -15,3 +15,4 @@ nextSteps:
   - label: Stop and save the recording
     toolId: record_sim_video
     priority: 1
+    when: success

@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "bundleId": "io.sentry.calculatorapp",
+      "deviceId": "<UUID>",
+      "processId": 99999
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

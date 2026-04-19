@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-// Import the tool and logic
 import { schema, handler, record_sim_videoLogic } from '../record_sim_video.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
+import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
 
 const DUMMY_EXECUTOR: any = (async () => ({ success: true })) as any; // CommandExecutor stub
 const VALID_SIM_ID = '00000000-0000-0000-0000-000000000000';
@@ -48,42 +48,38 @@ describe('record_sim_video logic - start behavior', () => {
       }),
     };
 
-    // DI for AXe helpers: available and version OK
     const axe = {
       areAxeToolsAvailable: () => true,
       isAxeAtLeastVersion: async () => true,
-      createAxeNotAvailableResponse: () => ({
-        content: [{ type: 'text' as const, text: 'AXe not available' }],
-        isError: true,
-      }),
     };
 
     const fs = createMockFileSystemExecutor();
 
-    const res = await record_sim_videoLogic(
-      {
-        simulatorId: VALID_SIM_ID,
-        start: true,
-        // fps omitted to hit default 30
-        outputFile: '/tmp/ignored.mp4', // should be ignored with a note
-      } as any,
-      DUMMY_EXECUTOR,
-      axe,
-      video,
-      fs,
+    const { result, run } = createMockToolHandlerContext();
+    await run(() =>
+      record_sim_videoLogic(
+        {
+          simulatorId: VALID_SIM_ID,
+          start: true,
+          outputFile: '/tmp/ignored.mp4',
+        } as any,
+        DUMMY_EXECUTOR,
+        axe,
+        video,
+        fs,
+      ),
     );
 
-    expect(res.isError).toBe(false);
-    const texts = (res.content ?? []).map((c: any) => c.text).join('\n');
+    expect(result.isError()).toBe(false);
+    const texts = result.text();
 
-    expect(texts).toMatch(/30\s*fps/i);
+    expect(texts).toContain('30');
     expect(texts.toLowerCase()).toContain('outputfile is ignored');
 
-    // Check nextStepParams instead of embedded text
-    expect(res.nextStepParams).toBeDefined();
-    expect(res.nextStepParams?.record_sim_video).toBeDefined();
-    expect(res.nextStepParams?.record_sim_video).toHaveProperty('stop', true);
-    expect(res.nextStepParams?.record_sim_video).toHaveProperty('outputFile');
+    expect(result.nextStepParams).toBeDefined();
+    expect(result.nextStepParams?.record_sim_video).toBeDefined();
+    expect(result.nextStepParams?.record_sim_video).toHaveProperty('stop', true);
+    expect(result.nextStepParams?.record_sim_video).toHaveProperty('outputFile');
   });
 });
 
@@ -106,46 +102,43 @@ describe('record_sim_video logic - end-to-end stop with rename', () => {
     const axe = {
       areAxeToolsAvailable: () => true,
       isAxeAtLeastVersion: async () => true,
-      createAxeNotAvailableResponse: () => ({
-        content: [{ type: 'text' as const, text: 'AXe not available' }],
-        isError: true,
-      }),
     };
 
-    // Start (not strictly required for stop path, but included to mimic flow)
-    const startRes = await record_sim_videoLogic(
-      {
-        simulatorId: VALID_SIM_ID,
-        start: true,
-      } as any,
-      DUMMY_EXECUTOR,
-      axe,
-      video,
-      fs,
+    const { result: startResult, run: runStart } = createMockToolHandlerContext();
+    await runStart(() =>
+      record_sim_videoLogic(
+        {
+          simulatorId: VALID_SIM_ID,
+          start: true,
+        } as any,
+        DUMMY_EXECUTOR,
+        axe,
+        video,
+        fs,
+      ),
     );
-    expect(startRes.isError).toBe(false);
+    expect(startResult.isError()).toBe(false);
 
-    // Stop and rename
     const outputFile = '/var/videos/final.mp4';
-    const stopRes = await record_sim_videoLogic(
-      {
-        simulatorId: VALID_SIM_ID,
-        stop: true,
-        outputFile,
-      } as any,
-      DUMMY_EXECUTOR,
-      axe,
-      video,
-      fs,
+    const { result: stopResult, run: runStop } = createMockToolHandlerContext();
+    await runStop(() =>
+      record_sim_videoLogic(
+        {
+          simulatorId: VALID_SIM_ID,
+          stop: true,
+          outputFile,
+        } as any,
+        DUMMY_EXECUTOR,
+        axe,
+        video,
+        fs,
+      ),
     );
 
-    expect(stopRes.isError).toBe(false);
-    const texts = (stopRes.content ?? []).map((c: any) => c.text).join('\n');
+    expect(stopResult.isError()).toBe(false);
+    const texts = stopResult.text();
     expect(texts).toContain('Original file: /tmp/recorded.mp4');
     expect(texts).toContain(`Saved to: ${outputFile}`);
-
-    // _meta should include final saved path
-    expect((stopRes as any)._meta?.outputFile).toBe(outputFile);
   });
 });
 
@@ -154,10 +147,6 @@ describe('record_sim_video logic - version gate', () => {
     const axe = {
       areAxeToolsAvailable: () => true,
       isAxeAtLeastVersion: async () => false,
-      createAxeNotAvailableResponse: () => ({
-        content: [{ type: 'text' as const, text: 'AXe not available' }],
-        isError: true,
-      }),
     };
 
     const video: any = {
@@ -172,19 +161,22 @@ describe('record_sim_video logic - version gate', () => {
 
     const fs = createMockFileSystemExecutor();
 
-    const res = await record_sim_videoLogic(
-      {
-        simulatorId: VALID_SIM_ID,
-        start: true,
-      } as any,
-      DUMMY_EXECUTOR,
-      axe,
-      video,
-      fs,
+    const { result, run } = createMockToolHandlerContext();
+    await run(() =>
+      record_sim_videoLogic(
+        {
+          simulatorId: VALID_SIM_ID,
+          start: true,
+        } as any,
+        DUMMY_EXECUTOR,
+        axe,
+        video,
+        fs,
+      ),
     );
 
-    expect(res.isError).toBe(true);
-    const text = (res.content?.[0] as any)?.text ?? '';
+    expect(result.isError()).toBe(true);
+    const text = result.text();
     expect(text).toContain('AXe v1.1.0');
   });
 });

@@ -1,0 +1,9 @@
+
+⌨️ Key Sequence
+
+   Simulator: <UUID>
+
+❌ Failed to execute key sequence: axe command 'key-sequence' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

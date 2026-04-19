@@ -1,0 +1,9 @@
+
+👆 Button
+
+   Simulator: <UUID>
+
+❌ Failed to press button 'home': axe command 'button' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

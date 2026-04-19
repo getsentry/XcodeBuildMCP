@@ -1,0 +1,11 @@
+
+🚀 Swift Package Run
+
+   Package: <ROOT>/example_projects/spm
+   Executable: nonexistent-executable
+
+Errors (1):
+
+  ✗ no executable product named 'nonexistent-executable'
+
+❌ Build failed. (⏱️ <DURATION>)

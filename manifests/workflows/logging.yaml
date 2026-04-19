@@ -1,8 +1,0 @@
-id: logging
-title: Log Capture
-description: Capture and retrieve logs from simulator and device apps.
-tools:
-  - start_sim_log_cap
-  - stop_sim_log_cap
-  - start_device_log_cap
-  - stop_device_log_cap

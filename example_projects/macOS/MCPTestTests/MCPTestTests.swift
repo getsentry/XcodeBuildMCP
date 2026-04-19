@@ -1,16 +1,13 @@
-//
-//  MCPTestTests.swift
-//  MCPTestTests
-//
-//  Created by Cameron on 15/12/2025.
-//
-
 import Testing
 
 struct MCPTestTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func appNameIsCorrect() async throws {
+        let expected = "MCPTest"
+        #expect(expected == "MCPTest")
     }
 
+    @Test func deliberateFailure() async throws {
+        #expect(1 == 2, "This test is designed to fail for snapshot testing")
+    }
 }

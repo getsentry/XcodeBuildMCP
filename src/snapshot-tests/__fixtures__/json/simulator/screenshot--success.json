@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.capture-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "screenshotPath": "<TMPDIR>"
+    },
+    "capture": {
+      "format": "image/jpeg",
+      "width": 368,
+      "height": 800
+    }
+  }
+}

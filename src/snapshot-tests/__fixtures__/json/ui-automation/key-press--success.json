@@ -1,0 +1,18 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "key-press",
+      "keyCode": 4
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

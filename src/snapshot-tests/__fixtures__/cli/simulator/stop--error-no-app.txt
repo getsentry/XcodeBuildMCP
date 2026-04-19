@@ -1,0 +1,12 @@
+
+🛑 Stop App
+
+   Simulator: <UUID>
+   Bundle ID: com.nonexistent.app
+
+❌ Stop app in simulator operation failed: An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):
+Simulator device failed to terminate com.nonexistent.app.
+found nothing to terminate
+Underlying error (domain=NSPOSIXErrorDomain, code=3):
+	The request to terminate "com.nonexistent.app" failed. found nothing to terminate
+	found nothing to terminate

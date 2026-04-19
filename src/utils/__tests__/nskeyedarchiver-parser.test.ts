@@ -1,6 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { describe, it, expect } from 'vitest';
 import {
   parseXcuserstate,
   parseXcuserstateBuffer,
@@ -9,53 +7,8 @@ import {
   findDictWithKey,
 } from '../nskeyedarchiver-parser.ts';
 
-// Path to the example project's xcuserstate (used as test fixture)
-const EXAMPLE_PROJECT_XCUSERSTATE = join(
-  process.cwd(),
-  'example_projects/iOS/MCPTest.xcodeproj/project.xcworkspace/xcuserdata/johndoe.xcuserdatad/UserInterfaceState.xcuserstate',
-);
-
-// Expected values for the MCPTest example project
-const EXPECTED_MCPTEST = {
-  scheme: 'MCPTest',
-  simulatorId: 'B38FE93D-578B-454B-BE9A-C6FA0CE5F096',
-  simulatorPlatform: 'iphonesimulator',
-};
-
 describe('NSKeyedArchiver Parser', () => {
   describe('parseXcuserstate (file path)', () => {
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts scheme name from example project',
-      () => {
-        const result = parseXcuserstate(EXAMPLE_PROJECT_XCUSERSTATE);
-        expect(result.scheme).toBe(EXPECTED_MCPTEST.scheme);
-      },
-    );
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts simulator UUID from example project',
-      () => {
-        const result = parseXcuserstate(EXAMPLE_PROJECT_XCUSERSTATE);
-        expect(result.simulatorId).toBe(EXPECTED_MCPTEST.simulatorId);
-      },
-    );
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts simulator platform from example project',
-      () => {
-        const result = parseXcuserstate(EXAMPLE_PROJECT_XCUSERSTATE);
-        expect(result.simulatorPlatform).toBe(EXPECTED_MCPTEST.simulatorPlatform);
-      },
-    );
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts device location from example project',
-      () => {
-        const result = parseXcuserstate(EXAMPLE_PROJECT_XCUSERSTATE);
-        expect(result.deviceLocation).toMatch(/^dvtdevice-iphonesimulator:[A-F0-9-]{36}$/);
-      },
-    );
-
     it('returns empty result for non-existent file', () => {
       const result = parseXcuserstate('/non/existent/file.xcuserstate');
       expect(result).toEqual({});
@@ -63,40 +16,6 @@ describe('NSKeyedArchiver Parser', () => {
   });
 
   describe('parseXcuserstateBuffer (buffer)', () => {
-    let fixtureBuffer: Buffer;
-
-    beforeAll(() => {
-      if (existsSync(EXAMPLE_PROJECT_XCUSERSTATE)) {
-        fixtureBuffer = readFileSync(EXAMPLE_PROJECT_XCUSERSTATE);
-      }
-    });
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))('extracts scheme name from buffer', () => {
-      const result = parseXcuserstateBuffer(fixtureBuffer);
-      expect(result.scheme).toBe(EXPECTED_MCPTEST.scheme);
-    });
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts simulator UUID from buffer',
-      () => {
-        const result = parseXcuserstateBuffer(fixtureBuffer);
-        expect(result.simulatorId).toBe(EXPECTED_MCPTEST.simulatorId);
-      },
-    );
-
-    it.skipIf(!existsSync(EXAMPLE_PROJECT_XCUSERSTATE))(
-      'extracts all fields correctly from buffer',
-      () => {
-        const result = parseXcuserstateBuffer(fixtureBuffer);
-        expect(result).toMatchObject({
-          scheme: EXPECTED_MCPTEST.scheme,
-          simulatorId: EXPECTED_MCPTEST.simulatorId,
-          simulatorPlatform: EXPECTED_MCPTEST.simulatorPlatform,
-        });
-        expect(result.deviceLocation).toBeDefined();
-      },
-    );
-
     it('returns empty result for empty buffer', () => {
       const result = parseXcuserstateBuffer(Buffer.from([]));
       expect(result).toEqual({});

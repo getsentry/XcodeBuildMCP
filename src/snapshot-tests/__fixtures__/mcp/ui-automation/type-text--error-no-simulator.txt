@@ -1,0 +1,9 @@
+
+⌨️ Type Text
+
+   Simulator: <UUID>
+
+❌ Failed to simulate text typing: axe command 'type' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

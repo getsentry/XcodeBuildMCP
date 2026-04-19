@@ -1,0 +1,6 @@
+
+⌨️ Key Sequence
+
+   Simulator: <UUID>
+
+✅ Key sequence [4,5,6] executed successfully.

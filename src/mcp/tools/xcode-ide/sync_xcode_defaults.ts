@@ -1,21 +1,15 @@
-/**
- * Sync Xcode Defaults Tool
- *
- * Reads Xcode's IDE state (active scheme and run destination) and updates
- * session defaults to match. This allows the agent to re-sync if the user
- * changes their selection in Xcode mid-session.
- *
- * Only visible when running under Xcode's coding agent.
- */
-
-import type { ToolResponse } from '../../../types/common.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import { readXcodeIdeState } from '../../../utils/xcode-state-reader.ts';
 import { lookupBundleId } from '../../../utils/xcode-state-watcher.ts';
 import * as z from 'zod';
+import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
+import { formatProfileAnnotation } from '../session-management/session-format-helpers.ts';
 
 const schemaObj = z.object({});
 
@@ -31,7 +25,10 @@ interface SyncXcodeDefaultsContext {
 export async function syncXcodeDefaultsLogic(
   _params: Params,
   ctx: SyncXcodeDefaultsContext,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const handlerContext = getHandlerContext();
+  const headerEvent = header('Sync Xcode Defaults');
+
   const xcodeState = await readXcodeIdeState({
     executor: ctx.executor,
     cwd: ctx.cwd,
@@ -40,36 +37,25 @@ export async function syncXcodeDefaultsLogic(
   });
 
   if (xcodeState.error) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to read Xcode IDE state: ${xcodeState.error}`,
-        },
-      ],
-      isError: true,
-    };
+    handlerContext.emit(headerEvent);
+    handlerContext.emit(statusLine('error', `Failed to read Xcode IDE state: ${xcodeState.error}`));
+    return;
   }
 
   const synced: Record<string, string> = {};
-  const notices: string[] = [];
 
   if (xcodeState.scheme) {
     synced.scheme = xcodeState.scheme;
-    notices.push(`Scheme: ${xcodeState.scheme}`);
   }
 
   if (xcodeState.simulatorId) {
     synced.simulatorId = xcodeState.simulatorId;
-    notices.push(`Simulator ID: ${xcodeState.simulatorId}`);
   }
 
   if (xcodeState.simulatorName) {
     synced.simulatorName = xcodeState.simulatorName;
-    notices.push(`Simulator Name: ${xcodeState.simulatorName}`);
   }
 
-  // Look up bundle ID if we have a scheme
   if (xcodeState.scheme) {
     const bundleId = await lookupBundleId(
       ctx.executor,
@@ -79,33 +65,28 @@ export async function syncXcodeDefaultsLogic(
     );
     if (bundleId) {
       synced.bundleId = bundleId;
-      notices.push(`Bundle ID: ${bundleId}`);
     }
   }
 
   if (Object.keys(synced).length === 0) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'No scheme or simulator selection detected in Xcode IDE state.',
-        },
-      ],
-      isError: false,
-    };
+    handlerContext.emit(headerEvent);
+    handlerContext.emit(
+      statusLine('info', 'No scheme or simulator selection detected in Xcode IDE state.'),
+    );
+    return;
   }
 
   sessionStore.setDefaults(synced);
 
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Synced session defaults from Xcode IDE:\n- ${notices.join('\n- ')}`,
-      },
-    ],
-    isError: false,
-  };
+  const activeProfile = sessionStore.getActiveProfile();
+  const profileAnnotation = formatProfileAnnotation(activeProfile);
+  const items = Object.entries(synced).map(([k, v]) => ({ label: k, value: v }));
+
+  handlerContext.emit(headerEvent);
+  handlerContext.emit(
+    statusLine('success', `Synced session defaults from Xcode IDE ${profileAnnotation}`),
+  );
+  handlerContext.emit(detailTree(items));
 }
 
 export const schema = schemaObj.shape;

@@ -1,0 +1,9 @@
+
+👆 Gesture
+
+   Simulator: <UUID>
+
+❌ Failed to execute gesture 'scroll-down': axe command 'gesture' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

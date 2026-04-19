@@ -88,13 +88,6 @@ export function createToolCatalog(tools: ToolDefinition[]): ToolCatalog {
 }
 
 /**
- * Get a list of all available tool names for display.
- */
-export function listToolNames(catalog: ToolCatalog): string[] {
-  return catalog.tools.map((t) => t.cliName).sort();
-}
-
-/**
  * Get tools grouped by workflow for display.
  */
 export function groupToolsByWorkflow(catalog: ToolCatalog): Map<string, ToolDefinition[]> {

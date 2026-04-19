@@ -1,0 +1,6 @@
+
+🚀 Launch macOS App
+
+   App: <TMPDIR>/NonExistent.app
+
+❌ File not found: '<TMPDIR>/NonExistent.app'. Please check the path and try again.

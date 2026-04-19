@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "simulator"
+    },
+    "artifacts": {
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_sim_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

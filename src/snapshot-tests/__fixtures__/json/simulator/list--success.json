@@ -1,0 +1,87 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "simulators": [
+      {
+        "name": "iPhone 17 Pro",
+        "simulatorId": "<UUID>",
+        "state": "Booted",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "simulatorId": "<UUID>",
+        "state": "Booted",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17e",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone Air",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17",
+        "simulatorId": "<UUID>",
+        "state": "Booted",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Pro 13-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Pro 11-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad mini (A17 Pro)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Air 13-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Air 11-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad (A16)",
+        "simulatorId": "<UUID>",
+        "state": "Shutdown",
+        "isAvailable": false,
+        "runtime": "iOS 26.4"
+      }
+    ]
+  }
+}

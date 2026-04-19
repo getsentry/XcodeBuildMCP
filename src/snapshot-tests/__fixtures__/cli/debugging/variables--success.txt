@@ -1,0 +1,18 @@
+
+🐛 Variables
+
+✅ Variables retrieved
+
+Values:
+  Locals:
+    (no variables)
+
+  Globals:
+    (no variables)
+
+  Registers:
+    General Purpose Registers (<no-type>) =
+    Floating Point Registers (<no-type>) =
+    Exception State Registers (<no-type>) =
+    Scalable Vector Extension Registers (<no-type>) =
+    Scalable Matrix Extension Registers (<no-type>) =

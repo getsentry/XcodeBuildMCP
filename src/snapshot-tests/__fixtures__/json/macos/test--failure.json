@@ -1,0 +1,50 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Tests failed",
+  "data": {
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "counts": {
+        "passed": 2,
+        "failed": 2,
+        "skipped": 0
+      },
+      "target": "macos"
+    },
+    "artifacts": {
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log"
+    },
+    "tests": {
+      "discovered": {
+        "total": 4,
+        "items": [
+          "MCPTestTests/MCPTestTests/appNameIsCorrect",
+          "MCPTestTests/MCPTestTests/deliberateFailure",
+          "MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect",
+          "MCPTestTests/MCPTestsXCTests/testDeliberateFailure"
+        ]
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [],
+      "testFailures": [
+        {
+          "suite": "MCPTestsXCTests",
+          "test": "testDeliberateFailure",
+          "message": "XCTAssertTrue failed - This test is designed to fail for snapshot testing",
+          "location": "MCPTestsXCTests.swift:11"
+        },
+        {
+          "suite": "MCPTestTests",
+          "test": "deliberateFailure",
+          "message": "Expectation failed: 1 == 2: This test is designed to fail for snapshot testing",
+          "location": "MCPTestTests.swift:11"
+        }
+      ]
+    }
+  }
+}

@@ -9,7 +9,11 @@ export {
   __setTestFileSystemExecutorOverride,
   __clearTestExecutorOverrides,
 } from '../command.ts';
-export { getDefaultInteractiveSpawner } from './interactive-process.ts';
+export {
+  getDefaultInteractiveSpawner,
+  __setTestInteractiveSpawnerOverride,
+  __clearTestInteractiveSpawnerOverride,
+} from './interactive-process.ts';
 
 // Types
 export type { CommandExecutor, CommandResponse, CommandExecOptions } from '../CommandExecutor.ts';

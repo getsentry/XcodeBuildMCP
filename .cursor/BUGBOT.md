@@ -12,7 +12,7 @@ For full details see [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCH
 ## 1. Security Checklist — Critical
 
 * No hard-coded secrets, tokens or DSNs.
-* All shell commands must flow through `CommandExecutor` with validated arguments (no direct `child_process` calls).
+* MCP tool logic functions that orchestrate long-running processes with sub-processes (e.g., `xcodebuild`) must flow through `CommandExecutor` with validated arguments. Standalone utility modules that invoke simple, short-lived commands may use direct `child_process`/`fs` imports and standard vitest mocking.
 * Paths must be sanitised via helpers in `src/utils/validation.ts`.
 * Sentry breadcrumbs / logs must **NOT** include user PII.
 
@@ -22,7 +22,7 @@ For full details see [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCH
 
 | Rule | Quick diff heuristic |
 |------|----------------------|
-| Dependency injection only | New `child_process` \| `fs` import ⇒ **critical** |
+| Dependency injection for tool logic | New `child_process` \| `fs` import in MCP tool logic ⇒ **warning** (check if process is complex/long-running) |
 | Handler / Logic split | `handler` > 20 LOC or contains branching ⇒ **critical** |
 | Plugin auto-registration | Manual `registerTool(...)` / `registerResource(...)` ⇒ **critical** |
 
@@ -45,7 +45,8 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 
 ## 3. Testing Checklist
 
-* **External-boundary rule**: Use `createMockExecutor` / `createMockFileSystemExecutor` for command execution and filesystem side effects.
+* **External-boundary rule for tool logic**: Use `createMockExecutor` / `createMockFileSystemExecutor` for complex process orchestration (xcodebuild, multi-step pipelines) in MCP tool logic functions.
+* **Simple utilities**: Standalone utility modules with simple command calls can use direct imports and standard vitest mocking.
 * **Internal mocking is allowed**: `vi.mock`, `vi.fn`, `vi.spyOn`, and `.mock*` are acceptable for internal modules/collaborators.
 * Each tool must have tests covering happy-path **and** at least one failure path.
 * Avoid the `any` type unless justified with an inline comment.
@@ -66,7 +67,7 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 |--------------|--------------------|
 | Complex logic in `handler` | Move to `*Logic` function |
 | Re-implementing logging | Use `src/utils/logger.ts` |
-| Direct `fs` / `child_process` usage | Inject `FileSystemExecutor` / `CommandExecutor` |
+| Direct `fs` / `child_process` in tool logic orchestrating complex processes | Inject `FileSystemExecutor` / `CommandExecutor` |
 | Chained re-exports | Export directly from source |
 
 ---
@@ -74,7 +75,7 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 ### How Bugbot Can Verify Rules
 
 1. **External-boundary violations**: confirm tests use injected executors/filesystem for external side effects.
-2. **DI compliance**: search for direct `child_process` / `fs` imports outside approved patterns.
+2. **DI compliance**: check direct `child_process` / `fs` imports in MCP tool logic; standalone utilities with simple commands are acceptable.
 3. **Docs accuracy**: compare `docs/TOOLS.md` against `src/mcp/tools/**`.
 4. **Style**: ensure ESLint and Prettier pass (`npm run lint`, `npm run format:check`).
 

@@ -1,0 +1,6 @@
+
+📷 Screenshot
+
+   Simulator: <UUID>
+
+❌ System error executing screenshot: Failed to capture screenshot: Invalid device: <UUID>

@@ -1,0 +1,6 @@
+
+⚙️ Clear Defaults
+
+   Profile: (default)
+
+✅ Session defaults cleared (default profile)

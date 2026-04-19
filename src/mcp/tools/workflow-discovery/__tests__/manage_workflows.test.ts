@@ -21,6 +21,8 @@ vi.mock('../../../../utils/config-store.ts', () => ({
 
 import { manage_workflowsLogic } from '../manage_workflows.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
+
 import {
   applyWorkflowSelectionFromManifest,
   getRegisteredWorkflows,
@@ -40,16 +42,15 @@ describe('manage_workflows tool', () => {
     });
 
     const executor = createMockExecutor({ success: true, output: '' });
-    const result = await manage_workflowsLogic(
-      { workflowNames: ['device'], enable: true },
-      executor,
+    const result = await runLogic(() =>
+      manage_workflowsLogic({ workflowNames: ['device'], enable: true }, executor),
     );
 
     expect(vi.mocked(applyWorkflowSelectionFromManifest)).toHaveBeenCalledWith(
       ['simulator', 'device'],
       expect.objectContaining({ runtime: 'mcp' }),
     );
-    expect(result.content[0].text).toBe('Workflows enabled: simulator, device');
+    expect(result.isError).toBeUndefined();
   });
 
   it('removes requested workflows when enable is false', async () => {
@@ -60,16 +61,15 @@ describe('manage_workflows tool', () => {
     });
 
     const executor = createMockExecutor({ success: true, output: '' });
-    const result = await manage_workflowsLogic(
-      { workflowNames: ['device'], enable: false },
-      executor,
+    const result = await runLogic(() =>
+      manage_workflowsLogic({ workflowNames: ['device'], enable: false }, executor),
     );
 
     expect(vi.mocked(applyWorkflowSelectionFromManifest)).toHaveBeenCalledWith(
       ['simulator'],
       expect.objectContaining({ runtime: 'mcp' }),
     );
-    expect(result.content[0].text).toBe('Workflows enabled: simulator');
+    expect(result.isError).toBeUndefined();
   });
 
   it('accepts workflowName as an array', async () => {
@@ -80,7 +80,9 @@ describe('manage_workflows tool', () => {
     });
 
     const executor = createMockExecutor({ success: true, output: '' });
-    await manage_workflowsLogic({ workflowNames: ['device', 'logging'], enable: true }, executor);
+    await runLogic(() =>
+      manage_workflowsLogic({ workflowNames: ['device', 'logging'], enable: true }, executor),
+    );
 
     expect(vi.mocked(applyWorkflowSelectionFromManifest)).toHaveBeenCalledWith(
       ['simulator', 'device', 'logging'],

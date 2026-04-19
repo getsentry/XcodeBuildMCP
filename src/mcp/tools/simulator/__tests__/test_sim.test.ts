@@ -1,12 +1,11 @@
-/**
- * Tests for test_sim plugin (session-aware version)
- * Follows CLAUDE.md guidance: dependency injection, no vi-mocks, literal validation.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, test_simLogic } from '../test_sim.ts';
+import {
+  createMockCommandResponse,
+  createMockFileSystemExecutor,
+} from '../../../../test-utils/mock-executors.ts';
 
 describe('test_sim tool', () => {
   beforeEach(() => {
@@ -35,7 +34,7 @@ describe('test_sim tool', () => {
       expect(schemaObj.safeParse({ testRunnerEnv: { FOO: 123 } }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'testRunnerEnv'].sort());
+      expect(schemaKeys).toEqual(['extraArgs', 'progress', 'testRunnerEnv'].sort());
     });
   });
 

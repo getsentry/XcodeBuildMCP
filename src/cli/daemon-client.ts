@@ -6,6 +6,7 @@ import {
   type DaemonRequest,
   type DaemonResponse,
   type DaemonMethod,
+  type DaemonToolResult,
   type ToolInvokeParams,
   type ToolInvokeResult,
   type DaemonStatusResult,
@@ -16,8 +17,14 @@ import {
   type XcodeIdeInvokeParams,
   type XcodeIdeInvokeResult,
 } from '../daemon/protocol.ts';
-import type { ToolResponse } from '../types/common.ts';
 import { getSocketPath } from '../daemon/socket-path.ts';
+
+export class DaemonVersionMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DaemonVersionMismatchError';
+  }
+}
 
 export interface DaemonClientOptions {
   socketPath?: string;
@@ -81,7 +88,14 @@ export class DaemonClient {
           socket.end();
 
           if (res.error) {
-            reject(new Error(`${res.error.code}: ${res.error.message}`));
+            if (
+              res.error.code === 'BAD_REQUEST' &&
+              res.error.message.startsWith('Unsupported protocol version')
+            ) {
+              reject(new DaemonVersionMismatchError(res.error.message));
+            } else {
+              reject(new Error(`${res.error.code}: ${res.error.message}`));
+            }
           } else {
             resolve(res.result as TResult);
           }
@@ -124,12 +138,12 @@ export class DaemonClient {
   /**
    * Invoke a tool.
    */
-  async invokeTool(tool: string, args: Record<string, unknown>): Promise<ToolResponse> {
+  async invokeTool(tool: string, args: Record<string, unknown>): Promise<DaemonToolResult> {
     const result = await this.request<ToolInvokeResult>('tool.invoke', {
       tool,
       args,
     } satisfies ToolInvokeParams);
-    return result.response;
+    return result.result;
   }
 
   /**
@@ -146,12 +160,12 @@ export class DaemonClient {
   async invokeXcodeIdeTool(
     remoteTool: string,
     args: Record<string, unknown>,
-  ): Promise<ToolResponse> {
+  ): Promise<DaemonToolResult> {
     const result = await this.request<XcodeIdeInvokeResult>('xcode-ide.invoke', {
       remoteTool,
       args,
     } satisfies XcodeIdeInvokeParams);
-    return result.response as ToolResponse;
+    return result.result;
   }
 
   /**

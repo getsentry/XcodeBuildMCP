@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -14,8 +13,12 @@ import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { startBuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
+import { finalizeInlineXcodebuild } from '../../../utils/xcodebuild-output.ts';
+import { formatToolPreflight } from '../../../utils/build-preflight.ts';
 
 // Unified schema: XOR between projectPath and workspacePath
 const baseSchemaObject = z.object({
@@ -57,22 +60,68 @@ const publicSchemaObject = baseSchemaObject.omit({
 export async function buildDeviceLogic(
   params: BuildDeviceParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const processedParams = {
     ...params,
-    configuration: params.configuration ?? 'Debug', // Default config
+    configuration: params.configuration ?? 'Debug',
   };
 
-  return executeXcodeBuildCommand(
+  const platformOptions = {
+    platform: XcodePlatform.iOS,
+    logPrefix: 'iOS Device Build',
+  };
+
+  const preflightText = formatToolPreflight({
+    operation: 'Build',
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: processedParams.configuration,
+    platform: 'iOS',
+  });
+
+  const pipelineParams = {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: processedParams.configuration,
+    platform: 'iOS',
+    preflight: preflightText,
+  };
+
+  const started = startBuildPipeline({
+    operation: 'BUILD',
+    toolName: 'build_device',
+    params: pipelineParams,
+    message: preflightText,
+  });
+
+  const buildResult = await executeXcodeBuildCommand(
     processedParams,
-    {
-      platform: XcodePlatform.iOS,
-      logPrefix: 'iOS Device Build',
-    },
+    platformOptions,
     params.preferXcodebuild ?? false,
     'build',
     executor,
+    undefined,
+    started.pipeline,
   );
+
+  finalizeInlineXcodebuild({
+    started,
+    emit: ctx.emit,
+    succeeded: !buildResult.isError,
+    durationMs: Date.now() - started.startedAt,
+    responseContent: buildResult.content,
+  });
+
+  if (!buildResult.isError) {
+    ctx.nextStepParams = {
+      get_device_app_path: {
+        scheme: params.scheme,
+      },
+    };
+  }
 }
 
 export const schema = getSessionAwareToolSchemaShape({

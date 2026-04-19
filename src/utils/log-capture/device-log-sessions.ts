@@ -1,5 +1,5 @@
-import type { ChildProcess } from 'child_process';
-import type * as fs from 'fs';
+import type { ChildProcess } from 'node:child_process';
+import type * as fs from 'node:fs';
 import { log } from '../logger.ts';
 import { getDefaultFileSystemExecutor } from '../command.ts';
 import type { FileSystemExecutor } from '../FileSystemExecutor.ts';
@@ -67,7 +67,7 @@ export async function stopDeviceLogSessionById(
   logSessionId: string,
   fileSystemExecutor: FileSystemExecutor,
   options: { timeoutMs?: number; readLogContent?: boolean } = {},
-): Promise<{ logContent: string; error?: string }> {
+): Promise<{ logContent: string; logFilePath?: string; error?: string }> {
   const session = activeDeviceLogSessions.get(logSessionId);
   if (!session) {
     return { logContent: '', error: `Device log capture session not found: ${logSessionId}` };
@@ -93,7 +93,7 @@ export async function stopDeviceLogSessionById(
         return { logContent: '', error: `Log file not found: ${session.logFilePath}` };
       }
       const fileContent = await fileSystemExecutor.readFile(session.logFilePath, 'utf-8');
-      return { logContent: fileContent };
+      return { logContent: fileContent, logFilePath: session.logFilePath };
     }
 
     return { logContent: '' };

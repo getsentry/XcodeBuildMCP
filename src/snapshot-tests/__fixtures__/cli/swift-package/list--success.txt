@@ -1,0 +1,8 @@
+
+📦 Swift Package Processes
+
+Running Processes (1):
+
+  🟢 spm
+     PID: <PID> | Uptime: <UPTIME>
+     Package: <ROOT>/example_projects/spm

@@ -133,13 +133,6 @@ describe('MCP Discovery (e2e)', () => {
     expect(names).toContain('debug_stack');
   });
 
-  it('includes logging tools', async () => {
-    const result = await harness.client.listTools();
-    const names = result.tools.map((t) => t.name);
-    expect(names).toContain('start_sim_log_cap');
-    expect(names).toContain('stop_sim_log_cap');
-  });
-
   it('includes project scaffolding tools', async () => {
     const result = await harness.client.listTools();
     const names = result.tools.map((t) => t.name);

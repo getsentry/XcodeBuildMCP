@@ -1,0 +1,336 @@
+
+📷 Snapshot UI
+
+   Simulator: <UUID>
+
+✅ Accessibility hierarchy retrieved successfully.
+
+Accessibility Hierarchy
+  ```json
+  [
+  {
+    "AXFrame" : "{{0, 0}, {402, 874}}",
+    "AXUniqueId" : null,
+    "frame" : {
+      "y" : 0,
+      "x" : 0,
+      "width" : 402,
+      "height" : 874
+    },
+    "role_description" : "application",
+    "AXLabel" : " ",
+    "content_required" : false,
+    "type" : "Application",
+    "title" : null,
+    "help" : null,
+    "custom_actions" : [
+
+    ],
+    "AXValue" : null,
+    "enabled" : true,
+    "role" : "AXApplication",
+    "children" : [
+      {
+        "AXFrame" : "{{28.333333333333371, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Fitness",
+        "frame" : {
+          "y" : 88,
+          "x" : 28.3,
+          "width" : 68,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Fitness",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{120.66666666666674, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Watch",
+        "frame" : {
+          "y" : 88,
+          "x" : 120.7,
+          "width" : 68,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Watch",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{211.33333333333326, 88}, {72.333333333333314, 90.666666666666657}}",
+        "AXUniqueId" : "Contacts",
+        "frame" : {
+          "y" : 88,
+          "x" : 211.3,
+          "width" : 72.3,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Contacts",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{306, 88}, {68, 90.666666666666657}}",
+        "AXUniqueId" : "Files",
+        "frame" : {
+          "y" : 88,
+          "x" : 306,
+          "width" : 68,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Files",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{28.333333333333371, 188.33333333333334}, {68, 90.666666666666714}}",
+        "AXUniqueId" : "Preview",
+        "frame" : {
+          "y" : 188.3,
+          "x" : 28.3,
+          "width" : 68,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Preview",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{120.66666666666674, 188.33333333333334}, {68, 90.666666666666714}}",
+        "AXUniqueId" : "Utilities",
+        "frame" : {
+          "y" : 188.3,
+          "x" : 120.7,
+          "width" : 68,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Utilities folder",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "2 apps",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{207.66666666666663, 188.33333333333334}, {79.333333333333314, 90.666666666666714}}",
+        "AXUniqueId" : "Calculator",
+        "frame" : {
+          "y" : 188.3,
+          "x" : 207.7,
+          "width" : 79.3,
+          "height" : 90.7
+        },
+        "role_description" : "button",
+        "AXLabel" : "Calculator",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{162, 703.66666666666674}, {78, 30}}",
+        "AXUniqueId" : "spotlight-pill",
+        "frame" : {
+          "y" : 703.7,
+          "x" : 162,
+          "width" : 78,
+          "height" : 30
+        },
+        "role_description" : "slider",
+        "AXLabel" : "Search",
+        "content_required" : false,
+        "type" : "Slider",
+        "title" : null,
+        "help" : "Activate to open Spotlight.",
+        "custom_actions" : [
+
+        ],
+        "AXValue" : "Page 2 of 2",
+        "enabled" : true,
+        "role" : "AXSlider",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{123, 771.33333333333326}, {68, 68}}",
+        "AXUniqueId" : "Safari",
+        "frame" : {
+          "y" : 771.3,
+          "x" : 123,
+          "width" : 68,
+          "height" : 68
+        },
+        "role_description" : "button",
+        "AXLabel" : "Safari",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      },
+      {
+        "AXFrame" : "{{211, 771.33333333333326}, {68, 68}}",
+        "AXUniqueId" : "Messages",
+        "frame" : {
+          "y" : 771.3,
+          "x" : 211,
+          "width" : 68,
+          "height" : 68
+        },
+        "role_description" : "button",
+        "AXLabel" : "Messages",
+        "content_required" : false,
+        "type" : "Button",
+        "title" : null,
+        "help" : "Double-tap to open",
+        "custom_actions" : [
+          "Edit mode",
+          "Today",
+          "App Library"
+        ],
+        "AXValue" : "",
+        "enabled" : true,
+        "role" : "AXButton",
+        "children" : [
+
+        ],
+        "subrole" : null,
+        "pid" : <PID>
+      }
+    ],
+    "subrole" : null,
+    "pid" : <PID>
+  }
+]
+  ```
+
+Tips
+  - Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)
+  - If a debugger is attached, ensure the app is running (not stopped on breakpoints)
+  - Screenshots are for visual verification only
+
+Next steps:
+1. Refresh after layout changes: xcodebuildmcp simulator snapshot-ui --simulator-id "<UUID>"
+2. Tap on element: xcodebuildmcp ui-automation tap --simulator-id "<UUID>" --x "0" --y "0"
+3. Take screenshot for verification: xcodebuildmcp simulator screenshot --simulator-id "<UUID>"

@@ -1,7 +1,10 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createErrorResponse, createTextResponse } from '../../../utils/responses/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
   type DebuggerToolContext,
@@ -18,17 +21,31 @@ export type DebugStackParams = z.infer<typeof debugStackSchema>;
 export async function debug_stackLogic(
   params: DebugStackParams,
   ctx: DebuggerToolContext,
-): Promise<ToolResponse> {
-  try {
-    const output = await ctx.debugger.getStack(params.debugSessionId, {
-      threadIndex: params.threadIndex,
-      maxFrames: params.maxFrames,
-    });
-    return createTextResponse(output.trim());
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to get stack', message);
-  }
+): Promise<void> {
+  const headerEvent = header('Stack Trace');
+
+  const handlerCtx = getHandlerContext();
+
+  return withErrorHandling(
+    handlerCtx,
+    async () => {
+      const output = await ctx.debugger.getStack(params.debugSessionId, {
+        threadIndex: params.threadIndex,
+        maxFrames: params.maxFrames,
+      });
+      const trimmed = output.trim();
+
+      handlerCtx.emit(headerEvent);
+      handlerCtx.emit(statusLine('success', 'Stack trace retrieved'));
+      if (trimmed) {
+        handlerCtx.emit(section('Frames:', trimmed.split('\n')));
+      }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to get stack: ${message}`,
+    },
+  );
 }
 
 export const schema = debugStackSchema.shape;

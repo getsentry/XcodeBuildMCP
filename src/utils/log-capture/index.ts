@@ -4,6 +4,12 @@ import {
   stopAllLogCaptures,
   stopLogCapture,
 } from '../log_capture.ts';
+import {
+  listActiveSimulatorLaunchOsLogSessions,
+  stopAllSimulatorLaunchOsLogSessions,
+  stopOwnedSimulatorLaunchOsLogSessions,
+  stopSimulatorLaunchOsLogSessionsForApp,
+} from './simulator-launch-oslog-sessions.ts';
 
 export type { SubsystemFilter } from '../log_capture.ts';
 
@@ -12,3 +18,9 @@ export function listActiveSimulatorLogSessionIds(): string[] {
 }
 
 export { startLogCapture, stopLogCapture, stopAllLogCaptures };
+export {
+  listActiveSimulatorLaunchOsLogSessions,
+  stopAllSimulatorLaunchOsLogSessions,
+  stopOwnedSimulatorLaunchOsLogSessions,
+  stopSimulatorLaunchOsLogSessionsForApp,
+};

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, sessionClearDefaultsLogic } from '../session_clear_defaults.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('session-clear-defaults tool', () => {
   beforeEach(() => {
@@ -33,11 +34,12 @@ describe('session-clear-defaults tool', () => {
 
   describe('Handler Behavior', () => {
     it('should clear specific keys when provided', async () => {
-      const result = await sessionClearDefaultsLogic({
-        keys: ['scheme', 'deviceId', 'derivedDataPath'],
-      });
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Session defaults cleared');
+      const result = await runLogic(() =>
+        sessionClearDefaultsLogic({
+          keys: ['scheme', 'deviceId', 'derivedDataPath'],
+        }),
+      );
+      expect(result.isError).toBeFalsy();
 
       const current = sessionStore.getAll();
       expect(current.scheme).toBeUndefined();
@@ -52,10 +54,9 @@ describe('session-clear-defaults tool', () => {
     it('should clear env when keys includes env', async () => {
       sessionStore.setDefaults({ env: { API_URL: 'https://staging.example.com', DEBUG: 'true' } });
 
-      const result = await sessionClearDefaultsLogic({ keys: ['env'] });
+      const result = await runLogic(() => sessionClearDefaultsLogic({ keys: ['env'] }));
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('Session defaults cleared');
+      expect(result.isError).toBeFalsy();
 
       const current = sessionStore.getAll();
       expect(current.env).toBeUndefined();
@@ -66,9 +67,8 @@ describe('session-clear-defaults tool', () => {
       sessionStore.setActiveProfile('ios');
       sessionStore.setDefaults({ scheme: 'IOS' });
       sessionStore.setActiveProfile(null);
-      const result = await sessionClearDefaultsLogic({ all: true });
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toBe('All session defaults cleared');
+      const result = await runLogic(() => sessionClearDefaultsLogic({ all: true }));
+      expect(result.isError).toBeFalsy();
 
       const current = sessionStore.getAll();
       expect(Object.keys(current).length).toBe(0);
@@ -83,8 +83,8 @@ describe('session-clear-defaults tool', () => {
       sessionStore.setDefaults({ scheme: 'Global' });
       sessionStore.setActiveProfile('ios');
 
-      const result = await sessionClearDefaultsLogic({});
-      expect(result.isError).toBe(false);
+      const result = await runLogic(() => sessionClearDefaultsLogic({}));
+      expect(result.isError).toBeFalsy();
 
       expect(sessionStore.getAll().scheme).toBe('Global');
       expect(sessionStore.listProfiles()).toEqual([]);
@@ -100,31 +100,29 @@ describe('session-clear-defaults tool', () => {
       sessionStore.setDefaults({ scheme: 'Watch' });
       sessionStore.setActiveProfile('watch');
 
-      const result = await sessionClearDefaultsLogic({ profile: 'ios' });
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain('profile "ios"');
+      const result = await runLogic(() => sessionClearDefaultsLogic({ profile: 'ios' }));
+      expect(result.isError).toBeFalsy();
 
       expect(sessionStore.listProfiles()).toEqual(['watch']);
       expect(sessionStore.getAll().scheme).toBe('Watch');
     });
 
     it('should error when the specified profile does not exist', async () => {
-      const result = await sessionClearDefaultsLogic({ profile: 'missing' });
+      const result = await runLogic(() => sessionClearDefaultsLogic({ profile: 'missing' }));
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('does not exist');
+      expect(allText(result)).toContain('does not exist');
     });
 
     it('should reject all=true when combined with scoped arguments', async () => {
-      const result = await sessionClearDefaultsLogic({ all: true, profile: 'ios' });
+      const result = await runLogic(() => sessionClearDefaultsLogic({ all: true, profile: 'ios' }));
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('cannot be combined');
+      expect(allText(result)).toContain('cannot be combined');
     });
 
     it('should validate keys enum', async () => {
       const result = (await handler({ keys: ['invalid' as any] })) as any;
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Parameter validation failed');
-      expect(result.content[0].text).toContain('keys');
+      expect(allText(result)).toContain('keys');
     });
   });
 });

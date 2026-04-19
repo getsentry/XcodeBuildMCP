@@ -1,7 +1,66 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import type { PredicateContext } from '../../visibility/predicate-types.ts';
+import type { ResolvedRuntimeConfig } from '../../utils/config-store.ts';
+import type { ResourceManifestEntry, ResolvedManifest } from '../manifest/schema.ts';
+
+vi.mock('../manifest/load-manifest.ts', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    loadManifest: vi.fn(),
+  };
+});
+
+vi.mock('../manifest/import-resource-module.ts', () => ({
+  importResourceModule: vi.fn(),
+}));
+
 import { registerResources, getAvailableResources, loadResources } from '../resources.ts';
+import { loadManifest } from '../manifest/load-manifest.ts';
+import { importResourceModule } from '../manifest/import-resource-module.ts';
+
+function createTestContext(overrides: Partial<PredicateContext> = {}): PredicateContext {
+  return {
+    runtime: 'mcp',
+    config: {} as ResolvedRuntimeConfig,
+    runningUnderXcode: false,
+    ...overrides,
+  };
+}
+
+const mockHandler = vi.fn(async () => ({ contents: [{ text: 'mock' }] }));
+
+function createMockManifest(resources: ResourceManifestEntry[]): ResolvedManifest {
+  return {
+    tools: new Map(),
+    workflows: new Map(),
+    resources: new Map(resources.map((r) => [r.id, r])),
+  };
+}
+
+const simulatorsResource: ResourceManifestEntry = {
+  id: 'simulators',
+  module: 'mcp/resources/simulators',
+  name: 'simulators',
+  uri: 'xcodebuildmcp://simulators',
+  description: 'Available iOS simulators with their UUIDs and states',
+  mimeType: 'text/plain',
+  availability: { mcp: true },
+  predicates: [],
+};
+
+const xcodeIdeStateResource: ResourceManifestEntry = {
+  id: 'xcode-ide-state',
+  module: 'mcp/resources/xcode-ide-state',
+  name: 'xcode-ide-state',
+  uri: 'xcodebuildmcp://xcode-ide-state',
+  description: "Current Xcode IDE selection (scheme and simulator) from Xcode's UI state",
+  mimeType: 'application/json',
+  availability: { mcp: true },
+  predicates: ['runningUnderXcodeAgent'],
+};
 
 describe('resources', () => {
   let mockServer: McpServer;
@@ -13,8 +72,8 @@ describe('resources', () => {
   }>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     registeredResources = [];
-    // Create a mock MCP server using simple object structure
     mockServer = {
       resource: (
         name: string,
@@ -25,6 +84,11 @@ describe('resources', () => {
         registeredResources.push({ name, uri, metadata, handler });
       },
     } as unknown as McpServer;
+
+    vi.mocked(loadManifest).mockReturnValue(
+      createMockManifest([simulatorsResource, xcodeIdeStateResource]),
+    );
+    vi.mocked(importResourceModule).mockResolvedValue({ handler: mockHandler });
   });
 
   describe('Exports', () => {
@@ -42,16 +106,17 @@ describe('resources', () => {
   });
 
   describe('loadResources', () => {
-    it('should load resources from generated loaders', async () => {
-      const resources = await loadResources();
+    it('should load resources from manifests', async () => {
+      const ctx = createTestContext();
+      const resources = await loadResources(ctx);
 
-      // Should have at least the simulators resource
       expect(resources.size).toBeGreaterThan(0);
       expect(resources.has('xcodebuildmcp://simulators')).toBe(true);
     });
 
     it('should validate resource structure', async () => {
-      const resources = await loadResources();
+      const ctx = createTestContext();
+      const resources = await loadResources(ctx);
 
       for (const [uri, resource] of resources) {
         expect(resource.uri).toBe(uri);
@@ -60,44 +125,64 @@ describe('resources', () => {
         expect(typeof resource.handler).toBe('function');
       }
     });
+
+    it('should filter out xcode-ide-state when not running under Xcode', async () => {
+      const ctx = createTestContext({ runningUnderXcode: false });
+      const resources = await loadResources(ctx);
+
+      expect(resources.has('xcodebuildmcp://xcode-ide-state')).toBe(false);
+    });
+
+    it('should include xcode-ide-state when running under Xcode', async () => {
+      const ctx = createTestContext({ runningUnderXcode: true });
+      const resources = await loadResources(ctx);
+
+      expect(resources.has('xcodebuildmcp://xcode-ide-state')).toBe(true);
+    });
   });
 
   describe('registerResources', () => {
     it('should register all loaded resources with the server and return true', async () => {
-      const result = await registerResources(mockServer);
+      const ctx = createTestContext();
+      const result = await registerResources(mockServer, ctx);
 
       expect(result).toBe(true);
-
-      // Should have registered at least one resource
       expect(registeredResources.length).toBeGreaterThan(0);
 
-      // Check simulators resource was registered
-      const simulatorsResource = registeredResources.find(
-        (r) => r.uri === 'xcodebuildmcp://simulators',
-      );
-      expect(typeof simulatorsResource?.handler).toBe('function');
-      expect(simulatorsResource?.metadata.title).toBe(
+      const simResource = registeredResources.find((r) => r.uri === 'xcodebuildmcp://simulators');
+      expect(typeof simResource?.handler).toBe('function');
+      expect(simResource?.metadata.title).toBe(
         'Available iOS simulators with their UUIDs and states',
       );
-      expect(simulatorsResource?.metadata.mimeType).toBe('text/plain');
-      expect(simulatorsResource?.name).toBe('simulators');
+      expect(simResource?.metadata.mimeType).toBe('text/plain');
+      expect(simResource?.name).toBe('simulators');
     });
 
     it('should register resources with correct handlers', async () => {
-      const result = await registerResources(mockServer);
+      const ctx = createTestContext();
+      const result = await registerResources(mockServer, ctx);
 
       expect(result).toBe(true);
 
-      const simulatorsResource = registeredResources.find(
-        (r) => r.uri === 'xcodebuildmcp://simulators',
+      const simResource = registeredResources.find((r) => r.uri === 'xcodebuildmcp://simulators');
+      expect(typeof simResource?.handler).toBe('function');
+    });
+
+    it('should not register xcode-ide-state outside of Xcode', async () => {
+      const ctx = createTestContext({ runningUnderXcode: false });
+      await registerResources(mockServer, ctx);
+
+      const xcodeResource = registeredResources.find(
+        (r) => r.uri === 'xcodebuildmcp://xcode-ide-state',
       );
-      expect(typeof simulatorsResource?.handler).toBe('function');
+      expect(xcodeResource).toBeUndefined();
     });
   });
 
   describe('getAvailableResources', () => {
     it('should return array of available resource URIs', async () => {
-      const resources = await getAvailableResources();
+      const ctx = createTestContext();
+      const resources = await getAvailableResources(ctx);
 
       expect(Array.isArray(resources)).toBe(true);
       expect(resources.length).toBeGreaterThan(0);
@@ -105,7 +190,8 @@ describe('resources', () => {
     });
 
     it('should return unique URIs', async () => {
-      const resources = await getAvailableResources();
+      const ctx = createTestContext();
+      const resources = await getAvailableResources(ctx);
       const uniqueResources = [...new Set(resources)];
 
       expect(resources.length).toBe(uniqueResources.length);

@@ -1,0 +1,25 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Build failed",
+  "data": {
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/NONEXISTENT",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_spm_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT"
+        }
+      ]
+    }
+  }
+}

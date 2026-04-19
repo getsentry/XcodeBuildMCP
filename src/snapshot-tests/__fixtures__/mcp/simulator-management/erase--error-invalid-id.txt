@@ -1,0 +1,6 @@
+
+🗑 Erase Simulator
+
+   Simulator: <UUID>
+
+❌ Failed to erase simulator: Invalid device: <UUID>

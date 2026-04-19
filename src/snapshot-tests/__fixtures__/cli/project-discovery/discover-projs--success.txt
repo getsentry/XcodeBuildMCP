@@ -1,0 +1,17 @@
+
+🔍 Discover Projects
+
+   Workspace root: <PATH>
+   Scan path: <PATH>
+   Max depth: 3
+
+✅ Found 1 project and 1 workspace
+
+Projects:
+  example_projects/iOS_Calculator/CalculatorApp.xcodeproj
+
+Workspaces:
+  example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+
+Next steps:
+1. Build and run once defaults are set: xcodebuildmcp simulator build-and-run

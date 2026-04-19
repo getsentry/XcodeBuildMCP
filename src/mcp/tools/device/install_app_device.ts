@@ -6,16 +6,19 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
+import { installAppOnDevice } from '../../../utils/device-steps.ts';
 
-// Define schema as ZodObject
 const installAppDeviceSchema = z.object({
   deviceId: z
     .string()
@@ -26,61 +29,42 @@ const installAppDeviceSchema = z.object({
 
 const publicSchemaObject = installAppDeviceSchema.omit({ deviceId: true } as const);
 
-// Use z.infer for type safety
 type InstallAppDeviceParams = z.infer<typeof installAppDeviceSchema>;
 
-/**
- * Business logic for installing an app on a physical Apple device
- */
 export async function install_app_deviceLogic(
   params: InstallAppDeviceParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   const { deviceId, appPath } = params;
+  const headerEvent = header('Install App', [
+    { label: 'Device', value: formatDeviceId(deviceId) },
+    { label: 'App', value: appPath },
+  ]);
 
   log('info', `Installing app on device ${deviceId}`);
 
-  try {
-    const result = await executor(
-      ['xcrun', 'devicectl', 'device', 'install', 'app', '--device', deviceId, appPath],
-      'Install app on device',
-      false, // useShell
-      undefined, // env
-    );
+  const ctx = getHandlerContext();
 
-    if (!result.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to install app: ${result.error}`,
-          },
-        ],
-        isError: true,
-      };
-    }
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const installResult = await installAppOnDevice(deviceId, appPath, executor);
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ App installed successfully on device ${deviceId}\n\n${result.output}`,
-        },
-      ],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error installing app on device: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Failed to install app on device: ${errorMessage}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+      if (!installResult.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Failed to install app: ${installResult.error}`));
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'App installed successfully.'));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to install app on device: ${message}`,
+      logMessage: ({ message }) => `Error installing app on device: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

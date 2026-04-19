@@ -4,6 +4,7 @@ import { stopXcodeStateWatcher } from '../utils/xcode-state-watcher.ts';
 import { shutdownXcodeToolsBridge } from '../integrations/xcode-tools-bridge/index.ts';
 import { stopAllLogCaptures } from '../utils/log_capture.ts';
 import { stopAllDeviceLogCaptures } from '../utils/log-capture/device-log-sessions.ts';
+import { stopOwnedSimulatorLaunchOsLogSessions } from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
 import { stopAllVideoCaptureSessions } from '../utils/video_capture.ts';
 import { stopAllTrackedProcesses } from '../mcp/tools/swift-package/active-processes.ts';
 import {
@@ -12,6 +13,7 @@ import {
   type FlushSentryOutcome,
 } from '../utils/sentry.ts';
 import { sealSentryCapture } from '../utils/shutdown-state.ts';
+import { toErrorMessage } from '../utils/errors.ts';
 import type { McpLifecycleSnapshot, McpShutdownReason } from './mcp-lifecycle.ts';
 import { isTransportDisconnectReason } from './mcp-lifecycle.ts';
 
@@ -51,16 +53,6 @@ export interface McpShutdownResult {
   steps: ShutdownStepResult[];
 }
 
-function stringifyError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function createTimer(timeoutMs: number, callback: () => void): NodeJS.Timeout {
-  const timer = setTimeout(callback, timeoutMs);
-  timer.unref?.();
-  return timer;
-}
-
 async function runStep<T>(
   name: string,
   timeoutMs: number,
@@ -71,7 +63,8 @@ async function runStep<T>(
 
   try {
     const timeoutPromise = new Promise<RunStepRaceOutcome<T>>((resolve) => {
-      timeoutHandle = createTimer(timeoutMs, () => resolve({ kind: 'timed_out' }));
+      timeoutHandle = setTimeout(() => resolve({ kind: 'timed_out' }), timeoutMs);
+      timeoutHandle.unref?.();
     });
 
     const operationOutcome = operation()
@@ -79,7 +72,7 @@ async function runStep<T>(
       .catch(
         (error): RunStepRaceOutcome<T> => ({
           kind: 'error',
-          error: stringifyError(error),
+          error: toErrorMessage(error),
         }),
       );
     const outcome = await Promise.race([operationOutcome, timeoutPromise]);
@@ -111,12 +104,14 @@ async function runStep<T>(
   }
 }
 
+const FAILURE_REASONS: ReadonlySet<McpShutdownReason> = new Set([
+  'startup-failure',
+  'uncaught-exception',
+  'unhandled-rejection',
+]);
+
 function buildExitCode(reason: McpShutdownReason): number {
-  return reason === 'startup-failure' ||
-    reason === 'uncaught-exception' ||
-    reason === 'unhandled-rejection'
-    ? 1
-    : 0;
+  return FAILURE_REASONS.has(reason) ? 1 : 0;
 }
 
 export async function closeServerWithTimeout(
@@ -149,12 +144,15 @@ export async function runMcpShutdown(input: {
   const steps: ShutdownStepResult[] = [];
 
   const pushStep = (name: string, outcome: ShutdownStepOutcome<unknown>): void => {
-    steps.push({
+    const step: ShutdownStepResult = {
       name,
       status: outcome.status,
       durationMs: outcome.durationMs,
-      ...(outcome.error ? { error: outcome.error } : {}),
-    });
+    };
+    if (outcome.error) {
+      step.error = outcome.error;
+    }
+    steps.push(step);
   };
 
   const serverCloseTimeout = transportDisconnected
@@ -200,6 +198,11 @@ export async function runMcpShutdown(input: {
       operation: () => stopAllLogCaptures(STEP_TIMEOUT_MS),
     },
     {
+      name: 'simulator-launch-oslogs.stop-owned',
+      timeoutMs: bulkStepTimeoutMs(input.snapshot.ownedSimulatorLaunchOsLogSessionCount),
+      operation: () => stopOwnedSimulatorLaunchOsLogSessions(STEP_TIMEOUT_MS),
+    },
+    {
       name: 'device-logs.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.deviceLogSessionCount),
       operation: () => stopAllDeviceLogCaptures(STEP_TIMEOUT_MS),
@@ -221,7 +224,7 @@ export async function runMcpShutdown(input: {
     pushStep(cleanupStep.name, outcome);
   }
 
-  const triggerError = input.error === undefined ? undefined : stringifyError(input.error);
+  const triggerError = input.error === undefined ? undefined : toErrorMessage(input.error);
   const cleanupFailureCount = steps.filter(
     (step) => step.status === 'failed' || step.status === 'timed_out',
   ).length;

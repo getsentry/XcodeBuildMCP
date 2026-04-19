@@ -1,0 +1,7 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Input validation error: Invalid arguments for tool build_sim: expected string for scheme",
+  "data": null
+}

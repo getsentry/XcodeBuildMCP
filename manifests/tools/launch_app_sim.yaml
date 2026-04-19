@@ -3,7 +3,7 @@ module: mcp/tools/simulator/launch_app_sim
 names:
   mcp: launch_app_sim
   cli: launch-app
-description: Launch app on simulator.
+description: Launch app on simulator. Runtime logs are captured automatically and the log file path is included in the response.
 annotations:
   title: Launch App Simulator
   readOnlyHint: false
@@ -13,16 +13,8 @@ nextSteps:
   - label: Open Simulator app to see it
     toolId: open_sim
     priority: 1
-  - label: Capture structured logs (app continues running)
-    toolId: start_sim_log_cap
-    params:
-      simulatorId: SIMULATOR_UUID
-      bundleId: BUNDLE_ID
+    when: success
+  - label: Stop app in simulator
+    toolId: stop_app_sim
     priority: 2
-  - label: Capture console + structured logs (app restarts)
-    toolId: start_sim_log_cap
-    params:
-      simulatorId: SIMULATOR_UUID
-      bundleId: BUNDLE_ID
-      captureConsole: true
-    priority: 3
+    when: success

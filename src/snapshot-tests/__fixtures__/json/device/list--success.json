@@ -1,0 +1,42 @@
+{
+  "schema": "xcodebuildmcp.output.device-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "devices": [
+      {
+        "name": "Cameron’s iPhone 16 Pro Max",
+        "deviceId": "<UUID>",
+        "platform": "iOS",
+        "state": "connected",
+        "isAvailable": true,
+        "osVersion": "26.3.1 (a)"
+      },
+      {
+        "name": "iPhone",
+        "deviceId": "<UUID>",
+        "platform": "iOS",
+        "state": "disconnected",
+        "isAvailable": false,
+        "osVersion": "26.1"
+      },
+      {
+        "name": "Cameron’s Apple Watch",
+        "deviceId": "<UUID>",
+        "platform": "watchOS",
+        "state": "disconnected",
+        "isAvailable": false,
+        "osVersion": "10.6.1"
+      },
+      {
+        "name": "Cameron’s Apple Watch",
+        "deviceId": "<UUID>",
+        "platform": "watchOS",
+        "state": "connected",
+        "isAvailable": true,
+        "osVersion": "26.3"
+      }
+    ]
+  }
+}

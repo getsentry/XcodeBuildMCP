@@ -13,9 +13,12 @@ nextSteps:
   - label: Get bundle ID
     toolId: get_app_bundle_id
     priority: 1
+    when: success
   - label: Install app on device
     toolId: install_app_device
     priority: 2
+    when: success
   - label: Launch app on device
     toolId: launch_app_device
     priority: 3
+    when: success

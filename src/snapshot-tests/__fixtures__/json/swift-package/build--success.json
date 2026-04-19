@@ -1,0 +1,21 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_spm_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

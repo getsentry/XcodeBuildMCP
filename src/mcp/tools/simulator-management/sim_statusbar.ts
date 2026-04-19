@@ -1,14 +1,15 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
-// Define schema as ZodObject
 const simStatusbarSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
   dataNetwork: z
@@ -29,62 +30,71 @@ const simStatusbarSchema = z.object({
     .describe('clear|hide|wifi|3g|4g|lte|lte-a|lte+|5g|5g+|5g-uwb|5g-uc'),
 });
 
-// Use z.infer for type safety
 type SimStatusbarParams = z.infer<typeof simStatusbarSchema>;
 
 export async function sim_statusbarLogic(
   params: SimStatusbarParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   log(
     'info',
     `Setting simulator ${params.simulatorId} status bar data network to ${params.dataNetwork}`,
   );
 
-  try {
-    let command: string[];
-    let successMessage: string;
+  const headerEvent = header('Statusbar', [
+    { label: 'Simulator', value: params.simulatorId },
+    { label: 'Data Network', value: params.dataNetwork },
+  ]);
 
-    if (params.dataNetwork === 'clear') {
-      command = ['xcrun', 'simctl', 'status_bar', params.simulatorId, 'clear'];
-      successMessage = `Successfully cleared status bar overrides for simulator ${params.simulatorId}`;
-    } else {
-      command = [
-        'xcrun',
-        'simctl',
-        'status_bar',
-        params.simulatorId,
-        'override',
-        '--dataNetwork',
-        params.dataNetwork,
-      ];
-      successMessage = `Successfully set simulator ${params.simulatorId} status bar data network to ${params.dataNetwork}`;
-    }
+  const ctx = getHandlerContext();
 
-    const result = await executor(command, 'Set Status Bar', false, undefined);
+  return withErrorHandling(
+    ctx,
+    async () => {
+      let command: string[];
 
-    if (!result.success) {
-      const failureMessage = `Failed to set status bar: ${result.error}`;
-      log('error', `${failureMessage} (simulator: ${params.simulatorId})`);
-      return {
-        content: [{ type: 'text', text: failureMessage }],
-        isError: true,
-      };
-    }
+      if (params.dataNetwork === 'clear') {
+        command = ['xcrun', 'simctl', 'status_bar', params.simulatorId, 'clear'];
+      } else {
+        command = [
+          'xcrun',
+          'simctl',
+          'status_bar',
+          params.simulatorId,
+          'override',
+          '--dataNetwork',
+          params.dataNetwork,
+        ];
+      }
 
-    log('info', `${successMessage} (simulator: ${params.simulatorId})`);
-    return {
-      content: [{ type: 'text', text: successMessage }],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const failureMessage = `Failed to set status bar: ${errorMessage}`;
-    log('error', `Error setting status bar for simulator ${params.simulatorId}: ${errorMessage}`);
-    return {
-      content: [{ type: 'text', text: failureMessage }],
-      isError: true,
-    };
-  }
+      const result = await executor(command, 'Set Status Bar', false);
+
+      if (!result.success) {
+        log(
+          'error',
+          `Failed to set status bar: ${result.error} (simulator: ${params.simulatorId})`,
+        );
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Failed to set status bar: ${result.error}`));
+        return;
+      }
+
+      const successMsg =
+        params.dataNetwork === 'clear'
+          ? 'Status bar overrides cleared'
+          : 'Status bar data network set successfully';
+
+      log('info', `${successMsg} (simulator: ${params.simulatorId})`);
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', successMsg));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to set status bar: ${message}`,
+      logMessage: ({ message }) =>
+        `Error setting status bar for simulator ${params.simulatorId}: ${message}`,
+    },
+  );
 }
 
 const publicSchemaObject = z.strictObject(

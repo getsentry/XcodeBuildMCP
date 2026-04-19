@@ -1,0 +1,11 @@
+
+📦 Swift Package Build
+
+   Package: <ROOT>/example_projects/NONEXISTENT
+
+Errors (1):
+
+  ✗ chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT
+
+❌ Build failed. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_spm_<TIMESTAMP>_pid<PID>.log

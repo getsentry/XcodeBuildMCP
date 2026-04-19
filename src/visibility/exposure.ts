@@ -4,7 +4,11 @@
  * availability flags and predicate evaluation.
  */
 
-import type { ToolManifestEntry, WorkflowManifestEntry } from '../core/manifest/schema.ts';
+import type {
+  ToolManifestEntry,
+  WorkflowManifestEntry,
+  ResourceManifestEntry,
+} from '../core/manifest/schema.ts';
 import type { PredicateContext, RuntimeKind } from './predicate-types.ts';
 import { evalPredicates } from './predicate-registry.ts';
 
@@ -121,6 +125,43 @@ export function getAutoIncludeWorkflows(
   return workflows.filter(
     (wf) => wf.selection?.mcp?.autoInclude === true && isWorkflowEnabledForRuntime(wf, ctx),
   );
+}
+
+/**
+ * Check if a resource is available for the current runtime.
+ */
+export function isResourceAvailableForRuntime(
+  resource: ResourceManifestEntry,
+  runtime: RuntimeKind,
+): boolean {
+  if (runtime !== 'mcp') {
+    return false;
+  }
+  return resource.availability.mcp;
+}
+
+/**
+ * Check if a resource is exposed (visible) for the current runtime context.
+ * Checks both availability flag and all predicates.
+ */
+export function isResourceExposedForRuntime(
+  resource: ResourceManifestEntry,
+  ctx: PredicateContext,
+): boolean {
+  if (!isResourceAvailableForRuntime(resource, ctx.runtime)) {
+    return false;
+  }
+  return evalPredicates(resource.predicates, ctx);
+}
+
+/**
+ * Filter resources based on exposure rules.
+ */
+export function filterExposedResources(
+  resources: ResourceManifestEntry[],
+  ctx: PredicateContext,
+): ResourceManifestEntry[] {
+  return resources.filter((resource) => isResourceExposedForRuntime(resource, ctx));
 }
 
 /**

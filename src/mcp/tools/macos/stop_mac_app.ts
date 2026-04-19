@@ -1,78 +1,69 @@
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool } from '../../../utils/typed-tool-factory.ts';
+import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
 
-// Define schema as ZodObject
 const stopMacAppSchema = z.object({
   appName: z.string().optional(),
   processId: z.number().optional(),
 });
 
-// Use z.infer for type safety
 type StopMacAppParams = z.infer<typeof stopMacAppSchema>;
 
 export async function stop_mac_appLogic(
   params: StopMacAppParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   if (!params.appName && !params.processId) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'Either appName or processId must be provided.',
-        },
-      ],
-      isError: true,
-    };
+    const ctx = getHandlerContext();
+    ctx.emit(header('Stop macOS App'));
+    ctx.emit(statusLine('error', 'Either appName or processId must be provided.'));
+    return;
   }
 
-  log(
-    'info',
-    `Stopping macOS app: ${params.processId ? `PID ${params.processId}` : params.appName}`,
+  const target = params.processId ? `PID ${params.processId}` : params.appName!;
+  const headerEvent = header('Stop macOS App', [{ label: 'App', value: target }]);
+
+  log('info', `Stopping macOS app: ${target}`);
+
+  const ctx = getHandlerContext();
+
+  return withErrorHandling(
+    ctx,
+    async () => {
+      let command: string[];
+
+      if (params.processId) {
+        command = ['kill', String(params.processId)];
+      } else {
+        command = ['pkill', '-f', params.appName!];
+      }
+
+      const result = await executor(command, 'Stop macOS App');
+
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(
+          statusLine(
+            'error',
+            `Stop macOS app operation failed: ${result.error ?? 'Unknown error'}`,
+          ),
+        );
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'App stopped successfully'));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Stop macOS app operation failed: ${message}`,
+      logMessage: ({ message }) => `Error stopping macOS app: ${message}`,
+    },
   );
-
-  try {
-    let command: string[];
-
-    if (params.processId) {
-      // Stop by process ID
-      command = ['kill', String(params.processId)];
-    } else {
-      // Stop by app name - use shell command with fallback for complex logic
-      command = [
-        'sh',
-        '-c',
-        `pkill -f "${params.appName}" || osascript -e 'tell application "${params.appName}" to quit'`,
-      ];
-    }
-
-    await executor(command, 'Stop macOS App');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ macOS app stopped successfully: ${params.processId ? `PID ${params.processId}` : params.appName}`,
-        },
-      ],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error stopping macOS app: ${errorMessage}`);
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `❌ Stop macOS app operation failed: ${errorMessage}`,
-        },
-      ],
-      isError: true,
-    };
-  }
 }
 
 export const schema = stopMacAppSchema.shape;

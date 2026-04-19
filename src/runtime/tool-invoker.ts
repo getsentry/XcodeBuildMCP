@@ -1,8 +1,13 @@
 import type { ToolCatalog, ToolDefinition, ToolInvoker, InvokeOptions } from './types.ts';
-import type { NextStep, NextStepParams, NextStepParamsMap, ToolResponse } from '../types/common.ts';
-import { createErrorResponse } from '../utils/responses/index.ts';
-import { DaemonClient } from '../cli/daemon-client.ts';
-import { ensureDaemonRunning, DEFAULT_DAEMON_STARTUP_TIMEOUT_MS } from '../cli/daemon-control.ts';
+import type { NextStep, NextStepParams, NextStepParamsMap } from '../types/common.ts';
+import type { DaemonToolResult } from '../daemon/protocol.ts';
+import { statusLine } from '../utils/tool-event-builders.ts';
+import { DaemonClient, DaemonVersionMismatchError } from '../cli/daemon-client.ts';
+import {
+  ensureDaemonRunning,
+  forceStopDaemon,
+  DEFAULT_DAEMON_STARTUP_TIMEOUT_MS,
+} from '../cli/daemon-control.ts';
 import { log } from '../utils/logger.ts';
 import {
   recordInternalErrorMetric,
@@ -11,6 +16,8 @@ import {
   type SentryToolRuntime,
   type SentryToolTransport,
 } from '../utils/sentry.ts';
+import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
+import { createRenderSession } from '../rendering/render.ts';
 
 type BuiltTemplateNextStep = {
   step: NextStep;
@@ -32,6 +39,7 @@ function buildTemplateNextSteps(
         step: {
           label: template.label,
           priority: template.priority,
+          when: template.when,
         },
       });
       continue;
@@ -48,6 +56,7 @@ function buildTemplateNextSteps(
         label: template.label,
         params: template.params ?? {},
         priority: template.priority,
+        when: template.when,
       },
       templateToolId: template.toolId,
     });
@@ -106,91 +115,135 @@ function mergeTemplateAndResponseNextSteps(
   });
 }
 
-function normalizeNextSteps(
-  response: ToolResponse,
-  catalog: ToolCatalog,
-  runtime: InvokeOptions['runtime'],
-): ToolResponse {
-  if (!response.nextSteps || response.nextSteps.length === 0) {
-    return response;
-  }
+function normalizeNextSteps(steps: NextStep[], catalog: ToolCatalog): NextStep[] {
+  return steps.map((step) => {
+    if (!step.tool) {
+      return step;
+    }
 
-  return {
-    ...response,
-    nextSteps: response.nextSteps.map((step) => {
-      if (!step.tool) {
-        return step;
-      }
+    const target = catalog.getByMcpName(step.tool);
+    if (!target) {
+      return step;
+    }
 
-      const target = catalog.getByMcpName(step.tool);
-      if (!target) {
-        return step;
-      }
-
-      return runtime === 'cli'
-        ? {
-            ...step,
-            tool: target.mcpName,
-            workflow: target.workflow,
-            cliTool: target.cliName,
-          }
-        : {
-            ...step,
-            tool: target.mcpName,
-          };
-    }),
-  };
+    return {
+      ...step,
+      tool: target.mcpName,
+      workflow: target.workflow,
+      cliTool: target.cliName,
+    };
+  });
 }
 
-export function postProcessToolResponse(params: {
+function isStructuredXcodebuildFailureSession(session: RenderSession): boolean {
+  const events = session.getEvents();
+
+  const hasFailedSummary = events.some(
+    (event) => event.type === 'summary' && event.status === 'FAILED',
+  );
+  const hasHeader = events.some((event) => event.type === 'header');
+
+  return hasFailedSummary && hasHeader;
+}
+
+function buildEffectiveNextStepParams(
+  nextStepParams: NextStepParamsMap | undefined,
+  handlerNextSteps: NextStep[] | undefined,
+  catalog: ToolCatalog,
+): NextStepParamsMap | undefined {
+  if (!handlerNextSteps || handlerNextSteps.length === 0) {
+    return nextStepParams;
+  }
+
+  let merged: NextStepParamsMap | undefined = nextStepParams;
+  for (const step of handlerNextSteps) {
+    if (!step.tool || !step.params || Object.keys(step.params).length === 0) {
+      continue;
+    }
+    const target = catalog.getByMcpName(step.tool);
+    const toolId = target?.id ?? step.tool;
+    if (merged?.[toolId]) {
+      continue;
+    }
+    merged = { ...merged, [toolId]: step.params as NextStepParams };
+  }
+  return merged;
+}
+
+export function postProcessSession(params: {
   tool: ToolDefinition;
-  response: ToolResponse;
+  session: RenderSession;
+  ctx: ToolHandlerContext;
   catalog: ToolCatalog;
   runtime: InvokeOptions['runtime'];
   applyTemplateNextSteps?: boolean;
-}): ToolResponse {
-  const { tool, response, catalog, runtime, applyTemplateNextSteps = true } = params;
+}): void {
+  const { tool, session, ctx, catalog, runtime, applyTemplateNextSteps = true } = params;
 
-  const templateSteps = buildTemplateNextSteps(tool, catalog);
+  const isError = session.isError();
+  const nextStepParams = ctx.nextStepParams;
+  const handlerNextSteps = ctx.nextSteps;
+  const suppressNextStepsForStructuredFailure =
+    isError && isStructuredXcodebuildFailureSession(session);
 
-  const withTemplates =
-    applyTemplateNextSteps && templateSteps.length > 0
-      ? {
-          ...response,
-          nextSteps: mergeTemplateAndResponseNextSteps(templateSteps, response.nextStepParams),
-        }
-      : response;
+  if (suppressNextStepsForStructuredFailure) {
+    return;
+  }
 
-  const result = normalizeNextSteps(withTemplates, catalog, runtime);
-  delete result.nextStepParams;
-  return result;
+  const suppressTemplateNextSteps = handlerNextSteps !== undefined && handlerNextSteps.length === 0;
+
+  const effectiveNextStepParams = buildEffectiveNextStepParams(
+    nextStepParams,
+    handlerNextSteps,
+    catalog,
+  );
+
+  const allTemplateSteps = buildTemplateNextSteps(tool, catalog);
+  const templateSteps = allTemplateSteps.filter((t) => {
+    const when = t.step.when ?? 'always';
+    if (when === 'success') return !isError;
+    if (when === 'failure') return isError;
+    return true;
+  });
+
+  let finalSteps: NextStep[];
+
+  if (applyTemplateNextSteps && !suppressTemplateNextSteps && templateSteps.length > 0) {
+    finalSteps = mergeTemplateAndResponseNextSteps(templateSteps, effectiveNextStepParams);
+  } else if (handlerNextSteps && handlerNextSteps.length > 0) {
+    finalSteps = handlerNextSteps;
+  } else {
+    return;
+  }
+
+  const normalized = normalizeNextSteps(finalSteps, catalog);
+
+  if (normalized.length > 0) {
+    session.emit({
+      type: 'next-steps',
+      timestamp: new Date().toISOString(),
+      steps: normalized,
+      runtime,
+    });
+  }
 }
 
 function buildDaemonEnvOverrides(opts: InvokeOptions): Record<string, string> | undefined {
-  const envOverrides: Record<string, string> = {};
-
-  if (opts.logLevel) {
-    envOverrides.XCODEBUILDMCP_DAEMON_LOG_LEVEL = opts.logLevel;
+  if (!opts.logLevel) {
+    return undefined;
   }
-
-  return Object.keys(envOverrides).length > 0 ? envOverrides : undefined;
+  return { XCODEBUILDMCP_DAEMON_LOG_LEVEL: opts.logLevel };
 }
 
 function getErrorKind(error: unknown): string {
-  if (error instanceof Error) {
-    return error.name || 'Error';
-  }
-  return typeof error;
+  return error instanceof Error ? error.name || 'Error' : typeof error;
 }
 
 function mapRuntimeToSentryToolRuntime(runtime: InvokeOptions['runtime']): SentryToolRuntime {
-  switch (runtime) {
-    case 'daemon':
-    case 'mcp':
-      return runtime;
-    default:
-      return 'cli';
+  if (runtime === 'daemon' || runtime === 'mcp') {
+    return runtime;
   }
+  return 'cli';
 }
 
 export class DefaultToolInvoker implements ToolInvoker {
@@ -200,53 +253,46 @@ export class DefaultToolInvoker implements ToolInvoker {
     toolName: string,
     args: Record<string, unknown>,
     opts: InvokeOptions,
-  ): Promise<ToolResponse> {
+  ): Promise<void> {
     const resolved = this.catalog.resolve(toolName);
+    const session = opts.renderSession ?? createRenderSession('text');
+    const resolvedOpts = { ...opts, renderSession: session };
 
     if (resolved.ambiguous) {
-      return createErrorResponse(
-        'Ambiguous tool name',
-        `Multiple tools match '${toolName}'. Use one of:\n- ${resolved.ambiguous.join('\n- ')}`,
+      session.emit(
+        statusLine(
+          'error',
+          `Ambiguous tool name: Multiple tools match '${toolName}'. Use one of:\n- ${resolved.ambiguous.join('\n- ')}`,
+        ),
       );
+      return;
     }
 
     if (resolved.notFound || !resolved.tool) {
-      return createErrorResponse(
-        'Tool not found',
-        `Unknown tool '${toolName}'. Run 'xcodebuildmcp tools' to see available tools.`,
+      session.emit(
+        statusLine(
+          'error',
+          `Tool not found: Unknown tool '${toolName}'. Run 'xcodebuildmcp tools' to see available tools.`,
+        ),
       );
+      return;
     }
 
-    return this.executeTool(resolved.tool, args, opts);
+    return this.executeTool(resolved.tool, args, resolvedOpts);
   }
 
-  /**
-   * Invoke a tool directly, bypassing catalog resolution.
-   * Used by CLI where the correct ToolDefinition is already known
-   * from workflow-scoped yargs routing.
-   */
   async invokeDirect(
     tool: ToolDefinition,
     args: Record<string, unknown>,
     opts: InvokeOptions,
-  ): Promise<ToolResponse> {
-    return this.executeTool(tool, args, opts);
-  }
-
-  private buildPostProcessParams(
-    tool: ToolDefinition,
-    runtime: InvokeOptions['runtime'],
-  ): {
-    tool: ToolDefinition;
-    catalog: ToolCatalog;
-    runtime: InvokeOptions['runtime'];
-  } {
-    return { tool, catalog: this.catalog, runtime };
+  ): Promise<void> {
+    const session = opts.renderSession ?? createRenderSession('text');
+    return this.executeTool(tool, args, { ...opts, renderSession: session });
   }
 
   private async invokeViaDaemon(
     opts: InvokeOptions,
-    invoke: (client: DaemonClient) => Promise<ToolResponse>,
+    invoke: (client: DaemonClient) => Promise<DaemonToolResult>,
     context: {
       label: string;
       errorTitle: string;
@@ -258,16 +304,20 @@ export class DefaultToolInvoker implements ToolInvoker {
         runtime: InvokeOptions['runtime'];
       };
     },
-  ): Promise<ToolResponse> {
+  ): Promise<void> {
+    const session = opts.renderSession!;
     const socketPath = opts.socketPath;
     if (!socketPath) {
       const error = new Error('SocketPathMissing');
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
-      return createErrorResponse(
-        'Socket path required',
-        'No socket path configured for daemon communication.',
+      session.emit(
+        statusLine(
+          'error',
+          'Socket path required: No socket path configured for daemon communication.',
+        ),
       );
+      return;
     }
 
     const client = new DaemonClient({ socketPath });
@@ -289,24 +339,73 @@ export class DefaultToolInvoker implements ToolInvoker {
         );
         context.captureInfraErrorMetric(error);
         context.captureInvocationMetric('infra_error');
-        return createErrorResponse(
-          'Daemon auto-start failed',
-          (error instanceof Error ? error.message : String(error)) +
-            '\n\nYou can try starting the daemon manually:\n' +
-            '  xcodebuildmcp daemon start',
+        session.emit(
+          statusLine(
+            'error',
+            `Daemon auto-start failed: ${error instanceof Error ? error.message : String(error)}\n\nYou can try starting the daemon manually:\n  xcodebuildmcp daemon start`,
+          ),
         );
+        return;
       }
     }
 
-    try {
-      const response = await invoke(client);
-      context.captureInvocationMetric('completed');
-      return postProcessToolResponse({
+    const consumeResult = (daemonResult: DaemonToolResult): void => {
+      for (const event of daemonResult.events) {
+        session.emit(event);
+      }
+
+      const ctx: ToolHandlerContext = {
+        emit: (event) => session.emit(event),
+        attach: (image) => session.attach(image),
+        nextStepParams: daemonResult.nextStepParams,
+        nextSteps: daemonResult.nextSteps,
+      };
+
+      postProcessSession({
         ...context.postProcessParams,
-        response,
-        applyTemplateNextSteps: false,
+        session,
+        ctx,
       });
+    };
+
+    try {
+      const daemonResult = await invoke(client);
+      context.captureInvocationMetric('completed');
+      consumeResult(daemonResult);
     } catch (error) {
+      if (error instanceof DaemonVersionMismatchError) {
+        log('info', `[infra/tool-invoker] ${context.label} daemon protocol mismatch, restarting`);
+        await forceStopDaemon(socketPath);
+        try {
+          await ensureDaemonRunning({
+            socketPath,
+            workspaceRoot: opts.workspaceRoot,
+            startupTimeoutMs: opts.daemonStartupTimeoutMs ?? DEFAULT_DAEMON_STARTUP_TIMEOUT_MS,
+            env: buildDaemonEnvOverrides(opts),
+          });
+          const retryClient = new DaemonClient({ socketPath });
+          const daemonResult = await invoke(retryClient);
+          context.captureInvocationMetric('completed');
+          consumeResult(daemonResult);
+          return;
+        } catch (retryError) {
+          log(
+            'error',
+            `[infra/tool-invoker] ${context.label} daemon restart failed (${getErrorKind(retryError)})`,
+            { sentry: true },
+          );
+          context.captureInfraErrorMetric(retryError);
+          context.captureInvocationMetric('infra_error');
+          session.emit(
+            statusLine(
+              'error',
+              `Daemon restart failed after protocol mismatch: ${retryError instanceof Error ? retryError.message : String(retryError)}\n\nTry restarting manually:\n  xcodebuildmcp daemon stop && xcodebuildmcp daemon start`,
+            ),
+          );
+          return;
+        }
+      }
+
       log(
         'error',
         `[infra/tool-invoker] ${context.label} transport failed (${getErrorKind(error)})`,
@@ -314,9 +413,11 @@ export class DefaultToolInvoker implements ToolInvoker {
       );
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
-      return createErrorResponse(
-        context.errorTitle,
-        error instanceof Error ? error.message : String(error),
+      session.emit(
+        statusLine(
+          'error',
+          `${context.errorTitle}: ${error instanceof Error ? error.message : String(error)}`,
+        ),
       );
     }
   }
@@ -325,7 +426,7 @@ export class DefaultToolInvoker implements ToolInvoker {
     tool: ToolDefinition,
     args: Record<string, unknown>,
     opts: InvokeOptions,
-  ): Promise<ToolResponse> {
+  ): Promise<void> {
     const startedAt = Date.now();
     const runtime = mapRuntimeToSentryToolRuntime(opts.runtime);
     let transport: SentryToolTransport = 'direct';
@@ -348,7 +449,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       });
     };
 
-    const postProcessParams = this.buildPostProcessParams(tool, opts.runtime);
+    const postProcessParams = { tool, catalog: this.catalog, runtime: opts.runtime };
     const xcodeIdeRemoteToolName = tool.xcodeIdeRemoteToolName;
     const isDynamicXcodeIdeTool =
       tool.workflow === 'xcode-ide' && typeof xcodeIdeRemoteToolName === 'string';
@@ -380,13 +481,27 @@ export class DefaultToolInvoker implements ToolInvoker {
     }
 
     // Direct invocation (CLI stateless or daemon internal)
+    const session = opts.renderSession!;
     try {
-      const response = await tool.handler(args);
+      const ctx: ToolHandlerContext = opts.handlerContext ?? {
+        emit: (event) => {
+          session.emit(event);
+        },
+        attach: (image) => {
+          session.attach(image);
+        },
+      };
+      await tool.handler(args, ctx);
+
       captureInvocationMetric('completed');
-      return postProcessToolResponse({
-        ...postProcessParams,
-        response,
-      });
+
+      if (opts.runtime !== 'daemon') {
+        postProcessSession({
+          ...postProcessParams,
+          session,
+          ctx,
+        });
+      }
     } catch (error) {
       log(
         'error',
@@ -396,7 +511,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       captureInfraErrorMetric(error);
       captureInvocationMetric('infra_error');
       const message = error instanceof Error ? error.message : String(error);
-      return createErrorResponse('Tool execution failed', message);
+      session.emit(statusLine('error', `Tool execution failed: ${message}`));
     }
   }
 }

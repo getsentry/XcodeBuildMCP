@@ -15,9 +15,12 @@ nextSteps:
   - label: Add a breakpoint
     toolId: debug_breakpoint_add
     priority: 1
+    when: success
   - label: Continue execution
     toolId: debug_continue
     priority: 2
+    when: success
   - label: Show call stack
     toolId: debug_stack
     priority: 3
+    when: success

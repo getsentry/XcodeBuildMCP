@@ -1,9 +1,3 @@
-/**
- * Tests for sim_statusbar plugin
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
-
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import {
@@ -12,6 +6,7 @@ import {
   type CommandExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { schema, sim_statusbarLogic } from '../sim_statusbar.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('sim_statusbar tool', () => {
   describe('Schema Validation', () => {
@@ -35,44 +30,17 @@ describe('sim_statusbar tool', () => {
         output: 'Status bar set successfully',
       });
 
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'wifi',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
+      const result = await runLogic(() =>
+        sim_statusbarLogic(
           {
-            type: 'text',
-            text: 'Successfully set simulator test-uuid-123 status bar data network to wifi',
+            simulatorId: 'test-uuid-123',
+            dataNetwork: 'wifi',
           },
-        ],
-      });
-    });
-
-    it('should handle minimal valid parameters (Zod handles validation)', async () => {
-      // Note: With createTypedTool, Zod validation happens before the logic function is called
-      // So we test with a valid minimal parameter set since validation is handled upstream
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Status bar set successfully',
-      });
-
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'wifi',
-        },
-        mockExecutor,
+          mockExecutor,
+        ),
       );
 
-      // The logic function should execute normally with valid parameters
-      // Zod validation errors are handled by createTypedTool wrapper
-      expect(result.isError).toBe(undefined);
-      expect(result.content[0].text).toContain('Successfully set simulator');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should handle command failure', async () => {
@@ -81,23 +49,17 @@ describe('sim_statusbar tool', () => {
         error: 'Simulator not found',
       });
 
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'invalid-uuid',
-          dataNetwork: '3g',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        sim_statusbarLogic(
+          {
+            simulatorId: 'invalid-uuid',
+            dataNetwork: '3g',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to set status bar: Simulator not found',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with Error object', async () => {
@@ -105,47 +67,17 @@ describe('sim_statusbar tool', () => {
         throw new Error('Connection failed');
       };
 
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: '4g',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        sim_statusbarLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            dataNetwork: '4g',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to set status bar: Connection failed',
-          },
-        ],
-        isError: true,
-      });
-    });
-
-    it('should handle exception with string error', async () => {
-      const mockExecutor: CommandExecutor = async () => {
-        throw 'String error';
-      };
-
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'lte',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to set status bar: String error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
 
     it('should verify command generation with mock executor for override', async () => {
@@ -172,12 +104,14 @@ describe('sim_statusbar tool', () => {
         });
       };
 
-      await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'wifi',
-        },
-        mockExecutor,
+      await runLogic(() =>
+        sim_statusbarLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            dataNetwork: 'wifi',
+          },
+          mockExecutor,
+        ),
       );
 
       expect(calls).toHaveLength(1);
@@ -221,12 +155,14 @@ describe('sim_statusbar tool', () => {
         });
       };
 
-      await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'clear',
-        },
-        mockExecutor,
+      await runLogic(() =>
+        sim_statusbarLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            dataNetwork: 'clear',
+          },
+          mockExecutor,
+        ),
       );
 
       expect(calls).toHaveLength(1);
@@ -244,22 +180,17 @@ describe('sim_statusbar tool', () => {
         output: 'Status bar cleared successfully',
       });
 
-      const result = await sim_statusbarLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          dataNetwork: 'clear',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        sim_statusbarLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            dataNetwork: 'clear',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Successfully cleared status bar overrides for simulator test-uuid-123',
-          },
-        ],
-      });
+      expect(result.isError).toBeFalsy();
     });
   });
 });

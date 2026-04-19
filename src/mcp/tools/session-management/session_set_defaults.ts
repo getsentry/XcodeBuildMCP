@@ -6,11 +6,22 @@ import {
 import { removeUndefined } from '../../../utils/remove-undefined.ts';
 import { scheduleSimulatorDefaultsRefresh } from '../../../utils/simulator-defaults-refresh.ts';
 import { sessionStore, type SessionDefaults } from '../../../utils/session-store.ts';
-import { sessionDefaultsSchema } from '../../../utils/session-defaults-schema.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
-import type { ToolResponse } from '../../../types/common.ts';
+import {
+  sessionDefaultsSchema,
+  sessionDefaultKeys,
+} from '../../../utils/session-defaults-schema.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
+import { header, statusLine, detailTree, section } from '../../../utils/tool-event-builders.ts';
+import {
+  formatProfileLabel,
+  formatProfileAnnotation,
+  buildFullDetailTree,
+} from './session-format-helpers.ts';
 
 const schemaObj = sessionDefaultsSchema.extend({
   profile: z
@@ -35,40 +46,52 @@ type SessionSetDefaultsContext = {
   executor: CommandExecutor;
 };
 
+const PARAM_LABEL_MAP: Record<string, string> = {
+  projectPath: 'Project Path',
+  workspacePath: 'Workspace Path',
+  scheme: 'Scheme',
+  configuration: 'Configuration',
+  simulatorName: 'Simulator Name',
+  simulatorId: 'Simulator ID',
+  simulatorPlatform: 'Simulator Platform',
+  deviceId: 'Device ID',
+  useLatestOS: 'Use Latest OS',
+  arch: 'Architecture',
+  suppressWarnings: 'Suppress Warnings',
+  derivedDataPath: 'Derived Data Path',
+  preferXcodebuild: 'Prefer xcodebuild',
+  platform: 'Platform',
+  bundleId: 'Bundle ID',
+  env: 'Environment',
+};
+
 export async function sessionSetDefaultsLogic(
   params: Params,
   context: SessionSetDefaultsContext,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const notices: string[] = [];
   let activeProfile = sessionStore.getActiveProfile();
-  const {
-    persist,
-    profile: rawProfile,
-    createIfNotExists: rawCreateIfNotExists,
-    ...rawParams
-  } = params;
-  const createIfNotExists = rawCreateIfNotExists ?? false;
+  const { persist, profile: rawProfile, createIfNotExists = false, ...rawParams } = params;
 
   if (rawProfile !== undefined) {
     const profile = rawProfile.trim();
     if (profile.length === 0) {
-      return {
-        content: [{ type: 'text', text: 'Profile name cannot be empty.' }],
-        isError: true,
-      };
+      ctx.emit(header('Set Defaults'));
+      ctx.emit(statusLine('error', 'Profile name cannot be empty.'));
+      return;
     }
 
     const profileExists = sessionStore.listProfiles().includes(profile);
     if (!profileExists && !createIfNotExists) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Profile "${profile}" does not exist. Pass createIfNotExists=true to create it.`,
-          },
-        ],
-        isError: true,
-      };
+      ctx.emit(header('Set Defaults'));
+      ctx.emit(
+        statusLine(
+          'error',
+          `Profile "${profile}" does not exist. Pass createIfNotExists=true to create it.`,
+        ),
+      );
+      return;
     }
 
     sessionStore.setActiveProfile(profile);
@@ -85,18 +108,10 @@ export async function sessionSetDefaultsLogic(
     rawParams as Record<string, unknown>,
   ) as Partial<SessionDefaults>;
 
-  const hasProjectPath =
-    Object.prototype.hasOwnProperty.call(nextParams, 'projectPath') &&
-    nextParams.projectPath !== undefined;
-  const hasWorkspacePath =
-    Object.prototype.hasOwnProperty.call(nextParams, 'workspacePath') &&
-    nextParams.workspacePath !== undefined;
-  const hasSimulatorId =
-    Object.prototype.hasOwnProperty.call(nextParams, 'simulatorId') &&
-    nextParams.simulatorId !== undefined;
-  const hasSimulatorName =
-    Object.prototype.hasOwnProperty.call(nextParams, 'simulatorName') &&
-    nextParams.simulatorName !== undefined;
+  const hasProjectPath = nextParams.projectPath !== undefined;
+  const hasWorkspacePath = nextParams.workspacePath !== undefined;
+  const hasSimulatorId = nextParams.simulatorId !== undefined;
+  const hasSimulatorName = nextParams.simulatorName !== undefined;
 
   if (hasProjectPath && hasWorkspacePath) {
     delete nextParams.projectPath;
@@ -105,21 +120,14 @@ export async function sessionSetDefaultsLogic(
     );
   }
 
-  // Clear mutually exclusive counterparts before merging new defaults
   const toClear = new Set<keyof SessionDefaults>();
-  if (
-    Object.prototype.hasOwnProperty.call(nextParams, 'projectPath') &&
-    nextParams.projectPath !== undefined
-  ) {
+  if (hasProjectPath) {
     toClear.add('workspacePath');
     if (current.workspacePath !== undefined) {
       notices.push('Cleared workspacePath because projectPath was set.');
     }
   }
-  if (
-    Object.prototype.hasOwnProperty.call(nextParams, 'workspacePath') &&
-    nextParams.workspacePath !== undefined
-  ) {
+  if (hasWorkspacePath) {
     toClear.add('projectPath');
     if (current.projectPath !== undefined) {
       notices.push('Cleared projectPath because workspacePath was set.');
@@ -132,7 +140,6 @@ export async function sessionSetDefaultsLogic(
     hasSimulatorName && nextParams.simulatorName !== current.simulatorName;
 
   if (hasSimulatorId && hasSimulatorName) {
-    // Both provided - keep both, simulatorId takes precedence for tools
     notices.push(
       'Both simulatorId and simulatorName were provided; simulatorId will be used by tools.',
     );
@@ -212,16 +219,24 @@ export async function sessionSetDefaultsLogic(
   }
 
   const updated = sessionStore.getAll();
-  const noticeText = notices.length > 0 ? `\nNotices:\n- ${notices.join('\n- ')}` : '';
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Defaults updated:\n${JSON.stringify(updated, null, 2)}${noticeText}`,
-      },
-    ],
-    isError: false,
-  };
+
+  const headerParams: Array<{ label: string; value: string }> = [];
+  for (const [key, value] of Object.entries(rawParams)) {
+    if (value !== undefined) {
+      const label = PARAM_LABEL_MAP[key] ?? key;
+      headerParams.push({ label, value: String(value) });
+    }
+  }
+  headerParams.push({ label: 'Profile', value: formatProfileLabel(activeProfile) });
+
+  const profileAnnotation = formatProfileAnnotation(activeProfile);
+  ctx.emit(header('Set Defaults', headerParams));
+  ctx.emit(statusLine('success', `Session defaults updated ${profileAnnotation}`));
+  ctx.emit(detailTree(buildFullDetailTree(updated)));
+
+  if (notices.length > 0) {
+    ctx.emit(section('Notices', notices));
+  }
 }
 
 export const schema = schemaObj.shape;

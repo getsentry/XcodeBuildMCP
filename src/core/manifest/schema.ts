@@ -63,6 +63,7 @@ export const manifestNextStepTemplateSchema = z
     toolId: z.string().optional(),
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
     priority: z.number().optional(),
+    when: z.enum(['always', 'success', 'failure']).default('always'),
   })
   .strict();
 
@@ -157,11 +158,58 @@ export const workflowManifestEntrySchema = z.object({
 export type WorkflowManifestEntry = z.infer<typeof workflowManifestEntrySchema>;
 
 /**
- * Resolved manifest containing all tools and workflows.
+ * Resource availability flags (MCP only).
+ */
+export const resourceAvailabilitySchema = z
+  .object({
+    mcp: z.boolean().default(true),
+  })
+  .strict();
+
+export type ResourceAvailability = z.infer<typeof resourceAvailabilitySchema>;
+
+/**
+ * Resource manifest entry schema.
+ * Describes a single MCP resource's metadata and configuration.
+ */
+export const resourceManifestEntrySchema = z.object({
+  /** Unique resource identifier */
+  id: z.string(),
+
+  /**
+   * Module path (extensionless, package-relative).
+   * Resolved to build/<module>.js at runtime.
+   */
+  module: z.string(),
+
+  /** MCP resource name */
+  name: z.string(),
+
+  /** Resource URI (e.g., xcodebuildmcp://simulators) */
+  uri: z.string(),
+
+  /** Resource description */
+  description: z.string(),
+
+  /** MIME type for the resource content */
+  mimeType: z.string(),
+
+  /** Per-runtime availability flags */
+  availability: resourceAvailabilitySchema.default({ mcp: true }),
+
+  /** Predicate names for visibility filtering (all must pass) */
+  predicates: z.array(z.string()).default([]),
+});
+
+export type ResourceManifestEntry = z.infer<typeof resourceManifestEntrySchema>;
+
+/**
+ * Resolved manifest containing all tools, workflows, and resources.
  */
 export interface ResolvedManifest {
   tools: Map<string, ToolManifestEntry>;
   workflows: Map<string, WorkflowManifestEntry>;
+  resources: Map<string, ResourceManifestEntry>;
 }
 
 /**

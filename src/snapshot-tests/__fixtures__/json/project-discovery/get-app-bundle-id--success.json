@@ -1,0 +1,12 @@
+{
+  "schema": "xcodebuildmcp.output.bundle-id",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "appPath": "<TMPDIR>/BundleTest.app",
+      "bundleId": "com.test.snapshot"
+    }
+  }
+}

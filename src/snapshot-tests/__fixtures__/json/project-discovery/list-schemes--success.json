@@ -1,0 +1,15 @@
+{
+  "schema": "xcodebuildmcp.output.scheme-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace"
+    },
+    "schemes": [
+      "CalculatorApp",
+      "CalculatorAppFeature"
+    ]
+  }
+}

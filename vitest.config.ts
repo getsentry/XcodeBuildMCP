@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    setupFiles: ['src/test-utils/vitest-executor-safety.setup.ts'],
     include: [
       'src/**/__tests__/**/*.test.ts', // Only __tests__ directories
     ],
@@ -21,6 +22,7 @@ export default defineConfig({
       '**/__pycache__/**',
       '**/dist/**',
       'src/smoke-tests/**',
+      'src/snapshot-tests/**',
     ],
     pool: 'threads',
     poolOptions: {

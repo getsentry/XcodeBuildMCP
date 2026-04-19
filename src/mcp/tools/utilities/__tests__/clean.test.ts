@@ -6,6 +6,7 @@ import {
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('clean (unified) tool', () => {
   beforeEach(() => {
@@ -51,17 +52,18 @@ describe('clean (unified) tool', () => {
 
   it('runs project-path flow via logic', async () => {
     const mock = createMockExecutor({ success: true, output: 'ok' });
-    const result = await cleanLogic({ projectPath: '/p.xcodeproj', scheme: 'App' } as any, mock);
-    expect(result.isError).not.toBe(true);
+    const result = await runLogic(() =>
+      cleanLogic({ projectPath: '/p.xcodeproj', scheme: 'App' } as any, mock),
+    );
+    expect(result.isError).toBeFalsy();
   });
 
   it('runs workspace-path flow via logic', async () => {
     const mock = createMockExecutor({ success: true, output: 'ok' });
-    const result = await cleanLogic(
-      { workspacePath: '/w.xcworkspace', scheme: 'App' } as any,
-      mock,
+    const result = await runLogic(() =>
+      cleanLogic({ workspacePath: '/w.xcworkspace', scheme: 'App' } as any, mock),
     );
-    expect(result.isError).not.toBe(true);
+    expect(result.isError).toBeFalsy();
   });
 
   it('handler validation: requires scheme when workspacePath is provided', async () => {
@@ -79,13 +81,11 @@ describe('clean (unified) tool', () => {
       return createMockCommandResponse({ success: true, output: 'clean success' });
     };
 
-    const result = await cleanLogic(
-      { projectPath: '/p.xcodeproj', scheme: 'App' } as any,
-      mockExecutor,
+    const result = await runLogic(() =>
+      cleanLogic({ projectPath: '/p.xcodeproj', scheme: 'App' } as any, mockExecutor),
     );
-    expect(result.isError).not.toBe(true);
+    expect(result.isError).toBeFalsy();
 
-    // Check that the command contains iOS platform destination
     const commandStr = capturedCommand.join(' ');
     expect(commandStr).toContain('-destination');
     expect(commandStr).toContain('platform=iOS');
@@ -98,17 +98,18 @@ describe('clean (unified) tool', () => {
       return createMockCommandResponse({ success: true, output: 'clean success' });
     };
 
-    const result = await cleanLogic(
-      {
-        projectPath: '/p.xcodeproj',
-        scheme: 'App',
-        platform: 'macOS',
-      } as any,
-      mockExecutor,
+    const result = await runLogic(() =>
+      cleanLogic(
+        {
+          projectPath: '/p.xcodeproj',
+          scheme: 'App',
+          platform: 'macOS',
+        } as any,
+        mockExecutor,
+      ),
     );
-    expect(result.isError).not.toBe(true);
+    expect(result.isError).toBeFalsy();
 
-    // Check that the command contains macOS platform destination
     const commandStr = capturedCommand.join(' ');
     expect(commandStr).toContain('-destination');
     expect(commandStr).toContain('platform=macOS');
@@ -121,17 +122,18 @@ describe('clean (unified) tool', () => {
       return createMockCommandResponse({ success: true, output: 'clean success' });
     };
 
-    const result = await cleanLogic(
-      {
-        projectPath: '/p.xcodeproj',
-        scheme: 'App',
-        platform: 'iOS Simulator',
-      } as any,
-      mockExecutor,
+    const result = await runLogic(() =>
+      cleanLogic(
+        {
+          projectPath: '/p.xcodeproj',
+          scheme: 'App',
+          platform: 'iOS Simulator',
+        } as any,
+        mockExecutor,
+      ),
     );
-    expect(result.isError).not.toBe(true);
+    expect(result.isError).toBeFalsy();
 
-    // For clean operations, iOS Simulator should be mapped to iOS platform
     const commandStr = capturedCommand.join(' ');
     expect(commandStr).toContain('-destination');
     expect(commandStr).toContain('platform=iOS');

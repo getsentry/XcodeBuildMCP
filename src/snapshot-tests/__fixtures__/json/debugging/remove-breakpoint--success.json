@@ -1,0 +1,12 @@
+{
+  "schema": "xcodebuildmcp.output.debug-breakpoint-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "remove",
+    "breakpoint": {
+      "breakpointId": 1
+    }
+  }
+}

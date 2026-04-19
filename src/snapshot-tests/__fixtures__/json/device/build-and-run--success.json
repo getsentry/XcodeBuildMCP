@@ -1,0 +1,24 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "device"
+    },
+    "artifacts": {
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app",
+      "bundleId": "io.sentry.calculatorapp",
+      "processId": 99999,
+      "deviceId": "<UUID>",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_device_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

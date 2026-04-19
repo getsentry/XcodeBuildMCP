@@ -1,0 +1,12 @@
+
+🐛 Attach Debugger
+
+✅ Attached DAP debugger to simulator process <PID> (<UUID>)
+  ├ Debug session ID: <UUID>
+  ├ Status: This session is now the current debug session.
+  └ Execution: Execution is running. App is responsive to UI interaction.
+
+Next steps:
+1. Add a breakpoint: xcodebuildmcp debugging add-breakpoint --debug-session-id "<UUID>" --file "..." --line "123"
+2. Continue execution: xcodebuildmcp debugging continue --debug-session-id "<UUID>"
+3. Show call stack: xcodebuildmcp debugging stack --debug-session-id "<UUID>"

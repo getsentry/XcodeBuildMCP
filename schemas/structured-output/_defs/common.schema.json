@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {},
+  "$defs": {
+    "errorConsistency": {
+      "type": "object",
+      "properties": {
+        "didError": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "didError": {
+                "const": false
+              }
+            },
+            "required": [
+              "didError"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "didError": {
+                "const": true
+              }
+            },
+            "required": [
+              "didError"
+            ]
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "diagnosticEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "basicDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/diagnosticEntry"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/diagnosticEntry"
+          }
+        }
+      },
+      "required": [
+        "warnings",
+        "errors"
+      ]
+    },
+    "testFailureEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suite": {
+          "type": "string"
+        },
+        "test": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "suite",
+        "test",
+        "message"
+      ]
+    },
+    "testDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/diagnosticEntry"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/diagnosticEntry"
+          }
+        },
+        "testFailures": {
+          "type": "array",
+          "items": {
+            "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/testFailureEntry"
+          }
+        }
+      },
+      "required": [
+        "warnings",
+        "errors",
+        "testFailures"
+      ]
+    },
+    "statusSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "passed",
+        "failed",
+        "skipped"
+      ]
+    },
+    "orderedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ]
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ]
+    },
+    "pathItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ]
+    },
+    "sessionDefaultsProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspacePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scheme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "simulatorName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "simulatorId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "simulatorPlatform": {
+          "anyOf": [
+            {
+              "const": null
+            },
+            {
+              "enum": [
+                "iOS Simulator",
+                "watchOS Simulator",
+                "tvOS Simulator",
+                "visionOS Simulator"
+              ]
+            }
+          ]
+        },
+        "deviceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "useLatestOS": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "arch": {
+          "anyOf": [
+            {
+              "const": null
+            },
+            {
+              "enum": [
+                "arm64",
+                "x86_64"
+              ]
+            }
+          ]
+        },
+        "suppressWarnings": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "derivedDataPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preferXcodebuild": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "platform": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bundleId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "anyOf": [
+            {
+              "const": null
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "projectPath",
+        "workspacePath",
+        "scheme",
+        "configuration",
+        "simulatorName",
+        "simulatorId",
+        "simulatorPlatform",
+        "deviceId",
+        "useLatestOS",
+        "arch",
+        "suppressWarnings",
+        "derivedDataPath",
+        "preferXcodebuild",
+        "platform",
+        "bundleId",
+        "env"
+      ]
+    }
+  }
+}

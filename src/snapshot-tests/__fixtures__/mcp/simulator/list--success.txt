@@ -1,0 +1,52 @@
+
+📱 List Simulators
+
+iOS Simulators:
+
+  iOS 26.4:
+
+    📱 [✓] iPhone 17 Pro (Booted)
+      UDID: <UUID>
+
+    📱 [✓] iPhone 17 Pro Max (Booted)
+      UDID: <UUID>
+
+    📱 [✗] iPhone 17e (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPhone Air (Shutdown)
+      UDID: <UUID>
+
+    📱 [✓] iPhone 17 (Booted)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 13-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Pro 11-inch (M5) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad mini (A17 Pro) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 13-inch (M4) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad Air 11-inch (M4) (Shutdown)
+      UDID: <UUID>
+
+    📱 [✗] iPad (A16) (Shutdown)
+      UDID: <UUID>
+
+✅ 11 simulators available (11 iOS).
+
+Hints
+  Use the simulator ID/UDID from above when required by other tools.
+  Save a default simulator with session-set-defaults { simulatorId: 'SIMULATOR_UDID' }.
+  Before running boot/build/run tools, set the desired simulator identifier in session defaults.
+
+Next steps:
+1. Boot a simulator: boot_sim({ simulatorId: "UUID_FROM_ABOVE" })
+2. Open the simulator UI: open_sim()
+3. Build for simulator: build_sim({ scheme: "YOUR_SCHEME", simulatorId: "UUID_FROM_ABOVE" })
+4. Get app path: get_sim_app_path({ scheme: "YOUR_SCHEME", platform: "iOS Simulator", simulatorId: "UUID_FROM_ABOVE" })

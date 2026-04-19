@@ -77,17 +77,33 @@ xcodebuildmcp simulator launch-app --simulator-id <UDID> --bundle-id io.sentry.M
 xcodebuildmcp simulator build-and-run --scheme MyApp --project-path ./MyApp.xcodeproj
 ```
 
-### Log Capture Workflow
+### Human-readable build-and-run output
 
-```bash
-# Start log capture
-xcodebuildmcp logging start-simulator-log-capture --simulator-id <UDID> --bundle-id io.sentry.MyApp
+For xcodebuild-backed build-and-run tools:
 
-> Log capture started successfully. Session ID: 51e2142a-1a99-442a-af01-0586540043df.
+- CLI text mode prints a durable preflight block first
+- interactive terminals then show active phases as live replace-in-place updates
+- warnings, errors, failures, summaries, and next steps are durable output
+- success output order is: front matter -> runtime state/diagnostics -> summary -> execution-derived footer -> next steps
+- failed structured xcodebuild runs do not render next steps
+- compiler/build diagnostics should be grouped into a readable failure block before the failed summary
+- the final footer should only contain execution-derived values such as app path, bundle ID, app ID, or process ID
+- requested values like scheme, project/workspace, configuration, and platform stay in front matter and should not be repeated later
+- when the tool computes a concrete value during execution, prefer showing it directly in the footer instead of relegating it to a hint or redundant next step
 
-# Stop and retrieve logs
-xcodebuildmcp logging stop-simulator-log-capture --session-id <SESSION_ID>
+For example, a successful build-and-run footer should prefer:
+
+```text
+✅ Build & Run complete
+
+  └ App Path: /tmp/.../MyApp.app
 ```
+
+rather than forcing the user to run another command just to retrieve a value the tool already knows.
+
+MCP uses the same human-readable formatting semantics, but buffers the rendered output instead of streaming it to stdout live. It is the same section model and ordering, just a different sink.
+
+`--output json` is still streamed JSONL events, not the human-readable section format.
 
 ### Testing
 
@@ -97,7 +113,12 @@ xcodebuildmcp simulator test --scheme MyAppTests --project-path ./MyApp.xcodepro
 
 # Run with specific simulator
 xcodebuildmcp simulator test --scheme MyAppTests --simulator-name "iPhone 17 Pro"
+
+# Run with pre-resolved test discovery and live progress
+xcodebuildmcp simulator test --json '{"workspacePath":"./MyApp.xcworkspace","scheme":"MyApp","simulatorName":"iPhone 17 Pro","progress":true,"extraArgs":["-only-testing:MyAppTests"]}'
 ```
+
+Simulator test output now pre-resolves concrete Swift XCTest and Swift Testing cases when it can, then streams filtered milestones for package resolution, compilation, and test execution plus a grouped failure summary instead of raw `xcodebuild` noise.
 
 For a full list of workflows and tools, see [TOOLS-CLI.md](TOOLS-CLI.md).
 
@@ -219,7 +240,6 @@ Most tools run directly without the daemon:
 
 ### Stateful Tools (require daemon)
 Some tools maintain state and route through the daemon:
-- Log capture: `start-simulator-log-capture`, `stop-simulator-log-capture`
 - Video recording: `record-video`
 - Debugging: `attach`, `continue`, etc.
 - Background processes: `run`, `stop`

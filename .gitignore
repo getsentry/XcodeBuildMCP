@@ -8,6 +8,7 @@ yarn-error.log*
 dist/
 /build/
 *.tsbuildinfo
+.wireit/
 
 # Auto-generated files
 src/version.ts

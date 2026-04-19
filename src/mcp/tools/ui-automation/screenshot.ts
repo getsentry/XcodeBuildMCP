@@ -1,23 +1,9 @@
-/**
- * Screenshot tool plugin - Capture screenshots from iOS Simulator
- *
- * Note: The simctl screenshot command captures the raw framebuffer in portrait orientation
- * regardless of the device's actual rotation. When the simulator is in landscape mode,
- * this results in a rotated image. This plugin detects the simulator window orientation
- * and applies a +90° rotation to correct landscape screenshots.
- */
-import * as path from 'path';
-import { tmpdir } from 'os';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
 import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createImageContent } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
-import {
-  createErrorResponse,
-  createTextResponse,
-  SystemError,
-} from '../../../utils/responses/index.ts';
+import { SystemError } from '../../../utils/errors.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
   getDefaultFileSystemExecutor,
@@ -26,9 +12,33 @@ import {
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { header, statusLine, detailTree } from '../../../utils/tool-event-builders.ts';
 
 const LOG_PREFIX = '[Screenshot]';
+
+async function getImageDimensions(
+  imagePath: string,
+  executor: CommandExecutor,
+): Promise<string | null> {
+  try {
+    const result = await executor(
+      ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', imagePath],
+      `${LOG_PREFIX}: get dimensions`,
+      false,
+    );
+    if (!result.success || !result.output) return null;
+    const widthMatch = result.output.match(/pixelWidth:\s*(\d+)/);
+    const heightMatch = result.output.match(/pixelHeight:\s*(\d+)/);
+    if (widthMatch && heightMatch) {
+      return `${widthMatch[1]}x${heightMatch[1]}px`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Type for simctl device list response
@@ -175,7 +185,6 @@ export async function rotateImage(
   }
 }
 
-// Define schema as ZodObject
 const screenshotSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
   returnFormat: z
@@ -184,7 +193,6 @@ const screenshotSchema = z.object({
     .describe('Return image path or base64 data (path|base64)'),
 });
 
-// Use z.infer for type safety
 type ScreenshotParams = z.infer<typeof screenshotSchema>;
 
 const publicSchemaObject = z.strictObject(
@@ -197,8 +205,10 @@ export async function screenshotLogic(
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   pathUtils: { tmpdir: () => string; join: (...paths: string[]) => string } = { ...path, tmpdir },
   uuidUtils: { v4: () => string } = { v4: uuidv4 },
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const { simulatorId } = params;
+  const headerEvent = header('Screenshot', [{ label: 'Simulator', value: simulatorId }]);
   const runtime = process.env.XCODEBUILDMCP_RUNTIME;
   const defaultFormat = runtime === 'cli' || runtime === 'daemon' ? 'path' : 'base64';
   const returnFormat = params.returnFormat ?? defaultFormat;
@@ -207,7 +217,6 @@ export async function screenshotLogic(
   const screenshotPath = pathUtils.join(tempDir, screenshotFilename);
   const optimizedFilename = `screenshot_optimized_${uuidUtils.v4()}.jpg`;
   const optimizedPath = pathUtils.join(tempDir, optimizedFilename);
-  // Use xcrun simctl to take screenshot
   const commandArgs: string[] = [
     'xcrun',
     'simctl',
@@ -220,7 +229,6 @@ export async function screenshotLogic(
   log('info', `${LOG_PREFIX}/screenshot: Starting capture to ${screenshotPath} on ${simulatorId}`);
 
   try {
-    // Execute the screenshot command
     const result = await executor(commandArgs, `${LOG_PREFIX}: screenshot`, false);
 
     if (!result.success) {
@@ -230,30 +238,26 @@ export async function screenshotLogic(
     log('info', `${LOG_PREFIX}/screenshot: Success for ${simulatorId}`);
 
     try {
-      // Fix landscape orientation: simctl captures in portrait orientation regardless of device rotation
-      // Get device name to identify the correct simulator window when multiple are open
       const deviceName = await getDeviceNameForSimulatorId(simulatorId, executor);
-      // Detect if simulator window is landscape and rotate the image +90° to correct
       const isLandscape = await detectLandscapeMode(executor, deviceName ?? undefined);
       if (isLandscape) {
-        log('info', `${LOG_PREFIX}/screenshot: Landscape mode detected, rotating +90°`);
+        log('info', `${LOG_PREFIX}/screenshot: Landscape mode detected, rotating +90`);
         const rotated = await rotateImage(screenshotPath, 90, executor);
         if (!rotated) {
           log('warn', `${LOG_PREFIX}/screenshot: Rotation failed, continuing with original`);
         }
       }
 
-      // Optimize the image for LLM consumption: resize to max 800px width and convert to JPEG
       const optimizeArgs = [
         'sips',
         '-Z',
-        '800', // Resize to max 800px (maintains aspect ratio)
+        '800',
         '-s',
         'format',
-        'jpeg', // Convert to JPEG
+        'jpeg',
         '-s',
         'formatOptions',
-        '75', // 75% quality compression
+        '75',
         screenshotPath,
         '--out',
         optimizedPath,
@@ -264,36 +268,40 @@ export async function screenshotLogic(
       if (!optimizeResult.success) {
         log('warn', `${LOG_PREFIX}/screenshot: Image optimization failed, using original PNG`);
         if (returnFormat === 'base64') {
-          // Fallback to original PNG if optimization fails
           const base64Image = await fileSystemExecutor.readFile(screenshotPath, 'base64');
 
-          // Clean up
           try {
             await fileSystemExecutor.rm(screenshotPath);
           } catch (err) {
             log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
           }
 
-          return {
-            content: [createImageContent(base64Image, 'image/png')],
-            isError: false,
-          };
+          ctx.emit(headerEvent);
+          ctx.emit(statusLine('success', 'Screenshot captured'));
+          ctx.emit(detailTree([{ label: 'Format', value: 'image/png (optimization failed)' }]));
+          ctx.attach({ data: base64Image, mimeType: 'image/png' });
+          return;
         }
 
-        return createTextResponse(
-          `Screenshot captured: ${screenshotPath} (image/png, optimization failed)`,
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('success', 'Screenshot captured'));
+        ctx.emit(
+          detailTree([
+            { label: 'Screenshot', value: screenshotPath },
+            { label: 'Format', value: 'image/png (optimization failed)' },
+          ]),
         );
+        return;
       }
 
       log('info', `${LOG_PREFIX}/screenshot: Image optimized successfully`);
 
       if (returnFormat === 'base64') {
-        // Read the optimized image file as base64
         const base64Image = await fileSystemExecutor.readFile(optimizedPath, 'base64');
+        const base64Dims = await getImageDimensions(optimizedPath, executor);
 
         log('info', `${LOG_PREFIX}/screenshot: Successfully encoded image as Base64`);
 
-        // Clean up both temporary files
         try {
           await fileSystemExecutor.rm(screenshotPath);
           await fileSystemExecutor.rm(optimizedPath);
@@ -301,37 +309,58 @@ export async function screenshotLogic(
           log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temporary files: ${err}`);
         }
 
-        // Return the optimized image (JPEG format, smaller size)
-        return {
-          content: [createImageContent(base64Image, 'image/jpeg')],
-          isError: false,
-        };
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('success', 'Screenshot captured'));
+        ctx.emit(
+          detailTree([
+            { label: 'Format', value: 'image/jpeg' },
+            ...(base64Dims ? [{ label: 'Size', value: base64Dims }] : []),
+          ] as Array<{ label: string; value: string }>),
+        );
+        ctx.attach({ data: base64Image, mimeType: 'image/jpeg' });
+        return;
       }
 
-      // Keep optimized file on disk for path-based return
       try {
         await fileSystemExecutor.rm(screenshotPath);
       } catch (err) {
         log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
       }
 
-      return createTextResponse(`Screenshot captured: ${optimizedPath} (image/jpeg)`);
+      const dims = await getImageDimensions(optimizedPath, executor);
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'Screenshot captured'));
+      ctx.emit(
+        detailTree([
+          { label: 'Screenshot', value: optimizedPath },
+          { label: 'Format', value: 'image/jpeg' },
+          ...(dims ? [{ label: 'Size', value: dims }] : []),
+        ] as Array<{ label: string; value: string }>),
+      );
+      return;
     } catch (fileError) {
       log('error', `${LOG_PREFIX}/screenshot: Failed to process image file: ${fileError}`);
-      return createErrorResponse(
-        `Screenshot captured but failed to process image file: ${fileError instanceof Error ? fileError.message : String(fileError)}`,
+      ctx.emit(headerEvent);
+      ctx.emit(
+        statusLine(
+          'error',
+          `Screenshot captured but failed to process image file: ${fileError instanceof Error ? fileError.message : String(fileError)}`,
+        ),
       );
+      return;
     }
   } catch (_error) {
     log('error', `${LOG_PREFIX}/screenshot: Failed - ${_error}`);
+    ctx.emit(headerEvent);
     if (_error instanceof SystemError) {
-      return createErrorResponse(
-        `System error executing screenshot: ${_error.message}`,
-        _error.originalError?.stack,
-      );
+      ctx.emit(statusLine('error', `System error executing screenshot: ${_error.message}`));
+      return;
     }
-    return createErrorResponse(
-      `An unexpected error occurred: ${_error instanceof Error ? _error.message : String(_error)}`,
+    ctx.emit(
+      statusLine(
+        'error',
+        `An unexpected error occurred: ${_error instanceof Error ? _error.message : String(_error)}`,
+      ),
     );
   }
 }
@@ -343,9 +372,8 @@ export const schema = getSessionAwareToolSchemaShape({
 
 export const handler = createSessionAwareTool<ScreenshotParams>({
   internalSchema: screenshotSchema as unknown as z.ZodType<ScreenshotParams, unknown>,
-  logicFunction: (params: ScreenshotParams, executor: CommandExecutor) => {
-    return screenshotLogic(params, executor);
-  },
+  logicFunction: (params: ScreenshotParams, executor: CommandExecutor) =>
+    screenshotLogic(params, executor),
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],
 });

@@ -1,0 +1,66 @@
+name: Publish Schemas
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'schemas/**'
+      - '.github/workflows/publish-schemas.yml'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      WEBSITE_REPO: getsentry/xcodebuildmcp.com
+      WEBSITE_BRANCH: main
+      TARGET_DIR: public/schemas/structured-output
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Fail if deploy key is missing
+        env:
+          DEPLOY_KEY: ${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "XCODEBUILDMCP_WEBSITE_DEPLOY_KEY is required to publish schemas." >&2
+            exit 1
+          fi
+
+      - name: Configure SSH for website repository
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}
+
+      - name: Clone website repository
+        run: |
+          set -euo pipefail
+          git clone "git@github.com:${WEBSITE_REPO}.git" website-repo
+          cd website-repo
+          git checkout "$WEBSITE_BRANCH"
+          git pull --ff-only origin "$WEBSITE_BRANCH"
+
+      - name: Sync schema files into website public directory
+        run: |
+          set -euo pipefail
+          mkdir -p "website-repo/${TARGET_DIR}"
+          rsync -a --delete schemas/structured-output/ "website-repo/${TARGET_DIR}/"
+
+      - name: Commit and push website update
+        run: |
+          set -euo pipefail
+          cd website-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$TARGET_DIR"
+          if git diff --cached --quiet; then
+            echo "Schema publish target already up to date."
+            exit 0
+          fi
+          git commit -m "Publish structured output schemas from ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+          git push origin "$WEBSITE_BRANCH"

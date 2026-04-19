@@ -1,5 +1,9 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockExecutor } from '../../test-utils/mock-executors.ts';
 import {
   buildMcpLifecycleSnapshot,
@@ -8,6 +12,17 @@ import {
   isTransportDisconnectReason,
 } from '../mcp-lifecycle.ts';
 import * as shutdownState from '../../utils/shutdown-state.ts';
+import {
+  clearAllSimulatorLaunchOsLogSessionsForTests,
+  registerSimulatorLaunchOsLogSession,
+  setSimulatorLaunchOsLogRegistryDirOverrideForTests,
+} from '../../utils/log-capture/simulator-launch-oslog-sessions.ts';
+import { setSimulatorLaunchOsLogRecordActiveOverrideForTests } from '../../utils/log-capture/simulator-launch-oslog-registry.ts';
+import { setRuntimeInstanceForTests } from '../../utils/runtime-instance.ts';
+import { EventEmitter as NodeEventEmitter } from 'node:events';
+import type { ChildProcess } from 'node:child_process';
+
+let registryDir: string;
 
 class TestStdin extends EventEmitter {
   override once(event: string, listener: (...args: unknown[]) => void): this {
@@ -33,9 +48,31 @@ class TestProcess extends EventEmitter {
   }
 }
 
+function createTrackedChild(pid = 777): ChildProcess {
+  const emitter = new NodeEventEmitter();
+  const child = emitter as ChildProcess;
+  Object.defineProperty(child, 'pid', { value: pid, configurable: true });
+  Object.defineProperty(child, 'exitCode', { value: null, writable: true, configurable: true });
+  child.kill = vi.fn(() => true) as ChildProcess['kill'];
+  return child;
+}
+
 describe('mcp lifecycle coordinator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-mcp-lifecycle-'));
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
+    setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
     vi.restoreAllMocks();
+  });
+
+  afterEach(async () => {
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
+    setRuntimeInstanceForTests(null);
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);
+    await rm(registryDir, { recursive: true, force: true });
   });
 
   it('deduplicates shutdown requests from stdin end and close', async () => {
@@ -139,6 +176,22 @@ describe('mcp lifecycle coordinator', () => {
 });
 
 describe('mcp lifecycle snapshot', () => {
+  beforeEach(async () => {
+    registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-mcp-lifecycle-'));
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
+    setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
+  });
+
+  afterEach(async () => {
+    await clearAllSimulatorLaunchOsLogSessionsForTests();
+    setSimulatorLaunchOsLogRecordActiveOverrideForTests(null);
+    setRuntimeInstanceForTests(null);
+    setSimulatorLaunchOsLogRegistryDirOverrideForTests(null);
+    await rm(registryDir, { recursive: true, force: true });
+  });
+
   it('classifies peer-count and memory anomalies', () => {
     expect(
       classifyMcpLifecycleAnomalies({
@@ -177,7 +230,28 @@ describe('mcp lifecycle snapshot', () => {
     expect(snapshot.matchingMcpPeerSummary).toEqual([{ pid: 999, ageSeconds: 180, rssKb: 1024 }]);
     expect(snapshot.ppid).toBe(process.ppid);
     expect(snapshot.orphaned).toBe(process.ppid === 1);
+    expect(snapshot.simulatorLaunchOsLogSessionCount).toBe(0);
+    expect(snapshot.ownedSimulatorLaunchOsLogSessionCount).toBe(0);
     expect(snapshot.anomalies).toEqual(['peer-age-high']);
+  });
+
+  it('reports tracked simulator launch OSLog session counts', async () => {
+    await registerSimulatorLaunchOsLogSession({
+      process: createTrackedChild(888),
+      simulatorUuid: 'sim-1',
+      bundleId: 'io.sentry.app',
+      logFilePath: '/tmp/app.log',
+    });
+
+    const snapshot = await buildMcpLifecycleSnapshot({
+      phase: 'running',
+      shutdownReason: null,
+      startedAtMs: Date.now() - 1000,
+      commandExecutor: createMockExecutor({ output: '' }),
+    });
+
+    expect(snapshot.simulatorLaunchOsLogSessionCount).toBe(1);
+    expect(snapshot.ownedSimulatorLaunchOsLogSessionCount).toBe(1);
   });
 
   it('classifies transport disconnect reasons', () => {

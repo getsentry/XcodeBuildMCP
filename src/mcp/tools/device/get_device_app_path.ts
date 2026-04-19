@@ -6,17 +6,22 @@
  */
 
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
 import { log } from '../../../utils/logging/index.ts';
-import { createTextResponse } from '../../../utils/responses/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { mapDevicePlatform, resolveAppPathFromBuildSettings } from './build-settings.ts';
+import { mapDevicePlatform } from './build-settings.ts';
+import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
+import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, detailTree, section } from '../../../utils/tool-event-builders.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
+import type { PipelineEvent } from '../../../types/pipeline-events.ts';
 
 // Unified schema: XOR between projectPath and workspacePath, sharing common options
 const baseOptions = {
@@ -42,7 +47,6 @@ const getDeviceAppPathSchema = z.preprocess(
     }),
 );
 
-// Use z.infer for type safety
 type GetDeviceAppPathParams = z.infer<typeof getDeviceAppPathSchema>;
 
 const publicSchemaObject = baseSchemaObject.omit({
@@ -56,54 +60,81 @@ const publicSchemaObject = baseSchemaObject.omit({
 export async function get_device_app_pathLogic(
   params: GetDeviceAppPathParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   const platform = mapDevicePlatform(params.platform);
   const configuration = params.configuration ?? 'Debug';
 
+  const headerParams: Array<{ label: string; value: string }> = [
+    { label: 'Scheme', value: params.scheme },
+  ];
+  if (params.workspacePath) {
+    headerParams.push({ label: 'Workspace', value: params.workspacePath });
+  } else if (params.projectPath) {
+    headerParams.push({ label: 'Project', value: params.projectPath });
+  }
+  headerParams.push({ label: 'Configuration', value: configuration });
+  headerParams.push({ label: 'Platform', value: platform });
+
+  const headerEvent = header('Get App Path', headerParams);
+
+  function buildErrorEvents(rawOutput: string): PipelineEvent[] {
+    const messages = extractQueryErrorMessages(rawOutput);
+    return [
+      headerEvent,
+      section(`Errors (${messages.length}):`, [...messages.map((m) => `\u{2717} ${m}`), ''], {
+        blankLineAfterTitle: true,
+      }),
+      statusLine('error', 'Query failed.'),
+    ];
+  }
+
   log('info', `Getting app path for scheme ${params.scheme} on platform ${platform}`);
 
-  try {
-    const appPath = await resolveAppPathFromBuildSettings(
-      {
-        projectPath: params.projectPath,
-        workspacePath: params.workspacePath,
-        scheme: params.scheme,
-        configuration,
-        platform,
-      },
-      executor,
-    );
+  const ctx = getHandlerContext();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ App path retrieved successfully: ${appPath}`,
-        },
-      ],
-      nextStepParams: {
+  return withErrorHandling(
+    ctx,
+    async () => {
+      let appPath: string;
+      try {
+        appPath = await resolveAppPathFromBuildSettings(
+          {
+            projectPath: params.projectPath,
+            workspacePath: params.workspacePath,
+            scheme: params.scheme,
+            configuration,
+            platform,
+          },
+          executor,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        for (const event of buildErrorEvents(message)) {
+          ctx.emit(event);
+        }
+        return;
+      }
+
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', 'Success'));
+      ctx.emit(detailTree([{ label: 'App Path', value: displayPath(appPath) }]));
+      ctx.nextStepParams = {
         get_app_bundle_id: { appPath },
         install_app_device: { deviceId: 'DEVICE_UDID', appPath },
         launch_app_device: { deviceId: 'DEVICE_UDID', bundleId: 'BUNDLE_ID' },
+      };
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Error retrieving app path: ${message}`,
+      logMessage: ({ message }) => `Error retrieving app path: ${message}`,
+      mapError: ({ message, emit }) => {
+        for (const event of buildErrorEvents(message)) {
+          emit?.(event);
+        }
       },
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log('error', `Error retrieving app path: ${errorMessage}`);
-
-    if (errorMessage.startsWith('Could not extract app path from build settings.')) {
-      return createTextResponse(
-        'Failed to extract app path from build settings. Make sure the app has been built first.',
-        true,
-      );
-    }
-
-    if (errorMessage.includes('xcodebuild:')) {
-      return createTextResponse(`Failed to get app path: ${errorMessage}`, true);
-    }
-
-    return createTextResponse(`Error retrieving app path: ${errorMessage}`, true);
-  }
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

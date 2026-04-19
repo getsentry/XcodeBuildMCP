@@ -1,7 +1,11 @@
 import * as z from 'zod';
-import { createTextResponse, createErrorResponse } from '../../../utils/responses/index.ts';
 import { getProcess, terminateTrackedProcess, type ProcessInfo } from './active-processes.ts';
-import type { ToolResponse } from '../../../types/common.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 
 const swiftPackageStopSchema = z.object({
   pid: z.number(),
@@ -38,58 +42,66 @@ export async function swift_package_stopLogic(
   params: SwiftPackageStopParams,
   processManager: ProcessManager = getDefaultProcessManager(),
   timeout: number = 5000,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
+  const headerEvent = header('Swift Package Stop', [{ label: 'PID', value: String(params.pid) }]);
+
   const processInfo = processManager.getProcess(params.pid);
   if (!processInfo) {
-    return createTextResponse(
-      `⚠️ No running process found with PID ${params.pid}. Use swift_package_run to check active processes.`,
-      true,
+    ctx.emit(headerEvent);
+    ctx.emit(
+      statusLine(
+        'error',
+        `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`,
+      ),
     );
+    return;
   }
 
-  try {
-    const result = await processManager.terminateTrackedProcess(params.pid, timeout);
-    if (result.status === 'not-found') {
-      return createTextResponse(
-        `⚠️ No running process found with PID ${params.pid}. Use swift_package_run to check active processes.`,
-        true,
+  await withErrorHandling(
+    ctx,
+    async () => {
+      const result = await processManager.terminateTrackedProcess(params.pid, timeout);
+      if (result.status === 'not-found') {
+        ctx.emit(headerEvent);
+        ctx.emit(
+          statusLine(
+            'error',
+            `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`,
+          ),
+        );
+        return;
+      }
+
+      if (result.error) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Failed to stop process: ${result.error}`));
+        return;
+      }
+
+      const startedAt = result.startedAt ?? processInfo.startedAt;
+
+      ctx.emit(headerEvent);
+      ctx.emit(
+        statusLine('success', `Stopped executable (was running since ${startedAt.toISOString()})`),
       );
-    }
-
-    if (result.error) {
-      return createErrorResponse('Failed to stop process', result.error);
-    }
-
-    const startedAt = result.startedAt ?? processInfo.startedAt;
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ Stopped executable (was running since ${startedAt.toISOString()})`,
-        },
-        {
-          type: 'text',
-          text: `💡 Process terminated. You can now run swift_package_run again if needed.`,
-        },
-      ],
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to stop process', message);
-  }
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to stop process: ${message}`,
+    },
+  );
 }
 
 export const schema = swiftPackageStopSchema.shape;
 
-export async function handler(args: Record<string, unknown>): Promise<ToolResponse> {
-  const parseResult = swiftPackageStopSchema.safeParse(args);
-  if (!parseResult.success) {
-    return createErrorResponse(
-      'Parameter validation failed',
-      parseResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-    );
-  }
-
-  return swift_package_stopLogic(parseResult.data);
+interface SwiftPackageStopContext {
+  processManager: ProcessManager;
 }
+
+export const handler = createTypedToolWithContext(
+  swiftPackageStopSchema,
+  (params: SwiftPackageStopParams, ctx: SwiftPackageStopContext) =>
+    swift_package_stopLogic(params, ctx.processManager),
+  () => ({ processManager: getDefaultProcessManager() }),
+);

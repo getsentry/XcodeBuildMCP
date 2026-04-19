@@ -9,6 +9,7 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { schema, handler, install_app_simLogic } from '../install_app_sim.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('install_app_sim tool', () => {
   beforeEach(() => {
@@ -74,13 +75,15 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
       expect(executorCalls).toEqual([
@@ -88,13 +91,11 @@ describe('install_app_sim tool', () => {
           ['xcrun', 'simctl', 'install', 'test-uuid-123', '/path/to/app.app'],
           'Install App in Simulator',
           false,
-          undefined,
         ],
         [
           ['defaults', 'read', '/path/to/app.app/Info', 'CFBundleIdentifier'],
           'Extract Bundle ID',
           false,
-          undefined,
         ],
       ]);
     });
@@ -115,13 +116,15 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      await install_app_simLogic(
-        {
-          simulatorId: 'different-uuid-456',
-          appPath: '/different/path/MyApp.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'different-uuid-456',
+            appPath: '/different/path/MyApp.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
       expect(executorCalls).toEqual([
@@ -129,13 +132,11 @@ describe('install_app_sim tool', () => {
           ['xcrun', 'simctl', 'install', 'different-uuid-456', '/different/path/MyApp.app'],
           'Install App in Simulator',
           false,
-          undefined,
         ],
         [
           ['defaults', 'read', '/different/path/MyApp.app/Info', 'CFBundleIdentifier'],
           'Extract Bundle ID',
           false,
-          undefined,
         ],
       ]);
     });
@@ -147,24 +148,20 @@ describe('install_app_sim tool', () => {
         existsSync: () => false,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        createNoopExecutor(),
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          createNoopExecutor(),
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: "File not found: '/path/to/app.app'. Please check the path and try again.",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain("File not found: '/path/to/app.app'");
     });
 
     it('should handle bundle id extraction failure gracefully', async () => {
@@ -197,26 +194,23 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'App installed successfully in simulator test-uuid-123.',
-          },
-        ],
-        nextStepParams: {
-          open_sim: {},
-          launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'YOUR_APP_BUNDLE_ID' },
-        },
+      const text = allText(result);
+      expect(text).toContain('App installed successfully');
+      expect(text).toContain('test-uuid-123');
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'YOUR_APP_BUNDLE_ID' },
       });
       expect(bundleIdCalls).toHaveLength(2);
     });
@@ -251,26 +245,23 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'App installed successfully in simulator test-uuid-123.',
-          },
-        ],
-        nextStepParams: {
-          open_sim: {},
-          launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'io.sentry.myapp' },
-        },
+      const text = allText(result);
+      expect(text).toContain('App installed successfully');
+      expect(text).toContain('test-uuid-123');
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'io.sentry.myapp' },
       });
       expect(bundleIdCalls).toHaveLength(2);
     });
@@ -289,23 +280,21 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Install app in simulator operation failed: Install failed',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('Install failed');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with Error object', async () => {
@@ -315,23 +304,21 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Install app in simulator operation failed: Command execution failed',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('Command execution failed');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with string error', async () => {
@@ -341,23 +328,21 @@ describe('install_app_sim tool', () => {
         existsSync: () => true,
       });
 
-      const result = await install_app_simLogic(
-        {
-          simulatorId: 'test-uuid-123',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-        mockFileSystem,
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorId: 'test-uuid-123',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Install app in simulator operation failed: String error',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('String error');
+      expect(result.isError).toBe(true);
     });
   });
 });

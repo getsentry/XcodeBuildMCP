@@ -1,0 +1,18 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "File not found: '<TMPDIR>/NonExistent.app'. Please check the path and try again.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "appPath": "<TMPDIR>/NonExistent.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

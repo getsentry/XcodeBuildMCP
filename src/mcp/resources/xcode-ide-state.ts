@@ -4,7 +4,7 @@
  * Provides read-only access to Xcode's current IDE selection (scheme and simulator).
  * Reads from UserInterfaceState.xcuserstate without modifying session defaults.
  *
- * Only available when running under Xcode's coding agent.
+ * Visibility is controlled by the `runningUnderXcodeAgent` predicate in the resource manifest.
  */
 
 import { log } from '../../utils/logging/index.ts';
@@ -64,12 +64,6 @@ export async function xcodeIdeStateResourceLogic(): Promise<{
   }
 }
 
-export default {
-  uri: 'xcodebuildmcp://xcode-ide-state',
-  name: 'xcode-ide-state',
-  description: "Current Xcode IDE selection (scheme and simulator) from Xcode's UI state",
-  mimeType: 'application/json',
-  async handler(): Promise<{ contents: Array<{ text: string }> }> {
-    return xcodeIdeStateResourceLogic();
-  },
-};
+export async function handler(_uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  return xcodeIdeStateResourceLogic();
+}

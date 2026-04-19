@@ -1,7 +1,10 @@
 import * as z from 'zod';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createErrorResponse, createTextResponse } from '../../../utils/responses/index.ts';
-import { createTypedToolWithContext } from '../../../utils/typed-tool-factory.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
   type DebuggerToolContext,
@@ -16,16 +19,27 @@ export type DebugDetachParams = z.infer<typeof debugDetachSchema>;
 export async function debug_detachLogic(
   params: DebugDetachParams,
   ctx: DebuggerToolContext,
-): Promise<ToolResponse> {
-  try {
-    const targetId = params.debugSessionId ?? ctx.debugger.getCurrentSessionId();
-    await ctx.debugger.detachSession(targetId ?? undefined);
+): Promise<void> {
+  const headerEvent = header('Detach');
 
-    return createTextResponse(`✅ Detached debugger session${targetId ? ` ${targetId}` : ''}.`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Failed to detach debugger', message);
-  }
+  const handlerCtx = getHandlerContext();
+
+  return withErrorHandling(
+    handlerCtx,
+    async () => {
+      const targetId = params.debugSessionId ?? ctx.debugger.getCurrentSessionId();
+      await ctx.debugger.detachSession(targetId ?? undefined);
+
+      handlerCtx.emit(headerEvent);
+      handlerCtx.emit(
+        statusLine('success', `Detached debugger session${targetId ? ` ${targetId}` : ''}`),
+      );
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to detach debugger: ${message}`,
+    },
+  );
 }
 
 export const schema = debugDetachSchema.shape;

@@ -1,0 +1,9 @@
+
+⌨️ Key Press
+
+   Simulator: <UUID>
+
+❌ Failed to simulate key press (code: 4): axe command 'key' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

@@ -1,7 +1,3 @@
-/**
- * Tests for button tool plugin
- */
-
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import {
@@ -12,6 +8,7 @@ import {
 import { schema, handler, buttonLogic } from '../button.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('Button Plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -53,19 +50,17 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -91,20 +86,18 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'side-button',
-          duration: 2.5,
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'side-button',
+            duration: 2.5,
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -132,19 +125,17 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'apple-pay',
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'apple-pay',
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -170,19 +161,17 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/path/to/bundled/axe',
         getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'siri',
-        },
-        trackingExecutor,
-        mockAxeHelpers,
+      await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'siri',
+          },
+          trackingExecutor,
+          mockAxeHelpers,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -200,8 +189,8 @@ describe('Button Plugin', () => {
       const result = await handler({ buttonType: 'home' });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Missing required session defaults');
-      expect(result.content[0].text).toContain('simulatorId is required');
+      expect(allText(result)).toContain('Missing required session defaults');
+      expect(allText(result)).toContain('simulatorId is required');
     });
 
     it('should return error for missing buttonType', async () => {
@@ -210,8 +199,8 @@ describe('Button Plugin', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Parameter validation failed');
-      expect(result.content[0].text).toContain(
+      expect(allText(result)).toContain('Parameter validation failed');
+      expect(allText(result)).toContain(
         'buttonType: Invalid option: expected one of "apple-pay"|"home"|"lock"|"side-button"|"siri"',
       );
     });
@@ -223,8 +212,8 @@ describe('Button Plugin', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Parameter validation failed');
-      expect(result.content[0].text).toContain('Invalid Simulator UUID format');
+      expect(allText(result)).toContain('Parameter validation failed');
+      expect(allText(result)).toContain('Invalid Simulator UUID format');
     });
 
     it('should return error for invalid buttonType', async () => {
@@ -234,7 +223,7 @@ describe('Button Plugin', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Parameter validation failed');
+      expect(allText(result)).toContain('Parameter validation failed');
     });
 
     it('should return error for negative duration', async () => {
@@ -245,8 +234,8 @@ describe('Button Plugin', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Parameter validation failed');
-      expect(result.content[0].text).toContain('Duration must be non-negative');
+      expect(allText(result)).toContain('Parameter validation failed');
+      expect(allText(result)).toContain('Duration must be non-negative');
     });
 
     it('should return success for valid button press', async () => {
@@ -260,25 +249,21 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [{ type: 'text' as const, text: "Hardware button 'home' pressed successfully." }],
-        isError: false,
-      });
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain("Hardware button 'home' pressed successfully.");
     });
 
     it('should return success for button press with duration', async () => {
@@ -292,63 +277,43 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'side-button',
-          duration: 2.5,
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'side-button',
+            duration: 2.5,
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          { type: 'text' as const, text: "Hardware button 'side-button' pressed successfully." },
-        ],
-        isError: false,
-      });
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain("Hardware button 'side-button' pressed successfully.");
     });
 
     it('should handle DependencyError when axe is not available', async () => {
       const mockAxeHelpers = {
         getAxePath: () => null,
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [
-            {
-              type: 'text' as const,
-              text: AXE_NOT_AVAILABLE_MESSAGE,
-            },
-          ],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        createNoopExecutor(),
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          createNoopExecutor(),
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: AXE_NOT_AVAILABLE_MESSAGE,
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
     });
 
     it('should handle AxeError from failed command execution', async () => {
@@ -362,30 +327,23 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: "Error: Failed to press button 'home': axe command 'button' failed.\nDetails: axe command failed",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(
+        "Failed to press button 'home': axe command 'button' failed.",
+      );
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -396,23 +354,21 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result.content[0].text).toMatch(
-        /^Error: System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
+      expect(allText(result)).toMatch(
+        /System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
       );
       expect(result.isError).toBe(true);
     });
@@ -425,23 +381,21 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result.content[0].text).toMatch(
-        /^Error: System error executing axe: Failed to execute axe command: Unexpected error/,
+      expect(allText(result)).toMatch(
+        /System error executing axe: Failed to execute axe command: Unexpected error/,
       );
       expect(result.isError).toBe(true);
     });
@@ -454,30 +408,23 @@ describe('Button Plugin', () => {
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
-        createAxeNotAvailableResponse: () => ({
-          content: [{ type: 'text' as const, text: 'axe not available' }],
-          isError: true,
-        }),
       };
 
-      const result = await buttonLogic(
-        {
-          simulatorId: '12345678-1234-4234-8234-123456789012',
-          buttonType: 'home',
-        },
-        mockExecutor,
-        mockAxeHelpers,
+      const result = await runLogic(() =>
+        buttonLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            buttonType: 'home',
+          },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Error: System error executing axe: Failed to execute axe command: String error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain(
+        'System error executing axe: Failed to execute axe command: String error',
+      );
     });
   });
 });

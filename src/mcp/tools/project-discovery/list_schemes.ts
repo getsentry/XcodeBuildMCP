@@ -1,23 +1,16 @@
-/**
- * Project Discovery Plugin: List Schemes (Unified)
- *
- * Lists available schemes for either a project or workspace using xcodebuild.
- * Accepts mutually exclusive `projectPath` or `workspacePath`.
- */
-
 import * as z from 'zod';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTextResponse } from '../../../utils/responses/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section } from '../../../utils/tool-event-builders.ts';
 
-// Unified schema: XOR between projectPath and workspacePath
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
@@ -35,8 +28,6 @@ const listSchemesSchema = z.preprocess(
 );
 
 export type ListSchemesParams = z.infer<typeof listSchemesSchema>;
-
-const createTextBlock = (text: string) => ({ type: 'text', text }) as const;
 
 export function parseSchemesFromXcodebuildListOutput(output: string): string[] {
   const schemesMatch = output.match(/Schemes:([\s\S]*?)(?=\n\n|$)/);
@@ -71,70 +62,67 @@ export async function listSchemes(
   return parseSchemesFromXcodebuildListOutput(result.output);
 }
 
-/**
- * Business logic for listing schemes in a project or workspace.
- * Exported for direct testing and reuse.
- */
 export async function listSchemesLogic(
   params: ListSchemesParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
   log('info', 'Listing schemes');
 
-  try {
-    const hasProjectPath = typeof params.projectPath === 'string';
-    const projectOrWorkspace = hasProjectPath ? 'project' : 'workspace';
-    const path = hasProjectPath ? params.projectPath : params.workspacePath;
-    const schemes = await listSchemes(params, executor);
+  const hasProjectPath = typeof params.projectPath === 'string';
+  const projectOrWorkspace = hasProjectPath ? 'project' : 'workspace';
+  const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
-    let nextStepParams: Record<string, Record<string, string | number | boolean>> | undefined;
-    let hintText = '';
+  const headerEvent = header(
+    'List Schemes',
+    hasProjectPath
+      ? [{ label: 'Project', value: pathValue! }]
+      : [{ label: 'Workspace', value: pathValue! }],
+  );
 
-    if (schemes.length > 0) {
-      const firstScheme = schemes[0];
+  const ctx = getHandlerContext();
 
-      nextStepParams = {
-        build_macos: { [`${projectOrWorkspace}Path`]: path!, scheme: firstScheme },
-        build_run_sim: {
-          [`${projectOrWorkspace}Path`]: path!,
-          scheme: firstScheme,
-          simulatorName: 'iPhone 17',
-        },
-        build_sim: {
-          [`${projectOrWorkspace}Path`]: path!,
-          scheme: firstScheme,
-          simulatorName: 'iPhone 17',
-        },
-        show_build_settings: { [`${projectOrWorkspace}Path`]: path!, scheme: firstScheme },
-      };
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const schemes = await listSchemes(params, executor);
 
-      hintText =
-        `Hint: Consider saving a default scheme with session-set-defaults ` +
-        `{ scheme: "${firstScheme}" } to avoid repeating it.`;
-    }
+      if (schemes.length > 0) {
+        const firstScheme = schemes[0];
 
-    const content = [createTextBlock('✅ Available schemes:'), createTextBlock(schemes.join('\n'))];
-    if (hintText.length > 0) {
-      content.push(createTextBlock(hintText));
-    }
+        ctx.nextStepParams = {
+          build_macos: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
+          build_run_sim: {
+            [`${projectOrWorkspace}Path`]: pathValue!,
+            scheme: firstScheme,
+            simulatorName: 'iPhone 17',
+          },
+          build_sim: {
+            [`${projectOrWorkspace}Path`]: pathValue!,
+            scheme: firstScheme,
+            simulatorName: 'iPhone 17',
+          },
+          show_build_settings: { [`${projectOrWorkspace}Path`]: pathValue!, scheme: firstScheme },
+        };
+      }
 
-    return {
-      content,
-      ...(nextStepParams ? { nextStepParams } : {}),
-      isError: false,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.startsWith('Failed to list schemes:') ||
-      errorMessage === 'No schemes found in the output'
-    ) {
-      return createTextResponse(errorMessage, true);
-    }
+      const schemeItems = schemes.length > 0 ? schemes : ['(none)'];
+      const schemeWord = schemes.length === 1 ? 'scheme' : 'schemes';
 
-    log('error', `Error listing schemes: ${errorMessage}`);
-    return createTextResponse(`Error listing schemes: ${errorMessage}`, true);
-  }
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', `Found ${schemes.length} ${schemeWord}`));
+      ctx.emit(section('Schemes:', schemeItems));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => {
+        const rawError = message.startsWith('Failed to list schemes: ')
+          ? message.slice('Failed to list schemes: '.length)
+          : message;
+        return rawError;
+      },
+      logMessage: ({ message }) => `Error listing schemes: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({

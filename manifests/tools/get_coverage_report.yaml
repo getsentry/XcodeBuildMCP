@@ -13,3 +13,4 @@ nextSteps:
   - label: View file-level coverage
     toolId: get_file_coverage
     priority: 1
+    when: success

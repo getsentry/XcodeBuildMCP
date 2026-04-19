@@ -1,14 +1,9 @@
-/**
- * Tests for install_app_device plugin (device-shared)
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, install_app_deviceLogic } from '../install_app_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('install_app_device plugin', () => {
   beforeEach(() => {
@@ -68,12 +63,14 @@ describe('install_app_device plugin', () => {
         return mockExecutor(command, description, useShell, opts, _detached);
       };
 
-      await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/test.app',
-        },
-        trackingExecutor,
+      await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            appPath: '/path/to/test.app',
+          },
+          trackingExecutor,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -105,12 +102,14 @@ describe('install_app_device plugin', () => {
         return mockExecutor(command);
       };
 
-      await install_app_deviceLogic(
-        {
-          deviceId: 'different-device-uuid',
-          appPath: '/apps/MyApp.app',
-        },
-        trackingExecutor,
+      await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'different-device-uuid',
+            appPath: '/apps/MyApp.app',
+          },
+          trackingExecutor,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -139,12 +138,14 @@ describe('install_app_device plugin', () => {
         return mockExecutor(command);
       };
 
-      await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/My App.app',
-        },
-        trackingExecutor,
+      await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            appPath: '/path/to/My App.app',
+          },
+          trackingExecutor,
+        ),
       );
 
       expect(capturedCommand).toEqual([
@@ -167,71 +168,17 @@ describe('install_app_device plugin', () => {
         output: 'App installation successful',
       });
 
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/test.app',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            appPath: '/path/to/test.app',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ App installed successfully on device test-device-123\n\nApp installation successful',
-          },
-        ],
-      });
-    });
-
-    it('should return successful installation with detailed output', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output:
-          'Installing app...\nApp bundle: /path/to/test.app\nInstallation completed successfully',
-      });
-
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'device-456',
-          appPath: '/apps/TestApp.app',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ App installed successfully on device device-456\n\nInstalling app...\nApp bundle: /path/to/test.app\nInstallation completed successfully',
-          },
-        ],
-      });
-    });
-
-    it('should return successful installation with empty output', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: '',
-      });
-
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'empty-output-device',
-          appPath: '/path/to/app.app',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ App installed successfully on device empty-output-device\n\n',
-          },
-        ],
-      });
+      expect(result.isError).toBeFalsy();
     });
   });
 
@@ -242,67 +189,33 @@ describe('install_app_device plugin', () => {
         error: 'Installation failed: App not found',
       });
 
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/nonexistent.app',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            appPath: '/path/to/nonexistent.app',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to install app: Installation failed: App not found',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
 
     it('should return exception handling response', async () => {
       const mockExecutor = createMockExecutor(new Error('Network error'));
 
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/test.app',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        install_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            appPath: '/path/to/test.app',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to install app on device: Network error',
-          },
-        ],
-        isError: true,
-      });
-    });
-
-    it('should return string error handling response', async () => {
-      const mockExecutor = createMockExecutor('String error');
-
-      const result = await install_app_deviceLogic(
-        {
-          deviceId: 'test-device-123',
-          appPath: '/path/to/test.app',
-        },
-        mockExecutor,
-      );
-
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Failed to install app on device: String error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
     });
   });
 });

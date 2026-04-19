@@ -1,0 +1,27 @@
+{
+  "schema": "xcodebuildmcp.output.debug-stack-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "threads": [
+      {
+        "threadId": 1,
+        "name": "Thread 1",
+        "truncated": true,
+        "frames": [
+          {
+            "index": 0,
+            "symbol": "static CalculatorApp.$main()",
+            "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>"
+          },
+          {
+            "index": 1,
+            "symbol": "main",
+            "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>"
+          }
+        ]
+      }
+    ]
+  }
+}

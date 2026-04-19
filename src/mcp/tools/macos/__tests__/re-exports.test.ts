@@ -1,11 +1,5 @@
-/**
- * Tests for macos tool module exports
- * Validates that tools export the required named exports (schema, handler)
- * Note: name and description are now defined in manifests, not in modules
- */
 import { describe, it, expect } from 'vitest';
 
-// Import all tool modules using named exports
 import * as testMacos from '../test_macos.ts';
 import * as buildMacos from '../build_macos.ts';
 import * as buildRunMacos from '../build_run_macos.ts';

@@ -1,8 +1,3 @@
-/**
- * Tests for get_coverage_report tool
- * Covers happy-path, target filtering, showFiles, and failure paths
- */
-
 import { afterEach, describe, it, expect } from 'vitest';
 import { createMockExecutor, createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 import {
@@ -11,6 +6,9 @@ import {
   __clearTestExecutorOverrides,
 } from '../../../../utils/execution/index.ts';
 import { schema, handler, get_coverage_reportLogic } from '../get_coverage_report.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+
+
 
 const sampleTargets = [
   { name: 'MyApp.app', coveredLines: 100, executableLines: 200, lineCoverage: 0.5 },
@@ -99,7 +97,7 @@ describe('get_coverage_report', () => {
       const result = await handler({ xcresultPath: '/tmp/missing.xcresult', showFiles: false });
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File not found');
     });
 
@@ -137,10 +135,10 @@ describe('get_coverage_report', () => {
         },
       });
 
-      await get_coverage_reportLogic(
+      await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(commands).toHaveLength(1);
       expect(commands[0]).toContain('--only-targets');
@@ -158,10 +156,10 @@ describe('get_coverage_report', () => {
         },
       });
 
-      await get_coverage_reportLogic(
+      await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(commands).toHaveLength(1);
       expect(commands[0]).not.toContain('--only-targets');
@@ -175,15 +173,14 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      expect(result.content).toHaveLength(1);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('Code Coverage Report');
+      expect(result.content.length).toBeGreaterThanOrEqual(1);
+      const text = allText(result);
       expect(text).toContain('Overall: 24.7%');
       expect(text).toContain('180/730 lines');
       const coreIdx = text.indexOf('Core');
@@ -199,10 +196,10 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.nextStepParams).toEqual({
         get_file_coverage: { xcresultPath: '/tmp/test.xcresult' },
@@ -216,13 +213,14 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(nestedData),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      expect(result.content.length).toBeGreaterThan(0);
+      const text = allText(result);
       expect(text).toContain('Core: 10.0%');
       expect(text).toContain('MyApp.app: 50.0%');
     });
@@ -235,16 +233,16 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', target: 'MyApp', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('MyApp.app');
-      expect(text).toContain('MyAppTests.xctest');
-      expect(text).not.toMatch(/^\s+Core:/m);
+      const text = allText(result);
+      expect(text.includes('MyApp.app')).toBe(true);
+      expect(text.includes('MyAppTests.xctest')).toBe(true);
+      expect(text.includes('Core:')).toBe(false);
     });
 
     it('should filter case-insensitively', async () => {
@@ -253,14 +251,13 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', target: 'core', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('Core: 10.0%');
+      expect(allText(result).includes('Core')).toBe(true);
     });
 
     it('should return error when no targets match filter', async () => {
@@ -269,13 +266,13 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargets),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', target: 'NonExistent', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('No targets found matching "NonExistent"');
     });
   });
@@ -287,17 +284,17 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargetsWithFiles),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('AppDelegate.swift: 20.0%');
-      expect(text).toContain('ViewModel.swift: 60.0%');
-      expect(text).toContain('Service.swift: 0.0%');
-      expect(text).toContain('Model.swift: 25.0%');
+      const text = allText(result);
+      expect(text.includes('AppDelegate.swift')).toBe(true);
+      expect(text.includes('ViewModel.swift')).toBe(true);
+      expect(text.includes('Service.swift')).toBe(true);
+      expect(text.includes('Model.swift')).toBe(true);
     });
 
     it('should sort files by coverage ascending within each target', async () => {
@@ -306,12 +303,12 @@ describe('get_coverage_report', () => {
         output: JSON.stringify(sampleTargetsWithFiles),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       const appDelegateIdx = text.indexOf('AppDelegate.swift');
       const viewModelIdx = text.indexOf('ViewModel.swift');
       expect(appDelegateIdx).toBeLessThan(viewModelIdx);
@@ -323,13 +320,13 @@ describe('get_coverage_report', () => {
       const missingFs = createMockFileSystemExecutor({ existsSync: () => false });
       const mockExecutor = createMockExecutor({ success: true, output: '{}' });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/missing.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: missingFs },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File not found');
       expect(text).toContain('/tmp/missing.xcresult');
     });
@@ -340,13 +337,13 @@ describe('get_coverage_report', () => {
         error: 'Failed to load result bundle',
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/bad.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Failed to get coverage report');
       expect(text).toContain('Failed to load result bundle');
     });
@@ -357,13 +354,13 @@ describe('get_coverage_report', () => {
         output: 'not valid json',
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Failed to parse coverage JSON output');
     });
 
@@ -373,13 +370,13 @@ describe('get_coverage_report', () => {
         output: JSON.stringify({ unexpected: 'format' }),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Unexpected coverage data format');
     });
 
@@ -389,13 +386,13 @@ describe('get_coverage_report', () => {
         output: JSON.stringify([]),
       });
 
-      const result = await get_coverage_reportLogic(
+      const result = await runLogic(() => get_coverage_reportLogic(
         { xcresultPath: '/tmp/test.xcresult', showFiles: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('No coverage data found');
     });
   });

@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, basename } from 'node:path';
 import { existsSync } from 'node:fs';
-import { DaemonClient } from './daemon-client.ts';
+import { DaemonClient, DaemonVersionMismatchError } from './daemon-client.ts';
+import { readDaemonRegistryEntry } from '../daemon/daemon-registry.ts';
+import { removeStaleSocket } from '../daemon/socket-path.ts';
 
 /**
  * Default timeout for daemon startup in milliseconds.
@@ -28,6 +30,26 @@ export function getDaemonExecutablePath(): string {
 
   // Fallback for source/dev layouts.
   return resolve(buildDir, '..', 'daemon.ts');
+}
+
+/**
+ * Force-stop a daemon that cannot be stopped gracefully (e.g. protocol version mismatch).
+ * Derives the workspace key from the socket path, reads the registry for the PID,
+ * sends SIGTERM, and removes the stale socket.
+ */
+export async function forceStopDaemon(socketPath: string): Promise<void> {
+  const workspaceKey = basename(dirname(socketPath));
+  const entry = readDaemonRegistryEntry(workspaceKey);
+  if (entry?.pid) {
+    try {
+      process.kill(entry.pid, 'SIGTERM');
+    } catch {
+      // Process may already be gone.
+    }
+    // Brief wait for the process to exit.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  removeStaleSocket(socketPath);
 }
 
 export interface StartDaemonBackgroundOptions {
@@ -111,25 +133,26 @@ export async function ensureDaemonRunning(opts: EnsureDaemonRunningOptions): Pro
   const client = new DaemonClient({ socketPath: opts.socketPath });
   const timeoutMs = opts.startupTimeoutMs ?? DEFAULT_DAEMON_STARTUP_TIMEOUT_MS;
 
-  // Check if already running
   const isRunning = await client.isRunning();
   if (isRunning) {
-    return;
+    try {
+      await client.status();
+      return;
+    } catch (error) {
+      if (error instanceof DaemonVersionMismatchError) {
+        await forceStopDaemon(opts.socketPath);
+      } else {
+        return;
+      }
+    }
   }
 
-  // Start daemon in background
-  const startOptions: StartDaemonBackgroundOptions = {
+  startDaemonBackground({
     socketPath: opts.socketPath,
     workspaceRoot: opts.workspaceRoot,
-  };
+    env: opts.env,
+  });
 
-  if (opts.env) {
-    startOptions.env = { ...opts.env };
-  }
-
-  startDaemonBackground(startOptions);
-
-  // Wait for it to be ready
   await waitForDaemonReady({
     socketPath: opts.socketPath,
     timeoutMs,

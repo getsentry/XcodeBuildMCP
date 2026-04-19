@@ -1,0 +1,29 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "executablePath": "example_projects/spm/.build/arm64-apple-macosx/debug/spm",
+      "processId": 99999,
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
+    },
+    "output": {
+      "stdout": [
+        "Hello, world!"
+      ],
+      "stderr": []
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

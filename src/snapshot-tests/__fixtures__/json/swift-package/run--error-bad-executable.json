@@ -1,0 +1,24 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Build failed",
+  "data": {
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/spm"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "no executable product named 'nonexistent-executable'"
+        }
+      ]
+    }
+  }
+}

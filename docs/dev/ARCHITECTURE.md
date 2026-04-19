@@ -38,20 +38,20 @@ XcodeBuildMCP is a Model Context Protocol (MCP) server that exposes Xcode operat
    - MCP server created with stdio transport
    - Plugin discovery system initialized
 
-3. **Plugin Discovery (Build-Time)**
-   - A build-time script (`build-plugins/plugin-discovery.ts`) scans the `src/mcp/tools/` and `src/mcp/resources/` directories
-   - It generates `src/core/generated-plugins.ts` and `src/core/generated-resources.ts` with dynamic import maps
-   - This approach improves startup performance by avoiding synchronous file system scans and enables code-splitting
-   - Tool code is only loaded when needed, reducing initial memory footprint
+3. **Manifest-Driven Discovery**
+   - YAML manifests in `manifests/tools/`, `manifests/workflows/`, and `manifests/resources/` define all metadata
+   - `loadManifest()` reads and validates all YAML files at startup against Zod schemas
+   - Tool and resource code modules are dynamically imported on demand
 
-4. **Plugin & Resource Loading (Runtime)**
-   - At runtime, `loadPlugins()` and `loadResources()` use the generated loaders from the previous step
-   - All workflow loaders are executed at startup to register tools
-- If `XCODEBUILDMCP_ENABLED_WORKFLOWS` is set, only those workflows (plus `session-management`) are registered; `workflow-discovery` is only auto-included when `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY=true`
+4. **Tool & Resource Loading (Runtime)**
+   - `registerWorkflowsFromManifest()` selects workflows based on config and predicate context, then dynamically imports tool modules
+   - `registerResources()` loads resource manifests, filters by predicates, and dynamically imports resource modules
+   - Both systems share the same `PredicateContext` for visibility filtering
+   - If `XCODEBUILDMCP_ENABLED_WORKFLOWS` is set, only those workflows (plus `session-management`) are registered; `workflow-discovery` is only auto-included when `XCODEBUILDMCP_EXPERIMENTAL_WORKFLOW_DISCOVERY=true`
 
-5. **Tool Registration**
-   - Discovered tools automatically registered with server using pre-generated maps
-   - No manual registration or configuration required
+5. **Tool & Resource Registration**
+   - Tools are registered via `server.registerTool()` after manifest-driven workflow selection
+   - Resources are registered via `server.resource()` after manifest-driven predicate filtering
    - Environment variables control workflow selection behavior
 
 5. **Request Handling**
@@ -201,11 +201,12 @@ Each tool is implemented in TypeScript and follows a standardized pattern that s
 
 ```typescript
 import { z } from 'zod';
-import { createTypedTool } from '../../../utils/typed-tool-factory.js';
+import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.js';
 import type { CommandExecutor } from '../../../utils/execution/index.js';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.js';
 import { log } from '../../../utils/logging/index.js';
-import { createTextResponse, createErrorResponse } from '../../../utils/responses/index.js';
+import { withErrorHandling } from '../../../utils/tool-error-handling.js';
+import { header, statusLine } from '../../../utils/tool-event-builders.js';
 
 // 1. Define the Zod schema for parameters
 const someToolSchema = z.object({
@@ -216,41 +217,46 @@ const someToolSchema = z.object({
 // 2. Infer the parameter type from the schema
 type SomeToolParams = z.infer<typeof someToolSchema>;
 
-// 3. Implement the core logic in a separate, testable function
-// This function receives strongly-typed parameters and an injected executor.
+// 3. Implement the core logic as an event-emitting function.
+// Handlers emit structured events via ctx.emit() instead of returning ToolResponse.
 export async function someToolLogic(
   params: SomeToolParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
-  log('info', `Executing some_tool with param: ${params.requiredParam}`);
+): Promise<void> {
+  const headerEvent = header('Some Tool', [
+    { label: 'Param', value: params.requiredParam },
+  ]);
+  const ctx = getHandlerContext();
 
-  try {
-    const result = await executor(['some', 'command'], 'Some Tool Operation');
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const result = await executor(['some', 'command'], 'Some Tool Operation');
 
-    if (!result.success) {
-      return createErrorResponse('Operation failed', result.error);
-    }
+      if (!result.success) {
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('error', `Operation failed: ${result.error}`));
+        return;
+      }
 
-    return createTextResponse(`✅ Success: ${result.output}`);
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return createErrorResponse('Tool execution failed', errorMessage);
-  }
+      ctx.emit(headerEvent);
+      ctx.emit(statusLine('success', `Success: ${result.output}`));
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Tool execution failed: ${message}`,
+    },
+  );
 }
 
-// 4. Export the tool definition for auto-discovery
-export default {
-  name: 'some_tool',
-  description: 'Tool description for AI agents. Example: some_tool({ requiredParam: "value" })',
-  schema: someToolSchema.shape, // Expose shape for MCP SDK
+// 4. Export schema shape and handler for manifest-driven auto-discovery
+export const schema = someToolSchema.shape;
 
-  // 5. Create the handler using the type-safe factory
-  handler: createTypedTool(
-    someToolSchema,
-    someToolLogic,
-    getDefaultCommandExecutor,
-  ),
-};
+export const handler = createTypedTool(
+  someToolSchema,
+  someToolLogic,
+  getDefaultCommandExecutor,
+);
 ```
 
 This pattern ensures that:
@@ -418,13 +424,13 @@ Not all parts are required for every tool. For example, `swift_package_build` ha
 
 ### Testing Principles
 
-XcodeBuildMCP uses a **Dependency Injection (DI)** pattern for testing external boundaries (command execution, filesystem, and other side effects). Vitest mocking libraries (`vi.mock`, `vi.fn`, etc.) are acceptable for internal collaborators when needed. This keeps tests robust while preserving deterministic behavior at external boundaries.
+XcodeBuildMCP uses a **Dependency Injection (DI)** pattern for MCP tool logic functions that orchestrate complex, long-running processes with sub-processes (e.g., `xcodebuild`), where standard vitest mocking produces race conditions. Standalone utility modules with simple commands may use direct `child_process`/`fs` imports and standard vitest mocking. Vitest mocking libraries (`vi.mock`, `vi.fn`, etc.) are also acceptable for internal collaborators.
 
 For detailed guidelines, see the [Testing Guide](TESTING.md).
 
 ### Test Structure Example
 
-Tests inject mock "executors" for external interactions like command-line execution or file system access. This allows for deterministic testing of tool logic without mocking the implementation itself. The project provides helper functions like `createMockExecutor` and `createMockFileSystemExecutor` in `src/test-utils/mock-executors.ts` to facilitate this pattern.
+Tests for MCP tool logic inject mock "executors" for complex process orchestration (e.g., xcodebuild). This allows for deterministic testing without race conditions from non-deterministic sub-process ordering. The project provides helper functions like `createMockExecutor` and `createMockFileSystemExecutor` in `src/test-utils/mock-executors.ts`. Standalone utility modules with simple commands use standard vitest mocking.
 
 ```typescript
 import { describe, it, expect } from 'vitest';

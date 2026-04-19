@@ -1,0 +1,6 @@
+
+🔍 Get Bundle ID
+
+   App: /nonexistent/path/Fake.app
+
+❌ File not found: '/nonexistent/path/Fake.app'. Please check the path and try again.

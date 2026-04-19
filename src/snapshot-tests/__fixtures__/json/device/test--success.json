@@ -1,0 +1,38 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "target": "device"
+    },
+    "artifacts": {
+      "deviceId": "<UUID>",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_device_<TIMESTAMP>_pid<PID>.log"
+    },
+    "tests": {
+      "selected": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
+      "discovered": {
+        "total": 1,
+        "items": [
+          "CalculatorAppTests/CalculatorAppTests/testAddition"
+        ]
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [],
+      "testFailures": []
+    }
+  }
+}

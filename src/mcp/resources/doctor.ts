@@ -10,7 +10,6 @@ import type { CommandExecutor } from '../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../utils/execution/index.ts';
 import { doctorLogic } from '../tools/doctor/doctor.ts';
 
-// Testable resource logic separated from MCP handler
 export async function doctorResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
@@ -35,13 +34,14 @@ export async function doctorResourceLogic(
       };
     }
 
-    const okTextItem = result.content.find((i) => i.type === 'text') as
-      | { type: 'text'; text: string }
-      | undefined;
+    const allText = result.content
+      .filter((i): i is { type: 'text'; text: string } => i.type === 'text')
+      .map((i) => i.text)
+      .join('\n');
     return {
       contents: [
         {
-          text: okTextItem?.text ?? 'No doctor data available',
+          text: allText || 'No doctor data available',
         },
       ],
     };
@@ -59,13 +59,6 @@ export async function doctorResourceLogic(
   }
 }
 
-export default {
-  uri: 'xcodebuildmcp://doctor',
-  name: 'doctor',
-  description:
-    'Comprehensive development environment diagnostic information and configuration status',
-  mimeType: 'text/plain',
-  async handler(): Promise<{ contents: Array<{ text: string }> }> {
-    return doctorResourceLogic();
-  },
-};
+export async function handler(_uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  return doctorResourceLogic();
+}

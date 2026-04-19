@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { DebuggerManager } from '../../../../utils/debugger/index.ts';
-import type { DebuggerToolContext } from '../../../../utils/debugger/index.ts';
+import { DebuggerManager, type DebuggerToolContext } from '../../../../utils/debugger/index.ts';
 import type { DebuggerBackend } from '../../../../utils/debugger/backends/DebuggerBackend.ts';
 import type { BreakpointSpec, DebugSessionInfo } from '../../../../utils/debugger/types.ts';
 
@@ -46,6 +45,7 @@ import {
   handler as variablesHandler,
   debug_variablesLogic,
 } from '../debug_variables.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 function createMockBackend(overrides: Partial<DebuggerBackend> = {}): DebuggerBackend {
   return {
@@ -130,39 +130,43 @@ describe('debug_attach_sim', () => {
     it('should attach successfully with pid', async () => {
       const ctx = createTestContext();
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          pid: 1234,
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            pid: 1234,
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
+      expect(result.isError).toBeFalsy();
+      const text = allText(result);
       expect(text).toContain('Attached');
       expect(text).toContain('1234');
       expect(text).toContain('test-sim-uuid');
-      expect(text).toContain('Debug session ID:');
+      expect(text).toContain('Debug session ID');
     });
 
     it('should attach without continuing when continueOnAttach is false', async () => {
       const ctx = createTestContext();
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          pid: 1234,
-          continueOnAttach: false,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            pid: 1234,
+            continueOnAttach: false,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
+      expect(result.isError).toBeFalsy();
+      const text = allText(result);
       expect(text).toContain('Execution is paused');
     });
 
@@ -173,18 +177,20 @@ describe('debug_attach_sim', () => {
         },
       });
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          pid: 1234,
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            pid: 1234,
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to attach debugger');
       expect(text).toContain('LLDB attach failed');
     });
@@ -196,18 +202,20 @@ describe('debug_attach_sim', () => {
         },
       });
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          pid: 1234,
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            pid: 1234,
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to resume debugger after attach');
     });
 
@@ -220,14 +228,16 @@ describe('debug_attach_sim', () => {
         debugger: createTestDebuggerManager(),
       };
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorName: 'NonExistent Simulator',
-          bundleId: 'com.test.app',
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorName: 'NonExistent Simulator',
+            bundleId: 'com.test.app',
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
       expect(result.isError).toBe(true);
@@ -242,32 +252,36 @@ describe('debug_attach_sim', () => {
         debugger: createTestDebuggerManager(),
       };
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          bundleId: 'com.test.app',
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            bundleId: 'com.test.app',
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to resolve simulator PID');
     });
 
     it('should include nextStepParams on success', async () => {
       const ctx = createTestContext();
 
-      const result = await debug_attach_simLogic(
-        {
-          simulatorId: 'test-sim-uuid',
-          pid: 1234,
-          continueOnAttach: true,
-          makeCurrent: true,
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_attach_simLogic(
+          {
+            simulatorId: 'test-sim-uuid',
+            pid: 1234,
+            continueOnAttach: true,
+            makeCurrent: true,
+          },
+          ctx,
+        ),
       );
 
       expect(result.nextStepParams).toBeDefined();
@@ -315,62 +329,46 @@ describe('debug_breakpoint_add', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_breakpoint_addLogic({ file: 'main.swift', line: 10 }, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should add file-line breakpoint successfully', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_addLogic(
-        { debugSessionId: session.id, file: 'main.swift', line: 42 },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_addLogic(
+          { debugSessionId: session.id, file: 'main.swift', line: 42 },
+          ctx,
+        ),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint');
-      expect(text).toContain('set');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should add function breakpoint successfully', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_addLogic(
-        { debugSessionId: session.id, function: 'viewDidLoad' },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_addLogic({ debugSessionId: session.id, function: 'viewDidLoad' }, ctx),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should add breakpoint with condition', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_addLogic(
-        {
-          debugSessionId: session.id,
-          file: 'main.swift',
-          line: 10,
-          condition: 'x > 5',
-        },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_addLogic(
+          {
+            debugSessionId: session.id,
+            file: 'main.swift',
+            line: 10,
+            condition: 'x > 5',
+          },
+          ctx,
+        ),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should return error when addBreakpoint throws', async () => {
@@ -380,13 +378,15 @@ describe('debug_breakpoint_add', () => {
         },
       });
 
-      const result = await debug_breakpoint_addLogic(
-        { debugSessionId: session.id, file: 'missing.swift', line: 1 },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_addLogic(
+          { debugSessionId: session.id, file: 'missing.swift', line: 1 },
+          ctx,
+        ),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to add breakpoint');
       expect(text).toContain('Invalid file path');
     });
@@ -394,11 +394,11 @@ describe('debug_breakpoint_add', () => {
     it('should use current session when debugSessionId is omitted', async () => {
       const { ctx } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_addLogic({ file: 'main.swift', line: 10 }, ctx);
+      const result = await runLogic(() =>
+        debug_breakpoint_addLogic({ file: 'main.swift', line: 10 }, ctx),
+      );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint');
+      expect(result.isError).toBeFalsy();
     });
   });
 });
@@ -423,30 +423,15 @@ describe('debug_breakpoint_remove', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_breakpoint_removeLogic({ breakpointId: 1 }, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should remove breakpoint successfully', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_removeLogic(
-        { debugSessionId: session.id, breakpointId: 1 },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_removeLogic({ debugSessionId: session.id, breakpointId: 1 }, ctx),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint 1 removed');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should return error when removeBreakpoint throws', async () => {
@@ -456,13 +441,12 @@ describe('debug_breakpoint_remove', () => {
         },
       });
 
-      const result = await debug_breakpoint_removeLogic(
-        { debugSessionId: session.id, breakpointId: 999 },
-        ctx,
+      const result = await runLogic(() =>
+        debug_breakpoint_removeLogic({ debugSessionId: session.id, breakpointId: 999 }, ctx),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to remove breakpoint');
       expect(text).toContain('Breakpoint not found');
     });
@@ -470,11 +454,9 @@ describe('debug_breakpoint_remove', () => {
     it('should use current session when debugSessionId is omitted', async () => {
       const { ctx } = await createSessionAndContext();
 
-      const result = await debug_breakpoint_removeLogic({ breakpointId: 1 }, ctx);
+      const result = await runLogic(() => debug_breakpoint_removeLogic({ breakpointId: 1 }, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Breakpoint 1 removed');
+      expect(result.isError).toBeFalsy();
     });
   });
 });
@@ -498,38 +480,21 @@ describe('debug_continue', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_continueLogic({}, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should resume session successfully with explicit id', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_continueLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_continueLogic({ debugSessionId: session.id }, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Resumed debugger session');
-      expect(text).toContain(session.id);
+      expect(result.isError).toBeFalsy();
     });
 
     it('should resume current session when debugSessionId is omitted', async () => {
       const { ctx } = await createSessionAndContext();
 
-      const result = await debug_continueLogic({}, ctx);
+      const result = await runLogic(() => debug_continueLogic({}, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Resumed debugger session');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should return error when resume throws', async () => {
@@ -539,10 +504,10 @@ describe('debug_continue', () => {
         },
       });
 
-      const result = await debug_continueLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_continueLogic({ debugSessionId: session.id }, ctx));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to resume debugger');
       expect(text).toContain('Process terminated');
     });
@@ -568,38 +533,21 @@ describe('debug_detach', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_detachLogic({}, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should detach session successfully with explicit id', async () => {
       const { ctx, session } = await createSessionAndContext();
 
-      const result = await debug_detachLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_detachLogic({ debugSessionId: session.id }, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Detached debugger session');
-      expect(text).toContain(session.id);
+      expect(result.isError).toBeFalsy();
     });
 
     it('should detach current session when debugSessionId is omitted', async () => {
       const { ctx } = await createSessionAndContext();
 
-      const result = await debug_detachLogic({}, ctx);
+      const result = await runLogic(() => debug_detachLogic({}, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toContain('Detached debugger session');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should return error when detach throws', async () => {
@@ -609,10 +557,10 @@ describe('debug_detach', () => {
         },
       });
 
-      const result = await debug_detachLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_detachLogic({ debugSessionId: session.id }, ctx));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to detach debugger');
       expect(text).toContain('Connection lost');
     });
@@ -640,32 +588,17 @@ describe('debug_lldb_command', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_lldb_commandLogic({ command: 'bt' }, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should run command successfully', async () => {
       const { ctx, session } = await createSessionAndContext({
         runCommand: async () => '  frame #0: main\n',
       });
 
-      const result = await debug_lldb_commandLogic(
-        { debugSessionId: session.id, command: 'bt' },
-        ctx,
+      const result = await runLogic(() =>
+        debug_lldb_commandLogic({ debugSessionId: session.id, command: 'bt' }, ctx),
       );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toBe('frame #0: main');
+      expect(result.isError).toBeFalsy();
     });
 
     it('should pass timeoutMs through to runCommand', async () => {
@@ -677,9 +610,11 @@ describe('debug_lldb_command', () => {
         },
       });
 
-      await debug_lldb_commandLogic(
-        { debugSessionId: session.id, command: 'expr x', timeoutMs: 5000 },
-        ctx,
+      await runLogic(() =>
+        debug_lldb_commandLogic(
+          { debugSessionId: session.id, command: 'expr x', timeoutMs: 5000 },
+          ctx,
+        ),
       );
 
       expect(receivedOpts?.timeoutMs).toBe(5000);
@@ -692,13 +627,12 @@ describe('debug_lldb_command', () => {
         },
       });
 
-      const result = await debug_lldb_commandLogic(
-        { debugSessionId: session.id, command: 'expr longRunning()' },
-        ctx,
+      const result = await runLogic(() =>
+        debug_lldb_commandLogic({ debugSessionId: session.id, command: 'expr longRunning()' }, ctx),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to run LLDB command');
       expect(text).toContain('Command timed out');
     });
@@ -708,11 +642,9 @@ describe('debug_lldb_command', () => {
         runCommand: async () => 'result',
       });
 
-      const result = await debug_lldb_commandLogic({ command: 'po self' }, ctx);
+      const result = await runLogic(() => debug_lldb_commandLogic({ command: 'po self' }, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toBe('result');
+      expect(result.isError).toBeFalsy();
     });
   });
 });
@@ -738,18 +670,6 @@ describe('debug_stack', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_stackLogic({}, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should return stack output successfully', async () => {
       const stackOutput = '  frame #0: 0x0000 main at main.swift:10\n  frame #1: 0x0001 start\n';
@@ -757,11 +677,9 @@ describe('debug_stack', () => {
         getStack: async () => stackOutput,
       });
 
-      const result = await debug_stackLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_stackLogic({ debugSessionId: session.id }, ctx));
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toBe(stackOutput.trim());
+      expect(result.isError).toBeFalsy();
     });
 
     it('should pass threadIndex and maxFrames through', async () => {
@@ -773,7 +691,9 @@ describe('debug_stack', () => {
         },
       });
 
-      await debug_stackLogic({ debugSessionId: session.id, threadIndex: 2, maxFrames: 5 }, ctx);
+      await runLogic(() =>
+        debug_stackLogic({ debugSessionId: session.id, threadIndex: 2, maxFrames: 5 }, ctx),
+      );
 
       expect(receivedOpts?.threadIndex).toBe(2);
       expect(receivedOpts?.maxFrames).toBe(5);
@@ -786,10 +706,10 @@ describe('debug_stack', () => {
         },
       });
 
-      const result = await debug_stackLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() => debug_stackLogic({ debugSessionId: session.id }, ctx));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to get stack');
       expect(text).toContain('Process not stopped');
     });
@@ -799,10 +719,9 @@ describe('debug_stack', () => {
         getStack: async () => 'frame #0: main',
       });
 
-      const result = await debug_stackLogic({}, ctx);
+      const result = await runLogic(() => debug_stackLogic({}, ctx));
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toBe('frame #0: main');
+      expect(result.isError).toBeFalsy();
     });
   });
 });
@@ -827,18 +746,6 @@ describe('debug_variables', () => {
     });
   });
 
-  describe('Handler Requirements', () => {
-    it('should handle missing debug session gracefully', async () => {
-      const ctx = createTestContext();
-
-      const result = await debug_variablesLogic({}, ctx);
-
-      expect(result.isError).toBe(true);
-      const text = result.content[0].text;
-      expect(text).toContain('No active debug session');
-    });
-  });
-
   describe('Logic Behavior', () => {
     it('should return variables output successfully', async () => {
       const variablesOutput = '  (Int) x = 42\n  (String) name = "hello"\n';
@@ -846,11 +753,11 @@ describe('debug_variables', () => {
         getVariables: async () => variablesOutput,
       });
 
-      const result = await debug_variablesLogic({ debugSessionId: session.id }, ctx);
+      const result = await runLogic(() =>
+        debug_variablesLogic({ debugSessionId: session.id }, ctx),
+      );
 
-      expect(result.isError).toBe(false);
-      const text = result.content[0].text;
-      expect(text).toBe(variablesOutput.trim());
+      expect(result.isError).toBeFalsy();
     });
 
     it('should pass frameIndex through', async () => {
@@ -862,7 +769,9 @@ describe('debug_variables', () => {
         },
       });
 
-      await debug_variablesLogic({ debugSessionId: session.id, frameIndex: 3 }, ctx);
+      await runLogic(() =>
+        debug_variablesLogic({ debugSessionId: session.id, frameIndex: 3 }, ctx),
+      );
 
       expect(receivedOpts?.frameIndex).toBe(3);
     });
@@ -874,13 +783,12 @@ describe('debug_variables', () => {
         },
       });
 
-      const result = await debug_variablesLogic(
-        { debugSessionId: session.id, frameIndex: 999 },
-        ctx,
+      const result = await runLogic(() =>
+        debug_variablesLogic({ debugSessionId: session.id, frameIndex: 999 }, ctx),
       );
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].text;
+      const text = allText(result);
       expect(text).toContain('Failed to get variables');
       expect(text).toContain('Frame index out of range');
     });
@@ -890,10 +798,9 @@ describe('debug_variables', () => {
         getVariables: async () => 'y = 99',
       });
 
-      const result = await debug_variablesLogic({}, ctx);
+      const result = await runLogic(() => debug_variablesLogic({}, ctx));
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toBe('y = 99');
+      expect(result.isError).toBeFalsy();
     });
   });
 });

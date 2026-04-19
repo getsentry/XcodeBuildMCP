@@ -1,0 +1,12 @@
+{
+  "schema": "xcodebuildmcp.output.process-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "runningProcessCount": 0
+    },
+    "processes": []
+  }
+}

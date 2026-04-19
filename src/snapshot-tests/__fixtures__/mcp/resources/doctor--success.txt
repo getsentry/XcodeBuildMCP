@@ -1,0 +1,126 @@
+
+⚙️ XcodeBuildMCP Doctor
+
+   Generated: <TIMESTAMP>
+   Server Version: <VERSION>
+   Output Mode: Redacted (default)
+
+  ├ platform: darwin
+  ├ release: <OS_RELEASE>
+  ├ arch: arm64
+  ├ cpus: <CPUS>
+  ├ memory: <MEMORY>
+  ├ hostname: <redacted>
+  ├ username: <redacted>
+  ├ homedir: <HOME>
+  └ tmpdir: <TMPDIR>
+
+Node.js Information
+  version: <NODE_VERSION>
+  execPath: <EXEC_PATH>
+  pid: <PID>
+  ppid: <PID>
+  platform: darwin
+  arch: arm64
+  cwd: <CWD>
+  argv: <ARGV>
+
+Process Tree
+  Running under Xcode: No
+   <PID> (ppid <PID>): <PROCESS>
+
+Xcode Information
+  version: <XCODE_VERSION>
+  path: <XCODE_PATH>
+  selectedXcode: <XCODE_PATH>
+  xcrunVersion: <VERSION>
+
+Dependencies
+  axe: <VERSION>
+  mise: <VERSION>
+
+Environment Variables
+  INCREMENTAL_BUILDS_ENABLED: (not set)
+  DEVELOPER_DIR: (not set)
+  HOME: /Users/<redacted>
+  USER: <redacted>
+  TMPDIR: <TMPDIR>
+  NODE_ENV: test
+  SENTRY_DISABLED: (not set)
+  AXE_PATH: (not set)
+  XBMCP_LAUNCH_JSON_WAIT_MS: (not set)
+  XCODEBUILDMCP_DEBUGGER_BACKEND: (not set)
+  XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE: (not set)
+  XCODEBUILDMCP_SILENCE_LOGS: true
+
+PATH
+  <PATH_ENTRIES>
+
+UI Automation (axe)
+  Available: Yes
+  UI Automation Supported: Yes
+  Simulator Video Capture Supported (AXe >= <VERSION>): <AVAILABLE>
+  UI-Debugger Guard Mode: error
+
+Incremental Builds
+  Enabled: No
+  xcodemake Binary Available: Yes
+  Makefile exists (cwd): (not checked: incremental builds disabled)
+
+Mise Integration
+  Running under mise: No
+  Mise available: Yes
+
+Debugger Backend (DAP)
+  lldb-dap available: Yes
+  Selected backend: dap
+
+Manifest Tool Inventory
+  Total Unique Tools: <COUNT>
+  Workflow Count: <COUNT>
+  coverage: <N> tools
+  debugging: <N> tools
+  device: <N> tools
+  doctor: <N> tools
+  macos: <N> tools
+  project-discovery: <N> tools
+  project-scaffolding: <N> tools
+  session-management: <N> tools
+  simulator-management: <N> tools
+  simulator: <N> tools
+  swift-package: <N> tools
+  ui-automation: <N> tools
+  utilities: <N> tools
+  workflow-discovery: <N> tools
+  xcode-ide: <N> tools
+
+Runtime Tool Registration
+  Enabled Workflows: 0
+  Registered Tools: 0
+  Note: Runtime registry unavailable.
+
+Xcode IDE Bridge (mcpbridge)
+  Workflow enabled: No
+  mcpbridge path: <XCODE_PATH>
+  Xcode running: (unknown)
+  Connected: No
+  Bridge PID: (none)
+  Proxied tools: 0
+  Last error: (none)
+  Note: Bridge debug tools (status/sync/disconnect) are only registered when debug: true
+
+Tool Availability Summary
+  Build Tools: Available
+  UI Automation Tools: Available
+  Incremental Build Support: Available but Disabled
+
+Sentry
+  Sentry enabled: Yes
+
+Troubleshooting Tips
+  If UI automation tools are not available, install axe: brew tap cameroncooke/axe && brew install axe
+  If incremental build support is not available, install xcodemake (https://github.com/cameroncooke/xcodemake) and ensure it is executable and available in your PATH
+  To enable xcodemake, set environment variable: export INCREMENTAL_BUILDS_ENABLED=1
+  For mise integration, follow instructions in the README.md file
+
+✅ Doctor diagnostics complete

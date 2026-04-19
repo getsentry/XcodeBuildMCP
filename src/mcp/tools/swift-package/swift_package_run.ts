@@ -1,19 +1,25 @@
 import * as z from 'zod';
 import path from 'node:path';
-import { createTextResponse, createErrorResponse } from '../../../utils/responses/index.ts';
 import { log } from '../../../utils/logging/index.ts';
-import type { CommandExecutor } from '../../../utils/execution/index.ts';
+import type { CommandExecutor, CommandResponse } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
-import { createTextContent } from '../../../types/common.ts';
 import { addProcess } from './active-processes.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { acquireDaemonActivity } from '../../../daemon/activity-registry.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine, section, detailTree } from '../../../utils/tool-event-builders.ts';
+import { createXcodebuildPipeline } from '../../../utils/xcodebuild-pipeline.ts';
+import type { StartedPipeline } from '../../../utils/xcodebuild-pipeline.ts';
+import {
+  createBuildRunResultEvents,
+  finalizeInlineXcodebuild,
+} from '../../../utils/xcodebuild-output.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
 
-// Define schema as ZodObject
 const baseSchemaObject = z.object({
   packagePath: z.string(),
   executableName: z.string().optional(),
@@ -28,27 +34,67 @@ const publicSchemaObject = baseSchemaObject.omit({
   configuration: true,
 } as const);
 
-const swiftPackageRunSchema = baseSchemaObject;
+type SwiftPackageRunParams = z.infer<typeof baseSchemaObject>;
 
-// Use z.infer for type safety
-type SwiftPackageRunParams = z.infer<typeof swiftPackageRunSchema>;
+type SwiftPackageRunTimeoutResult = {
+  success: boolean;
+  output: string;
+  error: string;
+  timedOut: true;
+};
+
+function isTimedOutResult(
+  result: CommandResponse | SwiftPackageRunTimeoutResult,
+): result is SwiftPackageRunTimeoutResult {
+  return 'timedOut' in result && result.timedOut;
+}
+
+async function resolveExecutablePath(
+  executor: CommandExecutor,
+  packagePath: string,
+  executableName: string,
+  configuration?: SwiftPackageRunParams['configuration'],
+): Promise<string | null> {
+  const command = ['swift', 'build', '--package-path', packagePath, '--show-bin-path'];
+  if (configuration?.toLowerCase() === 'release') {
+    command.push('-c', 'release');
+  }
+
+  const result = await executor(command, 'Swift Package Run (Resolve Executable Path)', false);
+  if (!result.success) {
+    return null;
+  }
+
+  const binPath = result.output.trim();
+  if (!binPath) {
+    return null;
+  }
+
+  return path.join(binPath, executableName);
+}
 
 export async function swift_package_runLogic(
   params: SwiftPackageRunParams,
   executor: CommandExecutor,
-): Promise<ToolResponse> {
+): Promise<void> {
+  const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
   const timeout = Math.min(params.timeout ?? 30, 300) * 1000; // Convert to ms, max 5 minutes
 
-  // Detect test environment to prevent real spawn calls during testing
-  const isTestEnvironment = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
-
   const swiftArgs = ['run', '--package-path', resolvedPath];
+
+  const headerEvent = header('Swift Package Run', [
+    { label: 'Package', value: resolvedPath },
+    ...(params.executableName ? [{ label: 'Executable', value: params.executableName }] : []),
+    ...(params.background ? [{ label: 'Mode', value: 'background' }] : []),
+  ]);
 
   if (params.configuration?.toLowerCase() === 'release') {
     swiftArgs.push('-c', 'release');
   } else if (params.configuration && params.configuration.toLowerCase() !== 'debug') {
-    return createTextResponse("Invalid configuration. Use 'debug' or 'release'.", true);
+    ctx.emit(headerEvent);
+    ctx.emit(statusLine('error', "Invalid configuration. Use 'debug' or 'release'."));
+    return;
   }
 
   if (params.parseAsLibrary) {
@@ -59,7 +105,6 @@ export async function swift_package_runLogic(
     swiftArgs.push(params.executableName);
   }
 
-  // Add double dash before executable arguments
   if (params.arguments && params.arguments.length > 0) {
     swiftArgs.push('--');
     swiftArgs.push(...params.arguments);
@@ -67,24 +112,11 @@ export async function swift_package_runLogic(
 
   log('info', `Running swift ${swiftArgs.join(' ')}`);
 
-  try {
-    if (params.background) {
-      // Background mode: Use CommandExecutor but don't wait for completion
-      if (isTestEnvironment) {
-        // In test environment, return mock response without real process
-        const mockPid = 12345;
-        return {
-          content: [
-            createTextContent(
-              `🚀 Started executable in background (PID: ${mockPid})\n` +
-                `💡 Process is running independently. Use swift_package_stop with PID ${mockPid} to terminate when needed.`,
-            ),
-          ],
-        };
-      } else {
-        // Production: use CommandExecutor to start the process
+  return withErrorHandling(
+    ctx,
+    async () => {
+      if (params.background) {
         const command = ['swift', ...swiftArgs];
-        // Filter out undefined values from process.env
         const cleanEnv = Object.fromEntries(
           Object.entries(process.env).filter(([, value]) => value !== undefined),
         ) as Record<string, string>;
@@ -96,12 +128,10 @@ export async function swift_package_runLogic(
           true,
         );
 
-        // Store the process in active processes system if available
         if (result.process?.pid) {
           addProcess(result.process.pid, {
             process: {
               kill: (signal?: string) => {
-                // Adapt string signal to NodeJS.Signals
                 if (result.process) {
                   result.process.kill(signal as NodeJS.Signals);
                 }
@@ -119,38 +149,47 @@ export async function swift_package_runLogic(
             releaseActivity: acquireDaemonActivity('swift-package.background-process'),
           });
 
-          return {
-            content: [
-              createTextContent(
-                `🚀 Started executable in background (PID: ${result.process.pid})\n` +
-                  `💡 Process is running independently. Use swift_package_stop with PID ${result.process.pid} to terminate when needed.`,
-              ),
-            ],
-          };
-        } else {
-          return {
-            content: [
-              createTextContent(
-                `🚀 Started executable in background\n` +
-                  `💡 Process is running independently. PID not available for this execution.`,
-              ),
-            ],
-          };
+          ctx.emit(headerEvent);
+          ctx.emit(
+            statusLine('success', `Started executable in background (PID: ${result.process.pid})`),
+          );
+          ctx.emit(
+            section('Next Steps', [
+              `Use swift_package_stop with PID ${result.process.pid} to terminate when needed.`,
+            ]),
+          );
+          return;
         }
+
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('success', 'Started executable in background'));
+        ctx.emit(section('Next Steps', ['PID not available for this execution.']));
+        return;
       }
-    } else {
-      // Foreground mode: use CommandExecutor but handle long-running processes
+
       const command = ['swift', ...swiftArgs];
 
-      // Create a promise that will either complete with the command result or timeout
-      const commandPromise = executor(command, 'Swift Package Run', false, undefined);
+      const pipeline = createXcodebuildPipeline({
+        operation: 'BUILD',
+        toolName: 'build_run_spm',
+        params: {},
+        emit: ctx.emit,
+      });
 
-      const timeoutPromise = new Promise<{
-        success: boolean;
-        output: string;
-        error: string;
-        timedOut: boolean;
-      }>((resolve) => {
+      pipeline.emitEvent(headerEvent);
+      const started: StartedPipeline = { pipeline, startedAt: Date.now() };
+
+      const stdoutChunks: string[] = [];
+
+      const commandPromise = executor(command, 'Swift Package Run', false, {
+        onStdout: (chunk: string) => {
+          stdoutChunks.push(chunk);
+          pipeline.onStdout(chunk);
+        },
+        onStderr: (chunk: string) => pipeline.onStderr(chunk),
+      });
+
+      const timeoutPromise = new Promise<SwiftPackageRunTimeoutResult>((resolve) => {
         setTimeout(() => {
           resolve({
             success: false,
@@ -161,64 +200,67 @@ export async function swift_package_runLogic(
         }, timeout);
       });
 
-      // Race between command completion and timeout
       const result = await Promise.race([commandPromise, timeoutPromise]);
 
-      if ('timedOut' in result && result.timedOut) {
-        // For timeout case, the process may still be running - provide timeout response
-        if (isTestEnvironment) {
-          // In test environment, return mock response
-          const mockPid = 12345;
-          return {
-            content: [
-              createTextContent(
-                `⏱️ Process timed out after ${timeout / 1000} seconds but may continue running.`,
-              ),
-              createTextContent(`PID: ${mockPid} (mock)`),
-              createTextContent(
-                `💡 Process may still be running. Use swift_package_stop with PID ${mockPid} to terminate when needed.`,
-              ),
-              createTextContent(result.output || '(no output so far)'),
-            ],
-          };
-        } else {
-          // Production: timeout occurred, but we don't start a new process
-          return {
-            content: [
-              createTextContent(`⏱️ Process timed out after ${timeout / 1000} seconds.`),
-              createTextContent(
-                `💡 Process execution exceeded the timeout limit. Consider using background mode for long-running executables.`,
-              ),
-              createTextContent(result.output || '(no output so far)'),
-            ],
-          };
-        }
+      if (isTimedOutResult(result)) {
+        const timeoutSeconds = timeout / 1000;
+        ctx.emit(headerEvent);
+        ctx.emit(statusLine('warning', `Process timed out after ${timeoutSeconds} seconds.`));
+        ctx.emit(
+          section('Details', [
+            'Process execution exceeded the timeout limit. Consider using background mode for long-running executables.',
+            result.output || '(no output so far)',
+          ]),
+        );
+        return;
       }
 
-      if (result.success) {
-        return {
-          content: [
-            createTextContent('✅ Swift executable completed successfully.'),
-            createTextContent('💡 Process finished cleanly. Check output for results.'),
-            createTextContent(result.output || '(no output)'),
-          ],
-        };
-      } else {
-        const content = [
-          createTextContent('❌ Swift executable failed.'),
-          createTextContent(result.output || '(no output)'),
-        ];
-        if (result.error) {
-          content.push(createTextContent(`Errors:\n${result.error}`));
-        }
-        return { content };
-      }
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log('error', `Swift run failed: ${message}`);
-    return createErrorResponse('Failed to execute swift run', message);
-  }
+      const capturedOutput = stdoutChunks.join('').trim();
+      const resolvedExecutableName = params.executableName ?? path.basename(resolvedPath);
+      const executablePath = await resolveExecutablePath(
+        executor,
+        resolvedPath,
+        resolvedExecutableName,
+        params.configuration,
+      );
+      const processId = result.process?.pid;
+      const buildRunEvents =
+        result.success && executablePath
+          ? createBuildRunResultEvents({
+              scheme: resolvedExecutableName,
+              platform: 'Swift Package',
+              target: resolvedExecutableName,
+              appPath: executablePath,
+              processId,
+              buildLogPath: pipeline.logPath,
+              launchState: 'requested',
+            })
+          : [];
+      const tailEvents = [
+        ...buildRunEvents,
+        ...(result.success && !executablePath
+          ? [detailTree([{ label: 'Build Logs', value: displayPath(pipeline.logPath) }])]
+          : []),
+        ...(capturedOutput ? [section('Output', [capturedOutput])] : []),
+      ];
+
+      finalizeInlineXcodebuild({
+        started,
+        emit: ctx.emit,
+        succeeded: result.success,
+        durationMs: Date.now() - started.startedAt,
+        tailEvents,
+        emitSummary: true,
+        errorFallbackPolicy: 'if-no-structured-diagnostics',
+        includeBuildLogFileRef: false,
+      });
+    },
+    {
+      header: headerEvent,
+      errorMessage: ({ message }) => `Failed to execute swift run: ${message}`,
+      logMessage: ({ message }) => `Swift run failed: ${message}`,
+    },
+  );
 }
 
 export const schema = getSessionAwareToolSchemaShape({
@@ -227,7 +269,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<SwiftPackageRunParams>({
-  internalSchema: swiftPackageRunSchema,
+  internalSchema: baseSchemaObject,
   logicFunction: swift_package_runLogic,
   getExecutor: getDefaultCommandExecutor,
 });

@@ -1,8 +1,3 @@
-/**
- * Tests for boot_sim plugin (session-aware version)
- * Follows CLAUDE.md guidance: dependency injection, no vi-mocks, literal validation.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
@@ -11,6 +6,7 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, boot_simLogic } from '../boot_sim.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('boot_sim tool', () => {
   beforeEach(() => {
@@ -48,20 +44,18 @@ describe('boot_sim tool', () => {
         output: 'Simulator booted successfully',
       });
 
-      const result = await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
+      const result = await runLogic(() =>
+        boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor),
+      );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Simulator booted successfully.',
-          },
-        ],
-        nextStepParams: {
-          open_sim: {},
-          install_app_sim: { simulatorId: 'test-uuid-123', appPath: 'PATH_TO_YOUR_APP' },
-          launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'YOUR_APP_BUNDLE_ID' },
-        },
+      const text = allText(result);
+      expect(text).toContain('Boot Simulator');
+      expect(text).toContain('Simulator booted successfully');
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        install_app_sim: { simulatorId: 'test-uuid-123', appPath: 'PATH_TO_YOUR_APP' },
+        launch_app_sim: { simulatorId: 'test-uuid-123', bundleId: 'YOUR_APP_BUNDLE_ID' },
       });
     });
 
@@ -71,16 +65,13 @@ describe('boot_sim tool', () => {
         error: 'Simulator not found',
       });
 
-      const result = await boot_simLogic({ simulatorId: 'invalid-uuid' }, mockExecutor);
+      const result = await runLogic(() =>
+        boot_simLogic({ simulatorId: 'invalid-uuid' }, mockExecutor),
+      );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Boot simulator operation failed: Simulator not found',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Boot simulator operation failed: Simulator not found');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with Error object', async () => {
@@ -88,16 +79,13 @@ describe('boot_sim tool', () => {
         throw new Error('Connection failed');
       };
 
-      const result = await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
+      const result = await runLogic(() =>
+        boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor),
+      );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Boot simulator operation failed: Connection failed',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Boot simulator operation failed: Connection failed');
+      expect(result.isError).toBe(true);
     });
 
     it('should handle exception with string error', async () => {
@@ -105,16 +93,13 @@ describe('boot_sim tool', () => {
         throw 'String error';
       };
 
-      const result = await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
+      const result = await runLogic(() =>
+        boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor),
+      );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Boot simulator operation failed: String error',
-          },
-        ],
-      });
+      const text = allText(result);
+      expect(text).toContain('Boot simulator operation failed: String error');
+      expect(result.isError).toBe(true);
     });
 
     it('should verify command generation with mock executor', async () => {
@@ -140,7 +125,7 @@ describe('boot_sim tool', () => {
         });
       };
 
-      await boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor);
+      await runLogic(() => boot_simLogic({ simulatorId: 'test-uuid-123' }, mockExecutor));
 
       expect(calls).toHaveLength(1);
       expect(calls[0]).toEqual({

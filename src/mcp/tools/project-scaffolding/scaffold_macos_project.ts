@@ -1,20 +1,18 @@
-/**
- * Utilities Plugin: Scaffold macOS Project
- *
- * Scaffold a new macOS project from templates.
- */
-
 import * as z from 'zod';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename } from 'node:path';
 import { log } from '../../../utils/logging/index.ts';
-import { ValidationError } from '../../../utils/responses/index.ts';
+import { ValidationError } from '../../../utils/errors.ts';
 import { TemplateManager } from '../../../utils/template/index.ts';
-import type { ToolResponse } from '../../../types/common.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultCommandExecutor, getDefaultFileSystemExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
+import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
+import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createTypedToolWithContext,
+  getHandlerContext,
+} from '../../../utils/typed-tool-factory.ts';
 
-// Common base schema for both iOS and macOS
 const BaseScaffoldSchema = z.object({
   projectName: z.string().min(1),
   outputPath: z.string(),
@@ -25,12 +23,10 @@ const BaseScaffoldSchema = z.object({
   customizeNames: z.boolean().default(true),
 });
 
-// macOS-specific schema
 const ScaffoldmacOSProjectSchema = BaseScaffoldSchema.extend({
   deploymentTarget: z.string().optional(),
 });
 
-// Use z.infer for type safety
 type ScaffoldMacOSProjectParams = z.infer<typeof ScaffoldmacOSProjectSchema>;
 
 /**
@@ -327,29 +323,28 @@ export async function scaffold_macos_projectLogic(
   params: ScaffoldMacOSProjectParams,
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): Promise<ToolResponse> {
-  try {
-    const projectParams = { ...params, platform: 'macOS' as const };
-    const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
+): Promise<void> {
+  const ctx = getHandlerContext();
 
-    const generatedProjectName = params.customizeNames === false ? 'MyProject' : params.projectName;
-    const workspacePath = `${projectPath}/${generatedProjectName}.xcworkspace`;
+  return withErrorHandling(
+    ctx,
+    async () => {
+      const projectParams = { ...params, platform: 'macOS' as const };
+      const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
 
-    const response = {
-      success: true,
-      projectPath,
-      platform: 'macOS',
-      message: `Successfully scaffolded macOS project "${params.projectName}" in ${projectPath}`,
-    };
+      const generatedProjectName =
+        params.customizeNames === false ? 'MyProject' : params.projectName;
+      const workspacePath = `${projectPath}/${generatedProjectName}.xcworkspace`;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(response, null, 2),
-        },
-      ],
-      nextStepParams: {
+      ctx.emit(
+        header('Scaffold macOS Project', [
+          { label: 'Name', value: params.projectName },
+          { label: 'Path', value: projectPath },
+          { label: 'Platform', value: 'macOS' },
+        ]),
+      );
+      ctx.emit(statusLine('success', `Project scaffolded successfully\n  └ ${projectPath}`));
+      ctx.nextStepParams = {
         build_macos: {
           workspacePath,
           scheme: generatedProjectName,
@@ -358,40 +353,33 @@ export async function scaffold_macos_projectLogic(
           workspacePath,
           scheme: generatedProjectName,
         },
-      },
-    };
-  } catch (error) {
-    log(
-      'error',
-      `Failed to scaffold macOS project: ${error instanceof Error ? error.message : String(error)}`,
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: false,
-              error: error instanceof Error ? error.message : 'Unknown error occurred',
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-      isError: true,
-    };
-  }
+      };
+    },
+    {
+      header: header('Scaffold macOS Project', [
+        { label: 'Name', value: params.projectName },
+        { label: 'Path', value: params.outputPath },
+        { label: 'Platform', value: 'macOS' },
+      ]),
+      errorMessage: ({ message }) => message,
+      logMessage: ({ message }) => `Failed to scaffold macOS project: ${message}`,
+    },
+  );
 }
 
 export const schema = ScaffoldmacOSProjectSchema.shape;
 
-export async function handler(args: Record<string, unknown>): Promise<ToolResponse> {
-  const validatedArgs = ScaffoldmacOSProjectSchema.parse(args);
-  return scaffold_macos_projectLogic(
-    validatedArgs,
-    getDefaultCommandExecutor(),
-    getDefaultFileSystemExecutor(),
-  );
+interface ScaffoldMacOSToolContext {
+  commandExecutor: CommandExecutor;
+  fileSystemExecutor: FileSystemExecutor;
 }
+
+export const handler = createTypedToolWithContext(
+  ScaffoldmacOSProjectSchema,
+  (params: ScaffoldMacOSProjectParams, ctx: ScaffoldMacOSToolContext) =>
+    scaffold_macos_projectLogic(params, ctx.commandExecutor, ctx.fileSystemExecutor),
+  () => ({
+    commandExecutor: getDefaultCommandExecutor(),
+    fileSystemExecutor: getDefaultFileSystemExecutor(),
+  }),
+);

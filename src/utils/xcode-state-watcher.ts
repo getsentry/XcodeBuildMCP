@@ -67,13 +67,12 @@ export async function lookupBundleId(
     return undefined;
   }
 
-  // Parse PRODUCT_BUNDLE_IDENTIFIER from output
-  const match = result.output.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*(.+)/);
-  if (match) {
-    return match[1].trim();
-  }
+  const matches = [...result.output.matchAll(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*(.+)/g)]
+    .map((match) => match[1]?.trim())
+    .filter((value): value is string => Boolean(value) && value !== 'NO');
 
-  return undefined;
+  const preferredMatch = matches.find((value) => value.includes('.'));
+  return preferredMatch ?? matches[0];
 }
 
 /**

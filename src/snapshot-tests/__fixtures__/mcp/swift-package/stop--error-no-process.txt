@@ -1,0 +1,6 @@
+
+🛑 Swift Package Stop
+
+   PID: <PID>
+
+❌ No running process found with PID 999999. Use swift_package_list to check active processes.

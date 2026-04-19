@@ -1,0 +1,9 @@
+schemaVersion: 1
+enabledWorkflows:
+  - project-discovery
+  - swift-package
+debug: false
+sentryDisabled: true
+sessionDefaults:
+  workspacePath: .swiftpm/xcode/package.xcworkspace
+  scheme: long-server

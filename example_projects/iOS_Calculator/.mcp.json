@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "XcodeBuildMCP": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "../../build/cli.js",
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

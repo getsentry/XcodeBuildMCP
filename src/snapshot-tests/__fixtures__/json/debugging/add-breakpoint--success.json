@@ -1,0 +1,15 @@
+{
+  "schema": "xcodebuildmcp.output.debug-breakpoint-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "add",
+    "breakpoint": {
+      "breakpointId": 1,
+      "kind": "file-line",
+      "file": "ContentView.swift",
+      "line": 42
+    }
+  }
+}

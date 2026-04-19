@@ -1,15 +1,4 @@
-/**
- * Test for scaffold_macos_project plugin - Dependency Injection Architecture
- *
- * Tests the plugin structure and exported components for scaffold_macos_project tool.
- * Uses pure dependency injection with createMockFileSystemExecutor.
- * NO VITEST MOCKING ALLOWED - Only createMockExecutor/createMockFileSystemExecutor
- *
- * Plugin location: plugins/utilities/scaffold_macos_project.js
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
-import * as z from 'zod';
 import {
   createMockFileSystemExecutor,
   createNoopExecutor,
@@ -23,6 +12,40 @@ import {
   initConfigStore,
   type RuntimeConfigOverrides,
 } from '../../../../utils/config-store.ts';
+import { allText, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+
+const runLogic = async (logic: () => Promise<unknown>) => {
+  const { result, run } = createMockToolHandlerContext();
+  const response = await run(logic);
+
+  if (
+    response &&
+    typeof response === 'object' &&
+    'content' in (response as Record<string, unknown>)
+  ) {
+    return response as {
+      content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+      isError?: boolean;
+      nextStepParams?: unknown;
+    };
+  }
+
+  const text = result.text();
+  const textContent = text.length > 0 ? [{ type: 'text' as const, text }] : [];
+  const imageContent = result.attachments.map((attachment) => ({
+    type: 'image' as const,
+    data: attachment.data,
+    mimeType: attachment.mimeType,
+  }));
+
+  return {
+    content: [...textContent, ...imageContent],
+    isError: result.isError() ? true : undefined,
+    nextStepParams: result.nextStepParams,
+    attachments: result.attachments,
+    text,
+  };
+};
 
 const cwd = '/repo';
 
@@ -30,8 +53,6 @@ async function initConfigStoreForTest(overrides?: RuntimeConfigOverrides): Promi
   __resetConfigStoreForTests();
   await initConfigStore({ cwd, fs: createMockFileSystemExecutor(), overrides });
 }
-
-// ONLY ALLOWED MOCKING: createMockFileSystemExecutor
 
 describe('scaffold_macos_project plugin', () => {
   let mockFileSystemExecutor: ReturnType<typeof createMockFileSystemExecutor>;
@@ -48,7 +69,6 @@ describe('scaffold_macos_project plugin', () => {
   };
 
   beforeEach(async () => {
-    // Create template manager stub using pure JavaScript approach
     let templateManagerCall = '';
     let templateManagerError: Error | string | null = null;
 
@@ -68,7 +88,6 @@ describe('scaffold_macos_project plugin', () => {
         templateManagerCall += `,cleanup(${path})`;
         return undefined;
       },
-      // Test helpers
       setError: (error: Error | string | null) => {
         templateManagerError = error;
       },
@@ -78,7 +97,6 @@ describe('scaffold_macos_project plugin', () => {
       },
     };
 
-    // Create fresh mock file system executor for each test
     mockFileSystemExecutor = createMockFileSystemExecutor({
       existsSync: () => false,
       mkdir: async () => {},
@@ -91,7 +109,6 @@ describe('scaffold_macos_project plugin', () => {
       ],
     });
 
-    // Replace the real TemplateManager with our stub for most tests
     (TemplateManager as any).getTemplatePath = templateManagerStub.getTemplatePath;
     (TemplateManager as any).cleanup = templateManagerStub.cleanup;
 
@@ -104,7 +121,6 @@ describe('scaffold_macos_project plugin', () => {
     });
 
     it('should have valid schema with required fields', () => {
-      // Test the schema object exists
       expect(schema).toBeDefined();
       expect(schema.projectName).toBeDefined();
       expect(schema.outputPath).toBeDefined();
@@ -116,57 +132,39 @@ describe('scaffold_macos_project plugin', () => {
 
   describe('Command Generation', () => {
     it('should generate correct curl command for macOS template download', async () => {
-      // This test validates that the curl command would be generated correctly
-      // by verifying the URL construction logic
       const expectedUrl =
         'https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/';
 
-      // The curl command should be structured correctly for macOS template
       expect(expectedUrl).toContain('XcodeBuildMCP-macOS-Template');
       expect(expectedUrl).toContain('releases/download');
 
-      // The template zip file should follow the expected pattern
       const expectedFilename = 'template.zip';
       expect(expectedFilename).toMatch(/template\.zip$/);
 
-      // The curl command flags should be correct
       const expectedCurlFlags = ['-L', '-f', '-o'];
-      expect(expectedCurlFlags).toContain('-L'); // Follow redirects
-      expect(expectedCurlFlags).toContain('-f'); // Fail on HTTP errors
-      expect(expectedCurlFlags).toContain('-o'); // Output to file
+      expect(expectedCurlFlags).toContain('-L');
+      expect(expectedCurlFlags).toContain('-f');
+      expect(expectedCurlFlags).toContain('-o');
     });
 
     it('should generate correct unzip command for template extraction', async () => {
-      // This test validates that the unzip command would be generated correctly
-      // by verifying the command structure
       const expectedUnzipCommand = ['unzip', '-q', 'template.zip'];
 
-      // The unzip command should use the quiet flag
       expect(expectedUnzipCommand).toContain('-q');
-
-      // The unzip command should target the template zip file
       expect(expectedUnzipCommand).toContain('template.zip');
-
-      // The unzip command should be structured correctly
       expect(expectedUnzipCommand[0]).toBe('unzip');
       expect(expectedUnzipCommand[1]).toBe('-q');
       expect(expectedUnzipCommand[2]).toMatch(/template\.zip$/);
     });
 
     it('should generate correct commands for template with version', async () => {
-      // This test validates that the curl command would be generated correctly with version
       const testVersion = 'v1.0.0';
       const expectedUrlWithVersion = `https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/${testVersion}/`;
 
-      // The URL should contain the specific version
       expect(expectedUrlWithVersion).toContain(testVersion);
       expect(expectedUrlWithVersion).toContain('XcodeBuildMCP-macOS-Template');
       expect(expectedUrlWithVersion).toContain('releases/download');
-
-      // The version should be in the correct format
       expect(testVersion).toMatch(/^v\d+\.\d+\.\d+$/);
-
-      // The full URL should be correctly constructed
       expect(expectedUrlWithVersion).toBe(
         `https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/${testVersion}/`,
       );
@@ -182,31 +180,30 @@ describe('scaffold_macos_project plugin', () => {
         });
       };
 
-      // Mock local template path exists
       mockFileSystemExecutor.existsSync = (path: string) => {
         return path === '/local/template/path' || path === '/local/template/path/template';
       };
 
       await initConfigStoreForTest({ macosTemplatePath: '/local/template/path' });
 
-      // Restore original TemplateManager for command generation tests
       const { TemplateManager: OriginalTemplateManager } = await import(
         '../../../../utils/template/index.ts'
       );
       (TemplateManager as any).getTemplatePath = OriginalTemplateManager.getTemplatePath;
       (TemplateManager as any).cleanup = OriginalTemplateManager.cleanup;
 
-      await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestMacApp',
-          customizeNames: true,
-          outputPath: '/tmp/test-projects',
-        },
-        trackingExecutor,
-        mockFileSystemExecutor,
+      await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
-      // Should not generate any curl or unzip commands when using local template
       expect(capturedCommands).not.toContainEqual(
         expect.arrayContaining(['curl', expect.anything(), expect.anything()]),
       );
@@ -214,7 +211,6 @@ describe('scaffold_macos_project plugin', () => {
         expect.arrayContaining(['unzip', expect.anything(), expect.anything()]),
       );
 
-      // Restore stub after test
       (TemplateManager as any).getTemplatePath = templateManagerStub.getTemplatePath;
       (TemplateManager as any).cleanup = templateManagerStub.cleanup;
     });
@@ -222,205 +218,145 @@ describe('scaffold_macos_project plugin', () => {
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should return success response for valid scaffold macOS project request', async () => {
-      const result = await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestMacApp',
-          customizeNames: true,
-          outputPath: '/tmp/test-projects',
-          bundleIdentifier: 'com.test.macapp',
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+            bundleIdentifier: 'com.test.macapp',
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                projectPath: '/tmp/test-projects',
-                platform: 'macOS',
-                message: 'Successfully scaffolded macOS project "TestMacApp" in /tmp/test-projects',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        nextStepParams: {
-          build_macos: {
-            workspacePath: '/tmp/test-projects/TestMacApp.xcworkspace',
-            scheme: 'TestMacApp',
-          },
-          build_run_macos: {
-            workspacePath: '/tmp/test-projects/TestMacApp.xcworkspace',
-            scheme: 'TestMacApp',
-          },
+      expect(result.isError).toBeFalsy();
+      const text = allText(result);
+      expect(text).toContain('Scaffold macOS Project');
+      expect(text).toContain('TestMacApp');
+      expect(text).toContain('/tmp/test-projects');
+      expect(text).toContain('Project scaffolded successfully');
+      expect(result.nextStepParams).toEqual({
+        build_macos: {
+          workspacePath: '/tmp/test-projects/TestMacApp.xcworkspace',
+          scheme: 'TestMacApp',
+        },
+        build_run_macos: {
+          workspacePath: '/tmp/test-projects/TestMacApp.xcworkspace',
+          scheme: 'TestMacApp',
         },
       });
 
-      // Verify template manager calls using manual tracking
       expect(templateManagerStub.getCalls()).toBe(
         'getTemplatePath(macOS),cleanup(/tmp/test-templates/macos)',
       );
     });
 
     it('should return success response with customizeNames false', async () => {
-      const result = await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestMacApp',
-          outputPath: '/tmp/test-projects',
-          customizeNames: false,
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            outputPath: '/tmp/test-projects',
+            customizeNames: false,
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                projectPath: '/tmp/test-projects',
-                platform: 'macOS',
-                message: 'Successfully scaffolded macOS project "TestMacApp" in /tmp/test-projects',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        nextStepParams: {
-          build_macos: {
-            workspacePath: '/tmp/test-projects/MyProject.xcworkspace',
-            scheme: 'MyProject',
-          },
-          build_run_macos: {
-            workspacePath: '/tmp/test-projects/MyProject.xcworkspace',
-            scheme: 'MyProject',
-          },
+      expect(result.isError).toBeFalsy();
+      const text = allText(result);
+      expect(text).toContain('Project scaffolded successfully');
+      expect(result.nextStepParams).toEqual({
+        build_macos: {
+          workspacePath: '/tmp/test-projects/MyProject.xcworkspace',
+          scheme: 'MyProject',
+        },
+        build_run_macos: {
+          workspacePath: '/tmp/test-projects/MyProject.xcworkspace',
+          scheme: 'MyProject',
         },
       });
     });
 
     it('should return error response for invalid project name', async () => {
-      const result = await scaffold_macos_projectLogic(
-        {
-          projectName: '123InvalidName',
-          customizeNames: true,
-          outputPath: '/tmp/test-projects',
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: '123InvalidName',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                error:
-                  'Project name must start with a letter and contain only letters, numbers, and underscores',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Project name must start with a letter');
     });
 
     it('should return error response for existing project files', async () => {
-      // Override existsSync to return true for workspace file
       mockFileSystemExecutor.existsSync = () => true;
 
-      const result = await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestMacApp',
-          customizeNames: true,
-          outputPath: '/tmp/test-projects',
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                error: 'Xcode project files already exist in /tmp/test-projects',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Xcode project files already exist in /tmp/test-projects');
     });
 
     it('should return error response for template manager failure', async () => {
       templateManagerStub.setError(new Error('Template not found'));
 
-      const result = await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestMacApp',
-          customizeNames: true,
-          outputPath: '/tmp/test-projects',
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: false,
-                error: 'Failed to get template for macOS: Template not found',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to get template for macOS: Template not found');
     });
   });
 
   describe('File System Operations', () => {
     it('should create directories and process files correctly', async () => {
-      await scaffold_macos_projectLogic(
-        {
-          projectName: 'TestApp',
-          customizeNames: true,
-          outputPath: '/tmp/test',
-        },
-        createNoopExecutor(),
-        mockFileSystemExecutor,
+      await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestApp',
+            customizeNames: true,
+            outputPath: '/tmp/test',
+          },
+          createNoopExecutor(),
+          mockFileSystemExecutor,
+        ),
       );
 
-      // Verify template manager calls using manual tracking
       expect(templateManagerStub.getCalls()).toBe(
         'getTemplatePath(macOS),cleanup(/tmp/test-templates/macos)',
       );
-
-      // File system operations are called by the mock implementation
-      // but we can't verify them without vitest mocking patterns
-      // This test validates the integration works correctly
     });
   });
 });

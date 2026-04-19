@@ -11,13 +11,20 @@ import {
   __clearTestExecutorOverrides,
 } from '../utils/command.ts';
 import {
+  __setTestInteractiveSpawnerOverride,
+  __clearTestInteractiveSpawnerOverride,
+} from '../utils/execution/interactive-process.ts';
+import {
   __resetConfigStoreForTests,
   initConfigStore,
   type RuntimeConfigOverrides,
 } from '../utils/config-store.ts';
 import { __resetServerStateForTests } from '../server/server-state.ts';
 import { __resetToolRegistryForTests } from '../utils/tool-registry.ts';
-import { createMockFileSystemExecutor } from '../test-utils/mock-executors.ts';
+import {
+  createMockFileSystemExecutor,
+  createNoopInteractiveSpawner,
+} from '../test-utils/mock-executors.ts';
 import { createServer } from '../server/server.ts';
 import { bootstrapServer } from '../server/bootstrap.ts';
 import { sessionStore } from '../utils/session-store.ts';
@@ -97,6 +104,7 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
   // Set executor overrides on the vitest-resolved source modules
   __setTestCommandExecutorOverride(capturingExecutor);
   __setTestFileSystemExecutorOverride(mockFs);
+  __setTestInteractiveSpawnerOverride(createNoopInteractiveSpawner());
 
   // Also set overrides on the built module instances (used by dynamically imported tool handlers)
   const buildRoot = resolve(getPackageRoot(), 'build');
@@ -116,6 +124,15 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
   };
   builtCommandModule.__setTestCommandExecutorOverride(capturingExecutor);
   builtCommandModule.__setTestFileSystemExecutorOverride(mockFs);
+
+  // Set interactive spawner override (built module)
+  const builtInteractiveModule = (await import(
+    pathToFileURL(resolve(buildRoot, 'utils/execution/interactive-process.js')).href
+  )) as {
+    __setTestInteractiveSpawnerOverride: typeof __setTestInteractiveSpawnerOverride;
+    __clearTestInteractiveSpawnerOverride: typeof __clearTestInteractiveSpawnerOverride;
+  };
+  builtInteractiveModule.__setTestInteractiveSpawnerOverride(createNoopInteractiveSpawner());
 
   // Set debugger tool context override (source module)
   __setTestDebuggerToolContextOverride({
@@ -217,6 +234,8 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
       await shutdownXcodeToolsBridge();
       __clearTestExecutorOverrides();
       builtCommandModule.__clearTestExecutorOverrides();
+      __clearTestInteractiveSpawnerOverride();
+      builtInteractiveModule.__clearTestInteractiveSpawnerOverride();
       __clearTestDebuggerToolContextOverride();
       builtDebuggerModule.__clearTestDebuggerToolContextOverride();
       __resetConfigStoreForTests();

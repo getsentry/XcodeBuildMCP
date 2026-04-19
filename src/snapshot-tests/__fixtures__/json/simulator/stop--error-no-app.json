@@ -1,0 +1,26 @@
+{
+  "schema": "xcodebuildmcp.output.stop-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Stop app in simulator operation failed: found nothing to terminate",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "bundleId": "com.nonexistent.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Simulator device failed to terminate com.nonexistent.app."
+        },
+        {
+          "message": "The request to terminate \"com.nonexistent.app\" failed. found nothing to terminate"
+        }
+      ]
+    }
+  }
+}

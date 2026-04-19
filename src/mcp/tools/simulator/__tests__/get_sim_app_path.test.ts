@@ -1,9 +1,5 @@
-/**
- * Tests for get_sim_app_path plugin (session-aware version)
- * Mirrors patterns from other simulator session-aware migrations.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
+import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import { ChildProcess } from 'child_process';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
@@ -11,6 +7,7 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, get_sim_app_pathLogic } from '../get_sim_app_path.ts';
 import type { CommandExecutor } from '../../../../utils/CommandExecutor.ts';
 import { XcodePlatform } from '../../../../types/common.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('get_sim_app_path tool', () => {
   beforeEach(() => {
@@ -131,15 +128,17 @@ describe('get_sim_app_path tool', () => {
         };
       };
 
-      const result = await get_sim_app_pathLogic(
-        {
-          workspacePath: '/path/to/workspace.xcworkspace',
-          scheme: 'MyScheme',
-          platform: XcodePlatform.iOSSimulator,
-          simulatorName: 'iPhone 17',
-          useLatestOS: true,
-        },
-        trackingExecutor,
+      const result = await runLogic(() =>
+        get_sim_app_pathLogic(
+          {
+            workspacePath: '/path/to/workspace.xcworkspace',
+            scheme: 'MyScheme',
+            platform: XcodePlatform.iOSSimulator,
+            simulatorName: 'iPhone 17',
+            useLatestOS: true,
+          },
+          trackingExecutor,
+        ),
       );
 
       expect(callHistory).toHaveLength(1);
@@ -156,12 +155,20 @@ describe('get_sim_app_path tool', () => {
         'Debug',
         '-destination',
         'platform=iOS Simulator,name=iPhone 17,OS=latest',
+        '-derivedDataPath',
+        DERIVED_DATA_DIR,
       ]);
 
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toContain(
-        '✅ App path retrieved successfully: /tmp/DerivedData/Build/MyApp.app',
-      );
+      expect(result.isError).toBeFalsy();
+      const text = allText(result);
+      expect(text).toContain('Get App Path');
+      expect(text).toContain('MyScheme');
+      expect(text).toContain('/path/to/workspace.xcworkspace');
+      expect(text).toContain('Debug');
+      expect(text).toContain('iOS Simulator');
+      expect(text).toContain('iPhone 17');
+      expect(text).toContain('/tmp/DerivedData/Build/MyApp.app');
+      expect(result.nextStepParams).toBeDefined();
     });
 
     it('should surface executor failures when build settings cannot be retrieved', async () => {
@@ -170,19 +177,26 @@ describe('get_sim_app_path tool', () => {
         error: 'Failed to run xcodebuild',
       });
 
-      const result = await get_sim_app_pathLogic(
-        {
-          projectPath: '/path/to/project.xcodeproj',
-          scheme: 'MyScheme',
-          platform: XcodePlatform.iOSSimulator,
-          simulatorId: 'SIM-UUID',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_sim_app_pathLogic(
+          {
+            projectPath: '/path/to/project.xcodeproj',
+            scheme: 'MyScheme',
+            platform: XcodePlatform.iOSSimulator,
+            simulatorId: 'SIM-UUID',
+          },
+          mockExecutor,
+        ),
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Failed to get app path');
-      expect(result.content[0].text).toContain('Failed to run xcodebuild');
+      const text = allText(result);
+      expect(text).toContain('Get App Path');
+      expect(text).toContain('MyScheme');
+      expect(text).toContain('Errors (1):');
+      expect(text).toContain('✗ Failed to run xcodebuild');
+      expect(text).toContain('Failed to get app path');
+      expect(result.nextStepParams).toBeUndefined();
     });
   });
 });

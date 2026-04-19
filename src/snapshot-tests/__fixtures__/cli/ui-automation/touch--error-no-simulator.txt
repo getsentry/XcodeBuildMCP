@@ -1,0 +1,9 @@
+
+👆 Touch
+
+   Simulator: <UUID>
+
+❌ Failed to execute touch event: axe command 'touch' failed.
+
+Details
+  Error: CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")

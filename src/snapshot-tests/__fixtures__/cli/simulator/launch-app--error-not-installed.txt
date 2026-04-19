@@ -1,0 +1,7 @@
+
+🚀 Launch App
+
+   Simulator: <UUID>
+   Bundle ID: com.nonexistent.app
+
+❌ App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.

@@ -13,9 +13,12 @@ annotations:
   openWorldHint: false
 nextSteps:
   - label: "Important: Before working on the project make sure to read the README.md file in the workspace root directory."
+    when: success
   - label: Build for macOS
     toolId: build_macos
     priority: 1
+    when: success
   - label: Build & Run on macOS
     toolId: build_run_macos
     priority: 2
+    when: success

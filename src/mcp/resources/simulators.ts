@@ -9,29 +9,30 @@ import { log } from '../../utils/logging/index.ts';
 import { getDefaultCommandExecutor } from '../../utils/execution/index.ts';
 import type { CommandExecutor } from '../../utils/execution/index.ts';
 import { list_simsLogic } from '../tools/simulator/list_sims.ts';
+import { createRenderSession } from '../../rendering/render.ts';
+import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
+import type { ToolHandlerContext } from '../../rendering/types.ts';
 
-// Testable resource logic separated from MCP handler
 export async function simulatorsResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
+  const session = createRenderSession('text');
+  const ctx: ToolHandlerContext = {
+    emit: (event) => session.emit(event),
+    attach: () => {},
+  };
+
   try {
     log('info', 'Processing simulators resource request');
-    const result = await list_simsLogic({}, executor);
-
-    if (result.isError) {
-      const errorText = result.content[0]?.text;
-      throw new Error(
-        typeof errorText === 'string' ? errorText : 'Failed to retrieve simulator data',
-      );
+    await handlerContextStorage.run(ctx, () => list_simsLogic({}, executor));
+    const text = session.finalize();
+    if (session.isError()) {
+      throw new Error(text || 'Failed to retrieve simulator data');
     }
-
     return {
       contents: [
         {
-          text:
-            typeof result.content[0]?.text === 'string'
-              ? result.content[0].text
-              : 'No simulator data available',
+          text: text || 'No simulator data available',
         },
       ],
     };
@@ -49,12 +50,6 @@ export async function simulatorsResourceLogic(
   }
 }
 
-export default {
-  uri: 'xcodebuildmcp://simulators',
-  name: 'simulators',
-  description: 'Available iOS simulators with their UUIDs and states',
-  mimeType: 'text/plain',
-  async handler(): Promise<{ contents: Array<{ text: string }> }> {
-    return simulatorsResourceLogic();
-  },
-};
+export async function handler(_uri: URL): Promise<{ contents: Array<{ text: string }> }> {
+  return simulatorsResourceLogic();
+}

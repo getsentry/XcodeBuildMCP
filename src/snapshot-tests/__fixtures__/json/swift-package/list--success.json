@@ -1,0 +1,21 @@
+{
+  "schema": "xcodebuildmcp.output.process-list",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "runningProcessCount": 1
+    },
+    "processes": [
+      {
+        "name": "spm",
+        "processId": 99999,
+        "uptimeSeconds": 3600,
+        "artifacts": {
+          "packagePath": "<ROOT>/example_projects/spm"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to execute touch event: axe command 'touch' failed.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "touch"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
+        }
+      ]
+    }
+  }
+}

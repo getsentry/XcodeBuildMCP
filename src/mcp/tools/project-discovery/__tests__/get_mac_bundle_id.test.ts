@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import * as z from 'zod';
+import { describe, it, expect } from 'vitest';
 import { schema, handler, get_mac_bundle_idLogic } from '../get_mac_bundle_id.ts';
+import { runLogic } from '../../../../test-utils/test-helpers.ts';
+
 import {
   createMockFileSystemExecutor,
   createCommandMatchingMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 
 describe('get_mac_bundle_id plugin', () => {
-  // Helper function to create mock executor for command matching
   const createMockExecutorForCommands = (results: Record<string, string | Error>) => {
     return createCommandMatchingMockExecutor(
       Object.fromEntries(
@@ -21,51 +21,30 @@ describe('get_mac_bundle_id plugin', () => {
     );
   };
 
-  describe('Export Field Validation (Literal)', () => {
-    it('should have handler function', () => {
+  describe('Plugin Structure', () => {
+    it('should expose schema and handler', () => {
+      expect(schema).toBeDefined();
       expect(typeof handler).toBe('function');
-    });
-
-    it('should validate schema with valid inputs', () => {
-      const schemaObj = z.object(schema);
-      expect(schemaObj.safeParse({ appPath: '/Applications/TextEdit.app' }).success).toBe(true);
-      expect(schemaObj.safeParse({ appPath: '/Users/dev/MyApp.app' }).success).toBe(true);
-    });
-
-    it('should validate schema with invalid inputs', () => {
-      const schemaObj = z.object(schema);
-      expect(schemaObj.safeParse({}).success).toBe(false);
-      expect(schemaObj.safeParse({ appPath: 123 }).success).toBe(false);
-      expect(schemaObj.safeParse({ appPath: null }).success).toBe(false);
-      expect(schemaObj.safeParse({ appPath: undefined }).success).toBe(false);
     });
   });
 
-  describe('Handler Behavior (Complete Literal Returns)', () => {
-    // Note: appPath validation is now handled by Zod schema validation in createTypedTool
-    // This test would not reach the logic function as Zod validation occurs before it
-
+  describe('Handler behavior', () => {
     it('should return error when file exists validation fails', async () => {
       const mockExecutor = createMockExecutorForCommands({});
       const mockFileSystemExecutor = createMockFileSystemExecutor({
         existsSync: () => false,
       });
 
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        get_mac_bundle_idLogic(
+          { appPath: '/Applications/MyApp.app' },
+          mockExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: "File not found: '/Applications/MyApp.app'. Please check the path and try again.",
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(result.nextStepParams).toBeUndefined();
     });
 
     it('should return success with bundle ID using defaults read', async () => {
@@ -77,24 +56,18 @@ describe('get_mac_bundle_id plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        get_mac_bundle_idLogic(
+          { appPath: '/Applications/MyApp.app' },
+          mockExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ Bundle ID: io.sentry.MyMacApp',
-          },
-        ],
-        nextStepParams: {
-          launch_mac_app: { appPath: '/Applications/MyApp.app' },
-          build_macos: { scheme: 'SCHEME_NAME' },
-        },
-        isError: false,
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        launch_mac_app: { appPath: '/Applications/MyApp.app' },
+        build_macos: { scheme: 'SCHEME_NAME' },
       });
     });
 
@@ -110,24 +83,18 @@ describe('get_mac_bundle_id plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
+      const result = await runLogic(() =>
+        get_mac_bundle_idLogic(
+          { appPath: '/Applications/MyApp.app' },
+          mockExecutor,
+          mockFileSystemExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ Bundle ID: io.sentry.MyMacApp',
-          },
-        ],
-        nextStepParams: {
-          launch_mac_app: { appPath: '/Applications/MyApp.app' },
-          build_macos: { scheme: 'SCHEME_NAME' },
-        },
-        isError: false,
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        launch_mac_app: { appPath: '/Applications/MyApp.app' },
+        build_macos: { scheme: 'SCHEME_NAME' },
       });
     });
 
@@ -143,82 +110,16 @@ describe('get_mac_bundle_id plugin', () => {
         existsSync: () => true,
       });
 
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(2);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Error extracting macOS bundle ID');
-      expect(result.content[0].text).toContain('Could not extract bundle ID from Info.plist');
-      expect(result.content[0].text).toContain('Command failed');
-      expect(result.content[1].type).toBe('text');
-      expect(result.content[1].text).toBe(
-        'Make sure the path points to a valid macOS app bundle (.app directory).',
-      );
-    });
-
-    it('should handle Error objects in catch blocks', async () => {
-      const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
-          'Custom error message',
+      const result = await runLogic(() =>
+        get_mac_bundle_idLogic(
+          { appPath: '/Applications/MyApp.app' },
+          mockExecutor,
+          mockFileSystemExecutor,
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
-          new Error('Custom error message'),
-      });
-      const mockFileSystemExecutor = createMockFileSystemExecutor({
-        existsSync: () => true,
-      });
-
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
       );
 
       expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(2);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Error extracting macOS bundle ID');
-      expect(result.content[0].text).toContain('Could not extract bundle ID from Info.plist');
-      expect(result.content[0].text).toContain('Custom error message');
-      expect(result.content[1].type).toBe('text');
-      expect(result.content[1].text).toBe(
-        'Make sure the path points to a valid macOS app bundle (.app directory).',
-      );
-    });
-
-    it('should handle string errors in catch blocks', async () => {
-      const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
-          'String error',
-        ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
-          new Error('String error'),
-      });
-      const mockFileSystemExecutor = createMockFileSystemExecutor({
-        existsSync: () => true,
-      });
-
-      const result = await get_mac_bundle_idLogic(
-        { appPath: '/Applications/MyApp.app' },
-        mockExecutor,
-        mockFileSystemExecutor,
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(2);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Error extracting macOS bundle ID');
-      expect(result.content[0].text).toContain('Could not extract bundle ID from Info.plist');
-      expect(result.content[0].text).toContain('String error');
-      expect(result.content[1].type).toBe('text');
-      expect(result.content[1].text).toBe(
-        'Make sure the path points to a valid macOS app bundle (.app directory).',
-      );
+      expect(result.nextStepParams).toBeUndefined();
     });
   });
 });

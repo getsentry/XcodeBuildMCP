@@ -1,9 +1,5 @@
-/**
- * Tests for get_mac_app_path plugin (unified project/workspace)
- * Following CLAUDE.md testing standards with literal validation
- * Using dependency injection for deterministic testing
- */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
@@ -11,8 +7,8 @@ import {
   type CommandExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler } from '../get_mac_app_path.ts';
-import { get_mac_app_pathLogic } from '../get_mac_app_path.ts';
+import { schema, handler, get_mac_app_pathLogic } from '../get_mac_app_path.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('get_mac_app_path plugin', () => {
   beforeEach(() => {
@@ -113,7 +109,7 @@ describe('get_mac_app_path plugin', () => {
         scheme: 'MyScheme',
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -127,10 +123,14 @@ describe('get_mac_app_path plugin', () => {
           'MyScheme',
           '-configuration',
           'Debug',
+          '-destination',
+          'generic/platform=macOS',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
 
@@ -151,7 +151,7 @@ describe('get_mac_app_path plugin', () => {
         scheme: 'MyScheme',
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -165,10 +165,14 @@ describe('get_mac_app_path plugin', () => {
           'MyScheme',
           '-configuration',
           'Debug',
+          '-destination',
+          'generic/platform=macOS',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
 
@@ -191,7 +195,7 @@ describe('get_mac_app_path plugin', () => {
         arch: 'arm64' as const,
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -207,10 +211,12 @@ describe('get_mac_app_path plugin', () => {
           'Release',
           '-destination',
           'platform=macOS,arch=arm64',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
 
@@ -233,7 +239,7 @@ describe('get_mac_app_path plugin', () => {
         arch: 'x86_64' as const,
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -249,10 +255,12 @@ describe('get_mac_app_path plugin', () => {
           'Debug',
           '-destination',
           'platform=macOS,arch=x86_64',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
 
@@ -276,7 +284,7 @@ describe('get_mac_app_path plugin', () => {
         extraArgs: ['--verbose'],
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -290,13 +298,15 @@ describe('get_mac_app_path plugin', () => {
           'MyScheme',
           '-configuration',
           'Release',
+          '-destination',
+          'generic/platform=macOS',
           '-derivedDataPath',
           '/path/to/derived',
           '--verbose',
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
 
@@ -318,7 +328,7 @@ describe('get_mac_app_path plugin', () => {
         arch: 'arm64' as const,
       };
 
-      await get_mac_app_pathLogic(args, mockExecutor);
+      await runLogic(() => get_mac_app_pathLogic(args, mockExecutor));
 
       // Verify command generation with manual call tracking
       expect(calls).toHaveLength(1);
@@ -334,10 +344,12 @@ describe('get_mac_app_path plugin', () => {
           'Debug',
           '-destination',
           'platform=macOS,arch=arm64',
+          '-derivedDataPath',
+          DERIVED_DATA_DIR,
         ],
         'Get App Path',
         false,
-        undefined,
+        { cwd: '/path/to' },
       ]);
     });
   });
@@ -349,8 +361,9 @@ describe('get_mac_app_path plugin', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('scheme is required');
-      expect(result.content[0].text).toContain('session-set-defaults');
+      const text = allText(result);
+      expect(text).toContain('scheme is required');
+      expect(text).toContain('session-set-defaults');
     });
 
     it('should return exact successful app path response with workspace', async () => {
@@ -362,31 +375,23 @@ FULL_PRODUCT_NAME = MyApp.app
         `,
       });
 
-      const result = await get_mac_app_pathLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_mac_app_pathLogic(
+          {
+            workspacePath: '/path/to/MyProject.xcworkspace',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ App path retrieved successfully: /Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-        ],
-        nextStepParams: {
-          get_mac_bundle_id: {
-            appPath:
-              '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-          launch_mac_app: {
-            appPath:
-              '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-        },
+      const appPath =
+        '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app';
+
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        get_mac_bundle_id: { appPath },
+        launch_mac_app: { appPath },
       });
     });
 
@@ -399,57 +404,44 @@ FULL_PRODUCT_NAME = MyApp.app
         `,
       });
 
-      const result = await get_mac_app_pathLogic(
-        {
-          projectPath: '/path/to/MyProject.xcodeproj',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_mac_app_pathLogic(
+          {
+            projectPath: '/path/to/MyProject.xcodeproj',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: '✅ App path retrieved successfully: /Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-        ],
-        nextStepParams: {
-          get_mac_bundle_id: {
-            appPath:
-              '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-          launch_mac_app: {
-            appPath:
-              '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app',
-          },
-        },
+      const appPath =
+        '/Users/test/Library/Developer/Xcode/DerivedData/MyApp-abc123/Build/Products/Debug/MyApp.app';
+
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        get_mac_bundle_id: { appPath },
+        launch_mac_app: { appPath },
       });
     });
 
     it('should return exact build settings failure response', async () => {
       const mockExecutor = createMockExecutor({
         success: false,
-        error: 'error: No such scheme',
+        error: 'xcodebuild: error: No such scheme',
       });
 
-      const result = await get_mac_app_pathLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_mac_app_pathLogic(
+          {
+            workspacePath: '/path/to/MyProject.xcworkspace',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Failed to get macOS app path\nDetails: error: No such scheme',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(result.nextStepParams).toBeUndefined();
     });
 
     it('should return exact missing build settings response', async () => {
@@ -458,23 +450,18 @@ FULL_PRODUCT_NAME = MyApp.app
         output: 'OTHER_SETTING = value',
       });
 
-      const result = await get_mac_app_pathLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_mac_app_pathLogic(
+          {
+            workspacePath: '/path/to/MyProject.xcworkspace',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Failed to get macOS app path\nDetails: Could not extract app path from build settings',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(result.nextStepParams).toBeUndefined();
     });
 
     it('should return exact exception handling response', async () => {
@@ -482,23 +469,18 @@ FULL_PRODUCT_NAME = MyApp.app
         throw new Error('Network error');
       };
 
-      const result = await get_mac_app_pathLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
+      const result = await runLogic(() =>
+        get_mac_app_pathLogic(
+          {
+            workspacePath: '/path/to/MyProject.xcworkspace',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+        ),
       );
 
-      expect(result).toEqual({
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Failed to get macOS app path\nDetails: Network error',
-          },
-        ],
-        isError: true,
-      });
+      expect(result.isError).toBe(true);
+      expect(result.nextStepParams).toBeUndefined();
     });
   });
 });

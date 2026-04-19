@@ -1,0 +1,27 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "macos"
+    },
+    "artifacts": {
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app",
+      "bundleId": "io.sentry.MCPTest.macOS",
+      "processId": 99999,
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_macos_<TIMESTAMP>_pid<PID>.log"
+    },
+    "output": {
+      "stdout": [],
+      "stderr": []
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

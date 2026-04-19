@@ -1,0 +1,6 @@
+
+📍 Reset Location
+
+   Simulator: <UUID>
+
+✅ Location successfully reset to default

@@ -1,8 +1,3 @@
-/**
- * Tests for get_file_coverage tool
- * Covers happy-path, showLines, uncovered line parsing, and failure paths
- */
-
 import { afterEach, describe, it, expect } from 'vitest';
 import {
   createMockExecutor,
@@ -15,6 +10,9 @@ import {
   __clearTestExecutorOverrides,
 } from '../../../../utils/execution/index.ts';
 import { schema, handler, get_file_coverageLogic } from '../get_file_coverage.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+
+
 
 const sampleFunctionsJson = [
   {
@@ -102,7 +100,7 @@ describe('get_file_coverage', () => {
       });
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File not found');
     });
 
@@ -140,10 +138,10 @@ describe('get_file_coverage', () => {
         },
       });
 
-      await get_file_coverageLogic(
+      await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(commands).toHaveLength(1);
       expect(commands[0]).toEqual([
@@ -180,10 +178,10 @@ describe('get_file_coverage', () => {
         return createMockCommandResponse({ success: true, output: sampleArchiveOutput, exitCode: 0 });
       };
 
-      await get_file_coverageLogic(
+      await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(commands).toHaveLength(2);
       expect(commands[1]).toEqual([
@@ -205,67 +203,68 @@ describe('get_file_coverage', () => {
         output: JSON.stringify(sampleFunctionsJson),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File: /src/MyApp/ViewModel.swift');
       expect(text).toContain('Coverage: 61.9%');
       expect(text).toContain('13/21 lines');
     });
 
-    it('should mark uncovered functions with [NOT COVERED]', async () => {
+    it('should group uncovered functions under Not Covered section', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: JSON.stringify(sampleFunctionsJson),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('[NOT COVERED] L40 reset()');
-      expect(text).not.toContain('[NOT COVERED] L10 init()');
+      const text = allText(result);
+      expect(text).toContain('Not Covered (1 function, 4 lines)');
+      expect(text).toContain('L40  reset()');
     });
 
-    it('should sort functions by line number', async () => {
+    it('should group functions by coverage status', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: JSON.stringify(sampleFunctionsJson),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      const initIdx = text.indexOf('L10 init()');
-      const loadIdx = text.indexOf('L20 loadData()');
-      const resetIdx = text.indexOf('L40 reset()');
-      expect(initIdx).toBeLessThan(loadIdx);
-      expect(loadIdx).toBeLessThan(resetIdx);
+      const text = allText(result);
+      const notCoveredIdx = text.indexOf('Not Covered');
+      const partialIdx = text.indexOf('Partial Coverage');
+      const fullIdx = text.indexOf('Full Coverage');
+      expect(notCoveredIdx).toBeLessThan(partialIdx);
+      expect(partialIdx).toBeLessThan(fullIdx);
     });
 
-    it('should list uncovered functions summary', async () => {
+    it('should show partial coverage functions with percentage', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
         output: JSON.stringify(sampleFunctionsJson),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('Uncovered functions (1):');
-      expect(text).toContain('- reset() (line 40)');
+      const text = allText(result);
+      expect(text).toContain('Partial Coverage (1 function)');
+      expect(text).toContain('L20  loadData()');
+      expect(text).toContain('66.7%');
     });
 
     it('should include nextStepParams', async () => {
@@ -274,10 +273,10 @@ describe('get_file_coverage', () => {
         output: JSON.stringify(sampleFunctionsJson),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.nextStepParams).toEqual({
         get_coverage_report: { xcresultPath: '/tmp/test.xcresult' },
@@ -318,13 +317,13 @@ describe('get_file_coverage', () => {
         output: JSON.stringify(nestedData),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Model.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File: /src/Model.swift');
       expect(text).toContain('50.0%');
     });
@@ -351,13 +350,13 @@ describe('get_file_coverage', () => {
         return createMockCommandResponse({ success: true, output: sampleArchiveOutput, exitCode: 0 });
       };
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
-      expect(text).toContain('Uncovered line ranges (/src/MyApp/ViewModel.swift):');
+      const text = allText(result);
+      expect(text).toContain('Uncovered line ranges (/src/MyApp/ViewModel.swift)');
       expect(text).toContain('L4-6');
       expect(text).toContain('L9');
     });
@@ -383,12 +382,12 @@ describe('get_file_coverage', () => {
         return createMockCommandResponse({ success: true, output: allCoveredArchive, exitCode: 0 });
       };
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('All executable lines are covered');
     });
 
@@ -417,13 +416,13 @@ describe('get_file_coverage', () => {
         });
       };
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift', showLines: true },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Could not retrieve line-level coverage from archive');
     });
   });
@@ -433,13 +432,13 @@ describe('get_file_coverage', () => {
       const missingFs = createMockFileSystemExecutor({ existsSync: () => false });
       const mockExecutor = createMockExecutor({ success: true, output: '{}' });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/missing.xcresult', file: 'Foo.swift', showLines: false },
         { executor: mockExecutor, fileSystem: missingFs },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File not found');
       expect(text).toContain('/tmp/missing.xcresult');
     });
@@ -450,13 +449,13 @@ describe('get_file_coverage', () => {
         error: 'Failed to load result bundle',
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/bad.xcresult', file: 'Foo.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Failed to get file coverage');
       expect(text).toContain('Failed to load result bundle');
     });
@@ -467,13 +466,13 @@ describe('get_file_coverage', () => {
         output: 'not json',
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Foo.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('Failed to parse coverage JSON output');
     });
 
@@ -483,13 +482,13 @@ describe('get_file_coverage', () => {
         output: JSON.stringify([]),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Missing.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('No coverage data found for "Missing.swift"');
     });
 
@@ -499,13 +498,13 @@ describe('get_file_coverage', () => {
         output: JSON.stringify({ targets: 'not-an-array' }),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Foo.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBe(true);
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('No coverage data found for "Foo.swift"');
     });
 
@@ -516,13 +515,13 @@ describe('get_file_coverage', () => {
         output: JSON.stringify(noFunctions),
       });
 
-      const result = await get_file_coverageLogic(
+      const result = await runLogic(() => get_file_coverageLogic(
         { xcresultPath: '/tmp/test.xcresult', file: 'Empty.swift', showLines: false },
         { executor: mockExecutor, fileSystem: mockFileSystem },
-      );
+      ));
 
       expect(result.isError).toBeUndefined();
-      const text = result.content[0].type === 'text' ? result.content[0].text : '';
+      const text = allText(result);
       expect(text).toContain('File: /src/Empty.swift');
       expect(text).toContain('Coverage: 0.0%');
       expect(text).toContain('0/0 lines');

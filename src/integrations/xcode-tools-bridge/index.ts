@@ -1,21 +1,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ToolResponse } from '../../types/common.ts';
+import type { BridgeToolResult } from './bridge-tool-result.ts';
 import { XcodeToolsBridgeManager } from './manager.ts';
 import { StandaloneXcodeToolsBridge } from './standalone.ts';
+
+export type { BridgeToolResult } from './bridge-tool-result.ts';
 
 let manager: XcodeToolsBridgeManager | null = null;
 let standalone: StandaloneXcodeToolsBridge | null = null;
 
 export interface XcodeToolsBridgeToolHandler {
-  statusTool(): Promise<ToolResponse>;
-  syncTool(): Promise<ToolResponse>;
-  disconnectTool(): Promise<ToolResponse>;
-  listToolsTool(params: { refresh?: boolean }): Promise<ToolResponse>;
+  statusTool(): Promise<BridgeToolResult>;
+  syncTool(): Promise<BridgeToolResult>;
+  disconnectTool(): Promise<BridgeToolResult>;
+  listToolsTool(params: { refresh?: boolean }): Promise<BridgeToolResult>;
   callToolTool(params: {
     remoteTool: string;
     arguments: Record<string, unknown>;
     timeoutMs?: number;
-  }): Promise<ToolResponse>;
+  }): Promise<BridgeToolResult>;
 }
 
 export function getXcodeToolsBridgeManager(server?: McpServer): XcodeToolsBridgeManager | null {

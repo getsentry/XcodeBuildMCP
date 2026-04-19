@@ -1,0 +1,28 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to simulate long press at (100, 400): axe command 'touch' failed.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "long-press",
+      "x": 100,
+      "y": 400,
+      "durationMs": 500
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
+        }
+      ]
+    }
+  }
+}

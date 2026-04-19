@@ -1,0 +1,15 @@
+
+🔨 Build
+
+   Scheme: MCPTest
+   Project: example_projects/macOS/MCPTest.xcodeproj
+   Configuration: Debug
+   Platform: macOS
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  ├ Bundle ID: io.sentry.MCPTest.macOS
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_macos_<TIMESTAMP>_pid<PID>.log
+
+Next steps:
+1. Get built macOS app path: xcodebuildmcp macos get-app-path --scheme "MCPTest"

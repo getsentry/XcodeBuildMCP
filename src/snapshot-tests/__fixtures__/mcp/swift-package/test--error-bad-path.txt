@@ -1,0 +1,14 @@
+
+🧪 Swift Package Test
+
+   Scheme: NONEXISTENT
+   Configuration: debug
+   Platform: Swift Package
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+
+Errors (1):
+
+  ✗ chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT
+
+❌ Test failed. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log

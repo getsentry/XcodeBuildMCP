@@ -1,67 +1,67 @@
 /**
  * Resource Management - MCP Resource handlers and URI management
  *
- * This module manages MCP resources, providing a unified interface for exposing
- * data through the Model Context Protocol resource system.
+ * This module manages MCP resources using manifest-driven discovery and
+ * predicate-aware registration through the Model Context Protocol resource system.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { log } from '../utils/logging/index.ts';
-import type { CommandExecutor } from '../utils/execution/index.ts';
-
-// Direct imports - no codegen needed
-import devicesResource from '../mcp/resources/devices.ts';
-import doctorResource from '../mcp/resources/doctor.ts';
-import sessionStatusResource from '../mcp/resources/session-status.ts';
-import simulatorsResource from '../mcp/resources/simulators.ts';
-import xcodeIdeStateResource from '../mcp/resources/xcode-ide-state.ts';
+import { loadManifest } from './manifest/load-manifest.ts';
+import { importResourceModule } from './manifest/import-resource-module.ts';
+import type { ResourceManifestEntry } from './manifest/schema.ts';
+import type { PredicateContext } from '../visibility/predicate-types.ts';
+import { isResourceExposedForRuntime } from '../visibility/exposure.ts';
 
 /**
- * Resource metadata interface
+ * Resource metadata interface (runtime-assembled from manifest + imported module).
  */
 export interface ResourceMeta {
   uri: string;
   name: string;
   description: string;
   mimeType: string;
-  handler: (
-    uri: URL,
-    executor?: CommandExecutor,
-  ) => Promise<{
-    contents: Array<{ text: string }>;
-  }>;
+  handler: (uri: URL) => Promise<{ contents: Array<{ text: string }> }>;
 }
 
 /**
- * All available resources
- */
-const RESOURCES: ResourceMeta[] = [
-  devicesResource,
-  doctorResource,
-  sessionStatusResource,
-  simulatorsResource,
-  xcodeIdeStateResource,
-];
-
-/**
- * Load all resources
+ * Load resources from manifests, filtered by predicate context.
+ * @param ctx Predicate context for visibility filtering
  * @returns Map of resource URI to resource metadata
  */
-export async function loadResources(): Promise<Map<string, ResourceMeta>> {
+export async function loadResources(ctx: PredicateContext): Promise<Map<string, ResourceMeta>> {
+  const manifest = loadManifest();
   const resources = new Map<string, ResourceMeta>();
 
-  for (const resource of RESOURCES) {
-    if (!resource.uri || !resource.handler || typeof resource.handler !== 'function') {
+  for (const resource of manifest.resources.values()) {
+    if (!isResourceExposedForRuntime(resource, ctx)) {
+      log('info', `Skipped resource '${resource.name}' (hidden by predicates)`);
+      continue;
+    }
+
+    let resourceModule;
+    try {
+      resourceModule = await importResourceModule(resource.module);
+    } catch (err) {
       log(
         'error',
-        `[infra/resources] invalid resource structure for ${resource.name ?? 'unknown'}`,
-        { sentry: true },
+        `[infra/resources] failed to import resource module '${resource.module}': ${err}`,
+        {
+          sentry: true,
+        },
       );
       continue;
     }
 
-    resources.set(resource.uri, resource);
+    resources.set(resource.uri, {
+      uri: resource.uri,
+      name: resource.name,
+      description: resource.description,
+      mimeType: resource.mimeType,
+      handler: resourceModule.handler,
+    });
+
     log('info', `Loaded resource: ${resource.name} (${resource.uri})`);
   }
 
@@ -69,12 +69,16 @@ export async function loadResources(): Promise<Map<string, ResourceMeta>> {
 }
 
 /**
- * Register all resources with the MCP server
+ * Register resources with the MCP server using manifest-driven discovery.
  * @param server The MCP server instance
+ * @param ctx Predicate context for visibility filtering
  * @returns true if resources were registered
  */
-export async function registerResources(server: McpServer): Promise<boolean> {
-  const resources = await loadResources();
+export async function registerResources(
+  server: McpServer,
+  ctx: PredicateContext,
+): Promise<boolean> {
+  const resources = await loadResources(ctx);
 
   for (const [uri, resource] of resources) {
     const readCallback = async (resourceUri: URL): Promise<ReadResourceResult> => {
@@ -106,10 +110,11 @@ export async function registerResources(server: McpServer): Promise<boolean> {
 }
 
 /**
- * Get all available resource URIs
+ * Get all available resource URIs for the given context.
+ * @param ctx Predicate context for visibility filtering
  * @returns Array of resource URI strings
  */
-export async function getAvailableResources(): Promise<string[]> {
-  const resources = await loadResources();
+export async function getAvailableResources(ctx: PredicateContext): Promise<string[]> {
+  const resources = await loadResources(ctx);
   return Array.from(resources.keys());
 }

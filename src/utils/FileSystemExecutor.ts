@@ -1,7 +1,3 @@
-/**
- * File system executor interface for dependency injection
- */
-
 import type { WriteStream } from 'fs';
 
 // Runtime marker to prevent empty output in unbundled builds

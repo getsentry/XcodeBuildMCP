@@ -1,0 +1,14 @@
+
+📝 Scaffold macOS Project
+
+   Name: SnapshotTestMacApp
+   Path: <TMPDIR>/macos
+   Platform: macOS
+
+✅ Project scaffolded successfully
+  └ <TMPDIR>/macos
+
+Next steps:
+1. Important: Before working on the project make sure to read the README.md file in the workspace root directory.
+2. Build for macOS: build_macos({ workspacePath: "<TMPDIR>/macos/SnapshotTestMacApp.xcworkspace", scheme: "SnapshotTestMacApp" })
+3. Build & Run on macOS: build_run_macos({ workspacePath: "<TMPDIR>/macos/SnapshotTestMacApp.xcworkspace", scheme: "SnapshotTestMacApp" })

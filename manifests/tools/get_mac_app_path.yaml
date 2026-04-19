@@ -13,6 +13,8 @@ nextSteps:
   - label: Get bundle ID
     toolId: get_mac_bundle_id
     priority: 1
+    when: success
   - label: Launch app
     toolId: launch_mac_app
     priority: 2
+    when: success

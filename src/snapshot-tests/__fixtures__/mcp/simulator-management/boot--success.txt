@@ -1,0 +1,11 @@
+
+📱 Boot Simulator
+
+   Simulator: <UUID>
+
+✅ Simulator booted successfully
+
+Next steps:
+1. Open the Simulator app (makes it visible): open_sim()
+2. Install an app: install_app_sim({ simulatorId: "<UUID>", appPath: "PATH_TO_YOUR_APP" })
+3. Launch an app: launch_app_sim({ simulatorId: "<UUID>", bundleId: "YOUR_APP_BUNDLE_ID" })

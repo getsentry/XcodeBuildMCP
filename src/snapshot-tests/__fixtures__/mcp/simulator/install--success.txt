@@ -1,0 +1,11 @@
+
+📦 Install App
+
+   Simulator: <UUID>
+   App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+
+✅ App installed successfully
+
+Next steps:
+1. Open the Simulator app: open_sim()
+2. Launch the app: launch_app_sim({ simulatorId: "<UUID>", bundleId: "io.sentry.calculatorapp" })

@@ -5,11 +5,13 @@ import { DaemonClient } from './daemon-client.ts';
 import { buildCliToolCatalogFromManifest, createToolCatalog } from '../runtime/tool-catalog.ts';
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
 import { toKebabCase } from '../runtime/naming.ts';
-import type { ToolResponse } from '../types/common.ts';
+import type { ToolHandlerContext } from '../rendering/types.ts';
+import type { PipelineEvent } from '../types/pipeline-events.ts';
 import { jsonSchemaToZod } from '../integrations/xcode-tools-bridge/jsonschema-to-zod.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
 import { log } from '../utils/logging/index.ts';
+import { statusLine } from '../utils/tool-event-builders.ts';
 
 interface BuildCliToolCatalogOptions {
   socketPath: string;
@@ -52,12 +54,28 @@ function jsonSchemaToToolSchemaShape(inputSchema: unknown): ToolSchemaShape {
 async function invokeRemoteToolOneShot(
   remoteToolName: string,
   args: Record<string, unknown>,
-): Promise<ToolResponse> {
+  ctx: ToolHandlerContext,
+): Promise<void> {
   const service = new XcodeIdeToolService();
   service.setWorkflowEnabled(true);
   try {
-    const response = await service.invokeTool(remoteToolName, args);
-    return response as unknown as ToolResponse;
+    const response = (await service.invokeTool(remoteToolName, args)) as unknown as {
+      content?: Array<{ type: string; text: string }>;
+      isError?: boolean;
+      _meta?: Record<string, unknown>;
+    };
+    const events = response._meta?.events;
+    if (Array.isArray(events)) {
+      for (const event of events as PipelineEvent[]) {
+        ctx.emit(event);
+      }
+    } else if (response.content) {
+      for (const item of response.content) {
+        if (item.type === 'text') {
+          ctx.emit(statusLine(response.isError ? 'error' : 'success', item.text));
+        }
+      }
+    }
   } finally {
     await service.disconnect();
   }
@@ -83,8 +101,8 @@ function createCliXcodeProxyTool(remoteTool: DynamicBridgeTool): ToolDefinition 
     cliSchema,
     stateful: false,
     xcodeIdeRemoteToolName: remoteTool.name,
-    handler: async (params): Promise<ToolResponse> => {
-      return invokeRemoteToolOneShot(remoteTool.name, params);
+    handler: async (params, ctx): Promise<void> => {
+      return invokeRemoteToolOneShot(remoteTool.name, params, ctx);
     },
   };
 }

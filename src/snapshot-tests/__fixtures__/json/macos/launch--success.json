@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app",
+      "bundleId": "io.sentry.MCPTest.macOS",
+      "processId": 99999
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  }
+}

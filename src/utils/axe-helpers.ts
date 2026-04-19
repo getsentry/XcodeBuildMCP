@@ -7,8 +7,6 @@
 
 import { accessSync, constants, existsSync } from 'fs';
 import { delimiter, join, resolve } from 'path';
-import { createTextResponse } from './validation.ts';
-import type { ToolResponse } from '../types/common.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import { getDefaultCommandExecutor } from './execution/index.ts';
 import { getConfig } from './config-store.ts';
@@ -121,10 +119,6 @@ export const AXE_NOT_AVAILABLE_MESSAGE =
   'AXe tool not found. UI automation features are not available.\n\n' +
   'Install AXe (brew tap cameroncooke/axe && brew install axe) or set XCODEBUILDMCP_AXE_PATH.\n' +
   'Ensure bundled artifacts are included or PATH is configured.';
-
-export function createAxeNotAvailableResponse(): ToolResponse {
-  return createTextResponse(AXE_NOT_AVAILABLE_MESSAGE, true);
-}
 
 /**
  * Compare two semver strings a and b.
