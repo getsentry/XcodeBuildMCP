@@ -269,7 +269,6 @@ export async function get_coverage_reportLogic(
   const executeGetCoverageReport = createGetCoverageReportExecutor(context);
   const result = await executeGetCoverageReport(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(ctx, result);

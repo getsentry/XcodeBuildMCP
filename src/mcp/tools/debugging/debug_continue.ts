@@ -78,7 +78,6 @@ export async function debug_continueLogic(
   const executeDebugContinue = createDebugContinueExecutor(ctx.debugger);
   const result = await executeDebugContinue(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);

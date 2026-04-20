@@ -77,7 +77,6 @@ export async function debug_detachLogic(
   const executeDebugDetach = createDebugDetachExecutor(ctx.debugger);
   const result = await executeDebugDetach(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);

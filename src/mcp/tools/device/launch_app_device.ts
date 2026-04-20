@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -19,11 +18,15 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchAppOnDevice } from '../../../utils/device-steps.ts';
-import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import {
+  buildLaunchFailure,
+  buildLaunchSuccess,
+  setLaunchResultStructuredOutput,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -42,27 +45,18 @@ const publicSchemaObject = launchAppDeviceSchema.omit({
 type LaunchAppDeviceParams = z.infer<typeof launchAppDeviceSchema>;
 type LaunchAppDeviceResult = LaunchResultDomainResult;
 
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.launch-result';
-
 export async function launch_app_deviceLogic(
   params: LaunchAppDeviceParams,
   executor: CommandExecutor,
   fileSystem: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Launch App', [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'Bundle ID', value: params.bundleId },
-    ]),
-  );
   const executeLaunchAppDevice = createLaunchAppDeviceExecutor(executor, fileSystem);
   const result = await executeLaunchAppDevice(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setLaunchResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error launching app on device: ${result.error ?? 'Unknown error'}`);
@@ -75,57 +69,8 @@ export async function launch_app_deviceLogic(
   }
 }
 
-function createLaunchAppDeviceResult(
-  params: LaunchAppDeviceParams,
-  processId?: number,
-): LaunchAppDeviceResult {
-  return {
-    kind: 'launch-result',
-    didError: false,
-    error: null,
-    summary: { status: 'SUCCEEDED' },
-    artifacts: {
-      deviceId: params.deviceId,
-      bundleId: params.bundleId,
-      ...(processId !== undefined ? { processId } : {}),
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function createLaunchAppDeviceErrorResult(
-  params: LaunchAppDeviceParams,
-  message: string,
-): LaunchAppDeviceResult {
-  return {
-    kind: 'launch-result',
-    didError: true,
-    error: message,
-    summary: { status: 'FAILED' },
-    artifacts: {
-      deviceId: params.deviceId,
-      bundleId: params.bundleId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
 function getProcessId(result: LaunchAppDeviceResult): number | undefined {
   return 'processId' in result.artifacts ? result.artifacts.processId : undefined;
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: LaunchAppDeviceResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
 }
 
 export function createLaunchAppDeviceExecutor(
@@ -134,6 +79,8 @@ export function createLaunchAppDeviceExecutor(
 ): ToolExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult> {
   return async (params) => {
     log('info', `Launching app ${params.bundleId} on device ${params.deviceId}`);
+
+    const baseArtifacts = { deviceId: params.deviceId, bundleId: params.bundleId };
 
     try {
       const launchResult = await launchAppOnDevice(
@@ -147,14 +94,18 @@ export function createLaunchAppDeviceExecutor(
       );
 
       if (!launchResult.success) {
-        const message = `Failed to launch app: ${launchResult.error}`;
-        return createLaunchAppDeviceErrorResult(params, message);
+        return buildLaunchFailure(baseArtifacts, `Failed to launch app: ${launchResult.error}`);
       }
 
-      return createLaunchAppDeviceResult(params, launchResult.processId);
+      return buildLaunchSuccess({
+        ...baseArtifacts,
+        ...(launchResult.processId !== undefined ? { processId: launchResult.processId } : {}),
+      });
     } catch (error) {
-      const message = `Failed to launch app on device: ${toErrorMessage(error)}`;
-      return createLaunchAppDeviceErrorResult(params, message);
+      return buildLaunchFailure(
+        baseArtifacts,
+        `Failed to launch app on device: ${toErrorMessage(error)}`,
+      );
     }
   };
 }
@@ -165,7 +116,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<LaunchAppDeviceParams>({
-  internalSchema: launchAppDeviceSchema as unknown as z.ZodType<LaunchAppDeviceParams>,
+  internalSchema: toInternalSchema<LaunchAppDeviceParams>(launchAppDeviceSchema),
   logicFunction: (params, executor) =>
     launch_app_deviceLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,

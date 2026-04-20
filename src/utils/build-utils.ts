@@ -14,7 +14,7 @@ import path from 'path';
 import os from 'node:os';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
 import type { XcodebuildPipeline } from './xcodebuild-pipeline.ts';
-import { createNoticeEvent } from './xcodebuild-output.ts';
+import { createNoticeFragment } from './xcodebuild-output.ts';
 
 export interface BuildCommandResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -42,8 +42,8 @@ export async function executeXcodeBuildCommand(
   pipeline?: XcodebuildPipeline,
 ): Promise<BuildCommandResult> {
   function addBuildMessage(message: string, level: 'info' | 'success' = 'info'): void {
-    pipeline?.emitEvent(
-      createNoticeEvent('BUILD', message.replace(/^[^\p{L}\p{N}]+/u, '').trim(), level),
+    pipeline?.emitFragment(
+      createNoticeFragment('BUILD', message.replace(/^[^\p{L}\p{N}]+/u, '').trim(), level),
     );
   }
 

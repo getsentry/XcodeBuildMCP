@@ -9,8 +9,9 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseSchemaObject = z.object({
@@ -20,13 +21,7 @@ const baseSchemaObject = z.object({
 
 const listSchemesSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 export type ListSchemesParams = z.infer<typeof listSchemesSchema>;
@@ -130,7 +125,6 @@ export async function listSchemesLogic(
   const executeListSchemes = createListSchemesExecutor(executor);
   const result = await executeListSchemes(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   setStructuredOutput(ctx, result);
@@ -165,7 +159,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ListSchemesParams>({
-  internalSchema: listSchemesSchema as unknown as z.ZodType<ListSchemesParams, unknown>,
+  internalSchema: toInternalSchema<ListSchemesParams>(listSchemesSchema),
   logicFunction: listSchemesLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

@@ -6,9 +6,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -17,16 +16,17 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import {
+  collectFallbackErrorMessages,
   createBuildDomainResult,
   createToolExecutionContext,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
+  setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -40,13 +40,7 @@ const baseSchemaObject = z.object({
 
 const buildDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 export type BuildDeviceParams = z.infer<typeof buildDeviceSchema>;
@@ -61,30 +55,15 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
-function getFallbackErrorMessages(
-  started: ReturnType<typeof createProgressStreamingPipeline>,
-  responseContent?: Array<{ type: 'text'; text: string }>,
-): string[] {
-  return [...started.stderrLines, ...(responseContent ?? []).map((item) => item.text)];
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: BuildDeviceResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createBuildDeviceExecutor(
   executor: CommandExecutor,
-): ToolExecutor<BuildDeviceParams, BuildDeviceResult> {
+): DomainStreamingExecutor<BuildDeviceParams, BuildDeviceResult> {
   return async (params, ctx) => {
     const processedParams = {
       ...params,
       configuration: params.configuration ?? 'Debug',
     };
-    const started = createProgressStreamingPipeline('build_device', 'BUILD', ctx);
+    const started = createDomainStreamingPipeline('build_device', 'BUILD', ctx, 'build-result');
 
     const buildResult = await executeXcodeBuildCommand(
       processedParams,
@@ -106,9 +85,7 @@ export function createBuildDeviceExecutor(
       artifacts: {
         buildLogPath: started.pipeline.logPath,
       },
-      responseContent: buildResult.content,
-      fallbackErrorMessages: getFallbackErrorMessages(started, buildResult.content),
-      errorFallbackPolicy: 'if-no-structured-diagnostics',
+      fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
     });
   };
 }
@@ -120,24 +97,25 @@ export async function buildDeviceLogic(
   const ctx = getHandlerContext();
   const configuration = params.configuration ?? 'Debug';
 
-  ctx.emit(
-    createBuildHeaderEvent(
-      {
-        scheme: params.scheme,
-        workspacePath: params.workspacePath,
-        projectPath: params.projectPath,
-        configuration,
-        platform: 'iOS',
-      },
-      'Build',
-    ),
+  const invocationRequest: BuildInvocationRequest = {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration,
+    platform: 'iOS',
+    target: 'device',
+  };
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'BUILD',
+    invocationRequest,
+    'build-result',
   );
-
-  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildDevice = createBuildDeviceExecutor(executor);
   const result = await executeBuildDevice(params, executionContext);
+  result.request = invocationRequest;
 
-  setStructuredOutput(ctx, result);
+  setXcodebuildStructuredOutput(ctx, 'build-result', result);
   executionContext.emitResult(result);
 
   if (!result.didError) {
@@ -155,7 +133,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<BuildDeviceParams>({
-  internalSchema: buildDeviceSchema as unknown as z.ZodType<BuildDeviceParams, unknown>,
+  internalSchema: toInternalSchema<BuildDeviceParams>(buildDeviceSchema),
   logicFunction: buildDeviceLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

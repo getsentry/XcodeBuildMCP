@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -149,7 +150,6 @@ export async function set_sim_locationLogic(
 
   const result = await executeSetSimulatorLocation(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
   setStructuredOutput(ctx, result);
 
@@ -176,10 +176,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<SetSimulatorLocationParams>({
-  internalSchema: setSimulatorLocationSchema as unknown as z.ZodType<
-    SetSimulatorLocationParams,
-    unknown
-  >,
+  internalSchema: toInternalSchema<SetSimulatorLocationParams>(setSimulatorLocationSchema),
   logicFunction: set_sim_locationLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

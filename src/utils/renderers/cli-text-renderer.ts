@@ -1,17 +1,20 @@
 import type { NextStep } from '../../types/common.ts';
 import type { StructuredToolOutput } from '../../rendering/types.ts';
+import type { AnyFragment, BuildRunPhase } from '../../types/domain-fragments.ts';
+import type { XcodebuildOperation } from '../../types/domain-fragments.ts';
 import type {
-  CompilerErrorProgressEvent,
-  CompilerWarningProgressEvent,
-  ProgressEvent,
-  StatusProgressEvent,
-  TestFailureProgressEvent,
-  XcodebuildOperation,
-} from '../../types/progress-events.ts';
+  CompilerErrorRenderItem,
+  CompilerWarningRenderItem,
+  RenderItem,
+  StatusRenderItem,
+  TestFailureRenderItem,
+} from '../../rendering/render-items.ts';
+import { deriveBuildLikeTitle, invocationRequestToHeaderParams } from '../xcodebuild-pipeline.ts';
 import { createCliProgressReporter } from '../cli-progress-reporter.ts';
 import { formatCliTextLine } from '../terminal-output.ts';
 import {
   createNextStepsBlock,
+  createStreamingTailItems,
   renderDomainResultTextItems,
   type SummaryTextBlock,
   type TextRenderableItem,
@@ -70,7 +73,7 @@ interface CliTextRendererOptions {
 }
 
 export interface CliTextTranscriptInput {
-  items?: readonly ProgressEvent[];
+  items?: readonly AnyFragment[];
   structuredOutput?: StructuredToolOutput;
   nextSteps?: readonly NextStep[];
   nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
@@ -80,22 +83,22 @@ export interface CliTextTranscriptInput {
 interface XcodebuildParserState {
   parser: XcodebuildEventParser;
   runState: XcodebuildRunStateHandle;
-  bufferedEvents: ProgressEvent[];
+  bufferedFragments: AnyFragment[];
 }
 
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
 function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRenderer {
   const { interactive, sink, suppressWarnings } = options;
-  const groupedCompilerErrors: CompilerErrorProgressEvent[] = [];
-  const groupedWarnings: CompilerWarningProgressEvent[] = [];
-  const groupedTestFailures: TestFailureProgressEvent[] = [];
+  const groupedCompilerErrors: CompilerErrorRenderItem[] = [];
+  const groupedWarnings: CompilerWarningRenderItem[] = [];
+  const groupedTestFailures: TestFailureRenderItem[] = [];
   const parserStates = new Map<XcodebuildOperation, XcodebuildParserState>();
   let pendingTransientRuntimeLine: string | null = null;
   let diagnosticBaseDir: string | null = null;
   let hasDurableRuntimeContent = false;
   let lastVisibleEventType: TextRenderableItem['type'] | null = null;
-  let lastStatusLineLevel: StatusProgressEvent['level'] | null = null;
+  let lastStatusLineLevel: StatusRenderItem['level'] | null = null;
   let structuredOutput: StructuredToolOutput | undefined;
   let sawIncomingHeaderEvent = false;
   let sawIncomingNonHeaderEvent = false;
@@ -313,11 +316,11 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       return existing;
     }
 
-    const bufferedEvents: ProgressEvent[] = [];
+    const bufferedFragments: AnyFragment[] = [];
     const runState = createXcodebuildRunState({
       operation,
-      onEvent: (event) => {
-        bufferedEvents.push(event);
+      onEvent: (fragment) => {
+        bufferedFragments.push(fragment);
       },
     });
     const parser = createXcodebuildEventParser({
@@ -327,16 +330,17 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       },
     });
 
-    const state = { parser, runState, bufferedEvents };
+    const state = { parser, runState, bufferedFragments };
     parserStates.set(operation, state);
     return state;
   }
 
   function drainParserState(state: XcodebuildParserState): void {
-    while (state.bufferedEvents.length > 0) {
-      const event = state.bufferedEvents.shift();
-      if (event) {
-        processItem(event);
+    while (state.bufferedFragments.length > 0) {
+      const fragment = state.bufferedFragments.shift();
+      if (fragment) {
+        const renderItem = domainFragmentToRenderItem(fragment);
+        if (renderItem) processItem(renderItem);
       }
     }
   }
@@ -349,14 +353,16 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   }
 
   return {
-    onProgress(event: ProgressEvent): void {
-      if (event.type === 'header') {
+    onFragment(fragment: AnyFragment): void {
+      const item = domainFragmentToRenderItem(fragment);
+      if (!item) return;
+      if (item.type === 'header') {
         sawIncomingHeaderEvent = true;
       }
-      if (event.type !== 'header') {
+      if (item.type !== 'header') {
         sawIncomingNonHeaderEvent = true;
       }
-      processItem(event);
+      processItem(item);
     },
 
     setStructuredOutput(output: StructuredToolOutput): void {
@@ -370,15 +376,24 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
 
     finalize(): void {
       flushParserStates();
-      const shouldReplayStructured = !!structuredOutput && !sawIncomingNonHeaderEvent;
-      if (shouldReplayStructured && structuredOutput) {
-        const structuredItems = renderDomainResultTextItems(structuredOutput.result);
-        const replayItems =
-          sawIncomingHeaderEvent && structuredItems[0]?.type === 'header'
-            ? structuredItems.slice(1)
-            : structuredItems;
-        for (const item of replayItems) {
-          processItem(item);
+      if (structuredOutput) {
+        if (!sawIncomingNonHeaderEvent) {
+          const structuredItems = renderDomainResultTextItems(
+            structuredOutput.result,
+            structuredOutput.renderHints,
+          );
+          const replayItems =
+            sawIncomingHeaderEvent && structuredItems[0]?.type === 'header'
+              ? structuredItems.slice(1)
+              : structuredItems;
+          for (const item of replayItems) {
+            processItem(item);
+          }
+        } else {
+          const tailItems = createStreamingTailItems(structuredOutput.result);
+          for (const item of tailItems) {
+            processItem(item);
+          }
         }
       }
       flushGroupedDiagnostics(true);
@@ -444,7 +459,7 @@ export function renderCliTextTranscript(input: CliTextTranscriptInput = {}): str
   });
 
   for (const item of input.items ?? []) {
-    renderer.onProgress(item);
+    renderer.onFragment(item);
   }
   if (input.structuredOutput) {
     renderer.setStructuredOutput(input.structuredOutput);
@@ -455,4 +470,104 @@ export function renderCliTextTranscript(input: CliTextTranscriptInput = {}): str
   renderer.finalize();
 
   return output;
+}
+
+function phaseDisplayMessage(phase: BuildRunPhase): string {
+  switch (phase) {
+    case 'resolve-app-path':
+      return 'Resolving app path';
+    case 'boot-simulator':
+      return 'Booting simulator';
+    case 'install-app':
+      return 'Installing app';
+    case 'launch-app':
+      return 'Launching app';
+  }
+}
+
+function domainFragmentToRenderItem(fragment: AnyFragment): RenderItem | null {
+  switch (fragment.fragment) {
+    case 'warning':
+      return { type: 'status', level: 'warning', message: fragment.message };
+    case 'phase':
+      return {
+        type: 'status',
+        level: fragment.status === 'started' ? 'info' : 'success',
+        message: phaseDisplayMessage(fragment.phase),
+      };
+    case 'build-stage':
+      return {
+        type: 'build-stage',
+        operation: fragment.operation,
+        stage: fragment.stage,
+        message: fragment.message,
+      };
+    case 'compiler-diagnostic':
+      if (fragment.severity === 'warning') {
+        return {
+          type: 'compiler-warning',
+          operation: fragment.operation,
+          message: fragment.message,
+          location: fragment.location,
+          rawLine: fragment.rawLine,
+        };
+      }
+      return {
+        type: 'compiler-error',
+        operation: fragment.operation,
+        message: fragment.message,
+        location: fragment.location,
+        rawLine: fragment.rawLine,
+      };
+    case 'build-summary':
+      return {
+        type: 'summary',
+        operation: fragment.operation,
+        status: fragment.status,
+        ...(fragment.totalTests !== undefined ? { totalTests: fragment.totalTests } : {}),
+        ...(fragment.passedTests !== undefined ? { passedTests: fragment.passedTests } : {}),
+        ...(fragment.failedTests !== undefined ? { failedTests: fragment.failedTests } : {}),
+        ...(fragment.skippedTests !== undefined ? { skippedTests: fragment.skippedTests } : {}),
+        ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
+      };
+    case 'test-discovery':
+      return {
+        type: 'test-discovery',
+        operation: fragment.operation,
+        total: fragment.total,
+        tests: fragment.tests,
+        truncated: fragment.truncated,
+      };
+    case 'test-failure':
+      return {
+        type: 'test-failure',
+        operation: fragment.operation,
+        ...(fragment.target !== undefined ? { target: fragment.target } : {}),
+        ...(fragment.suite !== undefined ? { suite: fragment.suite } : {}),
+        ...(fragment.test !== undefined ? { test: fragment.test } : {}),
+        message: fragment.message,
+        ...(fragment.location !== undefined ? { location: fragment.location } : {}),
+        ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
+      };
+    case 'status':
+      return { type: 'status', level: fragment.level, message: fragment.message };
+    case 'test-progress':
+      return {
+        type: 'test-progress',
+        operation: fragment.operation,
+        completed: fragment.completed,
+        failed: fragment.failed,
+        skipped: fragment.skipped,
+      };
+    case 'invocation':
+      return {
+        type: 'header',
+        operation: deriveBuildLikeTitle(fragment.kind, fragment.request),
+        params: invocationRequestToHeaderParams(fragment.request),
+      };
+    case 'process-command':
+    case 'process-line':
+    case 'process-exit':
+      return null;
+  }
 }

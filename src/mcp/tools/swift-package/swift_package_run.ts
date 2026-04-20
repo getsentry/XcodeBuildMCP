@@ -2,7 +2,7 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, CommandResponse } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -16,10 +16,11 @@ import { acquireDaemonActivity } from '../../../daemon/activity-registry.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   createBuildRunDomainResult,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
   createToolExecutionContext,
 } from '../../../utils/xcodebuild-domain-results.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseSchemaObject = z.object({
   packagePath: z.string(),
@@ -83,14 +84,15 @@ export async function swift_package_runLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
-  ctx.emit(
-    header('Swift Package Run', [
-      { label: 'Package', value: resolvedPath },
-      { label: 'Executable', value: params.executableName ?? path.basename(resolvedPath) },
-    ]),
-  );
+  const invocationRequest: BuildInvocationRequest = {
+    packagePath: resolvedPath,
+    executableName: params.executableName ?? path.basename(resolvedPath),
+    target: 'swift-package' as const,
+  };
+  ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', invocationRequest));
+  const executionContext = createToolExecutionContext(ctx);
   const executeSwiftPackageRun = createSwiftPackageRunExecutor(executor);
-  const result = await executeSwiftPackageRun(params, createToolExecutionContext(ctx, 'BUILD'));
+  const result = await executeSwiftPackageRun(params, executionContext);
 
   setStructuredOutput(ctx, result);
 
@@ -121,10 +123,10 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageRunRes
 
 export function createSwiftPackageRunExecutor(
   executor: CommandExecutor,
-): ToolExecutor<SwiftPackageRunParams, SwiftPackageRunResult> {
+): DomainStreamingExecutor<SwiftPackageRunParams, SwiftPackageRunResult> {
   return async (params, ctx) => {
     const resolvedPath = path.resolve(params.packagePath);
-    const started = createProgressStreamingPipeline('build_run_spm', 'BUILD', ctx);
+    const started = createDomainStreamingPipeline('build_run_spm', 'BUILD', ctx);
     const timeout = Math.min(params.timeout ?? 30, 300) * 1000;
     const swiftArgs = ['run', '--package-path', resolvedPath];
     const executableName = params.executableName ?? path.basename(resolvedPath);
@@ -140,7 +142,6 @@ export function createSwiftPackageRunExecutor(
           packagePath: resolvedPath,
         },
         fallbackErrorMessages: ["Invalid configuration. Use 'debug' or 'release'."],
-        errorFallbackPolicy: 'always',
       });
     }
 
@@ -282,7 +283,6 @@ export function createSwiftPackageRunExecutor(
             buildLogPath: started.pipeline.logPath,
           },
           fallbackErrorMessages: [result.error],
-          errorFallbackPolicy: 'always',
         });
       }
 
@@ -342,7 +342,6 @@ export function createSwiftPackageRunExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [toErrorMessage(error)],
-        errorFallbackPolicy: 'always',
       });
     }
   };

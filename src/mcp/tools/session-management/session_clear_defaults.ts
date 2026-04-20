@@ -136,7 +136,6 @@ export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
   const executeSessionClearDefaults = createSessionClearDefaultsExecutor();
   const result = await executeSessionClearDefaults(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   if (!result.didError) {

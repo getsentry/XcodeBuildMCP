@@ -4,7 +4,8 @@
 
 import { expect } from 'vitest';
 import type { ToolHandlerContext, ImageAttachment } from '../rendering/types.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
+
 import type { ToolResponse, NextStepParamsMap } from '../types/common.ts';
 import type { ToolHandler } from '../utils/typed-tool-factory.ts';
 import { createRenderSession } from '../rendering/render.ts';
@@ -30,7 +31,7 @@ export function allText(result: {
  * with an optional next-step tool reference.
  */
 export interface MockToolHandlerResult {
-  events: ProgressEvent[];
+  events: AnyFragment[];
   attachments: ImageAttachment[];
   nextStepParams?: NextStepParamsMap;
   text(): string;
@@ -46,22 +47,21 @@ export function createMockToolHandlerContext(
   result: MockToolHandlerResult;
   run: <T>(fn: () => Promise<T>) => Promise<T>;
 } {
-  const events: ProgressEvent[] = [];
+  const events: AnyFragment[] = [];
   const attachments: ImageAttachment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: options.liveProgressEnabled ?? true,
-    emit: (event) => {
-      events.push(event);
+    emit: (fragment: AnyFragment) => {
+      events.push(fragment);
     },
     attach: (image) => {
       attachments.push(image);
     },
-    emitProgress: (event) => {
+    emitLiveFragment: (fragment: AnyFragment) => {
       if (!ctx.liveProgressEnabled) {
         return;
       }
-
-      events.push(event);
+      events.push(fragment);
     },
   };
   const resultObj: MockToolHandlerResult = {
@@ -81,9 +81,9 @@ export function createMockToolHandlerContext(
       return (
         events.some(
           (e) =>
-            e.type === 'compiler-error' ||
-            e.type === 'test-failure' ||
-            (e.type === 'status' && e.level === 'error'),
+            (e.fragment === 'compiler-diagnostic' && e.severity === 'error') ||
+            e.fragment === 'test-failure' ||
+            (e.fragment === 'status' && e.level === 'error'),
         ) || ctx.structuredOutput?.result.didError === true
       );
     },
@@ -169,17 +169,17 @@ export async function callHandler(
   args: Record<string, unknown>,
 ): Promise<CallHandlerResult> {
   const session = createRenderSession('text');
-  const items: ProgressEvent[] = [];
+  const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: true,
-    emit: (event) => {
-      items.push(event);
-      session.emit(event);
+    emit: (fragment: AnyFragment) => {
+      items.push(fragment);
+      session.emit(fragment);
     },
     attach: (image) => session.attach(image),
-    emitProgress: (event) => {
-      items.push(event);
-      session.emit(event);
+    emitLiveFragment: (fragment: AnyFragment) => {
+      items.push(fragment);
+      session.emit(fragment);
     },
   };
   await handler(args, ctx);

@@ -7,6 +7,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
@@ -84,7 +85,6 @@ export async function debug_lldb_commandLogic(
   const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
   const result = await executeDebugLldbCommand(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);
@@ -93,7 +93,7 @@ export async function debug_lldb_commandLogic(
 export const schema = baseSchemaObject.shape;
 
 export const handler = createTypedToolWithContext<DebugLldbCommandParams, DebuggerToolContext>(
-  debugLldbCommandSchema as unknown as z.ZodType<DebugLldbCommandParams, unknown>,
+  toInternalSchema<DebugLldbCommandParams>(debugLldbCommandSchema),
   debug_lldb_commandLogic,
   getDefaultDebuggerToolContext,
 );

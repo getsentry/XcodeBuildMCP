@@ -55,60 +55,69 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [
-        { label: 'Scheme', value: 'MyApp' },
-        { label: 'Project', value: '/tmp/MyApp.xcodeproj' },
-        { label: 'Configuration', value: 'Debug' },
-        { label: 'Platform', value: 'macOS' },
-      ],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: {
+        scheme: 'MyApp',
+        projectPath: '/tmp/MyApp.xcodeproj',
+        configuration: 'Debug',
+        platform: 'macOS',
+        derivedDataPath: '/tmp/DerivedData',
+      },
     });
 
-    renderer.onProgress({
-      type: 'build-stage',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
     const output = stdoutWrite.mock.calls.flat().join('');
-    expect(output).toContain('  Platform: macOS\n\n\u203A Compiling\n');
+    expect(output).toContain('  Derived Data: /tmp/DerivedData\n\n\u203A Compiling\n');
   });
 
   it('uses transient interactive updates for active phases and durable writes for lasting events', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: true });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [{ label: 'Scheme', value: 'MyApp' }],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: { scheme: 'MyApp', derivedDataPath: '/tmp/DerivedData' },
     });
 
-    renderer.onProgress({
-      type: 'build-stage',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onProgress({
-      type: 'status',
+    renderer.onFragment({
+      kind: 'infrastructure',
+      fragment: 'status',
       level: 'info',
       message: 'Resolving app path',
     });
 
-    renderer.onProgress({
-      type: 'compiler-warning',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'compiler-diagnostic',
+      severity: 'warning',
       operation: 'BUILD',
       message: 'unused variable',
       rawLine: '/tmp/MyApp.swift:10: warning: unused variable',
     });
 
-    renderer.onProgress({
-      type: 'status',
+    renderer.onFragment({
+      kind: 'infrastructure',
+      fragment: 'status',
       level: 'success',
       message: 'Resolving app path',
     });
@@ -130,26 +139,31 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [
-        { label: 'Scheme', value: 'MyApp' },
-        { label: 'Project', value: '/tmp/MyApp.xcodeproj' },
-        { label: 'Configuration', value: 'Debug' },
-        { label: 'Platform', value: 'iOS Simulator' },
-        { label: 'Simulator', value: 'INVALID-SIM-ID-123' },
-      ],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: {
+        scheme: 'MyApp',
+        projectPath: '/tmp/MyApp.xcodeproj',
+        configuration: 'Debug',
+        platform: 'iOS Simulator',
+        simulatorId: 'INVALID-SIM-ID-123',
+        derivedDataPath: '/tmp/DerivedData',
+      },
     });
 
-    renderer.onProgress({
-      type: 'compiler-error',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       operation: 'BUILD',
       message: 'No available simulator matched: INVALID-SIM-ID-123',
       rawLine: 'No available simulator matched: INVALID-SIM-ID-123',
     });
-    renderer.onProgress({
-      type: 'summary',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-summary',
       operation: 'BUILD',
       status: 'FAILED',
       durationMs: 1200,
@@ -171,32 +185,38 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [
-        { label: 'Scheme', value: 'MyApp' },
-        { label: 'Project', value: '/tmp/MyApp.xcodeproj' },
-        { label: 'Configuration', value: 'Debug' },
-        { label: 'Platform', value: 'macOS' },
-      ],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: {
+        scheme: 'MyApp',
+        projectPath: '/tmp/MyApp.xcodeproj',
+        configuration: 'Debug',
+        platform: 'macOS',
+        derivedDataPath: '/tmp/DerivedData',
+      },
     });
 
-    renderer.onProgress({
-      type: 'build-stage',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onProgress({
-      type: 'compiler-error',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
-    renderer.onProgress({
-      type: 'summary',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-summary',
       operation: 'BUILD',
       status: 'FAILED',
       durationMs: 4000,
@@ -219,25 +239,30 @@ describe('cli-text-renderer', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [
-        { label: 'Scheme', value: 'MyApp' },
-        { label: 'Project', value: '/tmp/MyApp.xcodeproj' },
-        { label: 'Configuration', value: 'Debug' },
-        { label: 'Platform', value: 'macOS' },
-      ],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: {
+        scheme: 'MyApp',
+        projectPath: '/tmp/MyApp.xcodeproj',
+        configuration: 'Debug',
+        platform: 'macOS',
+        derivedDataPath: '/tmp/DerivedData',
+      },
     });
 
-    renderer.onProgress({
-      type: 'compiler-error',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
-    renderer.onProgress({
-      type: 'summary',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-summary',
       operation: 'BUILD',
       status: 'FAILED',
       durationMs: 2000,
@@ -250,43 +275,49 @@ describe('cli-text-renderer', () => {
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain(
-      '  Platform: macOS\n\nCompiler Errors (1):\n\n  \u2717 unterminated string literal\n    /tmp/MCPTest/ContentView.swift:16:18',
+      '  Derived Data: /tmp/DerivedData\n\nCompiler Errors (1):\n\n  \u2717 unterminated string literal\n    /tmp/MCPTest/ContentView.swift:16:18',
     );
-    expect(output).not.toContain('  Platform: macOS\n\n\nCompiler Errors (1):');
+    expect(output).not.toContain('  Derived Data: /tmp/DerivedData\n\n\nCompiler Errors (1):');
   });
 
   it('persists the last transient runtime phase as a durable line before grouped compiler errors', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: true });
 
-    renderer.onProgress({
-      type: 'header',
-      operation: 'Build & Run',
-      params: [{ label: 'Scheme', value: 'MyApp' }],
+    renderer.onFragment({
+      kind: 'build-run-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request: { scheme: 'MyApp', derivedDataPath: '/tmp/DerivedData' },
     });
 
-    renderer.onProgress({
-      type: 'build-stage',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
     });
 
-    renderer.onProgress({
-      type: 'build-stage',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'LINKING',
       message: 'Linking',
     });
 
-    renderer.onProgress({
-      type: 'compiler-error',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       operation: 'BUILD',
       message: 'unterminated string literal',
       rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
     });
-    renderer.onProgress({
-      type: 'summary',
+    renderer.onFragment({
+      kind: 'build-result',
+      fragment: 'build-summary',
       operation: 'BUILD',
       status: 'FAILED',
       durationMs: 4000,
@@ -347,9 +378,10 @@ describe('cli-text-renderer', () => {
     const output = renderCliTextTranscript({
       items: [
         {
-          type: 'header',
-          operation: 'Build',
-          params: [{ label: 'Scheme', value: 'MyApp' }],
+          kind: 'build-result',
+          fragment: 'invocation',
+          operation: 'BUILD',
+          request: { scheme: 'MyApp', derivedDataPath: '/tmp/DerivedData' },
         },
       ],
       structuredOutput: buildOutput({

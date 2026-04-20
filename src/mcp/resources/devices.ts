@@ -12,22 +12,22 @@ import { list_devicesLogic } from '../tools/device/list_devices.ts';
 import { createRenderSession } from '../../rendering/render.ts';
 import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
-import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { AnyFragment } from '../../types/domain-fragments.ts';
+
 import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
 
 export async function devicesResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
 ): Promise<{ contents: Array<{ text: string }> }> {
   const session = createRenderSession('text');
-  const items: ProgressEvent[] = [];
+  const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: false,
-    emit: (event) => {
-      items.push(event);
-      session.emit(event);
+    emit: (fragment: AnyFragment) => {
+      items.push(fragment);
+      session.emit(fragment);
     },
     attach: () => {},
-    emitProgress: () => {},
   };
 
   try {

@@ -5,10 +5,9 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SharedBuildParams, NextStepParamsMap } from '../../../types/common.ts';
 import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -20,21 +19,22 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 import { mapDevicePlatform } from './build-settings.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { installAppOnDevice, launchAppOnDevice } from '../../../utils/device-steps.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import {
+  collectFallbackErrorMessages,
   createBuildRunDomainResult,
   createToolExecutionContext,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
+  setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-run-result';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -54,50 +54,16 @@ const baseSchemaObject = z.object({
 
 const buildRunDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 export type BuildRunDeviceParams = z.infer<typeof buildRunDeviceSchema>;
 type BuildRunDeviceResult = BuildRunResultDomainResult;
 
-function emitStepProgress(
-  ctx: Parameters<ToolExecutor<BuildRunDeviceParams, BuildRunDeviceResult>>[1],
-  message: string,
-  level: 'info' | 'warning' | 'error' = 'info',
-): void {
-  ctx.emitProgress({ type: 'status', level, message });
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: BuildRunDeviceResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
-function getFallbackErrorMessages(
-  started: ReturnType<typeof createProgressStreamingPipeline>,
-  extraMessages: string[] = [],
-  responseContent?: Array<{ type: 'text'; text: string }>,
-): string[] {
-  return [
-    ...started.stderrLines,
-    ...extraMessages,
-    ...(responseContent ?? []).map((item) => item.text),
-  ];
-}
-
 export function createBuildRunDeviceExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): ToolExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
+): DomainStreamingExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
   return async (params, ctx) => {
     const platform = mapDevicePlatform(params.platform);
     const configuration = params.configuration ?? 'Debug';
@@ -109,7 +75,7 @@ export function createBuildRunDeviceExecutor(
       derivedDataPath: params.derivedDataPath,
       extraArgs: params.extraArgs,
     };
-    const started = createProgressStreamingPipeline('build_run_device', 'BUILD', ctx);
+    const started = createDomainStreamingPipeline('build_run_device', 'BUILD', ctx);
 
     const buildResult = await executeXcodeBuildCommand(
       sharedBuildParams,
@@ -133,13 +99,16 @@ export function createBuildRunDeviceExecutor(
           deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
         },
-        responseContent: buildResult.content,
-        fallbackErrorMessages: getFallbackErrorMessages(started, [], buildResult.content),
-        errorFallbackPolicy: 'if-no-structured-diagnostics',
+        fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
       });
     }
 
-    emitStepProgress(ctx, 'Resolving app path');
+    ctx.emitFragment({
+      kind: 'build-run-result',
+      fragment: 'phase',
+      phase: 'resolve-app-path',
+      status: 'started',
+    });
 
     let appPath: string;
     try {
@@ -165,13 +134,18 @@ export function createBuildRunDeviceExecutor(
           deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
         },
-        fallbackErrorMessages: getFallbackErrorMessages(started, [
+        fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to get app path to launch: ${errorMessage}`,
         ]),
       });
     }
 
-    ctx.emitProgress({ type: 'status', level: 'success', message: 'Resolving app path' });
+    ctx.emitFragment({
+      kind: 'build-run-result',
+      fragment: 'phase',
+      phase: 'resolve-app-path',
+      status: 'succeeded',
+    });
 
     let bundleId: string;
     try {
@@ -189,13 +163,18 @@ export function createBuildRunDeviceExecutor(
           deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
         },
-        fallbackErrorMessages: getFallbackErrorMessages(started, [
+        fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to extract bundle ID: ${errorMessage}`,
         ]),
       });
     }
 
-    emitStepProgress(ctx, 'Installing app');
+    ctx.emitFragment({
+      kind: 'build-run-result',
+      fragment: 'phase',
+      phase: 'install-app',
+      status: 'started',
+    });
     const installResult = await installAppOnDevice(params.deviceId, appPath, executor);
     if (!installResult.success) {
       const errorMessage = installResult.error ?? 'Failed to install app';
@@ -207,14 +186,24 @@ export function createBuildRunDeviceExecutor(
           deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
         },
-        fallbackErrorMessages: getFallbackErrorMessages(started, [
+        fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to install app on device: ${errorMessage}`,
         ]),
       });
     }
-    ctx.emitProgress({ type: 'status', level: 'success', message: 'Installing app' });
+    ctx.emitFragment({
+      kind: 'build-run-result',
+      fragment: 'phase',
+      phase: 'install-app',
+      status: 'succeeded',
+    });
 
-    emitStepProgress(ctx, 'Launching app');
+    ctx.emitFragment({
+      kind: 'build-run-result',
+      fragment: 'phase',
+      phase: 'launch-app',
+      status: 'started',
+    });
     const launchResult = await launchAppOnDevice(
       params.deviceId,
       bundleId,
@@ -232,7 +221,7 @@ export function createBuildRunDeviceExecutor(
           deviceId: params.deviceId,
           buildLogPath: started.pipeline.logPath,
         },
-        fallbackErrorMessages: getFallbackErrorMessages(started, [
+        fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to launch app on device: ${errorMessage}`,
         ]),
       });
@@ -277,26 +266,26 @@ export async function build_run_deviceLogic(
   const configuration = params.configuration ?? 'Debug';
   const deviceName = resolveDeviceName(params.deviceId);
 
-  ctx.emit(
-    createBuildHeaderEvent(
-      {
-        scheme: params.scheme,
-        workspacePath: params.workspacePath,
-        projectPath: params.projectPath,
-        configuration,
-        platform: String(platform),
-        deviceId: params.deviceId,
-        deviceName,
-      },
-      'Build & Run',
-    ),
+  const invocationRequest: BuildInvocationRequest = {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration,
+    platform: String(platform),
+    deviceId: params.deviceId,
+    target: 'device',
+  };
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'BUILD',
+    invocationRequest,
+    'build-run-result',
   );
-
-  const executionContext = createToolExecutionContext(ctx, 'BUILD');
   const executeBuildRunDevice = createBuildRunDeviceExecutor(executor, fileSystemExecutor);
   const result = await executeBuildRunDevice(params, executionContext);
+  result.request = invocationRequest;
 
-  setStructuredOutput(ctx, result);
+  setXcodebuildStructuredOutput(ctx, 'build-run-result', result);
   executionContext.emitResult(result);
 
   if (!result.didError) {
@@ -319,7 +308,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<BuildRunDeviceParams>({
-  internalSchema: buildRunDeviceSchema as unknown as z.ZodType<BuildRunDeviceParams, unknown>,
+  internalSchema: toInternalSchema<BuildRunDeviceParams>(buildRunDeviceSchema),
   logicFunction: (params, executor) =>
     build_run_deviceLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,

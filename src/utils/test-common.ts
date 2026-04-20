@@ -9,32 +9,31 @@ import { toErrorMessage } from './errors.ts';
 import type { XcodePlatform } from './xcode.ts';
 import { executeXcodeBuildCommand } from './build/index.ts';
 import { extractTestFailuresFromXcresult } from './xcresult-test-failures.ts';
-import { header, statusLine } from './tool-event-builders.ts';
+
 import { normalizeTestRunnerEnv } from './environment.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
 import { type TestPreflightResult } from './test-preflight.ts';
-import { resolveDeviceName } from './device-name-resolver.ts';
+
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
-import { createBuildHeaderEvent } from './xcodebuild-pipeline.ts';
+
 import type { BuildTarget, TestResultDomainResult } from '../types/domain-results.ts';
-import type { ToolExecutor } from '../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../types/tool-execution.ts';
 import {
   createToolExecutionContext,
-  createProgressStreamingPipeline,
-  createTestDiscoveryProgressEvent,
+  createDomainStreamingPipeline,
+  createTestDiscoveryFragment,
   createTestDomainResult,
 } from './xcodebuild-domain-results.ts';
-import { getHandlerContext } from './typed-tool-factory.ts';
 
 function emitXcresultFailures(
-  pipeline: ReturnType<typeof createProgressStreamingPipeline>['pipeline'],
+  pipeline: ReturnType<typeof createDomainStreamingPipeline>['pipeline'],
 ): void {
   const xcresultPath = pipeline.xcresultPath;
   if (xcresultPath) {
     const failures = extractTestFailuresFromXcresult(xcresultPath);
     for (const event of failures) {
-      pipeline.emitEvent(event);
+      pipeline.emitFragment(event);
     }
   }
 }
@@ -53,8 +52,7 @@ function getFallbackErrorMessages(
   streamedLines: readonly string[],
   responseContent?: Array<{ type: 'text'; text: string }>,
 ): string[] {
-  const contentMessages = (responseContent ?? []).map((item) => item.text);
-  return [...streamedLines, ...contentMessages];
+  return [...streamedLines, ...(responseContent ?? []).map((item) => item.text)];
 }
 
 export function resolveTestProgressEnabled(progress: boolean | undefined): boolean {
@@ -88,7 +86,7 @@ export interface SharedTestExecutorOptions {
 export function createTestExecutor(
   executor: CommandExecutor = getDefaultCommandExecutor(),
   options?: SharedTestExecutorOptions,
-): ToolExecutor<SharedTestExecutorParams, TestResultDomainResult> {
+): DomainStreamingExecutor<SharedTestExecutorParams, TestResultDomainResult> {
   return async (params, ctx) => {
     log(
       'info',
@@ -102,7 +100,7 @@ export function createTestExecutor(
       String(params.platform).includes('Simulator') && Boolean(options?.preflight);
     const toolName = options?.toolName ?? 'test_sim';
     const target = options?.target ?? getBuildTarget(params.platform);
-    const started = createProgressStreamingPipeline(toolName, 'TEST', ctx);
+    const started = createDomainStreamingPipeline(toolName, 'TEST', ctx, 'test-result');
     const platformOptions = {
       platform: params.platform,
       simulatorName: params.simulatorName,
@@ -112,10 +110,10 @@ export function createTestExecutor(
       packageCachePath: params.packageCachePath,
       logPrefix: 'Test Run',
     };
-    const discoveryEvent = createTestDiscoveryProgressEvent(options?.preflight);
+    const discoveryEvent = createTestDiscoveryFragment(options?.preflight);
 
     if (discoveryEvent) {
-      started.pipeline.emitEvent(discoveryEvent);
+      started.pipeline.emitFragment(discoveryEvent);
     }
 
     try {
@@ -145,12 +143,10 @@ export function createTestExecutor(
               ...(params.deviceId ? { deviceId: params.deviceId } : {}),
               buildLogPath: started.pipeline.logPath,
             },
-            responseContent: buildForTestingResult.content,
             fallbackErrorMessages: getFallbackErrorMessages(
               started.stderrLines,
               buildForTestingResult.content,
             ),
-            errorFallbackPolicy: 'if-no-structured-diagnostics',
             preflight: options?.preflight,
           });
         }
@@ -175,7 +171,6 @@ export function createTestExecutor(
             ...(params.deviceId ? { deviceId: params.deviceId } : {}),
             buildLogPath: started.pipeline.logPath,
           },
-          responseContent: testWithoutBuildingResult.content,
           fallbackErrorMessages: getFallbackErrorMessages(
             started.stderrLines,
             testWithoutBuildingResult.content,
@@ -204,7 +199,6 @@ export function createTestExecutor(
           ...(params.deviceId ? { deviceId: params.deviceId } : {}),
           buildLogPath: started.pipeline.logPath,
         },
-        responseContent: singlePhaseResult.content,
         fallbackErrorMessages: getFallbackErrorMessages(
           started.stderrLines,
           singlePhaseResult.content,
@@ -224,67 +218,8 @@ export function createTestExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [...started.stderrLines, errorMessage],
-        errorFallbackPolicy: 'always',
         preflight: options?.preflight,
       });
     }
   };
-}
-
-/**
- * Backward-compatible wrapper used by existing tests and call sites.
- */
-export async function handleTestLogic(
-  params: SharedTestExecutorParams,
-  executor: CommandExecutor = getDefaultCommandExecutor(),
-  options?: SharedTestExecutorOptions,
-): Promise<void> {
-  log(
-    'info',
-    `Starting test run for scheme ${params.scheme} on platform ${params.platform} (legacy)`,
-  );
-
-  const ctx = getHandlerContext();
-
-  try {
-    const deviceName = params.deviceId ? resolveDeviceName(params.deviceId) : undefined;
-    ctx.emit(
-      createBuildHeaderEvent(
-        {
-          scheme: params.scheme,
-          configuration: params.configuration,
-          platform: String(params.platform),
-          simulatorName: params.simulatorName,
-          simulatorId: params.simulatorId,
-          deviceId: params.deviceId,
-          deviceName,
-          onlyTesting: options?.preflight?.selectors.onlyTesting.map((selector) => selector.raw),
-          skipTesting: options?.preflight?.selectors.skipTesting.map((selector) => selector.raw),
-        },
-        'Test',
-      ),
-    );
-
-    const executionContext = createToolExecutionContext(ctx, 'TEST');
-    const executeTest = createTestExecutor(executor, options);
-    const result = await executeTest(params, executionContext);
-
-    ctx.structuredOutput = {
-      result,
-      schema: 'xcodebuildmcp.output.test-result',
-      schemaVersion: '1',
-    };
-    executionContext.emitResult(result);
-    return;
-  } catch (error) {
-    const errorMessage = toErrorMessage(error);
-    log('error', `Error during test run: ${errorMessage}`);
-    ctx.emit(
-      header('Test Run', [
-        { label: 'Scheme', value: params.scheme },
-        { label: 'Platform', value: String(params.platform) },
-      ]),
-    );
-    ctx.emit(statusLine('error', `Error during test run: ${errorMessage}`));
-  }
 }

@@ -16,6 +16,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -168,7 +169,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<GestureParams>({
-  internalSchema: gestureSchema as unknown as z.ZodType<GestureParams, unknown>,
+  internalSchema: toInternalSchema<GestureParams>(gestureSchema),
   logicFunction: (params: GestureParams, executor: CommandExecutor) =>
     gestureLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,

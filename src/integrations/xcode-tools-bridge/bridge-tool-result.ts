@@ -1,6 +1,5 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { NextStepParamsMap } from '../../types/common.ts';
-import type { ProgressEvent } from '../../types/progress-events.ts';
 import type { SerializedBridgeTool, XcodeToolsBridgeStatus } from './core.ts';
 import type { ProxySyncResult } from './registry.ts';
 
@@ -21,7 +20,6 @@ export type BridgeToolPayload =
     };
 
 export interface BridgeToolResult {
-  progress: ProgressEvent[];
   images?: Array<{ data: string; mimeType: string }>;
   isError?: boolean;
   errorMessage?: string;
@@ -30,8 +28,6 @@ export interface BridgeToolResult {
 }
 
 export function callToolResultToBridgeResult(result: CallToolResult): BridgeToolResult {
-  const meta = result._meta as Record<string, unknown> | undefined;
-  const progress = Array.isArray(meta?.progress) ? (meta.progress as ProgressEvent[]) : [];
   const images: Array<{ data: string; mimeType: string }> = [];
   const content = Array.isArray(result.content)
     ? result.content.filter(isBridgeCallContentItem).map((item) => ({ ...item }))
@@ -48,7 +44,6 @@ export function callToolResultToBridgeResult(result: CallToolResult): BridgeTool
   }
 
   return {
-    progress,
     ...(images.length > 0 ? { images } : {}),
     isError: result.isError || undefined,
     ...(errorMessage ? { errorMessage } : {}),

@@ -98,7 +98,6 @@ export async function manage_workflowsLogic(
   const executeManageWorkflows = createManageWorkflowsExecutor();
   const result = await executeManageWorkflows(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   setStructuredOutput(ctx, result);

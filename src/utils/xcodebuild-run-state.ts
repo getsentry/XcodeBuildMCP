@@ -1,31 +1,29 @@
 import type {
-  XcodebuildOperation,
-  XcodebuildStage,
-  BuildStageProgressEvent,
-  CompilerWarningProgressEvent,
-  CompilerErrorProgressEvent,
-  TestDiscoveryProgressEvent,
-  TestFailureProgressEvent,
-  TestProgressProgressEvent,
-  SummaryProgressEvent,
-} from '../types/progress-events.ts';
-import { STAGE_RANK } from '../types/progress-events.ts';
+  BuildStageFragment,
+  BuildSummaryFragment,
+  CompilerDiagnosticFragment,
+  DomainFragment,
+  TestDiscoveryFragment,
+  TestFailureFragment,
+  TestProgressFragment,
+} from '../types/domain-fragments.ts';
+import type { XcodebuildOperation, XcodebuildStage } from '../types/domain-fragments.ts';
+import { STAGE_RANK } from '../types/domain-fragments.ts';
 
-type XcodebuildRunStateEvent =
-  | BuildStageProgressEvent
-  | CompilerWarningProgressEvent
-  | CompilerErrorProgressEvent
-  | TestDiscoveryProgressEvent
-  | TestFailureProgressEvent
-  | TestProgressProgressEvent;
+type XcodebuildRunStateFragment =
+  | BuildStageFragment
+  | CompilerDiagnosticFragment
+  | TestDiscoveryFragment
+  | TestFailureFragment
+  | TestProgressFragment;
 
 export interface XcodebuildRunState {
   operation: XcodebuildOperation;
   currentStage: XcodebuildStage | null;
-  milestones: BuildStageProgressEvent[];
-  warnings: CompilerWarningProgressEvent[];
-  errors: CompilerErrorProgressEvent[];
-  testFailures: TestFailureProgressEvent[];
+  milestones: BuildStageFragment[];
+  warnings: CompilerDiagnosticFragment[];
+  errors: CompilerDiagnosticFragment[];
+  testFailures: TestFailureFragment[];
   completedTests: number;
   failedTests: number;
   skippedTests: number;
@@ -36,7 +34,7 @@ export interface XcodebuildRunState {
 export interface RunStateOptions {
   operation: XcodebuildOperation;
   minimumStage?: XcodebuildStage;
-  onEvent?: (event: XcodebuildRunStateEvent | SummaryProgressEvent) => void;
+  onEvent?: (fragment: DomainFragment) => void;
 }
 
 function normalizeDiagnosticKey(location: string | undefined, message: string): string {
@@ -56,15 +54,13 @@ function normalizeTestFailureLocation(location: string | undefined): string | nu
   return (match?.[1] ?? location).trim().toLowerCase();
 }
 
-function normalizeTestFailureKey(event: TestFailureProgressEvent): string {
-  const normalizedLocation = normalizeTestFailureLocation(event.location);
-  const normalizedMessage = event.message.trim().toLowerCase();
-  const suite = normalizeTestIdentifier(event.suite);
-  const test = normalizeTestIdentifier(event.test);
+function normalizeTestFailureKey(fragment: TestFailureFragment): string {
+  const normalizedLocation = normalizeTestFailureLocation(fragment.location);
+  const normalizedMessage = fragment.message.trim().toLowerCase();
+  const suite = normalizeTestIdentifier(fragment.suite);
+  const test = normalizeTestIdentifier(fragment.test);
 
   if (normalizedLocation) {
-    // Include test name but NOT suite -- suite naming disagrees between xcresult
-    // and live parsing (e.g. 'Module.Suite' vs absent). Test name is consistent.
     return `${test}|${normalizedLocation}|${normalizedMessage}`;
   }
 
@@ -72,22 +68,24 @@ function normalizeTestFailureKey(event: TestFailureProgressEvent): string {
 }
 
 export interface XcodebuildRunStateHandle {
-  push(event: XcodebuildRunStateEvent): void;
+  push(fragment: XcodebuildRunStateFragment): void;
   finalize(succeeded: boolean, durationMs?: number): XcodebuildRunState;
   snapshot(): Readonly<XcodebuildRunState>;
   highestStageRank(): number;
 }
 
-function createTestSummaryEvent(
+function createTestSummaryFragment(
   state: XcodebuildRunState,
+  kind: 'build-result' | 'build-run-result' | 'test-result',
   durationMs?: number,
-): SummaryProgressEvent {
+): BuildSummaryFragment {
   const failedTests = Math.max(state.failedTests, state.testFailures.length);
   const passedTests = Math.max(0, state.completedTests - failedTests - state.skippedTests);
   const totalTests = passedTests + failedTests + state.skippedTests;
 
   return {
-    type: 'summary',
+    kind,
+    fragment: 'build-summary',
     operation: 'TEST',
     status: state.finalStatus ?? 'FAILED',
     ...(totalTests > 0
@@ -102,12 +100,14 @@ function createTestSummaryEvent(
   };
 }
 
-function createBuildSummaryEvent(
+function createBuildSummaryFragment(
   state: XcodebuildRunState,
+  kind: 'build-result' | 'build-run-result' | 'test-result',
   durationMs?: number,
-): SummaryProgressEvent {
+): BuildSummaryFragment {
   return {
-    type: 'summary',
+    kind,
+    fragment: 'build-summary',
     operation: 'BUILD',
     status: state.finalStatus ?? 'FAILED',
     ...(durationMs !== undefined ? { durationMs } : {}),
@@ -134,83 +134,83 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
   let highestRank = options.minimumStage !== undefined ? STAGE_RANK[options.minimumStage] : -1;
   const seenDiagnostics = new Set<string>();
 
-  function accept(event: XcodebuildRunStateEvent): void {
-    onEvent?.(event);
+  function accept(fragment: DomainFragment): void {
+    onEvent?.(fragment);
   }
 
-  function acceptDedupedDiagnostic<T extends { location?: string; message: string }>(
-    event: XcodebuildRunStateEvent & T,
-    collection: T[],
+  function acceptDedupedDiagnostic(
+    fragment: CompilerDiagnosticFragment,
+    collection: CompilerDiagnosticFragment[],
   ): void {
-    const key = normalizeDiagnosticKey(event.location, event.message);
+    const key = normalizeDiagnosticKey(fragment.location, fragment.message);
     if (seenDiagnostics.has(key)) {
       return;
     }
     seenDiagnostics.add(key);
-    collection.push(event);
-    accept(event);
+    collection.push(fragment);
+    accept(fragment);
   }
 
   return {
-    push(event: XcodebuildRunStateEvent): void {
-      switch (event.type) {
+    push(fragment: XcodebuildRunStateFragment): void {
+      switch (fragment.fragment) {
         case 'build-stage': {
-          const rank = STAGE_RANK[event.stage];
+          const rank = STAGE_RANK[fragment.stage];
           if (rank <= highestRank) {
             return;
           }
           highestRank = rank;
-          state.currentStage = event.stage;
-          state.milestones.push(event);
-          accept(event);
+          state.currentStage = fragment.stage;
+          state.milestones.push(fragment);
+          accept(fragment);
           break;
         }
 
-        case 'compiler-warning': {
-          acceptDedupedDiagnostic(event, state.warnings);
-          break;
-        }
-
-        case 'compiler-error': {
-          acceptDedupedDiagnostic(event, state.errors);
+        case 'compiler-diagnostic': {
+          if (fragment.severity === 'warning') {
+            acceptDedupedDiagnostic(fragment, state.warnings);
+          } else {
+            acceptDedupedDiagnostic(fragment, state.errors);
+          }
           break;
         }
 
         case 'test-failure': {
-          const key = normalizeTestFailureKey(event);
+          const key = normalizeTestFailureKey(fragment);
           if (seenDiagnostics.has(key)) {
             return;
           }
           seenDiagnostics.add(key);
-          state.testFailures.push(event);
-          accept(event);
+          state.testFailures.push(fragment);
+          accept(fragment);
           break;
         }
 
         case 'test-discovery': {
-          accept(event);
+          accept(fragment);
           break;
         }
 
         case 'test-progress': {
-          state.completedTests = event.completed;
-          state.failedTests = event.failed;
-          state.skippedTests = event.skipped;
+          state.completedTests = fragment.completed;
+          state.failedTests = fragment.failed;
+          state.skippedTests = fragment.skipped;
 
           if (highestRank < STAGE_RANK.RUN_TESTS) {
-            const runTestsEvent: BuildStageProgressEvent = {
-              type: 'build-stage',
+            const runTestsFragment: BuildStageFragment = {
+              kind: operation === 'TEST' ? 'test-result' : 'build-result',
+              fragment: 'build-stage',
               operation: 'TEST',
               stage: 'RUN_TESTS',
               message: 'Running tests',
             };
             highestRank = STAGE_RANK.RUN_TESTS;
             state.currentStage = 'RUN_TESTS';
-            state.milestones.push(runTestsEvent);
-            accept(runTestsEvent);
+            state.milestones.push(runTestsFragment);
+            accept(runTestsFragment);
           }
 
-          accept(event);
+          accept(fragment);
           break;
         }
       }
@@ -220,10 +220,16 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
       state.finalStatus = succeeded ? 'SUCCEEDED' : 'FAILED';
       state.wallClockDurationMs = durationMs ?? null;
 
+      const kind = (state.milestones[0]?.kind ??
+        (operation === 'TEST' ? 'test-result' : 'build-result')) as
+        | 'build-result'
+        | 'build-run-result'
+        | 'test-result';
+
       if (operation === 'TEST') {
-        onEvent?.(createTestSummaryEvent(state, durationMs));
+        onEvent?.(createTestSummaryFragment(state, kind, durationMs));
       } else if (operation === 'BUILD') {
-        onEvent?.(createBuildSummaryEvent(state, durationMs));
+        onEvent?.(createBuildSummaryFragment(state, kind, durationMs));
       }
 
       return {

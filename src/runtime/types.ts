@@ -5,7 +5,7 @@ import type {
   StructuredToolOutput,
   ToolHandlerContext,
 } from '../rendering/types.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
 
 export interface NextStepTemplate {
   label: string;
@@ -88,7 +88,7 @@ export interface ToolCatalog {
 export interface InvokeOptions {
   runtime: RuntimeKind;
   renderSession?: RenderSession;
-  onProgress?: (event: ProgressEvent) => void;
+  onProgress?: (fragment: AnyFragment) => void;
   onStructuredOutput?: (output: StructuredToolOutput) => void;
   /** Pre-created handler context; if provided, executeTool uses it instead of creating a new one. */
   handlerContext?: ToolHandlerContext;

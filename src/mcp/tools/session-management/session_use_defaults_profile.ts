@@ -124,7 +124,6 @@ export async function sessionUseDefaultsProfileLogic(params: Params): Promise<vo
   const executeSessionUseDefaultsProfile = createSessionUseDefaultsProfileExecutor();
   const result = await executeSessionUseDefaultsProfile(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   setStructuredOutput(ctx, result);

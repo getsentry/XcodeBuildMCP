@@ -22,7 +22,7 @@ export class BridgeToolExecutionContext implements ToolExecutionContext {
   private nextStepParams?: NextStepParamsMap;
   private readonly bridgeImages: ImageAttachment[] = [];
 
-  emitProgress(): void {}
+  emitFragment(): void {}
 
   setNextStepParams(nextStepParams?: NextStepParamsMap): void {
     this.nextStepParams = nextStepParams;
@@ -50,7 +50,6 @@ export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult
     const bridgeResult: BridgeToolResult = bridge
       ? await options.callback(bridge, args)
       : {
-          progress: [],
           isError: true,
           errorMessage: 'Unable to initialize xcode tools bridge',
         };

@@ -12,15 +12,25 @@ import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { version } from '../../../utils/version/index.ts';
-import type { ProgressEvent } from '../../../types/progress-events.ts';
+import type {
+  HeaderRenderItem,
+  SectionRenderItem,
+  DetailTreeRenderItem,
+  StatusRenderItem,
+} from '../../../rendering/render-items.ts';
+import {
+  formatHeaderEvent,
+  formatSectionEvent,
+  formatDetailTreeEvent,
+  formatStatusLineEvent,
+} from '../../../utils/renderers/event-formatting.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getConfig } from '../../../utils/config-store.ts';
 import { detectXcodeRuntime } from '../../../utils/xcode-process.ts';
 import { type DoctorDependencies, createDoctorDependencies } from './lib/doctor.deps.ts';
 import { peekXcodeToolsBridgeManager } from '../../../integrations/xcode-tools-bridge/index.ts';
 import { getMcpBridgeAvailability } from '../../../integrations/xcode-tools-bridge/core.ts';
-import { header, statusLine, section, detailTree } from '../../../utils/tool-event-builders.ts';
-import { renderEvents } from '../../../rendering/render.ts';
+
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const LOG_PREFIX = '[Doctor]';
@@ -431,6 +441,70 @@ export function createDoctorExecutor(
   };
 }
 
+type DoctorRenderItem =
+  | HeaderRenderItem
+  | SectionRenderItem
+  | DetailTreeRenderItem
+  | StatusRenderItem;
+
+function doctorHeader(
+  operation: string,
+  params: Array<{ label: string; value: string }>,
+): HeaderRenderItem {
+  return { type: 'header', operation, params };
+}
+
+function doctorSection(
+  title: string,
+  lines: string[],
+  opts?: { icon?: SectionRenderItem['icon']; blankLineAfterTitle?: boolean },
+): SectionRenderItem {
+  return {
+    type: 'section',
+    title,
+    lines,
+    ...(opts?.icon ? { icon: opts.icon } : {}),
+    ...(opts?.blankLineAfterTitle ? { blankLineAfterTitle: opts.blankLineAfterTitle } : {}),
+  };
+}
+
+function doctorDetailTree(items: Array<{ label: string; value: string }>): DetailTreeRenderItem {
+  return { type: 'detail-tree', items };
+}
+
+function doctorStatus(level: StatusRenderItem['level'], message: string): StatusRenderItem {
+  return { type: 'status', level, message };
+}
+
+function renderDoctorItems(items: DoctorRenderItem[]): string {
+  let output = '';
+  let lastType: string | null = null;
+  for (const item of items) {
+    switch (item.type) {
+      case 'header':
+        output += `\n${formatHeaderEvent(item)}\n`;
+        break;
+      case 'section':
+        output += `\n${formatSectionEvent(item)}\n`;
+        break;
+      case 'detail-tree':
+        output += `${formatDetailTreeEvent(item)}\n`;
+        break;
+      case 'status': {
+        const compact = lastType === 'status' || lastType === 'summary';
+        if (compact) {
+          output += `${formatStatusLineEvent(item)}\n`;
+        } else {
+          output += `\n${formatStatusLineEvent(item)}\n`;
+        }
+        break;
+      }
+    }
+    lastType = item.type;
+  }
+  return output;
+}
+
 /**
  * Run the doctor tool and return the results.
  */
@@ -448,8 +522,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
       dapSelected,
     } = await collectDoctorData(params, deps);
 
-    const events: ProgressEvent[] = [
-      header('XcodeBuildMCP Doctor', [
+    const items: DoctorRenderItem[] = [
+      doctorHeader('XcodeBuildMCP Doctor', [
         { label: 'Generated', value: doctorInfo.timestamp },
         { label: 'Server Version', value: doctorInfo.serverVersion },
         {
@@ -460,8 +534,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     ];
 
     // System Information
-    events.push(
-      detailTree(
+    items.push(
+      doctorDetailTree(
         Object.entries(doctorInfo.system).map(([key, value]) => ({
           label: key,
           value: String(value),
@@ -470,8 +544,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     );
 
     // Node.js Information
-    events.push(
-      section(
+    items.push(
+      doctorSection(
         'Node.js Information',
         Object.entries(doctorInfo.node).map(([key, value]) => `${key}: ${value}`),
       ),
@@ -493,16 +567,16 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     if (doctorInfo.processTreeError) {
       processTreeLines.push(`Error: ${doctorInfo.processTreeError}`);
     }
-    events.push(section('Process Tree', processTreeLines));
+    items.push(doctorSection('Process Tree', processTreeLines));
 
     // Xcode Information
     if ('error' in doctorInfo.xcode) {
-      events.push(
-        section('Xcode Information', [`Error: ${doctorInfo.xcode.error}`], { icon: 'cross' }),
+      items.push(
+        doctorSection('Xcode Information', [`Error: ${doctorInfo.xcode.error}`], { icon: 'cross' }),
       );
     } else {
-      events.push(
-        section(
+      items.push(
+        doctorSection(
           'Xcode Information',
           Object.entries(doctorInfo.xcode).map(([key, value]) => `${key}: ${value}`),
         ),
@@ -510,8 +584,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     }
 
     // Dependencies
-    events.push(
-      section(
+    items.push(
+      doctorSection(
         'Dependencies',
         Object.entries(doctorInfo.dependencies).map(
           ([binary, status]) =>
@@ -524,11 +598,11 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     const envLines = Object.entries(doctorInfo.environmentVariables)
       .filter(([key]) => key !== 'PATH' && key !== 'PYTHONPATH')
       .map(([key, value]) => `${key}: ${value ?? '(not set)'}`);
-    events.push(section('Environment Variables', envLines));
+    items.push(doctorSection('Environment Variables', envLines));
 
     // PATH
     const pathValue = doctorInfo.environmentVariables.PATH ?? '(not set)';
-    events.push(section('PATH', pathValue.split(':')));
+    items.push(doctorSection('PATH', pathValue.split(':')));
 
     // UI Automation (axe)
     const axeLines: string[] = [
@@ -537,7 +611,7 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
       `Simulator Video Capture Supported (AXe >= 1.1.0): ${doctorInfo.features.axe.videoCaptureSupported ? 'Yes' : 'No'}`,
       `UI-Debugger Guard Mode: ${uiDebuggerGuardMode}`,
     ];
-    events.push(section('UI Automation (axe)', axeLines));
+    items.push(doctorSection('UI Automation (axe)', axeLines));
 
     // Incremental Builds
     let makefileStatus: string;
@@ -546,8 +620,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     } else {
       makefileStatus = doctorInfo.features.xcodemake.makefileExists ? 'Yes' : 'No';
     }
-    events.push(
-      section('Incremental Builds', [
+    items.push(
+      doctorSection('Incremental Builds', [
         `Enabled: ${doctorInfo.features.xcodemake.enabled ? 'Yes' : 'No'}`,
         `xcodemake Binary Available: ${doctorInfo.features.xcodemake.binaryAvailable ? 'Yes' : 'No'}`,
         `Makefile exists (cwd): ${makefileStatus}`,
@@ -555,8 +629,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     );
 
     // Mise Integration
-    events.push(
-      section('Mise Integration', [
+    items.push(
+      doctorSection('Mise Integration', [
         `Running under mise: ${doctorInfo.features.mise.running_under_mise ? 'Yes' : 'No'}`,
         `Mise available: ${doctorInfo.features.mise.available ? 'Yes' : 'No'}`,
       ]),
@@ -572,18 +646,18 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
         'Warning: DAP backend selected but lldb-dap not available. Set XCODEBUILDMCP_DEBUGGER_BACKEND=lldb-cli to use the CLI backend.',
       );
     }
-    events.push(section('Debugger Backend (DAP)', debuggerLines));
+    items.push(doctorSection('Debugger Backend (DAP)', debuggerLines));
 
     // Manifest Tool Inventory
     if ('error' in doctorInfo.manifestTools) {
-      events.push(
-        section('Manifest Tool Inventory', [`Error: ${doctorInfo.manifestTools.error}`], {
+      items.push(
+        doctorSection('Manifest Tool Inventory', [`Error: ${doctorInfo.manifestTools.error}`], {
           icon: 'cross',
         }),
       );
     } else {
-      events.push(
-        section('Manifest Tool Inventory', [
+      items.push(
+        doctorSection('Manifest Tool Inventory', [
           `Total Unique Tools: ${doctorInfo.manifestTools.totalTools}`,
           `Workflow Count: ${doctorInfo.manifestTools.workflowCount}`,
           ...Object.entries(doctorInfo.manifestTools.toolsByWorkflow).map(
@@ -604,12 +678,12 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     if (runtimeRegistration.enabledWorkflows.length > 0) {
       runtimeLines.push(`Workflows: ${runtimeRegistration.enabledWorkflows.join(', ')}`);
     }
-    events.push(section('Runtime Tool Registration', runtimeLines));
+    items.push(doctorSection('Runtime Tool Registration', runtimeLines));
 
     // Xcode IDE Bridge
     if (doctorInfo.xcodeToolsBridge.available) {
-      events.push(
-        section('Xcode IDE Bridge (mcpbridge)', [
+      items.push(
+        doctorSection('Xcode IDE Bridge (mcpbridge)', [
           `Workflow enabled: ${doctorInfo.xcodeToolsBridge.workflowEnabled ? 'Yes' : 'No'}`,
           `mcpbridge path: ${doctorInfo.xcodeToolsBridge.bridgePath ?? '(not found)'}`,
           `Xcode running: ${doctorInfo.xcodeToolsBridge.xcodeRunning ?? '(unknown)'}`,
@@ -621,8 +695,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
         ]),
       );
     } else {
-      events.push(
-        section('Xcode IDE Bridge (mcpbridge)', [
+      items.push(
+        doctorSection('Xcode IDE Bridge (mcpbridge)', [
           `Unavailable: ${doctorInfo.xcodeToolsBridge.reason}`,
         ]),
       );
@@ -638,8 +712,8 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     } else {
       incrementalStatus = 'Not available';
     }
-    events.push(
-      section('Tool Availability Summary', [
+    items.push(
+      doctorSection('Tool Availability Summary', [
         `Build Tools: ${buildToolsAvailable ? 'Available' : 'Not available'}`,
         `UI Automation Tools: ${doctorInfo.features.axe.uiAutomationSupported ? 'Available' : 'Not available'}`,
         `Incremental Build Support: ${incrementalStatus}`,
@@ -647,15 +721,15 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
     );
 
     // Sentry
-    events.push(
-      section('Sentry', [
+    items.push(
+      doctorSection('Sentry', [
         `Sentry enabled: ${doctorInfo.environmentVariables.SENTRY_DISABLED !== 'true' ? 'Yes' : 'No'}`,
       ]),
     );
 
     // Troubleshooting Tips
-    events.push(
-      section('Troubleshooting Tips', [
+    items.push(
+      doctorSection('Troubleshooting Tips', [
         'If UI automation tools are not available, install axe: brew tap cameroncooke/axe && brew install axe',
         'If incremental build support is not available, install xcodemake (https://github.com/cameroncooke/xcodemake) and ensure it is executable and available in your PATH',
         'To enable xcodemake, set environment variable: export INCREMENTAL_BUILDS_ENABLED=1',
@@ -663,16 +737,13 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
       ]),
     );
 
-    events.push(statusLine('success', 'Doctor diagnostics complete'));
+    items.push(doctorStatus('success', 'Doctor diagnostics complete'));
 
-    const rendered = renderEvents(events, 'text');
-    const hasError = events.some(
-      (e) => e.type === 'compiler-error' || (e.type === 'status' && e.level === 'error'),
-    );
+    const rendered = renderDoctorItems(items);
+    const hasError = items.some((e) => e.type === 'status' && e.level === 'error');
     return {
       content: [{ type: 'text' as const, text: rendered }],
       isError: hasError || undefined,
-      _meta: { progress: [...events] },
     };
   } finally {
     if (prevSilence === undefined) {
@@ -697,7 +768,6 @@ export async function doctorToolLogic(
   const executeDoctor = createDoctorExecutor(deps);
   const result = await executeDoctor(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(ctx, result);

@@ -2,7 +2,7 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -11,10 +11,11 @@ import {
   getSessionAwareToolSchemaShape,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import {
   createToolExecutionContext,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
   createTestDomainResult,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
@@ -49,7 +50,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageTestRe
 }
 
 function getFallbackErrorMessages(
-  started: ReturnType<typeof createProgressStreamingPipeline>,
+  started: ReturnType<typeof createDomainStreamingPipeline>,
   extraMessages: string[] = [],
 ): string[] {
   return [...started.stderrLines, ...extraMessages];
@@ -57,11 +58,11 @@ function getFallbackErrorMessages(
 
 export function createSwiftPackageTestExecutor(
   executor: CommandExecutor,
-): ToolExecutor<SwiftPackageTestParams, SwiftPackageTestResult> {
+): DomainStreamingExecutor<SwiftPackageTestParams, SwiftPackageTestResult> {
   return async (params, ctx) => {
     const resolvedPath = path.resolve(params.packagePath);
     const swiftArgs = ['test', '--package-path', resolvedPath];
-    const started = createProgressStreamingPipeline('swift_package_test', 'TEST', ctx);
+    const started = createDomainStreamingPipeline('swift_package_test', 'TEST', ctx, 'test-result');
 
     if (params.configuration?.toLowerCase() === 'release') {
       swiftArgs.push('-c', 'release');
@@ -129,7 +130,6 @@ export function createSwiftPackageTestExecutor(
           packagePath: resolvedPath,
         },
         fallbackErrorMessages: getFallbackErrorMessages(started, [message]),
-        errorFallbackPolicy: 'always',
       });
     }
   };
@@ -142,18 +142,14 @@ export async function swift_package_testLogic(
   const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
 
-  ctx.emit(
-    createBuildHeaderEvent(
-      {
-        scheme: path.basename(resolvedPath),
-        configuration: (params.configuration ?? 'debug').toLowerCase(),
-        platform: 'Swift Package',
-      },
-      'Swift Package Test',
-    ),
-  );
-
-  const executionContext = createToolExecutionContext(ctx, 'TEST');
+  const invocationRequest: BuildInvocationRequest = {
+    scheme: path.basename(resolvedPath),
+    configuration: (params.configuration ?? 'debug').toLowerCase(),
+    platform: 'Swift Package',
+    target: 'swift-package' as const,
+  };
+  ctx.emit(createBuildInvocationFragment('test-result', 'TEST', invocationRequest));
+  const executionContext = createToolExecutionContext(ctx);
   const executeSwiftPackageTest = createSwiftPackageTestExecutor(executor);
   const result = await executeSwiftPackageTest(params, executionContext);
 

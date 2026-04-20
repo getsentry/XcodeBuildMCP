@@ -6,9 +6,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -19,14 +18,16 @@ import {
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
+import {
+  createToolExecutionContext,
+  setXcodebuildStructuredOutput,
+} from '../../../utils/xcodebuild-domain-results.ts';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -57,16 +58,7 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
-const testMacosSchema = z.preprocess(
-  nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
-);
+const testMacosSchema = z.preprocess(nullifyEmptyStrings, withProjectOrWorkspace(baseSchemaObject));
 
 export type TestMacosParams = z.infer<typeof testMacosSchema>;
 type TestMacosResult = TestResultDomainResult;
@@ -74,7 +66,7 @@ type TestMacosResult = TestResultDomainResult;
 interface PreparedTestMacosExecution {
   configuration: string;
   preflight?: TestPreflightResult;
-  headerParams: Record<string, unknown>;
+  invocationRequest: BuildInvocationRequest;
 }
 
 async function prepareTestMacosExecution(
@@ -97,7 +89,7 @@ async function prepareTestMacosExecution(
   return {
     configuration,
     preflight: preflight ?? undefined,
-    headerParams: {
+    invocationRequest: {
       scheme: params.scheme,
       configuration,
       platform: 'macOS',
@@ -107,19 +99,11 @@ async function prepareTestMacosExecution(
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: TestMacosResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createTestMacOSExecutor(
   executor: CommandExecutor = getDefaultCommandExecutor(),
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   prepared?: PreparedTestMacosExecution,
-): ToolExecutor<TestMacosParams, TestMacosResult> {
+): DomainStreamingExecutor<TestMacosParams, TestMacosResult> {
   return async (params, ctx) => {
     const resolved = prepared ?? (await prepareTestMacosExecution(params, fileSystemExecutor));
     const executeTest = createTestExecutor(executor, {
@@ -154,13 +138,16 @@ export async function testMacosLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareTestMacosExecution(params, fileSystemExecutor);
 
-  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
-
-  const executionContext = createToolExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'TEST',
+    prepared.invocationRequest,
+    'test-result',
+  );
   const executeTestMacOS = createTestMacOSExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestMacOS(params, executionContext);
 
-  setStructuredOutput(ctx, result);
+  setXcodebuildStructuredOutput(ctx, 'test-result', result);
   executionContext.emitResult(result);
 }
 
@@ -170,7 +157,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<TestMacosParams>({
-  internalSchema: testMacosSchema as unknown as z.ZodType<TestMacosParams, unknown>,
+  internalSchema: toInternalSchema<TestMacosParams>(testMacosSchema),
   logicFunction: (params, executor) =>
     testMacosLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,

@@ -82,7 +82,6 @@ export async function sessionShowDefaultsLogic(): Promise<void> {
     {},
     {
       liveProgressEnabled: false,
-      emitProgress() {},
     },
   );
 

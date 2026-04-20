@@ -190,7 +190,6 @@ export async function list_simsLogic(
   const executeListSims = createListSimsExecutor(executor);
   const result = await executeListSims(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(ctx, result);

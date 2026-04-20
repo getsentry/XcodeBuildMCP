@@ -1,44 +1,36 @@
 import type { ToolDomainResult } from '../../types/domain-results.js';
-import type { ProgressEvent, XcodebuildOperation } from '../../types/progress-events.js';
-import type { ToolAttachment, ToolExecutionContext } from '../../types/tool-execution.js';
+import type { DomainFragment } from '../../types/domain-fragments.js';
+import type {
+  ToolAttachment,
+  DomainStreamingExecutionContext,
+} from '../../types/tool-execution.js';
 
 export interface DefaultToolExecutionContextOptions {
-  xcodebuildOperation?: XcodebuildOperation;
-  progressSink?: (event: ProgressEvent) => void;
   liveProgressEnabled?: boolean;
+  onFragment?: (fragment: DomainFragment) => void;
 }
 
-export class DefaultToolExecutionContext implements ToolExecutionContext {
+export class DefaultToolExecutionContext implements DomainStreamingExecutionContext {
   readonly liveProgressEnabled: boolean;
-  private readonly progressEvents: ProgressEvent[] = [];
   private readonly attachments: ToolAttachment[] = [];
-  private readonly progressSink?: (event: ProgressEvent) => void;
+  private readonly fragmentCallback?: (fragment: DomainFragment) => void;
   private result?: ToolDomainResult;
 
   constructor(options: DefaultToolExecutionContextOptions = {}) {
-    this.progressSink = options.progressSink;
     this.liveProgressEnabled = options.liveProgressEnabled ?? true;
-  }
-
-  emitProgress(event: ProgressEvent): void {
-    if (!this.liveProgressEnabled) {
-      return;
-    }
-
-    this.progressEvents.push(event);
-    this.progressSink?.(event);
+    this.fragmentCallback = options.onFragment;
   }
 
   attach(image: ToolAttachment): void {
     this.attachments.push(image);
   }
 
-  emitResult(result: ToolDomainResult): void {
-    this.result = result;
+  emitFragment(fragment: DomainFragment): void {
+    this.fragmentCallback?.(fragment);
   }
 
-  getProgressEvents(): readonly ProgressEvent[] {
-    return [...this.progressEvents];
+  emitResult(result: ToolDomainResult): void {
+    this.result = result;
   }
 
   getAttachments(): readonly ToolAttachment[] {

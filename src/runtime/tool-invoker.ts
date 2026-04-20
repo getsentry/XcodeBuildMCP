@@ -1,7 +1,8 @@
 import type { ToolCatalog, ToolDefinition, ToolInvoker, InvokeOptions } from './types.ts';
 import type { NextStep, NextStepParams, NextStepParamsMap } from '../types/common.ts';
 import type { DaemonToolResult, ToolInvokeResult } from '../daemon/protocol.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
+
 import { DaemonClient, DaemonVersionMismatchError } from '../cli/daemon-client.ts';
 import {
   ensureDaemonRunning,
@@ -24,12 +25,13 @@ type BuiltTemplateNextStep = {
   templateToolId?: string;
 };
 
-function createStatusEvent(
-  level: Extract<ProgressEvent, { type: 'status' }>['level'],
+function createStatusFragment(
+  level: RuntimeStatusFragment['level'],
   message: string,
-): Extract<ProgressEvent, { type: 'status' }> {
+): RuntimeStatusFragment {
   return {
-    type: 'status',
+    kind: 'infrastructure',
+    fragment: 'status',
     level,
     message,
   };
@@ -268,7 +270,7 @@ export class DefaultToolInvoker implements ToolInvoker {
 
     if (resolved.ambiguous) {
       session.emit(
-        createStatusEvent(
+        createStatusFragment(
           'error',
           `Ambiguous tool name: Multiple tools match '${toolName}'. Use one of:\n- ${resolved.ambiguous.join('\n- ')}`,
         ),
@@ -278,7 +280,7 @@ export class DefaultToolInvoker implements ToolInvoker {
 
     if (resolved.notFound || !resolved.tool) {
       session.emit(
-        createStatusEvent(
+        createStatusFragment(
           'error',
           `Tool not found: Unknown tool '${toolName}'. Run 'xcodebuildmcp tools' to see available tools.`,
         ),
@@ -321,7 +323,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
       session.emit(
-        createStatusEvent(
+        createStatusFragment(
           'error',
           'Socket path required: No socket path configured for daemon communication.',
         ),
@@ -349,7 +351,7 @@ export class DefaultToolInvoker implements ToolInvoker {
         context.captureInfraErrorMetric(error);
         context.captureInvocationMetric('infra_error');
         session.emit(
-          createStatusEvent(
+          createStatusFragment(
             'error',
             `Daemon auto-start failed: ${error instanceof Error ? error.message : String(error)}\n\nYou can try starting the daemon manually:\n  xcodebuildmcp daemon start`,
           ),
@@ -387,7 +389,7 @@ export class DefaultToolInvoker implements ToolInvoker {
           context.captureInfraErrorMetric(retryError);
           context.captureInvocationMetric('infra_error');
           session.emit(
-            createStatusEvent(
+            createStatusFragment(
               'error',
               `Daemon restart failed after protocol mismatch: ${retryError instanceof Error ? retryError.message : String(retryError)}\n\nTry restarting manually:\n  xcodebuildmcp daemon stop && xcodebuildmcp daemon start`,
             ),
@@ -404,7 +406,7 @@ export class DefaultToolInvoker implements ToolInvoker {
       context.captureInfraErrorMetric(error);
       context.captureInvocationMetric('infra_error');
       session.emit(
-        createStatusEvent(
+        createStatusFragment(
           'error',
           `${context.errorTitle}: ${error instanceof Error ? error.message : String(error)}`,
         ),
@@ -455,20 +457,19 @@ export class DefaultToolInvoker implements ToolInvoker {
           captureInfraErrorMetric,
           captureInvocationMetric,
           consumeResult: (daemonResult: DaemonToolResult) => {
-            for (const event of daemonResult.progress ?? []) {
-              opts.renderSession!.emit(event);
+            for (const fragment of daemonResult.fragments ?? []) {
+              opts.renderSession!.emit(fragment);
             }
 
             const ctx: ToolHandlerContext = {
               liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
-              emit: (event) => {
-                opts.renderSession!.emit(event);
+              emit: (fragment) => {
+                opts.renderSession!.emit(fragment);
               },
               attach: (image) => opts.renderSession!.attach(image),
-              emitProgress:
-                opts.handlerContext?.liveProgressEnabled === true
-                  ? (event) => opts.renderSession!.emit(event)
-                  : () => {},
+              ...(opts.handlerContext?.liveProgressEnabled === true
+                ? { emitLiveFragment: (fragment) => opts.renderSession!.emit(fragment) }
+                : {}),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
             };
@@ -492,12 +493,9 @@ export class DefaultToolInvoker implements ToolInvoker {
         opts,
         (client) =>
           client.invokeTool(tool.mcpName, args, {
-            onProgress: (event) => {
-              if (opts.onProgress) {
-                opts.onProgress(event);
-                return;
-              }
-              session.emit(event);
+            onFragment: (fragment) => {
+              session.emit(fragment);
+              opts.onProgress?.(fragment);
             },
           }),
         {
@@ -513,14 +511,13 @@ export class DefaultToolInvoker implements ToolInvoker {
 
             const ctx: ToolHandlerContext = {
               liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
-              emit: (event) => {
-                session.emit(event);
+              emit: (fragment) => {
+                session.emit(fragment);
               },
               attach: (image) => session.attach(image),
-              emitProgress:
-                opts.handlerContext?.liveProgressEnabled === true
-                  ? (event) => session.emit(event)
-                  : () => {},
+              ...(opts.handlerContext?.liveProgressEnabled === true
+                ? { emitLiveFragment: (fragment) => session.emit(fragment) }
+                : {}),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
               structuredOutput: daemonResult.structuredOutput ?? undefined,
@@ -542,14 +539,20 @@ export class DefaultToolInvoker implements ToolInvoker {
     try {
       const ctx: ToolHandlerContext = opts.handlerContext ?? {
         liveProgressEnabled: false,
-        emit: (event) => {
-          session.emit(event);
-          opts.onProgress?.(event);
+        emit: (fragment) => {
+          session.emit(fragment);
+          opts.onProgress?.(fragment);
         },
         attach: (image) => {
           session.attach(image);
         },
-        emitProgress: () => {},
+        emitLiveFragment: (fragment) => {
+          if (!ctx.liveProgressEnabled) {
+            return;
+          }
+          session.emit(fragment);
+          opts.onProgress?.(fragment);
+        },
       };
 
       await tool.handler(args, ctx);
@@ -580,7 +583,7 @@ export class DefaultToolInvoker implements ToolInvoker {
         throw error instanceof Error ? error : new Error(String(error));
       }
       const message = error instanceof Error ? error.message : String(error);
-      session.emit(createStatusEvent('error', `Tool execution failed: ${message}`));
+      session.emit(createStatusFragment('error', `Tool execution failed: ${message}`));
     }
   }
 }

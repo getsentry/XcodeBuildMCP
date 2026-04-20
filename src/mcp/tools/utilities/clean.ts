@@ -1,9 +1,7 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type {
   BasicDiagnostics,
   BuildResultArtifacts,
-  DiagnosticEntry,
   ToolDomainResultBase,
 } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
@@ -11,12 +9,13 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const baseOptions = {
@@ -51,17 +50,10 @@ const baseSchemaObject = z.object({
 
 const cleanSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    })
-    .refine((val) => !(val.workspacePath && !val.scheme), {
-      message: 'scheme is required when workspacePath is provided.',
-      path: ['scheme'],
-    }),
+  withProjectOrWorkspace(baseSchemaObject).refine((val) => !(val.workspacePath && !val.scheme), {
+    message: 'scheme is required when workspacePath is provided.',
+    path: ['scheme'],
+  }),
 );
 
 export type CleanParams = z.infer<typeof cleanSchema>;
@@ -113,33 +105,22 @@ function createCleanArtifacts(
   return artifacts;
 }
 
-function createDiagnosticEntries(messages: string[]): DiagnosticEntry[] {
-  return messages.map((message) => ({ message }));
-}
-
 const STDERR_NOISE_PATTERNS: readonly RegExp[] = [
   /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+\S+\[\d+:\d+\]/u,
   /^Command line invocation:$/u,
   /^Build settings from command line:$/u,
 ];
 
-function collectStderrDiagnosticMessages(stderrChunks: string[]): string[] {
+function extractStderrErrorLines(stderrChunks: string[]): string[] {
   if (stderrChunks.length === 0) {
     return [];
   }
-
-  const combined = stderrChunks.join('');
-  const seen = new Set<string>();
-  const messages: string[] = [];
-  for (const rawLine of combined.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (line.length === 0) continue;
-    if (STDERR_NOISE_PATTERNS.some((pattern) => pattern.test(line))) continue;
-    if (seen.has(line)) continue;
-    seen.add(line);
-    messages.push(line);
-  }
-  return messages;
+  return stderrChunks
+    .join('')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !STDERR_NOISE_PATTERNS.some((pattern) => pattern.test(line)));
 }
 
 function createCleanResult(
@@ -165,14 +146,6 @@ function createCleanResult(
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: CleanResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 function resolveCleanPlatform(params: CleanParams): XcodePlatform | null {
   const targetPlatform = params.platform ?? 'iOS';
   const platformEnum = PLATFORM_MAP[targetPlatform];
@@ -193,7 +166,7 @@ export function createCleanExecutor(
         'FAILED',
         {
           warnings: [],
-          errors: createDiagnosticEntries([message]),
+          errors: [{ message }],
         },
         message,
       );
@@ -207,7 +180,7 @@ export function createCleanExecutor(
         'FAILED',
         {
           warnings: [],
-          errors: createDiagnosticEntries([message]),
+          errors: [{ message }],
         },
         message,
       );
@@ -241,18 +214,16 @@ export function createCleanExecutor(
       );
 
       const didError = response.isError === true;
-      const stderrMessages = collectStderrDiagnosticMessages(stderrChunks);
-      const fallbackMessages = response.content.map((item) => item.text).filter(Boolean);
-      const errorMessages = stderrMessages.length > 0 ? stderrMessages : fallbackMessages;
+      const stderrLines = extractStderrErrorLines(stderrChunks);
 
       return createCleanResult(
         params,
         didError ? 'FAILED' : 'SUCCEEDED',
         {
           warnings: [],
-          errors: didError ? createDiagnosticEntries(errorMessages) : [],
+          errors: didError ? stderrLines.map((message) => ({ message })) : [],
         },
-        didError ? `Clean failed: ${errorMessages.join('; ') || 'Unknown error'}` : null,
+        didError ? `Clean failed: ${stderrLines.join('; ') || 'Unknown error'}` : null,
         {
           configuration,
           cleanPlatform,
@@ -265,7 +236,7 @@ export function createCleanExecutor(
         'FAILED',
         {
           warnings: [],
-          errors: createDiagnosticEntries([message]),
+          errors: [{ message }],
         },
         message,
         {
@@ -282,10 +253,9 @@ export async function cleanLogic(params: CleanParams, executor: CommandExecutor)
   const executeClean = createCleanExecutor(executor);
   const result = await executeClean(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
-  setStructuredOutput(ctx, result);
+  ctx.structuredOutput = { result, schema: STRUCTURED_OUTPUT_SCHEMA, schemaVersion: '1' };
 }
 
 const publicSchemaObject = baseSchemaObject.omit({
@@ -303,7 +273,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<CleanParams>({
-  internalSchema: cleanSchema as unknown as z.ZodType<CleanParams, unknown>,
+  internalSchema: toInternalSchema<CleanParams>(cleanSchema),
   logicFunction: cleanLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

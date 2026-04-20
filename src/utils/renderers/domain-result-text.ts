@@ -6,17 +6,20 @@ import type {
   TestDiagnostics,
   ToolDomainResult,
 } from '../../types/domain-results.ts';
+import type { RenderHints } from '../../rendering/types.ts';
+import type { XcodebuildOperation } from '../../types/domain-fragments.ts';
 import type {
-  CompilerErrorProgressEvent,
-  CompilerWarningProgressEvent,
-  HeaderProgressEvent,
-  ProgressEvent,
-  StatusProgressEvent,
-  TestDiscoveryProgressEvent,
-  TestFailureProgressEvent,
-  XcodebuildOperation,
-} from '../../types/progress-events.ts';
+  CompilerErrorRenderItem,
+  CompilerWarningRenderItem,
+  HeaderRenderItem,
+  RenderItem,
+  StatusRenderItem,
+  TestDiscoveryRenderItem,
+  TestFailureRenderItem,
+} from '../../rendering/render-items.ts';
 import { displayPath } from '../build-preflight.ts';
+import { formatDeviceId } from '../device-name-resolver.ts';
+import { deriveBuildLikeTitle, invocationRequestToHeaderParams } from '../xcodebuild-pipeline.ts';
 
 export interface SummaryTextBlock {
   type: 'summary';
@@ -69,7 +72,7 @@ export type TextRendererBlock =
   | FileRefTextBlock
   | NextStepsTextBlock;
 
-export type TextRenderableItem = ProgressEvent | TextRendererBlock;
+export type TextRenderableItem = RenderItem | TextRendererBlock;
 
 const SESSION_DEFAULT_KEYS = [
   'projectPath',
@@ -119,6 +122,7 @@ type SessionDefaultsOperation =
       changedKeys: string[];
       persisted?: boolean;
       activatedProfile?: string;
+      notices?: string[];
     }
   | {
       type: 'clear';
@@ -178,12 +182,12 @@ function inferXcodebuildOperation(result: ToolDomainResult): XcodebuildOperation
 
 function createHeader(
   operation: string,
-  params: HeaderProgressEvent['params'] = [],
-): HeaderProgressEvent {
+  params: HeaderRenderItem['params'] = [],
+): HeaderRenderItem {
   return { type: 'header', operation, params };
 }
 
-function createStatus(level: StatusProgressEvent['level'], message: string): StatusProgressEvent {
+function createStatus(level: StatusRenderItem['level'], message: string): StatusRenderItem {
   return { type: 'status', level, message };
 }
 
@@ -207,7 +211,7 @@ function createTable(
   return { type: 'table', columns, rows, heading };
 }
 
-function createTextBlock(text: string): Extract<ProgressEvent, { type: 'text-block' }> {
+function createTextBlock(text: string): Extract<RenderItem, { type: 'text-block' }> {
   return { type: 'text-block', text };
 }
 
@@ -547,7 +551,9 @@ function createDoctorReportItems(
   result: Extract<ToolDomainResult, { kind: 'doctor-report' }>,
 ): TextRenderableItem[] {
   const items: TextRenderableItem[] = [
-    createHeader('Doctor', [{ label: 'Server Version', value: result.serverVersion }]),
+    createHeader('XcodeBuildMCP Doctor', [
+      { label: 'Server Version', value: result.serverVersion },
+    ]),
     createTable(
       ['name', 'status', 'message'],
       result.checks.map((check) => ({
@@ -591,41 +597,50 @@ function createWorkflowSelectionItems(
 function createAppPathItems(
   result: Extract<ToolDomainResult, { kind: 'app-path' }>,
 ): TextRenderableItem[] {
-  const items: TextRenderableItem[] = [createHeader('Get App Path')];
+  const headerParams: HeaderRenderItem['params'] = [];
+  if (result.request?.scheme) {
+    headerParams.push({ label: 'Scheme', value: result.request.scheme });
+  }
+  if (result.request?.workspacePath) {
+    headerParams.push({ label: 'Workspace', value: displayPath(result.request.workspacePath) });
+  } else if (result.request?.projectPath) {
+    headerParams.push({ label: 'Project', value: displayPath(result.request.projectPath) });
+  }
+  if (result.request?.configuration) {
+    headerParams.push({ label: 'Configuration', value: result.request.configuration });
+  }
+  if (result.request?.platform) {
+    headerParams.push({ label: 'Platform', value: result.request.platform });
+  }
+  if (result.request?.simulator) {
+    headerParams.push({ label: 'Simulator', value: result.request.simulator });
+  }
+
+  const items: TextRenderableItem[] = [createHeader('Get App Path', headerParams)];
+  const target = result.summary?.target;
+
   if (result.didError) {
     if ('diagnostics' in result && result.diagnostics?.errors.length) {
       items.push(createTextBlock(formatCountedMessagesBlock('Errors', result.diagnostics.errors)));
     }
     items.push(
-      createStatus(
-        'error',
-        result.error === 'Query failed'
-          ? 'Query failed.'
-          : result.error === 'Failed to get app path'
-            ? 'Failed to get app path'
-            : (result.error ?? 'Query failed.'),
-      ),
+      createStatus('error', target === 'simulator' ? 'Failed to get app path' : 'Query failed.'),
     );
     return items;
   }
 
   const durationMs =
-    'summary' in result &&
-    result.summary &&
-    typeof result.summary === 'object' &&
-    'durationMs' in result.summary &&
-    typeof result.summary.durationMs === 'number'
-      ? result.summary.durationMs
-      : undefined;
+    typeof result.summary?.durationMs === 'number' ? result.summary.durationMs : undefined;
   const appPath =
     'artifacts' in result && result.artifacts && 'appPath' in result.artifacts
       ? result.artifacts.appPath
       : undefined;
   const isSimulatorAppPath =
-    typeof appPath === 'string' &&
-    /(iphonesimulator|watchsimulator|appletvsimulator|xrsimulator|visionossimulator)/i.test(
-      appPath,
-    );
+    target === 'simulator' ||
+    (typeof appPath === 'string' &&
+      /(iphonesimulator|watchsimulator|appletvsimulator|xrsimulator|visionossimulator)/i.test(
+        appPath,
+      ));
   items.push(
     createStatus(
       'success',
@@ -644,9 +659,12 @@ function createAppPathItems(
 
 function createBundleIdItems(
   result: Extract<ToolDomainResult, { kind: 'bundle-id' }>,
+  hints?: RenderHints,
 ): TextRenderableItem[] {
   const items: TextRenderableItem[] = [
-    createHeader('Get Bundle ID', [{ label: 'App', value: displayPath(result.artifacts.appPath) }]),
+    createHeader(hints?.headerTitle ?? 'Get Bundle ID', [
+      { label: 'App', value: displayPath(result.artifacts.appPath) },
+    ]),
   ];
   if (result.didError) {
     items.push(createStatus('error', result.error ?? 'Failed to get bundle ID.'));
@@ -667,7 +685,13 @@ function createInstallResultItems(
   const isSimulator = typeof result.artifacts.simulatorId === 'string';
   const targetLabel = isSimulator ? 'Simulator' : 'Device';
   const appLabel = isSimulator ? 'App Path' : 'App';
-  const targetValue = result.artifacts.simulatorId ?? result.artifacts.deviceId ?? 'unknown';
+  const targetValue = isSimulator
+    ? (result.artifacts.simulatorId ?? 'unknown')
+    : result.didError
+      ? (result.artifacts.deviceId ?? 'unknown')
+      : result.artifacts.deviceId
+        ? formatDeviceId(result.artifacts.deviceId)
+        : 'unknown';
   const items: TextRenderableItem[] = [
     createHeader('Install App', [
       { label: targetLabel, value: targetValue },
@@ -701,14 +725,19 @@ function createLaunchResultItems(
   const isDevice = typeof result.artifacts.deviceId === 'string';
   const isMac = !isSimulator && !isDevice;
   const title = isMac ? 'Launch macOS App' : 'Launch App';
-  const params: HeaderProgressEvent['params'] = [];
+  const params: HeaderRenderItem['params'] = [];
 
   if (isMac) {
     if (result.artifacts.appPath) {
       params.push({ label: 'App', value: displayPath(result.artifacts.appPath) });
     }
   } else if (isDevice) {
-    params.push({ label: 'Device', value: result.artifacts.deviceId! });
+    params.push({
+      label: 'Device',
+      value: result.didError
+        ? result.artifacts.deviceId!
+        : formatDeviceId(result.artifacts.deviceId!),
+    });
     if (result.artifacts.bundleId) {
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
@@ -762,14 +791,19 @@ function createStopResultItems(
   const isMac = !isSimulator && !isDevice && !isSwiftPackage;
 
   const title = isSwiftPackage ? 'Swift Package Stop' : isMac ? 'Stop macOS App' : 'Stop App';
-  const params: HeaderProgressEvent['params'] = [];
+  const params: HeaderRenderItem['params'] = [];
   if (isSimulator) {
     params.push({ label: 'Simulator', value: result.artifacts.simulatorId! });
     if (result.artifacts.bundleId) {
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
   } else if (isDevice) {
-    params.push({ label: 'Device', value: result.artifacts.deviceId! });
+    params.push({
+      label: 'Device',
+      value: result.didError
+        ? result.artifacts.deviceId!
+        : formatDeviceId(result.artifacts.deviceId!),
+    });
     if (typeof result.artifacts.processId === 'number') {
       params.push({ label: 'PID', value: String(result.artifacts.processId) });
     }
@@ -985,7 +1019,7 @@ function createSessionDefaultsItems(
     ];
   }
 
-  const headerParams: HeaderProgressEvent['params'] = [];
+  const headerParams: HeaderRenderItem['params'] = [];
   if (activeProfile?.projectPath !== null) {
     headerParams.push({
       label: 'Project Path',
@@ -1012,10 +1046,15 @@ function createSessionDefaultsItems(
     createTextBlock(formatSessionDefaultsTree(activeProfile).join('\n')),
   ];
 
+  const notices: string[] = [];
   if (result.operation?.type === 'set' && result.operation.activatedProfile) {
-    items.push(
-      createSection('Notices', [`Activated profile "${result.operation.activatedProfile}".`]),
-    );
+    notices.push(`Activated profile "${result.operation.activatedProfile}".`);
+  }
+  if (result.operation?.type === 'set' && result.operation.notices?.length) {
+    notices.push(...result.operation.notices);
+  }
+  if (notices.length > 0) {
+    items.push(createSection('Notices', notices));
   }
   return items;
 }
@@ -1060,7 +1099,7 @@ function createSimulatorActionItems(
     statusbar: 'Statusbar',
   };
 
-  const params: HeaderProgressEvent['params'] = [];
+  const params: HeaderRenderItem['params'] = [];
   if (result.artifacts?.simulatorId) {
     params.push({ label: 'Simulator', value: result.artifacts.simulatorId });
   }
@@ -1244,7 +1283,7 @@ function createCoverageResultItems(
   rawResult: Extract<ToolDomainResult, { kind: 'coverage-result' }>,
 ): TextRenderableItem[] {
   const result = rawResult as CoverageResultWithOptionalRanges;
-  const headerParams: HeaderProgressEvent['params'] =
+  const headerParams: HeaderRenderItem['params'] =
     result.coverageScope === 'report'
       ? [
           { label: 'xcresult', value: displayPath(result.artifacts.xcresultPath) },
@@ -1542,11 +1581,11 @@ function createCleanResultItems(
   const isSwiftPackage =
     'artifacts' in result && !!result.artifacts && 'packagePath' in result.artifacts;
   const title = isSwiftPackage ? 'Swift Package Clean' : 'Clean';
-  const params: HeaderProgressEvent['params'] = [];
+  const params: HeaderRenderItem['params'] = [];
 
   if ('artifacts' in result && result.artifacts) {
     if ('packagePath' in result.artifacts && typeof result.artifacts.packagePath === 'string') {
-      params.push({ label: 'Package', value: displayPath(result.artifacts.packagePath) });
+      params.push({ label: 'Package', value: result.artifacts.packagePath });
     } else {
       if ('scheme' in result.artifacts && typeof result.artifacts.scheme === 'string') {
         params.push({ label: 'Scheme', value: result.artifacts.scheme });
@@ -1634,6 +1673,9 @@ function createDiagnosticSections(result: ToolDomainResult): SectionTextBlock[] 
       ),
     );
   }
+  if (diagnostics.rawOutput && diagnostics.rawOutput.length > 0) {
+    sections.push(createSection('Raw Output', diagnostics.rawOutput, { icon: 'red-circle' }));
+  }
   return sections;
 }
 
@@ -1676,7 +1718,7 @@ function createSummaryBlock(result: ToolDomainResult): SummaryTextBlock | null {
 
 function createTestDiscoveryProgress(
   result: Extract<ToolDomainResult, { kind: 'test-result' }>,
-): TestDiscoveryProgressEvent | null {
+): TestDiscoveryRenderItem | null {
   const discovered = result.tests?.discovered;
   if (!discovered || discovered.total === 0) {
     return null;
@@ -1693,7 +1735,7 @@ function createTestDiscoveryProgress(
 function createCompilerWarningEvent(
   operation: XcodebuildOperation,
   entry: { message: string; location?: string },
-): CompilerWarningProgressEvent {
+): CompilerWarningRenderItem {
   return {
     type: 'compiler-warning',
     operation,
@@ -1706,7 +1748,7 @@ function createCompilerWarningEvent(
 function createCompilerErrorEvent(
   operation: XcodebuildOperation,
   entry: { message: string; location?: string },
-): CompilerErrorProgressEvent {
+): CompilerErrorRenderItem {
   return {
     type: 'compiler-error',
     operation,
@@ -1721,7 +1763,7 @@ function createTestFailureEvent(entry: {
   test: string;
   message: string;
   location?: string;
-}): TestFailureProgressEvent {
+}): TestFailureRenderItem {
   return {
     type: 'test-failure',
     operation: 'TEST',
@@ -1756,6 +1798,12 @@ function createBuildLikeDiagnosticEvents(
     }
   }
 
+  if (result.diagnostics.rawOutput) {
+    for (const line of result.diagnostics.rawOutput) {
+      items.push({ type: 'status', level: 'error', message: line } as StatusRenderItem);
+    }
+  }
+
   return items;
 }
 
@@ -1778,7 +1826,7 @@ function createBuildRunSyntheticStepItems(
 
   const stepsByTarget: Record<
     string,
-    Array<{ level: StatusProgressEvent['level']; message: string }>
+    Array<{ level: StatusRenderItem['level']; message: string }>
   > = {
     device: [
       { level: 'info', message: 'Resolving app path' },
@@ -1907,7 +1955,7 @@ function formatUiHierarchyJsonPropertyLines(
   return [`${prefix}${JSON.stringify(value)}`];
 }
 
-function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[] {
+export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[] {
   switch (result.kind) {
     case 'build-result': {
       if (!('artifacts' in result) || !result.artifacts) return [];
@@ -1982,6 +2030,22 @@ function createBuildLikeTailItems(result: ToolDomainResult): TextRenderableItem[
   }
 }
 
+export function createStreamingTailItems(result: ToolDomainResult): TextRenderableItem[] {
+  const items = createBuildLikeTailItems(result);
+
+  if (!('diagnostics' in result) || !result.diagnostics) {
+    return items;
+  }
+
+  if ('rawOutput' in result.diagnostics && Array.isArray(result.diagnostics.rawOutput)) {
+    for (const line of result.diagnostics.rawOutput) {
+      items.push({ type: 'status', level: 'error', message: line } as StatusRenderItem);
+    }
+  }
+
+  return items;
+}
+
 function renderBridgeCallContent(
   content: Extract<ToolDomainResult, { kind: 'xcode-bridge-call-result' }>['content'],
 ): string[] {
@@ -1993,12 +2057,15 @@ function renderBridgeCallContent(
   });
 }
 
-function createSpecialCaseItems(result: ToolDomainResult): TextRenderableItem[] | null {
+function createSpecialCaseItems(
+  result: ToolDomainResult,
+  hints?: RenderHints,
+): TextRenderableItem[] | null {
   switch (result.kind) {
     case 'app-path':
       return createAppPathItems(result);
     case 'bundle-id':
-      return createBundleIdItems(result);
+      return createBundleIdItems(result, hints);
     case 'install-result':
       return createInstallResultItems(result);
     case 'launch-result':
@@ -2204,8 +2271,11 @@ export function createNextStepsBlock(
   return steps.length > 0 ? { type: 'next-steps', steps: [...steps], runtime } : null;
 }
 
-export function renderDomainResultTextItems(result: ToolDomainResult): TextRenderableItem[] {
-  const specialCaseItems = createSpecialCaseItems(result);
+export function renderDomainResultTextItems(
+  result: ToolDomainResult,
+  hints?: RenderHints,
+): TextRenderableItem[] {
+  const specialCaseItems = createSpecialCaseItems(result, hints);
   if (specialCaseItems) {
     return specialCaseItems;
   }
@@ -2216,6 +2286,10 @@ export function renderDomainResultTextItems(result: ToolDomainResult): TextRende
     result.kind === 'build-run-result' ||
     result.kind === 'test-result'
   ) {
+    if (result.request) {
+      const title = hints?.headerTitle ?? deriveBuildLikeTitle(result.kind, result.request);
+      items.push(createHeader(title, invocationRequestToHeaderParams(result.request)));
+    }
     if (result.kind === 'test-result') {
       const discovery = createTestDiscoveryProgress(result);
       if (discovery) {

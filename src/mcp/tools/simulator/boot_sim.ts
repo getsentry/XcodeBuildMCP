@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -133,7 +134,6 @@ export async function boot_simLogic(
   const executeBootSim = createBootSimExecutor(executor);
   const result = await executeBootSim(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
   setStructuredOutput(ctx, result);
 
@@ -155,7 +155,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<BootSimParams>({
-  internalSchema: internalSchemaObject as unknown as z.ZodType<BootSimParams, unknown>,
+  internalSchema: toInternalSchema<BootSimParams>(internalSchemaObject),
   logicFunction: boot_simLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

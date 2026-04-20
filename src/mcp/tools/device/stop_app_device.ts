@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -16,10 +15,14 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { formatDeviceId } from '../../../utils/device-name-resolver.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import {
+  buildStopFailure,
+  buildStopSuccess,
+  setStopResultStructuredOutput,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const stopAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -30,75 +33,22 @@ type StopAppDeviceParams = z.infer<typeof stopAppDeviceSchema>;
 type StopAppDeviceResult = StopResultDomainResult;
 
 const publicSchemaObject = stopAppDeviceSchema.omit({ deviceId: true } as const);
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.stop-result';
 
 export async function stop_app_deviceLogic(
   params: StopAppDeviceParams,
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Stop App', [
-      { label: 'Device', value: formatDeviceId(params.deviceId) },
-      { label: 'PID', value: String(params.processId) },
-    ]),
-  );
   const executeStopAppDevice = createStopAppDeviceExecutor(executor);
   const result = await executeStopAppDevice(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setStopResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error stopping app on device: ${result.error ?? 'Unknown error'}`);
   }
-}
-
-function createStopAppDeviceResult(params: StopAppDeviceParams): StopAppDeviceResult {
-  return {
-    kind: 'stop-result',
-    didError: false,
-    error: null,
-    summary: { status: 'SUCCEEDED' },
-    artifacts: {
-      deviceId: params.deviceId,
-      processId: params.processId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function createStopAppDeviceErrorResult(
-  params: StopAppDeviceParams,
-  message: string,
-): StopAppDeviceResult {
-  return {
-    kind: 'stop-result',
-    didError: true,
-    error: message,
-    summary: { status: 'FAILED' },
-    artifacts: {
-      deviceId: params.deviceId,
-      processId: params.processId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: StopAppDeviceResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
 }
 
 export function createStopAppDeviceExecutor(
@@ -106,6 +56,8 @@ export function createStopAppDeviceExecutor(
 ): ToolExecutor<StopAppDeviceParams, StopAppDeviceResult> {
   return async (params) => {
     log('info', `Stopping app with PID ${params.processId} on device ${params.deviceId}`);
+
+    const artifacts = { deviceId: params.deviceId, processId: params.processId };
 
     try {
       const result = await executor(
@@ -125,14 +77,12 @@ export function createStopAppDeviceExecutor(
       );
 
       if (!result.success) {
-        const message = `Failed to stop app: ${result.error}`;
-        return createStopAppDeviceErrorResult(params, message);
+        return buildStopFailure(artifacts, `Failed to stop app: ${result.error}`);
       }
 
-      return createStopAppDeviceResult(params);
+      return buildStopSuccess(artifacts);
     } catch (error) {
-      const message = `Failed to stop app on device: ${toErrorMessage(error)}`;
-      return createStopAppDeviceErrorResult(params, message);
+      return buildStopFailure(artifacts, `Failed to stop app on device: ${toErrorMessage(error)}`);
     }
   };
 }
@@ -143,7 +93,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<StopAppDeviceParams>({
-  internalSchema: stopAppDeviceSchema as unknown as z.ZodType<StopAppDeviceParams>,
+  internalSchema: toInternalSchema<StopAppDeviceParams>(stopAppDeviceSchema),
   logicFunction: stop_app_deviceLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['deviceId'], message: 'deviceId is required' }],

@@ -15,6 +15,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -110,7 +111,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<KeySequenceParams>({
-  internalSchema: keySequenceSchema as unknown as z.ZodType<KeySequenceParams, unknown>,
+  internalSchema: toInternalSchema<KeySequenceParams>(keySequenceSchema),
   logicFunction: (params: KeySequenceParams, executor: CommandExecutor) =>
     key_sequenceLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,

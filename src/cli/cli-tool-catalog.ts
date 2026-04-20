@@ -6,12 +6,19 @@ import { buildCliToolCatalogFromManifest, createToolCatalog } from '../runtime/t
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
 import { toKebabCase } from '../runtime/naming.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
+
 import { jsonSchemaToZod } from '../integrations/xcode-tools-bridge/jsonschema-to-zod.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
 import { log } from '../utils/logging/index.ts';
-import { statusLine } from '../utils/tool-event-builders.ts';
+import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
+
+function infrastructureStatus(
+  level: RuntimeStatusFragment['level'],
+  message: string,
+): RuntimeStatusFragment {
+  return { kind: 'infrastructure', fragment: 'status', level, message };
+}
 
 interface BuildCliToolCatalogOptions {
   socketPath: string;
@@ -64,15 +71,10 @@ async function invokeRemoteToolOneShot(
       isError?: boolean;
       _meta?: Record<string, unknown>;
     };
-    const progress = response._meta?.progress;
-    if (Array.isArray(progress)) {
-      for (const event of progress as ProgressEvent[]) {
-        ctx.emit(event);
-      }
-    } else if (response.content) {
+    if (response.content) {
       for (const item of response.content) {
         if (item.type === 'text') {
-          ctx.emit(statusLine(response.isError ? 'error' : 'success', item.text));
+          ctx.emit(infrastructureStatus(response.isError ? 'error' : 'success', item.text));
         }
       }
     }

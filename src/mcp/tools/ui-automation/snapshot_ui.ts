@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { recordSnapshotUiCall } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
@@ -140,7 +141,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<SnapshotUiParams>({
-  internalSchema: snapshotUiSchema as unknown as z.ZodType<SnapshotUiParams, unknown>,
+  internalSchema: toInternalSchema<SnapshotUiParams>(snapshotUiSchema),
   logicFunction: (params: SnapshotUiParams, executor: CommandExecutor) =>
     snapshot_uiLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,

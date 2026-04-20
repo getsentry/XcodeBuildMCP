@@ -6,7 +6,6 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BundleIdDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -15,6 +14,10 @@ import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../.
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
+import {
+  buildBundleIdResult,
+  setBundleIdStructuredOutput,
+} from '../../../utils/app-query-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
 const getAppBundleIdSchema = z.object({
@@ -24,30 +27,6 @@ const getAppBundleIdSchema = z.object({
 type GetAppBundleIdParams = z.infer<typeof getAppBundleIdSchema>;
 type GetAppBundleIdResult = BundleIdDomainResult;
 
-function createBundleIdResult(
-  appPath: string,
-  bundleId?: string,
-  error?: string,
-): GetAppBundleIdResult {
-  return {
-    kind: 'bundle-id',
-    didError: typeof error === 'string',
-    error: error ?? null,
-    artifacts: {
-      appPath,
-      ...(bundleId ? { bundleId } : {}),
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: GetAppBundleIdResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: 'xcodebuildmcp.output.bundle-id',
-    schemaVersion: '1',
-  };
-}
-
 export function createGetAppBundleIdExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
@@ -56,7 +35,7 @@ export function createGetAppBundleIdExecutor(
     const appPath = params.appPath;
 
     if (!fileSystemExecutor.existsSync(appPath)) {
-      return createBundleIdResult(
+      return buildBundleIdResult(
         appPath,
         undefined,
         `File not found: '${appPath}'. Please check the path and try again.`,
@@ -70,10 +49,9 @@ export function createGetAppBundleIdExecutor(
         );
       });
 
-      const trimmedBundleId = bundleId.trim();
-      return createBundleIdResult(appPath, trimmedBundleId);
+      return buildBundleIdResult(appPath, bundleId.trim());
     } catch (error) {
-      return createBundleIdResult(appPath, undefined, toErrorMessage(error));
+      return buildBundleIdResult(appPath, undefined, toErrorMessage(error));
     }
   };
 }
@@ -94,10 +72,9 @@ export async function get_app_bundle_idLogic(
   const executeGetAppBundleId = createGetAppBundleIdExecutor(executor, fileSystemExecutor);
   const result = await executeGetAppBundleId(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
-  setStructuredOutput(ctx, result);
+  setBundleIdStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error extracting app bundle ID: ${result.error ?? 'Unknown error'}`);

@@ -96,6 +96,12 @@
           "items": {
             "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/diagnosticEntry"
           }
+        },
+        "rawOutput": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -146,6 +152,12 @@
           "type": "array",
           "items": {
             "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/testFailureEntry"
+          }
+        },
+        "rawOutput": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       },

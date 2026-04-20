@@ -170,7 +170,6 @@ export async function debug_stackLogic(
   const executeDebugStack = createDebugStackExecutor(ctx.debugger);
   const result = await executeDebugStack(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);

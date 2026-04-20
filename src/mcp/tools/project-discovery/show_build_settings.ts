@@ -9,11 +9,10 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -23,13 +22,7 @@ const baseSchemaObject = z.object({
 
 const showBuildSettingsSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 export type ShowBuildSettingsParams = z.infer<typeof showBuildSettingsSchema>;
@@ -179,19 +172,9 @@ export async function showBuildSettingsLogic(
   const pathValue = hasProjectPath ? params.projectPath : params.workspacePath;
 
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Show Build Settings', [
-      { label: 'Scheme', value: params.scheme },
-      {
-        label: hasProjectPath ? 'Project' : 'Workspace',
-        value: displayPath(pathValue!),
-      },
-    ]),
-  );
   const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
   const result = await executeShowBuildSettings(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   setStructuredOutput(ctx, result);
@@ -222,7 +205,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ShowBuildSettingsParams>({
-  internalSchema: showBuildSettingsSchema as unknown as z.ZodType<ShowBuildSettingsParams, unknown>,
+  internalSchema: toInternalSchema<ShowBuildSettingsParams>(showBuildSettingsSchema),
   logicFunction: showBuildSettingsLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

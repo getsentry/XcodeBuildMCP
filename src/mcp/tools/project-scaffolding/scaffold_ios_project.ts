@@ -387,7 +387,6 @@ export async function scaffold_ios_projectLogic(
   );
   const result = await executeScaffoldIOSProject(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
 
   setScaffoldStructuredOutput(ctx, result);

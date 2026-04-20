@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { DomainFragment } from '../../types/domain-fragments.ts';
 import type { StructuredToolOutput } from '../types.ts';
 import { renderTranscript } from '../render.ts';
 import { createCliTextRenderer } from '../../utils/renderers/cli-text-renderer.ts';
 import type { NextStep } from '../../types/common.ts';
 
 interface TranscriptFixture {
-  progressEvents: ProgressEvent[];
+  progressEvents: DomainFragment[];
   structuredOutput?: StructuredToolOutput;
   nextSteps?: NextStep[];
   nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
@@ -17,7 +17,7 @@ function captureCliText(fixture: TranscriptFixture): string {
   const renderer = createCliTextRenderer({ interactive: false });
 
   for (const event of fixture.progressEvents) {
-    renderer.onProgress(event);
+    renderer.onFragment(event);
   }
   if (fixture.structuredOutput) {
     renderer.setStructuredOutput(fixture.structuredOutput);
@@ -39,16 +39,14 @@ describe('text render parity', () => {
     const fixture: TranscriptFixture = {
       progressEvents: [
         {
-          type: 'header',
-          operation: 'Test',
-          params: [
-            { label: 'Scheme', value: 'CalculatorApp' },
-            { label: 'Configuration', value: 'Debug' },
-            { label: 'Platform', value: 'iOS Simulator' },
-          ],
+          kind: 'test-result',
+          fragment: 'invocation',
+          operation: 'TEST',
+          request: { scheme: 'CalculatorApp', configuration: 'Debug', platform: 'iOS Simulator' },
         },
         {
-          type: 'test-discovery',
+          kind: 'test-result',
+          fragment: 'test-discovery',
           operation: 'TEST',
           total: 1,
           tests: ['CalculatorAppTests/CalculatorAppTests/testAddition'],
@@ -90,16 +88,14 @@ describe('text render parity', () => {
     const fixture: TranscriptFixture = {
       progressEvents: [
         {
-          type: 'header',
-          operation: 'Test',
-          params: [
-            { label: 'Scheme', value: 'MCPTest' },
-            { label: 'Configuration', value: 'Debug' },
-            { label: 'Platform', value: 'macOS' },
-          ],
+          kind: 'test-result',
+          fragment: 'invocation',
+          operation: 'TEST',
+          request: { scheme: 'MCPTest', configuration: 'Debug', platform: 'macOS' },
         },
         {
-          type: 'test-discovery',
+          kind: 'test-result',
+          fragment: 'test-discovery',
           operation: 'TEST',
           total: 2,
           tests: [
@@ -109,7 +105,8 @@ describe('text render parity', () => {
           truncated: false,
         },
         {
-          type: 'test-failure',
+          kind: 'test-result',
+          fragment: 'test-failure',
           operation: 'TEST',
           suite: 'MCPTestsXCTests',
           test: 'testDeliberateFailure()',
@@ -152,19 +149,22 @@ describe('text render parity', () => {
     const fixture: TranscriptFixture = {
       progressEvents: [
         {
-          type: 'header',
-          operation: 'Test',
-          params: [{ label: 'Scheme', value: 'MCPTest' }],
+          kind: 'test-result',
+          fragment: 'invocation',
+          operation: 'TEST',
+          request: { scheme: 'MCPTest' },
         },
         {
-          type: 'test-discovery',
+          kind: 'test-result',
+          fragment: 'test-discovery',
           operation: 'TEST',
           total: 2,
           tests: ['MCPTestTests/testOne', 'MCPTestTests/testTwo'],
           truncated: false,
         },
         {
-          type: 'test-failure',
+          kind: 'test-result',
+          fragment: 'test-failure',
           operation: 'TEST',
           suite: 'MCPTestTests',
           test: 'testTwo()',
@@ -172,7 +172,8 @@ describe('text render parity', () => {
           location: 'MCPTestTests.swift:11',
         },
         {
-          type: 'summary',
+          kind: 'test-result',
+          fragment: 'build-summary',
           operation: 'TEST',
           status: 'FAILED',
           totalTests: 2,
@@ -180,10 +181,6 @@ describe('text render parity', () => {
           failedTests: 1,
           skippedTests: 0,
           durationMs: 2200,
-        },
-        {
-          type: 'detail-tree',
-          items: [{ label: 'Build Logs', value: '/tmp/Test.log' }],
         },
       ],
       structuredOutput: {

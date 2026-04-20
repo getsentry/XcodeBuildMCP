@@ -19,7 +19,7 @@ import {
   type XcodeIdeInvokeResult,
 } from '../daemon/protocol.ts';
 import { getSocketPath } from '../daemon/socket-path.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
 
 export class DaemonVersionMismatchError extends Error {
   constructor(message: string) {
@@ -34,7 +34,7 @@ export interface DaemonClientOptions {
 }
 
 export interface InvokeToolOptions {
-  onProgress?: (event: ProgressEvent) => void;
+  onFragment?: (fragment: AnyFragment) => void;
 }
 
 export class DaemonClient {
@@ -240,16 +240,16 @@ export class DaemonClient {
             }
 
             const progressFrame = frame as ToolInvokeProgressFrame;
-            if (progressFrame.stream.kind !== 'progress') {
+            if (progressFrame.stream.kind === 'fragment') {
+              options.onFragment?.(progressFrame.stream.fragment);
+            } else {
               failWithTransportError(
                 new Error(
-                  `Daemon protocol error: unknown stream kind '${progressFrame.stream.kind}'`,
+                  `Daemon protocol error: unknown stream kind '${(progressFrame.stream as { kind: string }).kind}'`,
                 ),
               );
               return;
             }
-
-            options.onProgress?.(progressFrame.stream.event);
             return;
           }
 

@@ -7,6 +7,7 @@ import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
@@ -118,7 +119,6 @@ export async function debug_breakpoint_addLogic(
   const executeDebugBreakpointAdd = createDebugBreakpointAddExecutor(ctx.debugger);
   const result = await executeDebugBreakpointAdd(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);
@@ -127,7 +127,7 @@ export async function debug_breakpoint_addLogic(
 export const schema = baseSchemaObject.shape;
 
 export const handler = createTypedToolWithContext<DebugBreakpointAddParams, DebuggerToolContext>(
-  debugBreakpointAddSchema as unknown as z.ZodType<DebugBreakpointAddParams, unknown>,
+  toInternalSchema<DebugBreakpointAddParams>(debugBreakpointAddSchema),
   debug_breakpoint_addLogic,
   getDefaultDebuggerToolContext,
 );

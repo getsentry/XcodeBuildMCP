@@ -1,4 +1,4 @@
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { DomainFragment } from '../types/domain-fragments.ts';
 import {
   parseSwiftTestingResultLine,
   parseSwiftTestingIssueLine,
@@ -19,7 +19,7 @@ export interface SwiftTestingEventParser {
 }
 
 export interface SwiftTestingEventParserOptions {
-  onEvent: (event: ProgressEvent) => void;
+  onEvent: (fragment: DomainFragment) => void;
 }
 
 export function createSwiftTestingEventParser(
@@ -45,7 +45,8 @@ export function createSwiftTestingEventParser(
       return;
     }
     onEvent({
-      type: 'test-failure',
+      kind: 'test-result',
+      fragment: 'test-failure',
       operation: 'TEST',
       suite: lastIssueDiagnostic.suiteName,
       test: lastIssueDiagnostic.testName,
@@ -57,7 +58,8 @@ export function createSwiftTestingEventParser(
 
   function emitTestProgress(): void {
     onEvent({
-      type: 'test-progress',
+      kind: 'test-result',
+      fragment: 'test-progress',
       operation: 'TEST',
       completed: completedCount,
       failed: failedCount,
@@ -72,19 +74,18 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // Swift Testing continuation line (↳) appends context to the pending issue
     const continuation = parseSwiftTestingContinuationLine(line);
     if (continuation && lastIssueDiagnostic) {
       lastIssueDiagnostic.message += `\n${continuation}`;
       return;
     }
 
-    // Check result line BEFORE flushing so we can attach duration to pending issue
     const stResult = parseSwiftTestingResultLine(line);
     if (stResult && stResult.status === 'failed' && lastIssueDiagnostic) {
       const durationMs = parseDurationMs(stResult.durationText);
       onEvent({
-        type: 'test-failure',
+        kind: 'test-result',
+        fragment: 'test-failure',
         operation: 'TEST',
         suite: lastIssueDiagnostic.suiteName,
         test: lastIssueDiagnostic.testName,
@@ -102,7 +103,6 @@ export function createSwiftTestingEventParser(
 
     flushPendingIssue();
 
-    // Swift Testing issue line: ✘ Test "Name" recorded an issue at file:line:col: message
     const issue = parseSwiftTestingIssueLine(line);
     if (issue) {
       lastIssueDiagnostic = {
@@ -114,7 +114,6 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // Swift Testing result line: ✔/✘/◇ Test "Name" passed/failed/skipped (non-failure or no pending issue)
     if (stResult) {
       const increment = stResult.caseCount ?? 1;
       completedCount += increment;
@@ -128,7 +127,6 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // Swift Testing run summary
     const stSummary = parseSwiftTestingRunSummary(line);
     if (stSummary) {
       completedCount = stSummary.executed;
@@ -137,7 +135,6 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // XCTest: Test Case '...' passed/failed (for mixed output from `swift test`)
     const xcTestCase = parseTestCaseLine(line);
     if (xcTestCase) {
       const xcIncrement = xcTestCase.caseCount ?? 1;
@@ -152,7 +149,6 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // XCTest totals: Executed N tests, with N failures
     const xcTotals = parseTotalsLine(line);
     if (xcTotals) {
       completedCount = xcTotals.executed;
@@ -161,11 +157,11 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // XCTest failure diagnostic: file:line: error: -[Suite test] : message
     const xcFailure = parseFailureDiagnostic(line);
     if (xcFailure) {
       onEvent({
-        type: 'test-failure',
+        kind: 'test-result',
+        fragment: 'test-failure',
         operation: 'TEST',
         suite: xcFailure.suiteName,
         test: xcFailure.testName,
@@ -175,10 +171,10 @@ export function createSwiftTestingEventParser(
       return;
     }
 
-    // Detect test run start
     if (/^[◇] Test run started/u.test(line) || /^Testing started$/u.test(line)) {
       onEvent({
-        type: 'build-stage',
+        kind: 'test-result',
+        fragment: 'build-stage',
         operation: 'TEST',
         stage: 'RUN_TESTS',
         message: 'Running tests',

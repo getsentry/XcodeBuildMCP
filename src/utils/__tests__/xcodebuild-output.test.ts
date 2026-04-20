@@ -1,104 +1,73 @@
 import { describe, expect, it } from 'vitest';
-import { startBuildPipeline } from '../xcodebuild-pipeline.ts';
+import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
+import type { StartedPipeline } from '../xcodebuild-pipeline.ts';
 import { finalizeInlineXcodebuild } from '../xcodebuild-output.ts';
-import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { AnyFragment, DomainFragment } from '../../types/domain-fragments.ts';
 
-function startPipeline(emit: (event: ProgressEvent) => void = () => {}) {
-  return startBuildPipeline({
+function startPipeline(emit: (fragment: AnyFragment) => void = () => {}): StartedPipeline {
+  const pipeline = createXcodebuildPipeline({
     operation: 'BUILD',
     toolName: 'build_run_macos',
     params: { scheme: 'MyApp' },
-    message: '🚀 Build & Run\n\n  Scheme: MyApp',
     emit,
   });
+  return { pipeline, startedAt: Date.now() };
 }
 
 describe('xcodebuild-output', () => {
-  it('suppresses fallback error progress when structured diagnostics already exist', () => {
-    const emitted: ProgressEvent[] = [];
-    const started = startPipeline();
-
-    started.pipeline.emitEvent({
-      type: 'compiler-error',
-      operation: 'BUILD',
-      message: 'unterminated string literal',
-      rawLine: '/tmp/MyApp.swift:10:1: error: unterminated string literal',
-    });
-
-    const result = finalizeInlineXcodebuild({
-      started,
-      emit: (event) => emitted.push(event),
-      succeeded: false,
-      durationMs: 100,
-      responseContent: [{ type: 'text', text: 'Legacy fallback error block' }],
-      errorFallbackPolicy: 'if-no-structured-diagnostics',
-    });
-
-    expect(result.state.errors).toHaveLength(1);
-    expect(emitted).toEqual([]);
-  });
-
-  it('emits fallback error progress when no structured diagnostics exist', () => {
-    const emitted: ProgressEvent[] = [];
-    const started = startPipeline();
+  it('does not emit fallback events (fallback is handled by domain result creators)', () => {
+    const emitted: DomainFragment[] = [];
+    const started = startPipeline((fragment) => emitted.push(fragment));
+    emitted.length = 0;
 
     finalizeInlineXcodebuild({
       started,
-      emit: (event) => emitted.push(event),
       succeeded: false,
       durationMs: 100,
-      responseContent: [{ type: 'text', text: 'Legacy fallback error block' }],
-      errorFallbackPolicy: 'if-no-structured-diagnostics',
     });
 
     expect(emitted).toEqual([
       {
-        type: 'status',
-        level: 'error',
-        message: 'Legacy fallback error block',
+        kind: 'build-result',
+        fragment: 'build-summary',
+        operation: 'BUILD',
+        status: 'FAILED',
+        durationMs: 100,
       },
     ]);
   });
 
-  it('surfaces parser debug logs as progress notices during finalize', () => {
-    const emitted: ProgressEvent[] = [];
-    const started = startPipeline((event) => emitted.push(event));
+  it('logs parser debug info without emitting progress events during finalize', () => {
+    const emitted: DomainFragment[] = [];
+    const started = startPipeline((fragment) => emitted.push(fragment));
     emitted.length = 0;
 
     started.pipeline.onStdout('UNRECOGNIZED LINE\n');
 
     finalizeInlineXcodebuild({
       started,
-      emit: (event) => emitted.push(event),
       succeeded: true,
       durationMs: 100,
-      includeParserDebugFileRef: true,
     });
 
-    expect(emitted).toEqual(
-      expect.arrayContaining([
-        {
-          type: 'status',
-          level: 'warning',
-          message: 'Parsing issue detected - debug log:',
-        },
-        expect.objectContaining({
-          type: 'file-ref',
-          label: 'Parser Debug Log',
-          path: expect.stringContaining('build_run_macos_parser-debug_'),
-        }),
-      ]),
-    );
+    expect(emitted).toEqual([
+      {
+        kind: 'build-result',
+        fragment: 'build-summary',
+        operation: 'BUILD',
+        status: 'SUCCEEDED',
+        durationMs: 100,
+      },
+    ]);
   });
 
   it('returns finalized state without synthesizing footer events beyond the build summary', () => {
-    const emitted: ProgressEvent[] = [];
-    const started = startPipeline((event) => emitted.push(event));
+    const emitted: DomainFragment[] = [];
+    const started = startPipeline((fragment) => emitted.push(fragment));
     emitted.length = 0;
 
     const result = finalizeInlineXcodebuild({
       started,
-      emit: (event) => emitted.push(event),
       succeeded: true,
       durationMs: 100,
     });
@@ -107,7 +76,8 @@ describe('xcodebuild-output', () => {
     expect(result.state.wallClockDurationMs).toBe(100);
     expect(emitted).toEqual([
       {
-        type: 'summary',
+        kind: 'build-result',
+        fragment: 'build-summary',
         operation: 'BUILD',
         status: 'SUCCEEDED',
         durationMs: 100,

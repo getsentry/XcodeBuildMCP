@@ -6,9 +6,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -19,15 +18,17 @@ import {
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { createToolExecutionContext } from '../../../utils/xcodebuild-domain-results.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
+import {
+  createToolExecutionContext,
+  setXcodebuildStructuredOutput,
+} from '../../../utils/xcodebuild-domain-results.ts';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -53,13 +54,7 @@ const baseSchemaObject = z.object({
 
 const testDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 export type TestDeviceParams = z.infer<typeof testDeviceSchema>;
@@ -80,7 +75,7 @@ interface PreparedTestDeviceExecution {
   configuration: string;
   platform: XcodePlatform;
   preflight?: TestPreflightResult;
-  headerParams: Record<string, unknown>;
+  invocationRequest: BuildInvocationRequest;
 }
 
 async function prepareTestDeviceExecution(
@@ -105,23 +100,15 @@ async function prepareTestDeviceExecution(
     configuration,
     platform,
     preflight: preflight ?? undefined,
-    headerParams: {
+    invocationRequest: {
       scheme: params.scheme,
       configuration,
       platform: String(platform),
       deviceId: params.deviceId,
-      deviceName: resolveDeviceName(params.deviceId),
+      target: 'device' as const,
       onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
       skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: TestDeviceResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    } satisfies BuildInvocationRequest,
   };
 }
 
@@ -129,7 +116,7 @@ export function createTestDeviceExecutor(
   executor: CommandExecutor = getDefaultCommandExecutor(),
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   prepared?: PreparedTestDeviceExecution,
-): ToolExecutor<TestDeviceParams, TestDeviceResult> {
+): DomainStreamingExecutor<TestDeviceParams, TestDeviceResult> {
   return async (params, ctx) => {
     const resolved = prepared ?? (await prepareTestDeviceExecution(params, fileSystemExecutor));
     const executeTest = createTestExecutor(executor, {
@@ -166,13 +153,17 @@ export async function testDeviceLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareTestDeviceExecution(params, fileSystemExecutor);
 
-  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
-
-  const executionContext = createToolExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'TEST',
+    prepared.invocationRequest,
+    'test-result',
+  );
   const executeTestDevice = createTestDeviceExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestDevice(params, executionContext);
 
-  setStructuredOutput(ctx, result);
+  result.request = prepared.invocationRequest;
+  setXcodebuildStructuredOutput(ctx, 'test-result', result);
   executionContext.emitResult(result);
 }
 
@@ -182,7 +173,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<TestDeviceParams>({
-  internalSchema: testDeviceSchema as unknown as z.ZodType<TestDeviceParams, unknown>,
+  internalSchema: toInternalSchema<TestDeviceParams>(testDeviceSchema),
   logicFunction: (params, executor) =>
     testDeviceLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,

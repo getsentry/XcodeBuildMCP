@@ -8,7 +8,9 @@ import type { OutputFormat } from './output.ts';
 import { groupToolsByWorkflow } from '../runtime/tool-catalog.ts';
 import { getWorkflowMetadataFromManifest } from '../core/manifest/load-manifest.ts';
 import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
-import type { RenderSession, ToolHandlerContext } from '../rendering/types.ts';
+import type { ToolHandlerContext } from '../rendering/types.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
+import { transcriptEmitterStorage } from '../utils/transcript-context.ts';
 import {
   getCliSessionDefaultsForTool,
   isKnownCliSessionDefaultsProfile,
@@ -16,7 +18,6 @@ import {
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -70,21 +71,23 @@ function setEnvScoped(key: string, value: string): () => void {
 }
 
 function createBufferedHandlerContext(
-  session: RenderSession,
-  opts: { liveProgressEnabled: boolean; onProgress?: (event: ProgressEvent) => void },
+  session: ReturnType<typeof createRenderSession>,
+  opts: { liveProgressEnabled: boolean; onProgress?: (fragment: AnyFragment) => void },
 ): ToolHandlerContext {
-  const emit = (event: ProgressEvent): void => {
-    session.emit(event);
-    opts?.onProgress?.(event);
-  };
-
   return {
     liveProgressEnabled: opts.liveProgressEnabled,
-    emit,
+    emit: (fragment) => {
+      session.emit(fragment);
+      opts?.onProgress?.(fragment);
+    },
     attach: (image) => {
       session.attach(image);
     },
-    emitProgress: opts.liveProgressEnabled ? emit : () => {},
+    emitLiveFragment: (fragment) => {
+      if (!opts.liveProgressEnabled) return;
+      session.emit(fragment);
+      opts?.onProgress?.(fragment);
+    },
   };
 }
 
@@ -338,8 +341,6 @@ function registerToolSubcommand(
       }
 
       const restoreCliOutputFormat = setEnvScoped('XCODEBUILDMCP_CLI_OUTPUT_FORMAT', outputFormat);
-      const restoreVerbose =
-        outputFormat === 'raw' ? setEnvScoped('XCODEBUILDMCP_VERBOSE', '1') : undefined;
 
       try {
         const session =
@@ -348,31 +349,42 @@ function registerToolSubcommand(
                 interactive: process.stdout.isTTY === true,
               })
             : outputFormat === 'raw'
-              ? createRenderSession('text')
+              ? createRenderSession('raw')
               : createRenderSession('text');
         const handlerContext = createBufferedHandlerContext(session, {
           liveProgressEnabled: outputFormat === 'text' || outputFormat === 'jsonl',
           onProgress:
             outputFormat === 'jsonl'
-              ? (event) => {
-                  process.stdout.write(JSON.stringify(event) + '\n');
+              ? (fragment) => {
+                  const line = { type: 'fragment' as const, fragment };
+                  process.stdout.write(JSON.stringify(line) + '\n');
                 }
               : undefined,
         });
 
-        await invoker.invokeDirect(tool, args, {
-          runtime: 'cli',
-          renderSession: session,
-          handlerContext,
-          onProgress: outputFormat === 'jsonl' ? handlerContext.emit : undefined,
-          onStructuredOutput: (structuredOutput) => {
-            handlerContext.structuredOutput = structuredOutput;
-          },
-          cliExposedWorkflowIds,
-          socketPath,
-          workspaceRoot: opts.workspaceRoot,
-          logLevel,
-        });
+        const runInvocation = () =>
+          invoker.invokeDirect(tool, args, {
+            runtime: 'cli',
+            renderSession: session,
+            handlerContext,
+            onProgress:
+              outputFormat === 'jsonl'
+                ? (fragment: AnyFragment) => handlerContext.emit(fragment)
+                : undefined,
+            onStructuredOutput: (structuredOutput) => {
+              handlerContext.structuredOutput = structuredOutput;
+            },
+            cliExposedWorkflowIds,
+            socketPath,
+            workspaceRoot: opts.workspaceRoot,
+            logLevel,
+          });
+
+        if (outputFormat === 'raw') {
+          await transcriptEmitterStorage.run((fragment) => session.emit(fragment), runInvocation);
+        } else {
+          await runInvocation();
+        }
 
         if (outputFormat === 'json') {
           writeJsonOutput(handlerContext);
@@ -397,7 +409,6 @@ function registerToolSubcommand(
         }
       } finally {
         restoreCliOutputFormat();
-        restoreVerbose?.();
       }
     },
   );

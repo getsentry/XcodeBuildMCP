@@ -16,6 +16,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
@@ -125,7 +126,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<LongPressParams>({
-  internalSchema: longPressSchema as unknown as z.ZodType<LongPressParams, unknown>,
+  internalSchema: toInternalSchema<LongPressParams>(longPressSchema),
   logicFunction: (params: LongPressParams, executor: CommandExecutor) =>
     long_pressLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,

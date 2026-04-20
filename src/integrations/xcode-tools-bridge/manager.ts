@@ -5,7 +5,7 @@ import {
   type BridgeToolPayload,
   type BridgeToolResult,
 } from './bridge-tool-result.ts';
-import { header, statusLine, section } from '../../utils/tool-event-builders.ts';
+
 import { XcodeToolsProxyRegistry, type ProxySyncResult } from './registry.ts';
 import {
   buildXcodeToolsBridgeStatus,
@@ -115,7 +115,6 @@ export class XcodeToolsBridgeManager {
   async statusTool(): Promise<BridgeToolResult> {
     const status = await this.getStatus();
     return {
-      progress: [header('Bridge Status'), section('Status', [JSON.stringify(status, null, 2)])],
       payload: { kind: 'status', status },
     };
   }
@@ -125,18 +124,12 @@ export class XcodeToolsBridgeManager {
       const sync = await this.syncTools({ reason: 'manual' });
       const status = await this.getStatus();
       return {
-        progress: [
-          header('Bridge Sync'),
-          section('Sync Result', [JSON.stringify({ sync, status }, null, 2)]),
-          statusLine('success', 'Bridge sync completed'),
-        ],
         payload: { kind: 'sync', sync, status },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        progress: [header('Bridge Sync'), statusLine('error', `Bridge sync failed: ${message}`)],
         isError: true,
         errorMessage: `Bridge sync failed: ${message}`,
         payload: {
@@ -153,21 +146,12 @@ export class XcodeToolsBridgeManager {
       await this.disconnect();
       const status = await this.getStatus();
       return {
-        progress: [
-          header('Bridge Disconnect'),
-          section('Status', [JSON.stringify(status, null, 2)]),
-          statusLine('success', 'Bridge disconnected'),
-        ],
         payload: { kind: 'status', status },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = await this.safeGetStatus();
       return {
-        progress: [
-          header('Bridge Disconnect'),
-          statusLine('error', `Bridge disconnect failed: ${message}`),
-        ],
         isError: true,
         errorMessage: `Bridge disconnect failed: ${message}`,
         ...(status ? { payload: { kind: 'status', status } } : {}),
@@ -192,11 +176,6 @@ export class XcodeToolsBridgeManager {
         tools: tools.map(serializeBridgeTool),
       };
       return {
-        progress: [
-          header('Xcode IDE List Tools'),
-          section('Tools', [JSON.stringify(payload, null, 2)]),
-          statusLine('success', `Found ${tools.length} tool(s)`),
-        ],
         payload: { kind: 'tool-list', ...payload },
       };
     } catch (error) {
@@ -258,7 +237,6 @@ export class XcodeToolsBridgeManager {
   ): BridgeToolResult {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      progress: [header(operation), statusLine('error', `[${code}] ${message}`)],
       isError: true,
       errorMessage: `[${code}] ${message}`,
       ...(payload ? { payload } : {}),

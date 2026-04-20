@@ -39,6 +39,8 @@ export interface ToolDomainResultBase {
 export type AtLeastOne<T extends object> = {
   [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
 }[keyof T];
+import type { BuildInvocationRequest } from './domain-fragments.ts';
+
 export type ExecutionStatus = 'SUCCEEDED' | 'FAILED';
 export type BuildTarget = 'simulator' | 'device' | 'macos' | 'swift-package';
 export type SimulatorPlatform =
@@ -62,6 +64,7 @@ export interface DoctorCheckEntry {
 export interface BasicDiagnostics {
   warnings: DiagnosticEntry[];
   errors: DiagnosticEntry[];
+  rawOutput?: string[];
 }
 export interface TestFailureEntry {
   suite: string;
@@ -407,20 +410,34 @@ export type SimulatorAction =
   | SimulatorActionSetLocation
   | SimulatorActionSetAppearance
   | SimulatorActionStatusbar;
-export type AppPathDomainResult = ToolDomainResultBase & { kind: 'app-path' } & AtLeastOne<{
+export interface AppPathRequest {
+  scheme?: string;
+  projectPath?: string;
+  workspacePath?: string;
+  configuration?: string;
+  platform?: string;
+  simulator?: string;
+}
+export type AppPathDomainResult = ToolDomainResultBase & {
+  kind: 'app-path';
+  request?: AppPathRequest;
+  summary?: BuildLikeSummary;
+} & AtLeastOne<{
     artifacts: { appPath: string };
     diagnostics: BasicDiagnostics;
   }>;
 export type BuildResultDomainResult =
   | (ToolDomainResultBase & {
       kind: 'build-result';
+      request?: BuildInvocationRequest;
       summary: BuildLikeSummary;
       artifacts: BuildResultArtifacts;
       diagnostics: BasicDiagnostics;
     })
-  | (ToolDomainResultBase & { kind: 'build-result' });
+  | (ToolDomainResultBase & { kind: 'build-result'; request?: BuildInvocationRequest });
 export type BuildRunResultDomainResult = ToolDomainResultBase & {
   kind: 'build-run-result';
+  request?: BuildInvocationRequest;
   summary: BuildLikeSummary;
   artifacts: BuildRunResultArtifacts;
   diagnostics: BasicDiagnostics;
@@ -567,6 +584,7 @@ export type StopResultDomainResult = ToolDomainResultBase & {
 };
 export type TestResultDomainResult = ToolDomainResultBase & {
   kind: 'test-result';
+  request?: BuildInvocationRequest;
   summary: TestSummary;
   artifacts: TestResultArtifacts;
   diagnostics: TestDiagnostics;

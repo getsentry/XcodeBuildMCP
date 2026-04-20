@@ -16,6 +16,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -104,7 +105,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<TypeTextParams>({
-  internalSchema: typeTextSchema as unknown as z.ZodType<TypeTextParams, unknown>,
+  internalSchema: toInternalSchema<TypeTextParams>(typeTextSchema),
   logicFunction: (params: TypeTextParams, executor: CommandExecutor) =>
     type_textLogic(params, executor),
   getExecutor: getDefaultCommandExecutor,

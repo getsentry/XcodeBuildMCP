@@ -19,7 +19,6 @@ import { toStructuredEnvelope } from './structured-output-envelope.ts';
 function sessionToToolResponse(session: ReturnType<typeof createRenderSession>): ToolResponse {
   const text = session.finalize();
   const attachments = session.getAttachments();
-  const progress = [...(session.getProgressEvents?.() ?? session.getEvents())];
   const structuredOutput = session.getStructuredOutput?.();
 
   const content: ToolResponse['content'] = [];
@@ -46,7 +45,6 @@ function sessionToToolResponse(session: ReturnType<typeof createRenderSession>):
           ),
         }
       : {}),
-    ...(progress.length > 0 ? { _meta: { progress } } : {}),
   };
 }
 
@@ -302,13 +300,10 @@ export async function applyWorkflowSelectionFromManifest(
               const session = createRenderSession('text');
               const ctx: ToolHandlerContext = {
                 liveProgressEnabled: false,
-                emit: (event) => {
-                  if (!('timestamp' in event)) {
-                    session.emit(event);
-                  }
+                emit: (fragment) => {
+                  session.emit(fragment);
                 },
                 attach: session.attach,
-                emitProgress: () => {},
               };
               await toolModule.handler(args as Record<string, unknown>, ctx);
 

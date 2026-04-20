@@ -13,6 +13,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
@@ -377,7 +378,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ScreenshotParams>({
-  internalSchema: screenshotSchema as unknown as z.ZodType<ScreenshotParams, unknown>,
+  internalSchema: toInternalSchema<ScreenshotParams>(screenshotSchema),
   logicFunction: (params: ScreenshotParams, executor: CommandExecutor) =>
     screenshotLogic(params, executor),
   getExecutor: getDefaultCommandExecutor,

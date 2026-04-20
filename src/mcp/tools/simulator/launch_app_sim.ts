@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -9,12 +8,19 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import {
   launchSimulatorAppWithLogging,
   type LaunchWithLoggingResult,
 } from '../../../utils/simulator-steps.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import {
+  buildLaunchFailure,
+  buildLaunchSuccess,
+  setLaunchResultStructuredOutput,
+  type LaunchResultArtifacts,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -52,8 +58,6 @@ type LaunchAppSimResult = LaunchResultDomainResult;
 
 export type SimulatorLauncher = typeof launchSimulatorAppWithLogging;
 
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.launch-result';
-
 export async function launch_app_simLogic(
   params: LaunchAppSimParams,
   executor: CommandExecutor,
@@ -63,10 +67,9 @@ export async function launch_app_simLogic(
   const executeLaunchAppSim = createLaunchAppSimExecutor(executor, launcher);
   const result = await executeLaunchAppSim(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setLaunchResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log(
@@ -82,54 +85,16 @@ export async function launch_app_simLogic(
   };
 }
 
-function createLaunchAppSimResult(
+function buildSuccessArtifacts(
   params: LaunchAppSimParams,
   launchResult: LaunchWithLoggingResult,
-): LaunchAppSimResult {
+): LaunchResultArtifacts {
   return {
-    kind: 'launch-result',
-    didError: false,
-    error: null,
-    summary: { status: 'SUCCEEDED' },
-    artifacts: {
-      simulatorId: params.simulatorId,
-      bundleId: params.bundleId,
-      ...(launchResult.processId !== undefined ? { processId: launchResult.processId } : {}),
-      ...(launchResult.logFilePath ? { runtimeLogPath: launchResult.logFilePath } : {}),
-      ...(launchResult.osLogPath ? { osLogPath: launchResult.osLogPath } : {}),
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function createLaunchAppSimErrorResult(
-  params: LaunchAppSimParams,
-  message: string,
-): LaunchAppSimResult {
-  return {
-    kind: 'launch-result',
-    didError: true,
-    error: message,
-    summary: { status: 'FAILED' },
-    artifacts: {
-      simulatorId: params.simulatorId,
-      bundleId: params.bundleId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: LaunchAppSimResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    simulatorId: params.simulatorId,
+    bundleId: params.bundleId,
+    ...(launchResult.processId !== undefined ? { processId: launchResult.processId } : {}),
+    ...(launchResult.logFilePath ? { runtimeLogPath: launchResult.logFilePath } : {}),
+    ...(launchResult.osLogPath ? { osLogPath: launchResult.osLogPath } : {}),
   };
 }
 
@@ -140,29 +105,28 @@ export function createLaunchAppSimExecutor(
   return async (params) => {
     log('info', `Starting xcrun simctl launch request for simulator ${params.simulatorId}`);
 
+    const baseArtifacts: LaunchResultArtifacts = {
+      simulatorId: params.simulatorId,
+      bundleId: params.bundleId,
+    };
+
     try {
-      const getAppContainerCmd = [
-        'xcrun',
-        'simctl',
-        'get_app_container',
-        params.simulatorId,
-        params.bundleId,
-        'app',
-      ];
       const getAppContainerResult = await executor(
-        getAppContainerCmd,
+        ['xcrun', 'simctl', 'get_app_container', params.simulatorId, params.bundleId, 'app'],
         'Check App Installed',
         false,
       );
       if (!getAppContainerResult.success) {
-        const message =
-          'App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-        return createLaunchAppSimErrorResult(params, message);
+        return buildLaunchFailure(
+          baseArtifacts,
+          'App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.',
+        );
       }
     } catch {
-      const message =
-        'App is not installed on the simulator (check failed). Please use install_app_sim before launching. Workflow: build -> install -> launch.';
-      return createLaunchAppSimErrorResult(params, message);
+      return buildLaunchFailure(
+        baseArtifacts,
+        'App is not installed on the simulator (check failed). Please use install_app_sim before launching. Workflow: build -> install -> launch.',
+      );
     }
 
     try {
@@ -172,14 +136,18 @@ export function createLaunchAppSimExecutor(
       });
 
       if (!launchResult.success) {
-        const message = `Launch app in simulator operation failed: ${launchResult.error}`;
-        return createLaunchAppSimErrorResult(params, message);
+        return buildLaunchFailure(
+          baseArtifacts,
+          `Launch app in simulator operation failed: ${launchResult.error}`,
+        );
       }
 
-      return createLaunchAppSimResult(params, launchResult);
+      return buildLaunchSuccess(buildSuccessArtifacts(params, launchResult));
     } catch (error) {
-      const message = `Launch app in simulator operation failed: ${toErrorMessage(error)}`;
-      return createLaunchAppSimErrorResult(params, message);
+      return buildLaunchFailure(
+        baseArtifacts,
+        `Launch app in simulator operation failed: ${toErrorMessage(error)}`,
+      );
     }
   };
 }
@@ -198,7 +166,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<LaunchAppSimParams>({
-  internalSchema: internalSchemaObject as unknown as z.ZodType<LaunchAppSimParams, unknown>,
+  internalSchema: toInternalSchema<LaunchAppSimParams>(internalSchemaObject),
   logicFunction: launch_app_simLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

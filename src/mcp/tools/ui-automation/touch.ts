@@ -16,6 +16,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
@@ -132,7 +133,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<TouchParams>({
-  internalSchema: touchSchema as unknown as z.ZodType<TouchParams, unknown>,
+  internalSchema: toInternalSchema<TouchParams>(touchSchema),
   logicFunction: (params: TouchParams, executor: CommandExecutor) => touchLogic(params, executor),
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

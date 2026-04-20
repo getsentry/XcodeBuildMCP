@@ -19,7 +19,7 @@ describe('swift package non-streaming tools', () => {
     expect(result.text()).toContain('No Swift Package processes currently running.');
   });
 
-  it('emits only a durable header for swift_package_clean', async () => {
+  it('emits no fragments for swift_package_clean', async () => {
     const { result } = await runToolLogic(() =>
       swift_package_cleanLogic(
         { packagePath: '/test/package' },
@@ -27,17 +27,11 @@ describe('swift package non-streaming tools', () => {
       ),
     );
 
-    expect(result.events).toEqual([
-      {
-        type: 'header',
-        operation: 'Swift Package Clean',
-        params: [{ label: 'Package', value: '/test/package' }],
-      },
-    ]);
+    expect(result.events).toEqual([]);
     expect(result.text()).toContain('Swift package cleaned successfully');
   });
 
-  it('emits only a durable header for swift_package_run', async () => {
+  it('carries invocation fragment for swift_package_run', async () => {
     const { result } = await runToolLogic(
       () =>
         swift_package_runLogic(
@@ -49,14 +43,17 @@ describe('swift package non-streaming tools', () => {
 
     expect(result.events).toEqual([
       {
-        type: 'header',
-        operation: 'Swift Package Run',
-        params: [
-          { label: 'Package', value: '/test/package' },
-          { label: 'Executable', value: 'package' },
-        ],
+        kind: 'build-run-result',
+        fragment: 'invocation',
+        operation: 'BUILD',
+        request: {
+          packagePath: '/test/package',
+          executableName: 'package',
+          target: 'swift-package',
+        },
       },
     ]);
+    expect(result.text()).toContain('Swift Package Run');
     expect(result.text()).toContain('Build & Run complete');
   });
 

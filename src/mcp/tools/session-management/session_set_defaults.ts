@@ -49,6 +49,7 @@ type SessionSetDefaultsResult = SessionDefaultsDomainResult & {
   operation?: {
     type: 'set';
     activatedProfile?: string;
+    notices?: string[];
   };
 };
 
@@ -134,8 +135,10 @@ export function createSessionSetDefaultsExecutor(
       const hasSimulatorId = nextParams.simulatorId !== undefined;
       const hasSimulatorName = nextParams.simulatorName !== undefined;
 
+      const notices: string[] = [];
       if (hasProjectPath && hasWorkspacePath) {
         delete nextParams.projectPath;
+        notices.push('Both projectPath and workspacePath were provided; keeping workspacePath.');
       }
 
       const toClear = new Set<keyof SessionDefaults>();
@@ -198,7 +201,14 @@ export function createSessionSetDefaultsExecutor(
         });
       }
 
-      return createSessionDefaultsResult();
+      const result = createSessionDefaultsResult();
+      if (notices.length > 0) {
+        result.operation = {
+          type: 'set',
+          notices,
+        };
+      }
+      return result;
     } catch (error) {
       return createSessionDefaultsResult(toErrorMessage(error));
     }
@@ -213,7 +223,6 @@ export async function sessionSetDefaultsLogic(
   const executeSessionSetDefaults = createSessionSetDefaultsExecutor(context);
   const result = await executeSessionSetDefaults(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
   const {
     profile: rawProfile,
@@ -226,6 +235,7 @@ export async function sessionSetDefaultsLogic(
     result.operation = {
       type: 'set',
       ...(rawProfile !== undefined ? { activatedProfile: rawProfile.trim() } : {}),
+      ...(result.operation?.notices ? { notices: result.operation.notices } : {}),
     };
   }
 

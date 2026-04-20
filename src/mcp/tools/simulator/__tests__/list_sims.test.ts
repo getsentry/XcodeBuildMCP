@@ -276,12 +276,13 @@ describe('list_sims tool', () => {
         }),
         error: undefined,
       });
-      const ctx = new DefaultToolExecutionContext();
+      const fragments: import('../../../../types/domain-fragments.ts').DomainFragment[] = [];
+      const ctx = new DefaultToolExecutionContext({ onFragment: (f) => fragments.push(f) });
       const executeListSims = createListSimsExecutor(mockExecutor);
 
       const result = await executeListSims({}, ctx);
 
-      expect(ctx.getProgressEvents()).toEqual([]);
+      expect(fragments).toEqual([]);
       expect(result).toEqual({
         kind: 'simulator-list',
         didError: false,

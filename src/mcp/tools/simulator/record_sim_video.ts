@@ -21,6 +21,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 
 // Base schema object (used for MCP schema exposure)
@@ -247,7 +248,6 @@ export async function record_sim_videoLogic(
   const executeRecordSimVideo = createRecordSimVideoExecutor(executor, axe, video, fs);
   const result = await executeRecordSimVideo(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(ctx, result);
@@ -277,7 +277,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<RecordSimVideoParams>({
-  internalSchema: recordSimVideoSchema as unknown as z.ZodType<RecordSimVideoParams, unknown>,
+  internalSchema: toInternalSchema<RecordSimVideoParams>(recordSimVideoSchema),
   logicFunction: record_sim_videoLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

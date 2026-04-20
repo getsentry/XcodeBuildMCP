@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -135,7 +136,6 @@ export async function erase_simsLogic(
 
   const result = await executeEraseSims(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
   setStructuredOutput(ctx, result);
 
@@ -152,7 +152,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<EraseSimsParams>({
-  internalSchema: eraseSimsSchema as unknown as z.ZodType<EraseSimsParams>,
+  internalSchema: toInternalSchema<EraseSimsParams>(eraseSimsSchema),
   logicFunction: erase_simsLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

@@ -1,4 +1,4 @@
-import type { ProgressEvent } from '../types/progress-events.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
 import type { NextStep } from '../types/common.ts';
 import { sessionStore } from '../utils/session-store.ts';
 import {
@@ -12,26 +12,29 @@ import type {
   StructuredToolOutput,
 } from './types.ts';
 
-function isErrorEvent(event: ProgressEvent): boolean {
-  return event.type === 'compiler-error' || (event.type === 'status' && event.level === 'error');
+function isErrorFragment(fragment: AnyFragment): boolean {
+  return (
+    (fragment.fragment === 'compiler-diagnostic' && fragment.severity === 'error') ||
+    (fragment.fragment === 'status' && fragment.level === 'error')
+  );
 }
 
 export interface RenderTranscriptInput {
-  items?: readonly ProgressEvent[];
+  items?: readonly AnyFragment[];
   structuredOutput?: StructuredToolOutput;
   nextSteps?: readonly NextStep[];
   nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
 }
 
 interface RenderSessionHooks {
-  onEmit?: (event: ProgressEvent) => void;
+  onEmit?: (fragment: AnyFragment) => void;
   onSetStructuredOutput?: (output: StructuredToolOutput) => void;
   onSetNextSteps?: (steps: readonly NextStep[], runtime: 'cli' | 'daemon' | 'mcp') => void;
   finalize: (input: RenderTranscriptInput) => string;
 }
 
 function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
-  const progressEvents: ProgressEvent[] = [];
+  const fragments: AnyFragment[] = [];
   const attachments: ImageAttachment[] = [];
   let structuredOutput: StructuredToolOutput | undefined;
   let nextSteps: NextStep[] = [];
@@ -39,10 +42,10 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
   let hasError = false;
 
   return {
-    emit(event: ProgressEvent): void {
-      progressEvents.push(event);
-      if (isErrorEvent(event)) hasError = true;
-      hooks.onEmit?.(event);
+    emit(fragment: AnyFragment): void {
+      fragments.push(fragment);
+      if (isErrorFragment(fragment)) hasError = true;
+      hooks.onEmit?.(fragment);
     },
 
     attach(image: ImageAttachment): void {
@@ -75,12 +78,8 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
       return nextStepsRuntime;
     },
 
-    getEvents(): readonly ProgressEvent[] {
-      return progressEvents;
-    },
-
-    getProgressEvents(): readonly ProgressEvent[] {
-      return progressEvents;
+    getFragments(): readonly AnyFragment[] {
+      return fragments;
     },
 
     getAttachments(): readonly ImageAttachment[] {
@@ -93,7 +92,7 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
     finalize(): string {
       return hooks.finalize({
-        items: progressEvents,
+        items: fragments,
         structuredOutput,
         nextSteps,
         nextStepsRuntime,
@@ -114,11 +113,43 @@ function createTextRenderSession(): RenderSession {
   });
 }
 
+function createRawRenderSession(): RenderSession {
+  const suppressWarnings = sessionStore.get('suppressWarnings');
+
+  return createBaseRenderSession({
+    onEmit: (fragment) => {
+      if (fragment.kind === 'transcript') {
+        if (fragment.fragment === 'process-command') {
+          const dim = process.stderr.isTTY ? '\x1B[2m' : '';
+          const reset = process.stderr.isTTY ? '\x1B[0m' : '';
+          process.stderr.write(`${dim}$ ${fragment.displayCommand}${reset}\n`);
+        } else if (fragment.fragment === 'process-line') {
+          process.stderr.write(fragment.line);
+        }
+      }
+    },
+    finalize: (input) => {
+      const nonTranscriptItems = (input.items ?? []).filter((f) => f.kind !== 'transcript');
+      const text = renderCliTextTranscript({
+        items: nonTranscriptItems,
+        structuredOutput: input.structuredOutput,
+        nextSteps: input.nextSteps,
+        nextStepsRuntime: input.nextStepsRuntime,
+        suppressWarnings: suppressWarnings ?? false,
+      });
+      if (text) {
+        process.stdout.write(text);
+      }
+      return '';
+    },
+  });
+}
+
 function createCliTextRenderSession(options: { interactive: boolean }): RenderSession {
   const renderer = createCliTextRenderer(options);
 
   return createBaseRenderSession({
-    onEmit: (event) => renderer.onProgress(event),
+    onEmit: (fragment) => renderer.onFragment(fragment),
     onSetStructuredOutput: (output) => renderer.setStructuredOutput(output),
     onSetNextSteps: (steps, runtime) => renderer.setNextSteps(steps, runtime),
     finalize: () => {
@@ -141,6 +172,8 @@ export function createRenderSession(
       return createTextRenderSession();
     case 'cli-text':
       return createCliTextRenderSession({ interactive: options?.interactive ?? false });
+    case 'raw':
+      return createRawRenderSession();
   }
 }
 
@@ -158,6 +191,9 @@ export function renderTranscript(input: RenderTranscriptInput, strategy: RenderS
   return session.finalize();
 }
 
-export function renderEvents(events: readonly ProgressEvent[], strategy: RenderStrategy): string {
-  return renderTranscript({ items: events }, strategy);
+export function renderFragments(
+  fragments: readonly AnyFragment[],
+  strategy: RenderStrategy,
+): string {
+  return renderTranscript({ items: fragments }, strategy);
 }

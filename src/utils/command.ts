@@ -3,6 +3,7 @@ import { createWriteStream, existsSync } from 'fs';
 import * as fsPromises from 'fs/promises';
 import { tmpdir as osTmpdir } from 'os';
 import { log } from './logger.ts';
+import { transcriptEmitterStorage } from './transcript-context.ts';
 import type { FileSystemExecutor } from './FileSystemExecutor.ts';
 import type { CommandExecutor, CommandResponse, CommandExecOptions } from './CommandExecutor.ts';
 
@@ -46,11 +47,9 @@ async function defaultExecutor(
       useShell && escapedCommand.length === 3 ? escapedCommand[2] : [executable, ...args].join(' ');
     log('debug', `Executing ${logPrefix ?? ''} command: ${displayCommand}`);
 
-    const verbose = process.env.XCODEBUILDMCP_VERBOSE === '1';
-    if (verbose) {
-      const dim = process.stderr.isTTY ? '\x1B[2m' : '';
-      const reset = process.stderr.isTTY ? '\x1B[0m' : '';
-      process.stderr.write(`${dim}$ ${displayCommand}${reset}\n`);
+    const emitTranscript = transcriptEmitterStorage.getStore();
+    if (emitTranscript) {
+      emitTranscript({ kind: 'transcript', fragment: 'process-command', displayCommand });
     }
 
     const spawnOpts: Parameters<typeof spawn>[2] = {
@@ -151,7 +150,6 @@ async function defaultExecutor(
     const attachStream = (
       stream: NodeJS.ReadableStream | null | undefined,
       onChunk: (chunk: string) => void,
-      mirrorToStderr: boolean,
     ): void => {
       if (!stream) {
         return;
@@ -175,9 +173,6 @@ async function defaultExecutor(
         }
         const chunk = data.toString();
         onChunk(chunk);
-        if (mirrorToStderr) {
-          process.stderr.write(chunk);
-        }
       };
 
       stream.on('data', handleData);
@@ -222,23 +217,27 @@ async function defaultExecutor(
       return;
     }
 
-    attachStream(
-      childProcess.stdout,
-      (chunk) => {
-        stdout += chunk;
-        opts?.onStdout?.(chunk);
-      },
-      verbose,
-    );
+    attachStream(childProcess.stdout, (chunk) => {
+      stdout += chunk;
+      opts?.onStdout?.(chunk);
+      emitTranscript?.({
+        kind: 'transcript',
+        fragment: 'process-line',
+        stream: 'stdout',
+        line: chunk,
+      });
+    });
 
-    attachStream(
-      childProcess.stderr,
-      (chunk) => {
-        stderr += chunk;
-        opts?.onStderr?.(chunk);
-      },
-      verbose,
-    );
+    attachStream(childProcess.stderr, (chunk) => {
+      stderr += chunk;
+      opts?.onStderr?.(chunk);
+      emitTranscript?.({
+        kind: 'transcript',
+        fragment: 'process-line',
+        stream: 'stderr',
+        line: chunk,
+      });
+    });
 
     childProcess.once('error', handleError);
     childProcess.once('exit', (code) => {

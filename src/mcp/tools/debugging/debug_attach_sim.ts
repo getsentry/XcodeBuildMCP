@@ -4,12 +4,13 @@ import type { DebugSessionActionDomainResult } from '../../../types/domain-resul
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings, withSimulatorIdOrName } from '../../../utils/schema-helpers.ts';
 import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import {
   createSessionAwareToolWithContext,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import {
   getDefaultDebuggerToolContext,
@@ -43,13 +44,7 @@ const baseSchemaObject = z.object({
 
 const debugAttachSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.simulatorId !== undefined || val.simulatorName !== undefined, {
-      message: 'Either simulatorId or simulatorName is required.',
-    })
-    .refine((val) => !(val.simulatorId && val.simulatorName), {
-      message: 'simulatorId and simulatorName are mutually exclusive. Provide only one.',
-    })
+  withSimulatorIdOrName(baseSchemaObject)
     .refine((val) => val.bundleId !== undefined || val.pid !== undefined, {
       message: 'Provide either bundleId or pid to attach.',
     })
@@ -244,7 +239,6 @@ export async function debug_attach_simLogic(
   const executeDebugAttachSim = createDebugAttachSimExecutor(ctx);
   const result = await executeDebugAttachSim(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerCtx, result);
@@ -277,7 +271,7 @@ export const schema = getSessionAwareToolSchemaShape({
 
 export const handler = createSessionAwareToolWithContext<DebugAttachSimParams, DebuggerToolContext>(
   {
-    internalSchema: debugAttachSchema as unknown as z.ZodType<DebugAttachSimParams, unknown>,
+    internalSchema: toInternalSchema<DebugAttachSimParams>(debugAttachSchema),
     logicFunction: debug_attach_simLogic,
     getContext: getDefaultDebuggerToolContext,
     requirements: [

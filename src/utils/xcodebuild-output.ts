@@ -1,36 +1,11 @@
-import type {
-  BuildRunResultNoticeData,
-  BuildRunStepNoticeData,
-  NoticeCode,
-  NoticeLevel,
-  ProgressEvent,
-  XcodebuildOperation,
-} from '../types/progress-events.ts';
+import type { NoticeLevel, XcodebuildOperation } from '../types/domain-fragments.ts';
+import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
 import type { PipelineResult, StartedPipeline } from './xcodebuild-pipeline.ts';
-import { displayPath } from './build-preflight.ts';
-
-export type ErrorFallbackPolicy = 'always' | 'if-no-structured-diagnostics';
 
 interface FinalizeInlineXcodebuildOptions {
   started: StartedPipeline;
   succeeded: boolean;
   durationMs: number;
-  responseContent?: Array<{ type: 'text'; text: string }>;
-  emit?: (event: ProgressEvent) => void;
-  errorFallbackPolicy?: ErrorFallbackPolicy;
-  includeParserDebugFileRef?: boolean;
-}
-
-function createStructuredErrorEvent(
-  operation: XcodebuildOperation,
-  message: string,
-): ProgressEvent {
-  return {
-    type: 'compiler-error',
-    operation,
-    message,
-    rawLine: message,
-  };
 }
 
 function formatBuildRunStepLabel(step: string): string {
@@ -52,161 +27,36 @@ function formatBuildRunStepLabel(step: string): string {
   }
 }
 
-function extractTextContent(
-  content: Array<{ type: 'text'; text: string }> | undefined,
-): Array<{ type: 'text'; text: string }> {
-  return (content ?? []).filter(
-    (item): item is { type: 'text'; text: string } =>
-      item.type === 'text' && typeof item.text === 'string' && item.text.trim().length > 0,
-  );
-}
-
-export function createNoticeEvent(
-  operation: XcodebuildOperation,
+export function createNoticeFragment(
+  _operation: XcodebuildOperation,
   message: string,
   level: NoticeLevel = 'info',
   options: {
-    code?: NoticeCode;
-    data?:
-      | Record<string, string | number | boolean>
-      | BuildRunStepNoticeData
-      | BuildRunResultNoticeData;
+    code?: string;
+    data?: Record<string, string | number | boolean>;
   } = {},
-): ProgressEvent {
-  if (options.code === 'build-run-step' && options.data && typeof options.data === 'object') {
-    const data = options.data as BuildRunStepNoticeData;
-    const stepLabel = formatBuildRunStepLabel(data.step);
+): RuntimeStatusFragment {
+  if (options.code === 'build-run-step' && options.data) {
+    const data = options.data as { step: string; status?: string };
     return {
-      type: 'status',
+      kind: 'infrastructure',
+      fragment: 'status',
       level: data.status === 'succeeded' ? 'success' : 'info',
-      message: stepLabel,
+      message: formatBuildRunStepLabel(data.step),
     };
   }
 
-  const statusLevel = level === 'success' || level === 'warning' ? level : 'info';
+  const statusLevel: RuntimeStatusFragment['level'] =
+    level === 'success' || level === 'warning' ? level : 'info';
 
   return {
-    type: 'status',
+    kind: 'infrastructure',
+    fragment: 'status',
     level: statusLevel,
     message,
   };
 }
 
-export function createBuildRunResultEvents(data: BuildRunResultNoticeData): ProgressEvent[] {
-  const events: ProgressEvent[] = [];
-
-  events.push({
-    type: 'status',
-    level: 'success',
-    message: 'Build & Run complete',
-  });
-
-  const items: Array<{ label: string; value: string }> = [
-    { label: 'App Path', value: displayPath(data.appPath) },
-  ];
-
-  if (data.bundleId) {
-    items.push({ label: 'Bundle ID', value: data.bundleId });
-  }
-
-  if (data.appId) {
-    items.push({ label: 'App ID', value: data.appId });
-  }
-
-  if (data.processId !== undefined) {
-    items.push({ label: 'Process ID', value: String(data.processId) });
-  }
-
-  if (data.buildLogPath) {
-    items.push({ label: 'Build Logs', value: displayPath(data.buildLogPath) });
-  }
-
-  if (data.runtimeLogPath) {
-    items.push({ label: 'Runtime Logs', value: displayPath(data.runtimeLogPath) });
-  }
-
-  if (data.osLogPath) {
-    items.push({ label: 'OSLog', value: displayPath(data.osLogPath) });
-  }
-
-  if (data.launchState !== 'requested') {
-    items.push({ label: 'Launch', value: 'Running' });
-  }
-
-  events.push({
-    type: 'detail-tree',
-    items,
-  });
-
-  return events;
-}
-
-export function emitPipelineNotice(
-  started: StartedPipeline,
-  operation: XcodebuildOperation,
-  message: string,
-  level: NoticeLevel = 'info',
-  options: {
-    code?: NoticeCode;
-    data?:
-      | Record<string, string | number | boolean>
-      | BuildRunStepNoticeData
-      | BuildRunResultNoticeData;
-  } = {},
-): void {
-  if (options.code === 'build-run-result' && options.data && typeof options.data === 'object') {
-    const resultEvents = createBuildRunResultEvents(options.data as BuildRunResultNoticeData);
-    for (const event of resultEvents) {
-      started.pipeline.emitEvent(event);
-    }
-    return;
-  }
-  started.pipeline.emitEvent(createNoticeEvent(operation, message, level, options));
-}
-
-export function emitPipelineError(
-  started: StartedPipeline,
-  operation: XcodebuildOperation,
-  message: string,
-): void {
-  started.pipeline.emitEvent(createStructuredErrorEvent(operation, message));
-}
-
-export function isPendingXcodebuildResponse(response: {
-  _meta?: Record<string, unknown>;
-}): boolean {
-  const pending = response._meta?.pendingXcodebuild;
-  return (
-    typeof pending === 'object' &&
-    pending !== null &&
-    (pending as { kind?: string }).kind === 'pending-xcodebuild'
-  );
-}
-
 export function finalizeInlineXcodebuild(options: FinalizeInlineXcodebuildOptions): PipelineResult {
-  const pipelineResult = options.started.pipeline.finalize(options.succeeded, options.durationMs, {
-    includeParserDebugFileRef: options.includeParserDebugFileRef ?? false,
-  });
-
-  const fallbackContent = extractTextContent(options.responseContent);
-  const hasStructuredDiagnostics =
-    pipelineResult.state.errors.length > 0 || pipelineResult.state.testFailures.length > 0;
-  const errorFallbackPolicy = options.errorFallbackPolicy ?? 'if-no-structured-diagnostics';
-  const shouldEmitFallback =
-    !options.succeeded &&
-    fallbackContent.length > 0 &&
-    (errorFallbackPolicy === 'always' || !hasStructuredDiagnostics);
-
-  if (!shouldEmitFallback) {
-    return pipelineResult;
-  }
-
-  const fallbackEvents = fallbackContent.map(
-    (item): ProgressEvent => ({ type: 'status', level: 'error', message: item.text }),
-  );
-  for (const event of fallbackEvents) {
-    options.emit?.(event);
-  }
-
-  return pipelineResult;
+  return options.started.pipeline.finalize(options.succeeded, options.durationMs);
 }

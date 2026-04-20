@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -9,9 +8,15 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { stopSimulatorLaunchOsLogSessionsForApp } from '../../../utils/log-capture/index.ts';
+import {
+  buildStopFailure,
+  buildStopSuccess,
+  setStopResultStructuredOutput,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -49,44 +54,12 @@ function splitDiagnosticMessages(...messages: string[]): Array<{ message: string
     .map((message) => ({ message }));
 }
 
-function createStopAppSimResult(params: {
-  simulatorId: string;
-  bundleId: string;
-  didError: boolean;
-  error?: string;
-  diagnosticMessages?: string[];
-}): StopAppSimResult {
-  return {
-    kind: 'stop-result',
-    didError: params.didError,
-    error: params.error ?? null,
-    summary: {
-      status: params.didError ? 'FAILED' : 'SUCCEEDED',
-    },
-    artifacts: {
-      simulatorId: params.simulatorId,
-      bundleId: params.bundleId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: splitDiagnosticMessages(...(params.diagnosticMessages ?? [])),
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: StopAppSimResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: 'xcodebuildmcp.output.stop-result',
-    schemaVersion: '1',
-  };
-}
-
 export function createStopAppSimExecutor(
   executor: CommandExecutor,
 ): ToolExecutor<StopAppSimParams, StopAppSimResult> {
   return async (params, _ctx) => {
     const simulatorId = params.simulatorId;
+    const artifacts = { simulatorId, bundleId: params.bundleId };
 
     try {
       const terminateResult = await executor(
@@ -109,29 +82,21 @@ export function createStopAppSimExecutor(
       }
 
       if (diagnosticMessages.length > 0) {
-        return createStopAppSimResult({
-          simulatorId,
-          bundleId: params.bundleId,
-          didError: true,
-          error: `Stop app in simulator operation failed: ${diagnosticMessages.join(' | ')}`,
-          diagnosticMessages,
-        });
+        return buildStopFailure(
+          artifacts,
+          `Stop app in simulator operation failed: ${diagnosticMessages.join(' | ')}`,
+          splitDiagnosticMessages(...diagnosticMessages),
+        );
       }
 
-      return createStopAppSimResult({
-        simulatorId,
-        bundleId: params.bundleId,
-        didError: false,
-      });
+      return buildStopSuccess(artifacts);
     } catch (error) {
       const diagnosticMessage = toErrorMessage(error);
-      return createStopAppSimResult({
-        simulatorId,
-        bundleId: params.bundleId,
-        didError: true,
-        error: `Stop app in simulator operation failed: ${diagnosticMessage}`,
-        diagnosticMessages: [diagnosticMessage],
-      });
+      return buildStopFailure(
+        artifacts,
+        `Stop app in simulator operation failed: ${diagnosticMessage}`,
+        splitDiagnosticMessages(diagnosticMessage),
+      );
     }
   };
 }
@@ -148,9 +113,8 @@ export async function stop_app_simLogic(
   const executeStopAppSim = createStopAppSimExecutor(executor);
   const result = await executeStopAppSim(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
-  setStructuredOutput(ctx, result);
+  setStopResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error stopping app in simulator: ${result.error ?? 'Unknown error'}`);
@@ -172,7 +136,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<StopAppSimParams>({
-  internalSchema: internalSchemaObject as unknown as z.ZodType<StopAppSimParams, unknown>,
+  internalSchema: toInternalSchema<StopAppSimParams>(internalSchemaObject),
   logicFunction: stop_app_simLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

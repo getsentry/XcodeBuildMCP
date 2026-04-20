@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -144,7 +145,6 @@ export async function sim_statusbarLogic(
 
   const result = await executeSimStatusbar(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
   setStructuredOutput(ctx, result);
 
@@ -174,7 +174,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<SimStatusbarParams>({
-  internalSchema: simStatusbarSchema as unknown as z.ZodType<SimStatusbarParams, unknown>,
+  internalSchema: toInternalSchema<SimStatusbarParams>(simStatusbarSchema),
   logicFunction: sim_statusbarLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

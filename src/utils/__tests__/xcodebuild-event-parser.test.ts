@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createXcodebuildEventParser } from '../xcodebuild-event-parser.ts';
-import type { ProgressEvent } from '../../types/progress-events.ts';
+import type { DomainFragment } from '../../types/domain-fragments.ts';
 
 function collectEvents(
   operation: 'BUILD' | 'TEST',
   lines: { source: 'stdout' | 'stderr'; text: string }[],
-): ProgressEvent[] {
-  const events: ProgressEvent[] = [];
+): DomainFragment[] {
+  const events: DomainFragment[] = [];
   const parser = createXcodebuildEventParser({
     operation,
     onEvent: (event) => events.push(event),
@@ -30,7 +30,7 @@ describe('xcodebuild-event-parser', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      type: 'build-stage',
+      fragment: 'build-stage',
       operation: 'TEST',
       stage: 'RESOLVING_PACKAGES',
       message: 'Resolving packages',
@@ -44,7 +44,7 @@ describe('xcodebuild-event-parser', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      type: 'build-stage',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'COMPILING',
       message: 'Compiling',
@@ -58,7 +58,7 @@ describe('xcodebuild-event-parser', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      type: 'build-stage',
+      fragment: 'build-stage',
       operation: 'BUILD',
       stage: 'LINKING',
       message: 'Linking',
@@ -70,7 +70,7 @@ describe('xcodebuild-event-parser', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      type: 'build-stage',
+      fragment: 'build-stage',
       stage: 'RUN_TESTS',
     });
   });
@@ -82,7 +82,7 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stdout', text: "Test Case '-[Suite testC]' passed (0.003 seconds)\n" },
     ]);
 
-    const progressEvents = events.filter((e) => e.type === 'test-progress');
+    const progressEvents = events.filter((e) => e.fragment === 'test-progress');
     expect(progressEvents).toHaveLength(3);
     expect(progressEvents[0]).toMatchObject({ completed: 1, failed: 0, skipped: 0 });
     expect(progressEvents[1]).toMatchObject({ completed: 2, failed: 1, skipped: 0 });
@@ -97,7 +97,7 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const progressEvents = events.filter((e) => e.type === 'test-progress');
+    const progressEvents = events.filter((e) => e.fragment === 'test-progress');
     expect(progressEvents).toHaveLength(1);
     expect(progressEvents[0]).toMatchObject({ completed: 5, failed: 2 });
   });
@@ -110,10 +110,10 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const failures = events.filter((e) => e.type === 'test-failure');
+    const failures = events.filter((e) => e.fragment === 'test-failure');
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatchObject({
-      type: 'test-failure',
+      fragment: 'test-failure',
       suite: 'Suite',
       test: 'testB',
       location: '/tmp/Test.swift:52',
@@ -130,10 +130,10 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.002 seconds)\n" },
     ]);
 
-    const failures = events.filter((e) => e.type === 'test-failure');
+    const failures = events.filter((e) => e.fragment === 'test-failure');
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatchObject({
-      type: 'test-failure',
+      fragment: 'test-failure',
       suite: 'Suite',
       test: 'testB',
       location: '/tmp/Test.swift:52',
@@ -150,10 +150,13 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const errors = events.filter((e) => e.type === 'compiler-error');
+    const errors = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'error',
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
-      type: 'compiler-error',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       location: '/tmp/App.swift:8',
       message: "cannot convert value of type 'String' to specified type 'Int'",
     });
@@ -164,10 +167,13 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stdout', text: 'error: emit-module command failed with exit code 1\n' },
     ]);
 
-    const errors = events.filter((e) => e.type === 'compiler-error');
+    const errors = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'error',
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
-      type: 'compiler-error',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       message: 'emit-module command failed with exit code 1',
     });
   });
@@ -182,10 +188,13 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stderr', text: '\n' },
     ]);
 
-    const errors = events.filter((e) => e.type === 'compiler-error');
+    const errors = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'error',
+    );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
-      type: 'compiler-error',
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
       message:
         'Unable to find a device matching the provided destination specifier:\n{ platform:iOS Simulator, name:iPhone 22, OS:latest }',
     });
@@ -196,10 +205,13 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stdout', text: '/tmp/App.swift:10:5: warning: variable unused\n' },
     ]);
 
-    const warnings = events.filter((e) => e.type === 'compiler-warning');
+    const warnings = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'warning',
+    );
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({
-      type: 'compiler-warning',
+      fragment: 'compiler-diagnostic',
+      severity: 'warning',
       location: '/tmp/App.swift:10',
       message: 'variable unused',
     });
@@ -210,16 +222,19 @@ describe('xcodebuild-event-parser', () => {
       { source: 'stdout', text: 'ld: warning: directory not found for option\n' },
     ]);
 
-    const warnings = events.filter((e) => e.type === 'compiler-warning');
+    const warnings = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'warning',
+    );
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({
-      type: 'compiler-warning',
+      fragment: 'compiler-diagnostic',
+      severity: 'warning',
       message: 'directory not found for option',
     });
   });
 
   it('handles split chunks across buffer boundaries', () => {
-    const events: ProgressEvent[] = [];
+    const events: DomainFragment[] = [];
     const parser = createXcodebuildEventParser({
       operation: 'TEST',
       onEvent: (event) => events.push(event),
@@ -230,7 +245,7 @@ describe('xcodebuild-event-parser', () => {
     parser.flush();
 
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: 'build-stage', stage: 'RESOLVING_PACKAGES' });
+    expect(events[0]).toMatchObject({ fragment: 'build-stage', stage: 'RESOLVING_PACKAGES' });
   });
 
   it('attaches swift-testing failure duration when the issue and failed result lines both appear', () => {
@@ -245,10 +260,10 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const failures = events.filter((e) => e.type === 'test-failure');
+    const failures = events.filter((e) => e.fragment === 'test-failure');
     expect(failures).toHaveLength(1);
     expect(failures[0]).toMatchObject({
-      type: 'test-failure',
+      fragment: 'test-failure',
       suite: 'IntentionalFailureSuite',
       test: 'test',
       location: '/tmp/SimpleTests.swift:48',
@@ -273,10 +288,10 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const types = events.map((e) => e.type);
-    expect(types).toContain('build-stage');
-    expect(types).toContain('test-progress');
-    expect(types).toContain('test-failure');
+    const fragments = events.map((e) => e.fragment);
+    expect(fragments).toContain('build-stage');
+    expect(fragments).toContain('test-progress');
+    expect(fragments).toContain('test-failure');
   });
 
   it('increments counts by caseCount for parameterized Swift Testing results', () => {
@@ -287,9 +302,9 @@ describe('xcodebuild-event-parser', () => {
       },
     ]);
 
-    const progress = events.filter((e) => e.type === 'test-progress');
+    const progress = events.filter((e) => e.fragment === 'test-progress');
     expect(progress).toHaveLength(1);
-    if (progress[0].type === 'test-progress') {
+    if (progress[0].fragment === 'test-progress') {
       expect(progress[0].completed).toBe(3);
     }
   });
@@ -301,7 +316,7 @@ describe('xcodebuild-event-parser', () => {
     ]);
 
     // Test Suite 'All tests' started triggers RUN_TESTS status; 'passed' is noise
-    const statusEvents = events.filter((e) => e.type === 'build-stage');
+    const statusEvents = events.filter((e) => e.fragment === 'build-stage');
     expect(statusEvents.length).toBeLessThanOrEqual(1);
   });
 });

@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -9,8 +8,11 @@ import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { launchMacApp } from '../../../utils/macos-steps.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
-import { header } from '../../../utils/tool-event-builders.ts';
+import {
+  buildLaunchFailure,
+  buildLaunchSuccess,
+  setLaunchResultStructuredOutput,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const launchMacAppSchema = z.object({
   appPath: z.string(),
@@ -20,22 +22,18 @@ const launchMacAppSchema = z.object({
 type LaunchMacAppParams = z.infer<typeof launchMacAppSchema>;
 type LaunchMacAppResult = LaunchResultDomainResult;
 
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.launch-result';
-
 export async function launch_mac_appLogic(
   params: LaunchMacAppParams,
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(header('Launch macOS App', [{ label: 'App', value: displayPath(params.appPath) }]));
   const executeLaunchMacApp = createLaunchMacAppExecutor(executor, fileSystem);
   const result = await executeLaunchMacApp(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setLaunchResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log('error', `Error during launch macOS app operation: ${result.error ?? 'Unknown error'}`);
@@ -43,63 +41,19 @@ export async function launch_mac_appLogic(
   }
 }
 
-function createLaunchMacAppResult(
-  params: LaunchMacAppParams,
-  result: Awaited<ReturnType<typeof launchMacApp>>,
-): LaunchMacAppResult {
-  return {
-    kind: 'launch-result',
-    didError: false,
-    error: null,
-    summary: { status: 'SUCCEEDED' },
-    artifacts: {
-      appPath: params.appPath,
-      ...(result.bundleId ? { bundleId: result.bundleId } : {}),
-      ...(result.processId !== undefined ? { processId: result.processId } : {}),
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function createLaunchMacAppErrorResult(
-  params: LaunchMacAppParams,
-  message: string,
-): LaunchMacAppResult {
-  return {
-    kind: 'launch-result',
-    didError: true,
-    error: message,
-    summary: { status: 'FAILED' },
-    artifacts: {
-      appPath: params.appPath,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: LaunchMacAppResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createLaunchMacAppExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
 ): ToolExecutor<LaunchMacAppParams, LaunchMacAppResult> {
   return async (params) => {
+    const baseArtifacts = { appPath: params.appPath };
+
     const fileExistsValidation = validateFileExists(params.appPath, fileSystem);
     if (!fileExistsValidation.isValid) {
-      const message = fileExistsValidation.errorMessage ?? `File not found: '${params.appPath}'`;
-      return createLaunchMacAppErrorResult(params, message);
+      return buildLaunchFailure(
+        baseArtifacts,
+        fileExistsValidation.errorMessage ?? `File not found: '${params.appPath}'`,
+      );
     }
 
     log('info', `Starting launch macOS app request for ${params.appPath}`);
@@ -108,14 +62,22 @@ export function createLaunchMacAppExecutor(
       const result = await launchMacApp(params.appPath, executor, { args: params.args });
 
       if (!result.success) {
-        const message = `Launch macOS app operation failed: ${result.error}`;
-        return createLaunchMacAppErrorResult(params, message);
+        return buildLaunchFailure(
+          baseArtifacts,
+          `Launch macOS app operation failed: ${result.error}`,
+        );
       }
 
-      return createLaunchMacAppResult(params, result);
+      return buildLaunchSuccess({
+        ...baseArtifacts,
+        ...(result.bundleId ? { bundleId: result.bundleId } : {}),
+        ...(result.processId !== undefined ? { processId: result.processId } : {}),
+      });
     } catch (error) {
-      const message = `Launch macOS app operation failed: ${toErrorMessage(error)}`;
-      return createLaunchMacAppErrorResult(params, message);
+      return buildLaunchFailure(
+        baseArtifacts,
+        `Launch macOS app operation failed: ${toErrorMessage(error)}`,
+      );
     }
   };
 }

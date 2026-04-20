@@ -7,9 +7,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -17,23 +16,27 @@ import {
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import {
+  nullifyEmptyStrings,
+  withProjectOrWorkspace,
+  withSimulatorIdOrName,
+} from '../../../utils/schema-helpers.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { inferPlatform, type InferPlatformResult } from '../../../utils/infer-platform.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { resolveSimulatorIdOrName } from '../../../utils/simulator-resolver.ts';
 import {
   createToolExecutionContext,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
   createTestDomainResult,
+  setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.test-result';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z
@@ -79,19 +82,7 @@ const baseSchemaObject = z.object({
 
 const testSimulatorSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    })
-    .refine((val) => val.simulatorId !== undefined || val.simulatorName !== undefined, {
-      message: 'Either simulatorId or simulatorName is required.',
-    })
-    .refine((val) => !(val.simulatorId !== undefined && val.simulatorName !== undefined), {
-      message: 'simulatorId and simulatorName are mutually exclusive. Provide only one.',
-    }),
+  withSimulatorIdOrName(withProjectOrWorkspace(baseSchemaObject)),
 );
 
 type TestSimulatorParams = z.infer<typeof testSimulatorSchema>;
@@ -102,7 +93,7 @@ interface PreparedTestSimExecution {
   platform: InferPlatformResult['platform'];
   preflight?: TestPreflightResult;
   resolvedSimulatorId?: string;
-  headerParams: Record<string, unknown>;
+  invocationRequest: BuildInvocationRequest;
   resolutionError?: string;
   warningMessage?: string;
 }
@@ -140,7 +131,7 @@ async function prepareTestSimExecution(
       configuration,
       platform: inferred.platform,
       resolutionError: simulatorResolution.error,
-      headerParams: {
+      invocationRequest: {
         scheme: params.scheme,
         configuration,
         platform: inferred.platform,
@@ -172,7 +163,7 @@ async function prepareTestSimExecution(
     platform: inferred.platform,
     preflight: preflight ?? undefined,
     resolvedSimulatorId: simulatorResolution.simulatorId,
-    headerParams: {
+    invocationRequest: {
       scheme: params.scheme,
       configuration,
       platform: inferred.platform,
@@ -188,30 +179,26 @@ async function prepareTestSimExecution(
   };
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: TestSimulatorResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createTestSimExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   prepared?: PreparedTestSimExecution,
-): ToolExecutor<TestSimulatorParams, TestSimulatorResult> {
+): DomainStreamingExecutor<TestSimulatorParams, TestSimulatorResult> {
   return async (params, ctx) => {
     const resolved =
       prepared ?? (await prepareTestSimExecution(params, executor, fileSystemExecutor));
 
     if (resolved.warningMessage) {
       log('warn', resolved.warningMessage);
-      ctx.emitProgress({ type: 'status', level: 'warning', message: resolved.warningMessage });
+      ctx.emitFragment({
+        kind: 'test-result',
+        fragment: 'warning',
+        message: resolved.warningMessage,
+      });
     }
 
     if (resolved.resolutionError || !resolved.resolvedSimulatorId) {
-      const started = createProgressStreamingPipeline('test_sim', 'TEST', ctx);
+      const started = createDomainStreamingPipeline('test_sim', 'TEST', ctx, 'test-result');
       return createTestDomainResult({
         started,
         succeeded: false,
@@ -260,13 +247,16 @@ export async function test_simLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareTestSimExecution(params, executor, fileSystemExecutor);
 
-  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Test'));
-
-  const executionContext = createToolExecutionContext(ctx, 'TEST');
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'TEST',
+    prepared.invocationRequest,
+    'test-result',
+  );
   const executeTestSim = createTestSimExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestSim(params, executionContext);
 
-  setStructuredOutput(ctx, result);
+  setXcodebuildStructuredOutput(ctx, 'test-result', result);
   executionContext.emitResult(result);
 }
 
@@ -288,7 +278,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<TestSimulatorParams>({
-  internalSchema: testSimulatorSchema as unknown as z.ZodType<TestSimulatorParams, unknown>,
+  internalSchema: toInternalSchema<TestSimulatorParams>(testSimulatorSchema),
   logicFunction: (params, executor) =>
     test_simLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,

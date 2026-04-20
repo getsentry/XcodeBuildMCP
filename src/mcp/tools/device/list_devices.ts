@@ -328,7 +328,6 @@ export async function list_devicesLogic(
     {},
     {
       liveProgressEnabled: false,
-      emitProgress: () => {},
     },
   );
 

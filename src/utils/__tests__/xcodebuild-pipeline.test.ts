@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
-import { STAGE_RANK } from '../../types/progress-events.ts';
-import type { ProgressEvent } from '../../types/progress-events.ts';
+import { STAGE_RANK } from '../../types/domain-fragments.ts';
+import type { DomainFragment } from '../../types/domain-fragments.ts';
 import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
 import type { StructuredToolOutput } from '../../rendering/types.ts';
 
@@ -18,7 +18,7 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('produces MCP content from xcodebuild test output', () => {
-    const emittedEvents: ProgressEvent[] = [];
+    const emittedEvents: DomainFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -26,10 +26,11 @@ describe('xcodebuild-pipeline', () => {
       emit: (event) => emittedEvents.push(event),
     });
 
-    pipeline.emitEvent({
-      type: 'header',
-      operation: 'Test',
-      params: [{ label: 'Scheme', value: 'MyApp' }],
+    pipeline.emitFragment({
+      kind: 'test-result',
+      fragment: 'invocation',
+      operation: 'TEST',
+      request: { scheme: 'MyApp' },
     });
 
     pipeline.onStdout('Resolve Package Graph\n');
@@ -79,16 +80,16 @@ describe('xcodebuild-pipeline', () => {
     expect(text).toContain('Resolving packages');
 
     expect(emittedEvents.length).toBeGreaterThan(0);
-    const eventTypes = emittedEvents.map((e) => e.type);
-    expect(eventTypes).toContain('header');
-    expect(eventTypes).toContain('build-stage');
-    expect(eventTypes).toContain('test-progress');
-    expect(eventTypes).toContain('summary');
+    const fragmentTypes = emittedEvents.map((e) => e.fragment);
+    expect(fragmentTypes).toContain('invocation');
+    expect(fragmentTypes).toContain('build-stage');
+    expect(fragmentTypes).toContain('test-progress');
+    expect(fragmentTypes).toContain('build-summary');
     expect(text.match(/1 test failed, 1 passed, 0 skipped/g)).toHaveLength(1);
   });
 
   it('handles build output with warnings and errors', () => {
-    const emittedEvents: ProgressEvent[] = [];
+    const emittedEvents: DomainFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'BUILD',
       toolName: 'build_sim',
@@ -108,7 +109,7 @@ describe('xcodebuild-pipeline', () => {
     expect(
       emittedEvents.some(
         (event) =>
-          event.type === 'summary' &&
+          event.fragment === 'build-summary' &&
           event.operation === 'BUILD' &&
           event.status === 'FAILED' &&
           event.durationMs === 500,
@@ -118,7 +119,7 @@ describe('xcodebuild-pipeline', () => {
 
   it('supports multi-phase with minimumStage', () => {
     // Phase 1: build-for-testing
-    const phase1Events: ProgressEvent[] = [];
+    const phase1Events: DomainFragment[] = [];
     const phase1 = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -140,7 +141,7 @@ describe('xcodebuild-pipeline', () => {
       | 'COMPILING'
       | undefined;
 
-    const phase2Events: ProgressEvent[] = [];
+    const phase2Events: DomainFragment[] = [];
     const phase2 = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -165,8 +166,8 @@ describe('xcodebuild-pipeline', () => {
     expect(result.state.completedTests).toBe(1);
   });
 
-  it('emitEvent passes tool-originated events through the pipeline', () => {
-    const emittedEvents: ProgressEvent[] = [];
+  it('emitFragment passes tool-originated events through the pipeline', () => {
+    const emittedEvents: DomainFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -174,8 +175,9 @@ describe('xcodebuild-pipeline', () => {
       emit: (event) => emittedEvents.push(event),
     });
 
-    pipeline.emitEvent({
-      type: 'test-discovery',
+    pipeline.emitFragment({
+      kind: 'test-result',
+      fragment: 'test-discovery',
       operation: 'TEST',
       total: 3,
       tests: ['testA', 'testB', 'testC'],
@@ -184,7 +186,7 @@ describe('xcodebuild-pipeline', () => {
 
     pipeline.finalize(true, 100);
 
-    const discoveryEvents = emittedEvents.filter((e) => e.type === 'test-discovery');
+    const discoveryEvents = emittedEvents.filter((e) => e.fragment === 'test-discovery');
     expect(discoveryEvents).toHaveLength(1);
 
     const text = renderCliTextTranscript({
@@ -216,9 +218,10 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('renders test discovery in cli-text mode', () => {
-    const emittedEvents: ProgressEvent[] = [
+    const emittedEvents: DomainFragment[] = [
       {
-        type: 'test-discovery',
+        kind: 'test-result',
+        fragment: 'test-discovery',
         operation: 'TEST',
         total: 8,
         tests: ['testA', 'testB', 'testC', 'testD', 'testE', 'testF', 'testG', 'testH'],
@@ -277,7 +280,7 @@ describe('xcodebuild-pipeline', () => {
     process.env.XCODEBUILDMCP_RUNTIME = 'cli';
     process.env.XCODEBUILDMCP_CLI_OUTPUT_FORMAT = 'json';
 
-    const emittedEvents: ProgressEvent[] = [];
+    const emittedEvents: DomainFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'BUILD',
       toolName: 'build_sim',
@@ -290,10 +293,10 @@ describe('xcodebuild-pipeline', () => {
 
     expect(emittedEvents.length).toBeGreaterThan(0);
 
-    // Each emitted event should be valid JSON-serializable with required fields
+    // Each emitted fragment should be valid JSON-serializable with required fields
     for (const event of emittedEvents) {
       const parsed = JSON.parse(JSON.stringify(event));
-      expect(parsed).toHaveProperty('type');
+      expect(parsed).toHaveProperty('fragment');
     }
   });
 });

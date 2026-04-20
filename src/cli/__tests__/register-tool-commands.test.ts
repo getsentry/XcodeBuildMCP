@@ -98,7 +98,6 @@ function mockInvokeDirectThroughHandler() {
           opts.renderSession?.attach(image);
         },
         liveProgressEnabled: false,
-        emitProgress: () => {},
       };
 
       if (opts.onProgress) {
@@ -392,7 +391,8 @@ describe('registerToolCommands', () => {
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
         ctx?.emit({
-          type: 'status',
+          kind: 'presentation',
+          fragment: 'status',
           level: 'info',
           message: 'legacy event',
         });
@@ -450,7 +450,7 @@ describe('registerToolCommands', () => {
     );
   });
 
-  it('writes one NDJSON line per progress event for jsonl output and omits the final envelope', async () => {
+  it('writes one NDJSON line per domain fragment for jsonl output and omits the final envelope', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
@@ -461,12 +461,14 @@ describe('registerToolCommands', () => {
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
         ctx?.emit({
-          type: 'status',
+          kind: 'presentation',
+          fragment: 'status',
           level: 'info',
           message: 'Starting work',
         });
         ctx?.emit({
-          type: 'artifact',
+          kind: 'presentation',
+          fragment: 'artifact',
           name: 'Build Log',
           path: '/tmp/build.log',
         });
@@ -492,8 +494,8 @@ describe('registerToolCommands', () => {
     ).resolves.toBeDefined();
 
     expect(stdoutChunks.join('')).toBe(
-      `${JSON.stringify({ type: 'status', level: 'info', message: 'Starting work' })}\n` +
-        `${JSON.stringify({ type: 'artifact', name: 'Build Log', path: '/tmp/build.log' })}\n`,
+      `${JSON.stringify({ type: 'fragment', fragment: { kind: 'presentation', fragment: 'status', level: 'info', message: 'Starting work' } })}\n` +
+        `${JSON.stringify({ type: 'fragment', fragment: { kind: 'presentation', fragment: 'artifact', name: 'Build Log', path: '/tmp/build.log' } })}\n`,
     );
   });
 
@@ -503,7 +505,8 @@ describe('registerToolCommands', () => {
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
         ctx?.emit({
-          type: 'status',
+          kind: 'presentation',
+          fragment: 'status',
           level: 'info',
           message: 'legacy event',
         });

@@ -199,21 +199,51 @@ describe('MCP Session Management (e2e)', () => {
       },
     });
 
-    const activeWatch = await harness.client.callTool({
+    const watchResult = (await harness.client.callTool({
+      name: 'session_use_defaults_profile',
+      arguments: { profile: 'watch' },
+    })) as {
+      structuredContent?: { data?: { currentProfile?: string } };
+    };
+    expect(watchResult.structuredContent?.data?.currentProfile).toBe('watch');
+
+    const watchDefaults = (await harness.client.callTool({
       name: 'session_show_defaults',
       arguments: {},
-    });
-    expect(extractText(activeWatch)).toContain('WatchScheme');
-    expect(extractText(activeWatch)).not.toContain('IOSScheme');
+    })) as {
+      structuredContent?: {
+        data?: {
+          currentProfile?: string;
+          profiles?: Record<string, { scheme?: string | null; projectPath?: string | null }>;
+        };
+      };
+    };
+    expect(watchDefaults.structuredContent?.data?.currentProfile).toBe('watch');
+    expect(watchDefaults.structuredContent?.data?.profiles?.watch?.scheme).toBe('WatchScheme');
+    expect(watchDefaults.structuredContent?.data?.profiles?.ios?.scheme).toBe('IOSScheme');
 
-    await harness.client.callTool({
+    const iosResult = (await harness.client.callTool({
       name: 'session_use_defaults_profile',
       arguments: { profile: 'ios' },
-    });
-    const activeIos = await harness.client.callTool({
+    })) as {
+      structuredContent?: { data?: { currentProfile?: string } };
+    };
+    expect(iosResult.structuredContent?.data?.currentProfile).toBe('ios');
+
+    const iosDefaults = (await harness.client.callTool({
       name: 'session_show_defaults',
       arguments: {},
-    });
-    expect(extractText(activeIos)).toContain('IOSScheme');
+    })) as {
+      structuredContent?: {
+        data?: {
+          currentProfile?: string;
+          profiles?: Record<string, { scheme?: string | null; projectPath?: string | null }>;
+        };
+      };
+    };
+    expect(iosDefaults.structuredContent?.data?.currentProfile).toBe('ios');
+    expect(iosDefaults.structuredContent?.data?.profiles?.ios?.projectPath).toBe(
+      '/ios/project.xcodeproj',
+    );
   });
 });

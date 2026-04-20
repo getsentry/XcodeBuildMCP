@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { InstallResultDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -10,9 +9,15 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnSimulator } from '../../../utils/simulator-steps.ts';
+import {
+  buildInstallFailure,
+  buildInstallSuccess,
+  setInstallResultStructuredOutput,
+} from '../../../utils/app-lifecycle-results.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -37,9 +42,6 @@ const internalSchemaObject = z.object({
 });
 
 type InstallAppSimParams = z.infer<typeof internalSchemaObject>;
-type InstallAppSimResult = InstallResultDomainResult;
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.install-result';
 
 const publicSchemaObject = z.strictObject(
   baseSchemaObject.omit({
@@ -57,10 +59,9 @@ export async function install_app_simLogic(
   const executeInstallAppSim = createInstallAppSimExecutor(executor, fileSystem);
   const result = await executeInstallAppSim(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setInstallResultStructuredOutput(ctx, result);
 
   if (result.didError) {
     log(
@@ -76,43 +77,6 @@ export async function install_app_simLogic(
     launch_app_sim: {
       simulatorId: params.simulatorId,
       bundleId: bundleId || 'YOUR_APP_BUNDLE_ID',
-    },
-  };
-}
-
-function createInstallAppSimResult(params: InstallAppSimParams): InstallAppSimResult {
-  return {
-    kind: 'install-result',
-    didError: false,
-    error: null,
-    summary: { status: 'SUCCEEDED' },
-    artifacts: {
-      appPath: params.appPath,
-      simulatorId: params.simulatorId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
-  };
-}
-
-function createInstallAppSimErrorResult(
-  params: InstallAppSimParams,
-  message: string,
-): InstallAppSimResult {
-  return {
-    kind: 'install-result',
-    didError: true,
-    error: message,
-    summary: { status: 'FAILED' },
-    artifacts: {
-      appPath: params.appPath,
-      simulatorId: params.simulatorId,
-    },
-    diagnostics: {
-      warnings: [],
-      errors: [],
     },
   };
 }
@@ -138,23 +102,17 @@ async function extractBundleId(
   return undefined;
 }
 
-function setStructuredOutput(ctx: ToolHandlerContext, result: InstallAppSimResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createInstallAppSimExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
-): ToolExecutor<InstallAppSimParams, InstallAppSimResult> {
+): ToolExecutor<InstallAppSimParams, InstallResultDomainResult> {
   return async (params) => {
+    const artifacts = { appPath: params.appPath, simulatorId: params.simulatorId };
+
     const appPathExistsValidation = validateFileExists(params.appPath, fileSystem);
     if (!appPathExistsValidation.isValid) {
       const message = appPathExistsValidation.errorMessage ?? `File not found: '${params.appPath}'`;
-      return createInstallAppSimErrorResult(params, message);
+      return buildInstallFailure(artifacts, message);
     }
 
     log('info', `Starting xcrun simctl install request for simulator ${params.simulatorId}`);
@@ -167,14 +125,18 @@ export function createInstallAppSimExecutor(
       );
 
       if (!installResult.success) {
-        const message = `Install app in simulator operation failed: ${installResult.error}`;
-        return createInstallAppSimErrorResult(params, message);
+        return buildInstallFailure(
+          artifacts,
+          `Install app in simulator operation failed: ${installResult.error}`,
+        );
       }
 
-      return createInstallAppSimResult(params);
+      return buildInstallSuccess(artifacts);
     } catch (error) {
-      const message = `Install app in simulator operation failed: ${toErrorMessage(error)}`;
-      return createInstallAppSimErrorResult(params, message);
+      return buildInstallFailure(
+        artifacts,
+        `Install app in simulator operation failed: ${toErrorMessage(error)}`,
+      );
     }
   };
 }
@@ -185,7 +147,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<InstallAppSimParams>({
-  internalSchema: internalSchemaObject as unknown as z.ZodType<InstallAppSimParams, unknown>,
+  internalSchema: toInternalSchema<InstallAppSimParams>(internalSchemaObject),
   logicFunction: install_app_simLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

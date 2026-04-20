@@ -154,7 +154,6 @@ export async function syncXcodeDefaultsLogic(
   const executeSyncXcodeDefaults = createSyncXcodeDefaultsExecutor(context);
   const result = await executeSyncXcodeDefaults(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
   setStructuredOutput(handlerContext, result);

@@ -6,16 +6,20 @@ import type {
   BuildRunResultArtifacts,
   BuildRunResultDomainResult,
   BuildTarget,
-  DiagnosticEntry,
   TestDiagnostics,
   TestResultArtifacts,
   TestResultDomainResult,
   TestSelectionInfo,
 } from '../types/domain-results.js';
-import type { TestDiscoveryProgressEvent, XcodebuildOperation } from '../types/progress-events.js';
-import type { ToolExecutionContext } from '../types/tool-execution.js';
-import { finalizeInlineXcodebuild, type ErrorFallbackPolicy } from './xcodebuild-output.js';
-import { displayPath } from './build-preflight.js';
+import type {
+  BuildInvocationRequest,
+  BuildLikeKind,
+  TestDiscoveryFragment,
+  XcodebuildOperation,
+} from '../types/domain-fragments.js';
+import type { DomainStreamingExecutionContext } from '../types/tool-execution.js';
+
+import { finalizeInlineXcodebuild } from './xcodebuild-output.js';
 import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
 import { createXcodebuildPipeline } from './xcodebuild-pipeline.js';
 import type { XcodebuildRunState } from './xcodebuild-run-state.js';
@@ -53,56 +57,15 @@ function flushChunkLines(state: LineStreamState): void {
   state.remainder = '';
 }
 
-function normalizeFallbackErrorMessage(message: string): string | null {
-  const trimmed = message.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  let normalized = trimmed;
-  normalized = normalized.replace(/^error:\s*/i, '').trim();
-  normalized = normalized.replace(/^warning:\s*/i, '').trim();
-  normalized = normalized.replace(/^Error during [^:]+:\s*/i, '').trim();
-
-  if (
-    normalized.length === 0 ||
-    /^Unknown error$/i.test(normalized) ||
-    /^(Build|Tests) failed$/i.test(normalized)
-  ) {
-    return null;
-  }
-
-  return normalized;
-}
-
-function collectFallbackDiagnosticEntries(
+function collectRawOutput(
   fallbackErrorMessages: readonly string[] | undefined,
-): DiagnosticEntry[] {
+): string[] | undefined {
   if (!fallbackErrorMessages || fallbackErrorMessages.length === 0) {
-    return [];
+    return undefined;
   }
 
-  const entries: DiagnosticEntry[] = [];
-  const seen = new Set<string>();
-
-  for (const message of fallbackErrorMessages) {
-    for (const line of message.split('\n')) {
-      const normalized = normalizeFallbackErrorMessage(line);
-      if (!normalized) {
-        continue;
-      }
-
-      const key = normalized.toLowerCase();
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      entries.push({ message: normalized });
-    }
-  }
-
-  return entries;
+  const lines = fallbackErrorMessages.filter((msg) => msg.trim().length > 0);
+  return lines.length > 0 ? lines : undefined;
 }
 
 function createBasicDiagnostics(
@@ -115,16 +78,17 @@ function createBasicDiagnostics(
     location: warning.location,
   }));
 
-  const errors = !didError
-    ? []
-    : state.errors.length > 0
-      ? state.errors.map((error) => ({
-          message: error.message,
-          location: error.location,
-        }))
-      : collectFallbackDiagnosticEntries(fallbackErrorMessages);
+  const errors = didError
+    ? state.errors.map((error) => ({
+        message: error.message,
+        location: error.location,
+      }))
+    : [];
 
-  return { warnings, errors };
+  const rawOutput =
+    didError && state.errors.length === 0 ? collectRawOutput(fallbackErrorMessages) : undefined;
+
+  return { warnings, errors, ...(rawOutput ? { rawOutput } : {}) };
 }
 
 function createTestDiagnostics(
@@ -156,9 +120,9 @@ function hasTestCounts(state: XcodebuildRunState): boolean {
   );
 }
 
-export function createTestDiscoveryProgressEvent(
+export function createTestDiscoveryFragment(
   preflight?: TestPreflightResult,
-): TestDiscoveryProgressEvent | null {
+): TestDiscoveryFragment | null {
   if (!preflight || preflight.totalTests === 0) {
     return null;
   }
@@ -166,7 +130,8 @@ export function createTestDiscoveryProgressEvent(
   const discoveredItems = collectResolvedTestSelectors(preflight).slice(0, MAX_DISCOVERED_TESTS);
 
   return {
-    type: 'test-discovery',
+    kind: 'test-result',
+    fragment: 'test-discovery',
     operation: 'TEST',
     total: preflight.totalTests,
     tests: discoveredItems,
@@ -180,7 +145,7 @@ function createTestSelectionInfo(preflight?: TestPreflightResult): TestSelection
   }
 
   const discoveredItems = collectResolvedTestSelectors(preflight);
-  const discoveryEvent = createTestDiscoveryProgressEvent(preflight);
+  const discoveryEvent = createTestDiscoveryFragment(preflight);
   const hasExplicitSelection =
     preflight.selectors.onlyTesting.length > 0 || preflight.selectors.skipTesting.length > 0;
 
@@ -200,9 +165,6 @@ function createTestSelectionInfo(preflight?: TestPreflightResult): TestSelection
 interface FinalizeXcodebuildResultOptions {
   started: StartedPipeline;
   succeeded: boolean;
-  responseContent?: Array<{ type: 'text'; text: string }>;
-  fallbackErrorMessages?: readonly string[];
-  errorFallbackPolicy?: ErrorFallbackPolicy;
 }
 
 function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
@@ -211,11 +173,6 @@ function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
     started: options.started,
     succeeded: options.succeeded,
     durationMs,
-    responseContent:
-      options.responseContent ??
-      options.fallbackErrorMessages?.map((text) => ({ type: 'text' as const, text })),
-    emit: (event) => options.started.pipeline.emitEvent(event),
-    errorFallbackPolicy: options.errorFallbackPolicy,
   });
 
   return {
@@ -224,115 +181,25 @@ function finalizePipelineResult(options: FinalizeXcodebuildResultOptions) {
   };
 }
 
-function emitBuildLikeTailEvents(
-  started: StartedPipeline,
-  result: BuildResultDomainResult | BuildRunResultDomainResult | TestResultDomainResult,
-): void {
-  switch (result.kind) {
-    case 'build-result': {
-      if (!('artifacts' in result) || !result.artifacts) {
-        return;
-      }
-
-      const items: Array<{ label: string; value: string }> = [];
-      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
-        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
-      }
-      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
-        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
-      }
-
-      if (items.length > 0) {
-        started.pipeline.emitEvent({ type: 'detail-tree', items });
-      }
-      return;
-    }
-
-    case 'build-run-result': {
-      if (!result.didError) {
-        started.pipeline.emitEvent({
-          type: 'status',
-          level: 'success',
-          message: 'Build & Run complete',
-        });
-      }
-
-      const items: Array<{ label: string; value: string }> = [];
-      if ('appPath' in result.artifacts && typeof result.artifacts.appPath === 'string') {
-        items.push({ label: 'App Path', value: displayPath(result.artifacts.appPath) });
-      } else if (
-        'executablePath' in result.artifacts &&
-        typeof result.artifacts.executablePath === 'string'
-      ) {
-        items.push({ label: 'App Path', value: displayPath(result.artifacts.executablePath) });
-      }
-      if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
-        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
-      }
-      if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
-        items.push({ label: 'Process ID', value: String(result.artifacts.processId) });
-      }
-      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
-        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
-      }
-      if (
-        'runtimeLogPath' in result.artifacts &&
-        typeof result.artifacts.runtimeLogPath === 'string'
-      ) {
-        items.push({ label: 'Runtime Logs', value: displayPath(result.artifacts.runtimeLogPath) });
-      }
-      if ('osLogPath' in result.artifacts && typeof result.artifacts.osLogPath === 'string') {
-        items.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
-      }
-
-      if (items.length > 0) {
-        started.pipeline.emitEvent({ type: 'detail-tree', items });
-      }
-
-      const outputLines =
-        result.output?.stdout.length && result.output.stdout.length > 0
-          ? result.output.stdout
-          : (result.output?.stderr ?? []);
-      if (outputLines.length > 0) {
-        started.pipeline.emitEvent({
-          type: 'section',
-          title: 'Output',
-          lines: outputLines,
-        });
-      }
-      return;
-    }
-
-    case 'test-result': {
-      if (!('artifacts' in result) || !result.artifacts) {
-        return;
-      }
-
-      if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
-        started.pipeline.emitEvent({
-          type: 'detail-tree',
-          items: [{ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) }],
-        });
-      }
-    }
-  }
-}
-
 export interface ProgressStreamingXcodebuildExecution extends StartedPipeline {
   stdoutLines: string[];
   stderrLines: string[];
 }
 
-export function createProgressStreamingPipeline(
+export function createDomainStreamingPipeline(
   toolName: string,
   operation: XcodebuildOperation,
-  ctx: ToolExecutionContext,
+  ctx: DomainStreamingExecutionContext,
+  kind: BuildLikeKind = 'build-run-result',
 ): ProgressStreamingXcodebuildExecution {
   const innerPipeline = createXcodebuildPipeline({
     operation,
+    kind,
     toolName,
     params: {},
-    emit: (event) => ctx.emitProgress(event),
+    emit: (fragment) => {
+      ctx.emitFragment(fragment);
+    },
   });
 
   const stdoutState: LineStreamState = { remainder: '', lines: [] };
@@ -349,8 +216,8 @@ export function createProgressStreamingPipeline(
       emitChunkLines(stderrState, chunk);
     },
 
-    emitEvent(event): void {
-      innerPipeline.emitEvent(event);
+    emitFragment(fragment): void {
+      innerPipeline.emitFragment(fragment);
     },
 
     finalize(succeeded, durationMs, options) {
@@ -385,13 +252,13 @@ export function createBuildDomainResult(options: {
   succeeded: boolean;
   target: BuildTarget;
   artifacts: BuildResultArtifacts;
-  responseContent?: Array<{ type: 'text'; text: string }>;
   fallbackErrorMessages?: readonly string[];
-  errorFallbackPolicy?: ErrorFallbackPolicy;
+  request?: BuildInvocationRequest;
 }): BuildResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const result: BuildResultDomainResult = {
     kind: 'build-result',
+    ...(options.request ? { request: options.request } : {}),
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
     summary: {
@@ -407,7 +274,6 @@ export function createBuildDomainResult(options: {
     ),
   };
 
-  emitBuildLikeTailEvents(options.started, result);
   return result;
 }
 
@@ -416,14 +282,14 @@ export function createBuildRunDomainResult(options: {
   succeeded: boolean;
   target: BuildTarget;
   artifacts: BuildRunResultArtifacts;
-  responseContent?: Array<{ type: 'text'; text: string }>;
   fallbackErrorMessages?: readonly string[];
-  errorFallbackPolicy?: ErrorFallbackPolicy;
   output?: BuildRunResultDomainResult['output'];
+  request?: BuildInvocationRequest;
 }): BuildRunResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const result: BuildRunResultDomainResult = {
     kind: 'build-run-result',
+    ...(options.request ? { request: options.request } : {}),
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
     summary: {
@@ -440,7 +306,6 @@ export function createBuildRunDomainResult(options: {
     ...(options.output ? { output: options.output } : {}),
   };
 
-  emitBuildLikeTailEvents(options.started, result);
   return result;
 }
 
@@ -449,18 +314,19 @@ export function createTestDomainResult(options: {
   succeeded: boolean;
   target: BuildTarget;
   artifacts: TestResultArtifacts;
-  responseContent?: Array<{ type: 'text'; text: string }>;
   fallbackErrorMessages?: readonly string[];
-  errorFallbackPolicy?: ErrorFallbackPolicy;
   preflight?: TestPreflightResult;
+  request?: BuildInvocationRequest;
 }): TestResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const state = pipelineResult.state;
   const failed = Math.max(state.failedTests, state.testFailures.length);
   const skipped = state.skippedTests;
   const passed = Math.max(0, state.completedTests - failed - skipped);
+  const testSelectionInfo = createTestSelectionInfo(options.preflight);
   const result: TestResultDomainResult = {
     kind: 'test-result',
+    ...(options.request ? { request: options.request } : {}),
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Tests failed',
     summary: {
@@ -479,13 +345,48 @@ export function createTestDomainResult(options: {
     },
     artifacts: options.artifacts,
     diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
-    ...(createTestSelectionInfo(options.preflight)
-      ? { tests: createTestSelectionInfo(options.preflight) }
-      : {}),
+    ...(testSelectionInfo ? { tests: testSelectionInfo } : {}),
   };
 
-  emitBuildLikeTailEvents(options.started, result);
   return result;
+}
+
+const XCODEBUILD_STRUCTURED_OUTPUT_SCHEMAS = {
+  'build-result': 'xcodebuildmcp.output.build-result',
+  'build-run-result': 'xcodebuildmcp.output.build-run-result',
+  'test-result': 'xcodebuildmcp.output.test-result',
+} as const;
+
+export type XcodebuildStructuredOutputKind = keyof typeof XCODEBUILD_STRUCTURED_OUTPUT_SCHEMAS;
+
+type XcodebuildDomainResultFor<K extends XcodebuildStructuredOutputKind> = {
+  'build-result': BuildResultDomainResult;
+  'build-run-result': BuildRunResultDomainResult;
+  'test-result': TestResultDomainResult;
+}[K];
+
+export function setXcodebuildStructuredOutput<K extends XcodebuildStructuredOutputKind>(
+  ctx: ToolHandlerContext,
+  kind: K,
+  result: XcodebuildDomainResultFor<K>,
+): void {
+  ctx.structuredOutput = {
+    result,
+    schema: XCODEBUILD_STRUCTURED_OUTPUT_SCHEMAS[kind],
+    schemaVersion: '1',
+  };
+}
+
+export function collectFallbackErrorMessages(
+  started: ProgressStreamingXcodebuildExecution,
+  extraMessages: readonly string[] = [],
+  responseContent?: ReadonlyArray<{ type: 'text'; text: string }>,
+): string[] {
+  return [
+    ...started.stderrLines,
+    ...extraMessages,
+    ...(responseContent ?? []).map((item) => item.text),
+  ];
 }
 
 export { createToolExecutionContext };

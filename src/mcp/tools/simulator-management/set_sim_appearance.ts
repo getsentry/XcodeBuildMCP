@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 
@@ -117,7 +118,6 @@ export async function set_sim_appearanceLogic(
 
   const result = await executeSetSimAppearance(params, {
     liveProgressEnabled: false,
-    emitProgress() {},
   });
   setStructuredOutput(ctx, result);
 
@@ -142,7 +142,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<SetSimAppearanceParams>({
-  internalSchema: setSimAppearanceSchema as unknown as z.ZodType<SetSimAppearanceParams, unknown>,
+  internalSchema: toInternalSchema<SetSimAppearanceParams>(setSimAppearanceSchema),
   logicFunction: set_sim_appearanceLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

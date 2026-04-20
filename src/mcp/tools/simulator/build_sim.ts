@@ -7,9 +7,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -18,17 +17,22 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import {
+  nullifyEmptyStrings,
+  withProjectOrWorkspace,
+  withSimulatorIdOrName,
+} from '../../../utils/schema-helpers.ts';
 import { inferPlatform, type InferPlatformResult } from '../../../utils/infer-platform.ts';
 import {
+  collectFallbackErrorMessages,
   createBuildDomainResult,
   createToolExecutionContext,
-  createProgressStreamingPipeline,
+  createDomainStreamingPipeline,
+  setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
-import { createBuildHeaderEvent } from '../../../utils/xcodebuild-pipeline.ts';
-
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
+import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use (Required)'),
@@ -68,19 +72,7 @@ const baseSchemaObject = z.object({
 
 const buildSimulatorSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    })
-    .refine((val) => val.simulatorId !== undefined || val.simulatorName !== undefined, {
-      message: 'Either simulatorId or simulatorName is required.',
-    })
-    .refine((val) => !(val.simulatorId !== undefined && val.simulatorName !== undefined), {
-      message: 'simulatorId and simulatorName are mutually exclusive. Provide only one.',
-    }),
+  withSimulatorIdOrName(withProjectOrWorkspace(baseSchemaObject)),
 );
 
 export type BuildSimulatorParams = z.infer<typeof buildSimulatorSchema>;
@@ -98,7 +90,7 @@ interface PreparedBuildSimExecution {
     useLatestOS: boolean;
     logPrefix: string;
   };
-  headerParams: Record<string, unknown>;
+  invocationRequest: BuildInvocationRequest;
   warningMessage?: string;
 }
 
@@ -133,7 +125,7 @@ async function prepareBuildSimExecution(
       useLatestOS: params.simulatorId ? false : useLatestOS,
       logPrefix: `${platformName} Simulator Build`,
     },
-    headerParams: {
+    invocationRequest: {
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
@@ -161,38 +153,23 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
-function getFallbackErrorMessages(
-  started: ReturnType<typeof createProgressStreamingPipeline>,
-  responseContent?: Array<{ type: 'text'; text: string }>,
-): string[] {
-  return [...started.stderrLines, ...(responseContent ?? []).map((item) => item.text)];
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: BuildSimulatorResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 export function createBuildSimExecutor(
   executor: CommandExecutor,
   prepared?: PreparedBuildSimExecution,
-): ToolExecutor<BuildSimulatorParams, BuildSimulatorResult> {
+): DomainStreamingExecutor<BuildSimulatorParams, BuildSimulatorResult> {
   return async (params, ctx) => {
     const resolved = prepared ?? (await prepareBuildSimExecution(params, executor));
 
     if (resolved.warningMessage) {
       log('warn', resolved.warningMessage);
-      ctx.emitProgress({
-        type: 'status',
-        level: 'warning',
+      ctx.emitFragment({
+        kind: 'build-result',
+        fragment: 'warning',
         message: resolved.warningMessage,
       });
     }
 
-    const started = createProgressStreamingPipeline('build_sim', 'BUILD', ctx);
+    const started = createDomainStreamingPipeline('build_sim', 'BUILD', ctx, 'build-result');
     const buildResult = await executeXcodeBuildCommand(
       resolved.sharedBuildParams,
       resolved.platformOptions,
@@ -210,9 +187,7 @@ export function createBuildSimExecutor(
       artifacts: {
         buildLogPath: started.pipeline.logPath,
       },
-      responseContent: buildResult.content,
-      fallbackErrorMessages: getFallbackErrorMessages(started, buildResult.content),
-      errorFallbackPolicy: 'if-no-structured-diagnostics',
+      fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
     });
   };
 }
@@ -224,13 +199,16 @@ export async function build_simLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareBuildSimExecution(params, executor);
 
-  ctx.emit(createBuildHeaderEvent(prepared.headerParams, 'Build'));
-
-  const executionContext = createToolExecutionContext(ctx, 'BUILD');
+  const executionContext = createToolExecutionContext(
+    ctx,
+    'BUILD',
+    prepared.invocationRequest,
+    'build-result',
+  );
   const executeBuildSim = createBuildSimExecutor(executor, prepared);
   const result = await executeBuildSim(params, executionContext);
 
-  setStructuredOutput(ctx, result);
+  setXcodebuildStructuredOutput(ctx, 'build-result', result);
   executionContext.emitResult(result);
 
   if (!result.didError) {
@@ -252,7 +230,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<BuildSimulatorParams>({
-  internalSchema: buildSimulatorSchema as unknown as z.ZodType<BuildSimulatorParams, unknown>,
+  internalSchema: toInternalSchema<BuildSimulatorParams>(buildSimulatorSchema),
   logicFunction: build_simLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

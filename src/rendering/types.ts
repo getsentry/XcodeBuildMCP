@@ -1,8 +1,12 @@
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
+import type {
+  AnyFragment,
+  BuildInvocationRequest,
+  DomainFragment,
+} from '../types/domain-fragments.ts';
 import type { ToolDomainResult } from '../types/domain-results.ts';
-import type { ProgressEvent } from '../types/progress-events.ts';
 
-export type RenderStrategy = 'text' | 'cli-text';
+export type RenderStrategy = 'text' | 'cli-text' | 'raw';
 
 export interface ImageAttachment {
   data: string;
@@ -10,31 +14,36 @@ export interface ImageAttachment {
 }
 
 export interface RenderSession {
-  emit(event: ProgressEvent): void;
+  emit(fragment: AnyFragment): void;
   attach(image: ImageAttachment): void;
   setStructuredOutput?(output: StructuredToolOutput): void;
   getStructuredOutput?(): StructuredToolOutput | undefined;
   setNextSteps?(steps: NextStep[], runtime: 'cli' | 'daemon' | 'mcp'): void;
   getNextSteps?(): readonly NextStep[];
   getNextStepsRuntime?(): 'cli' | 'daemon' | 'mcp' | undefined;
-  getEvents(): readonly ProgressEvent[];
-  getProgressEvents?(): readonly ProgressEvent[];
+  getFragments(): readonly AnyFragment[];
   getAttachments(): readonly ImageAttachment[];
   isError(): boolean;
   finalize(): string;
+}
+
+export interface RenderHints {
+  headerTitle?: string;
 }
 
 export interface StructuredToolOutput {
   result: ToolDomainResult;
   schema: string;
   schemaVersion: string;
+  renderHints?: RenderHints;
 }
 
 export interface ToolHandlerContext {
-  emit: (event: ProgressEvent) => void;
+  emit: (fragment: AnyFragment) => void;
   attach: (image: ImageAttachment) => void;
-  emitProgress: (event: ProgressEvent) => void;
   liveProgressEnabled: boolean;
+  emitLiveFragment?: (fragment: AnyFragment) => void;
+  pendingInvocationRequest?: BuildInvocationRequest;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;

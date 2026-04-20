@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import type { AppPathDomainResult } from '../../../types/domain-results.ts';
 import type { ToolExecutor } from '../../../types/tool-execution.ts';
@@ -10,13 +9,17 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
-import { extractQueryErrorMessages } from '../../../utils/xcodebuild-error-utils.ts';
+import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
-import { displayPath } from '../../../utils/build-preflight.ts';
-import { detailTree, header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  buildAppPathFailure,
+  buildAppPathSuccess,
+  getAppPathArtifact,
+  setAppPathStructuredOutput,
+} from '../../../utils/app-query-results.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
@@ -45,71 +48,18 @@ const publicSchemaObject = baseSchemaObject.omit({
 
 const getMacosAppPathSchema = z.preprocess(
   nullifyEmptyStrings,
-  baseSchemaObject
-    .refine((val) => val.projectPath !== undefined || val.workspacePath !== undefined, {
-      message: 'Either projectPath or workspacePath is required.',
-    })
-    .refine((val) => !(val.projectPath !== undefined && val.workspacePath !== undefined), {
-      message: 'projectPath and workspacePath are mutually exclusive. Provide only one.',
-    }),
+  withProjectOrWorkspace(baseSchemaObject),
 );
 
 type GetMacosAppPathParams = z.infer<typeof getMacosAppPathSchema>;
 
-const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.app-path';
-
-function getErrorMessages(rawMessage: string): string[] {
-  const messages = extractQueryErrorMessages(rawMessage);
-  return messages.length > 0 ? messages : [rawMessage];
-}
-
-function createAppPathResult(appPath: string): AppPathDomainResult {
+function createRequest(params: GetMacosAppPathParams) {
   return {
-    kind: 'app-path',
-    didError: false,
-    error: null,
-    artifacts: { appPath },
-  };
-}
-
-function createAppPathErrorResult(rawMessage: string): AppPathDomainResult {
-  const messages = getErrorMessages(rawMessage);
-
-  return {
-    kind: 'app-path',
-    didError: true,
-    error: `Failed to get app path: ${messages[0]}`,
-    diagnostics: {
-      warnings: [],
-      errors: messages.map((message) => ({ message })),
-    },
-  };
-}
-
-function formatDiagnosticsBlock(messages: string[]): string {
-  const lines = [`Errors (${messages.length}):`, ''];
-  messages.forEach((message, index) => {
-    lines.push(`  ✗ ${message}`);
-    if (index < messages.length - 1) {
-      lines.push('');
-    }
-  });
-  return lines.join('\n');
-}
-
-function getAppPath(result: AppPathDomainResult): string | null {
-  if ('artifacts' in result && result.artifacts && 'appPath' in result.artifacts) {
-    return result.artifacts.appPath;
-  }
-
-  return null;
-}
-
-function setStructuredOutput(ctx: ToolHandlerContext, result: AppPathDomainResult): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    scheme: params.scheme,
+    projectPath: params.projectPath,
+    workspacePath: params.workspacePath,
+    configuration: params.configuration ?? 'Debug',
+    platform: 'macOS',
   };
 }
 
@@ -138,9 +88,14 @@ export function createGetMacAppPathExecutor(
         executor,
       );
 
-      return createAppPathResult(appPath);
+      return buildAppPathSuccess(appPath, createRequest(params), 'macos');
     } catch (error) {
-      return createAppPathErrorResult(toErrorMessage(error));
+      return buildAppPathFailure(
+        toErrorMessage(error),
+        createRequest(params),
+        'macos',
+        'Query failed',
+      );
     }
   };
 }
@@ -150,44 +105,23 @@ export async function get_mac_app_pathLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  ctx.emit(
-    header('Get App Path', [
-      { label: 'Scheme', value: params.scheme },
-      ...(params.workspacePath
-        ? [{ label: 'Workspace', value: displayPath(params.workspacePath) }]
-        : params.projectPath
-          ? [{ label: 'Project', value: displayPath(params.projectPath) }]
-          : []),
-      { label: 'Configuration', value: params.configuration ?? 'Debug' },
-      { label: 'Platform', value: 'macOS' },
-    ]),
-  );
   const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
   const result = await executeGetMacAppPath(params, {
     liveProgressEnabled: false,
-    emitProgress: () => {},
   });
 
-  setStructuredOutput(ctx, result);
+  setAppPathStructuredOutput(ctx, result);
 
   if (result.didError) {
-    const messages = result.diagnostics?.errors.map((entry) => entry.message) ?? [];
-    if (messages.length > 0) {
-      ctx.emit({ type: 'text-block', text: formatDiagnosticsBlock(messages) });
-    }
-    ctx.emit(statusLine('error', 'Query failed.'));
     log('error', `Error retrieving app path: ${result.error ?? 'Unknown error'}`);
     return;
   }
 
-  const appPath = getAppPath(result);
+  const appPath = getAppPathArtifact(result);
   if (!appPath) {
     log('error', 'Error retrieving app path: missing appPath artifact in successful result');
     return;
   }
-
-  ctx.emit(statusLine('success', 'Success'));
-  ctx.emit(detailTree([{ label: 'App Path', value: displayPath(appPath) }]));
 
   ctx.nextStepParams = {
     get_mac_bundle_id: { appPath },
@@ -201,7 +135,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<GetMacosAppPathParams>({
-  internalSchema: getMacosAppPathSchema as unknown as z.ZodType<GetMacosAppPathParams, unknown>,
+  internalSchema: toInternalSchema<GetMacosAppPathParams>(getMacosAppPathSchema),
   logicFunction: get_mac_app_pathLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [

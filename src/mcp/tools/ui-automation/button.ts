@@ -9,6 +9,7 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -103,7 +104,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ButtonParams>({
-  internalSchema: buttonSchema as unknown as z.ZodType<ButtonParams, unknown>,
+  internalSchema: toInternalSchema<ButtonParams>(buttonSchema),
   logicFunction: (params: ButtonParams, executor: CommandExecutor) =>
     buttonLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,
