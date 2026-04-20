@@ -493,6 +493,52 @@ describe('registerToolCommands', () => {
     );
   });
 
+  it('does not duplicate daemon-streamed fragments in the render session for jsonl output', async () => {
+    const streamedFragment = {
+      kind: 'transcript',
+      fragment: 'process-line',
+      stream: 'stderr',
+      line: 'Build Log: /tmp/build.log\n',
+    } as const;
+    let observedSessionFragmentCount = 0;
+
+    vi.spyOn(DefaultToolInvoker.prototype, 'invokeDirect').mockImplementation(
+      async (_tool, _args, opts) => {
+        opts.renderSession?.emit(streamedFragment);
+        opts.onProgress?.(streamedFragment);
+        observedSessionFragmentCount = opts.renderSession?.getFragments().length ?? 0;
+        opts.onStructuredOutput?.({
+          schema: 'xcodebuildmcp.output.simulator-list',
+          schemaVersion: '1',
+          result: {
+            kind: 'simulator-list',
+            didError: false,
+            error: null,
+            simulators: [],
+          },
+        });
+      },
+    );
+
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({ stateful: true });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'jsonl']),
+    ).resolves.toBeDefined();
+
+    expect(observedSessionFragmentCount).toBe(1);
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify({ type: 'fragment', fragment: streamedFragment })}\n`,
+    );
+  });
+
   it('throws when no structured output is available for json mode', async () => {
     mockInvokeDirectThroughHandler();
 

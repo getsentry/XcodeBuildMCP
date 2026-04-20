@@ -351,15 +351,16 @@ function registerToolSubcommand(
             : outputFormat === 'raw'
               ? createRenderSession('raw')
               : createRenderSession('text');
+        const writeJsonlFragment =
+          outputFormat === 'jsonl'
+            ? (fragment: AnyFragment) => {
+                const line = { type: 'fragment' as const, fragment };
+                process.stdout.write(JSON.stringify(line) + '\n');
+              }
+            : undefined;
         const handlerContext = createBufferedHandlerContext(session, {
           liveProgressEnabled: outputFormat === 'text' || outputFormat === 'jsonl',
-          onProgress:
-            outputFormat === 'jsonl'
-              ? (fragment) => {
-                  const line = { type: 'fragment' as const, fragment };
-                  process.stdout.write(JSON.stringify(line) + '\n');
-                }
-              : undefined,
+          onProgress: writeJsonlFragment,
         });
 
         const runInvocation = () =>
@@ -367,10 +368,7 @@ function registerToolSubcommand(
             runtime: 'cli',
             renderSession: session,
             handlerContext,
-            onProgress:
-              outputFormat === 'jsonl'
-                ? (fragment: AnyFragment) => handlerContext.emit(fragment)
-                : undefined,
+            onProgress: writeJsonlFragment,
             onStructuredOutput: (structuredOutput) => {
               handlerContext.structuredOutput = structuredOutput;
             },

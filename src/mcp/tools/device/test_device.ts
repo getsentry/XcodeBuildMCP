@@ -22,7 +22,6 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
-import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
   createToolExecutionContext,

@@ -162,7 +162,6 @@ export class XcodeToolsBridgeManager {
   async listToolsTool(params: { refresh?: boolean }): Promise<BridgeToolResult> {
     if (!this.workflowEnabled) {
       return this.createBridgeFailureResult(
-        'Xcode IDE List Tools',
         'XCODE_MCP_UNAVAILABLE',
         'xcode-ide workflow is not enabled',
         { kind: 'tool-list', toolCount: 0, tools: [] },
@@ -180,7 +179,6 @@ export class XcodeToolsBridgeManager {
       };
     } catch (error) {
       return this.createBridgeFailureResult(
-        'Xcode IDE List Tools',
         classifyBridgeError(error, 'list', {
           connected: this.service.getClientStatus().connected,
         }),
@@ -197,7 +195,6 @@ export class XcodeToolsBridgeManager {
   }): Promise<BridgeToolResult> {
     if (!this.workflowEnabled) {
       return this.createBridgeFailureResult(
-        'Xcode IDE Call Tool',
         'XCODE_MCP_UNAVAILABLE',
         'xcode-ide workflow is not enabled',
         { kind: 'call-result', succeeded: false, content: [] },
@@ -211,7 +208,6 @@ export class XcodeToolsBridgeManager {
       return callToolResultToBridgeResult(response);
     } catch (error) {
       return this.createBridgeFailureResult(
-        'Xcode IDE Call Tool',
         classifyBridgeError(error, 'call', {
           connected: this.service.getClientStatus().connected,
         }),
@@ -230,7 +226,6 @@ export class XcodeToolsBridgeManager {
   }
 
   private createBridgeFailureResult(
-    operation: string,
     code: string,
     error: unknown,
     payload?: BridgeToolPayload,

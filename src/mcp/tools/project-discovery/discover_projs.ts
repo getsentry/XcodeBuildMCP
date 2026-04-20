@@ -14,7 +14,6 @@ import { log } from '../../../utils/logging/index.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { toErrorMessage } from '../../../utils/errors.ts';
 
 const DEFAULT_MAX_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['build', 'DerivedData', 'Pods', '.git', 'node_modules']);

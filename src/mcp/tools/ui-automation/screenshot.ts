@@ -261,6 +261,7 @@ export function createScreenshotExecutor(
           if (returnFormat === 'base64') {
             const base64Image = await fileSystemExecutor.readFile(screenshotPath, 'base64');
             dependencies.onAttachment?.({ data: base64Image, mimeType: 'image/png' });
+            const dimensions = await getImageDimensions(screenshotPath, executor);
 
             try {
               await fileSystemExecutor.rm(screenshotPath);
@@ -268,7 +269,6 @@ export function createScreenshotExecutor(
               log('warn', `${LOG_PREFIX}/screenshot: Failed to delete temp file: ${err}`);
             }
 
-            const dimensions = await getImageDimensions(screenshotPath, executor);
             return createCaptureSuccessResult(simulatorId, {
               capture: {
                 format: 'image/png',

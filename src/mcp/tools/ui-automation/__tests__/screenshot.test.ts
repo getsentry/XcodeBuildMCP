@@ -287,6 +287,85 @@ describe('Screenshot Plugin', () => {
       expect(result.isError).toBeFalsy();
     });
 
+    it('preserves PNG dimensions when base64 fallback uses the original screenshot', async () => {
+      const mockDeviceListJson = JSON.stringify({
+        devices: {
+          'com.apple.CoreSimulator.SimRuntime.iOS-17-2': [
+            {
+              udid: '12345678-1234-4234-8234-123456789012',
+              name: 'iPhone 15 Pro',
+              state: 'Booted',
+            },
+          ],
+        },
+      });
+      const mockExecutor = async (command: string[]) => {
+        const cmd = command.join(' ');
+        if (cmd.includes('simctl list devices')) {
+          return {
+            success: true,
+            output: mockDeviceListJson,
+            error: undefined,
+            process: mockProcess,
+          };
+        }
+        if (command[0] === 'swift') {
+          return {
+            success: true,
+            output: '390,844',
+            error: undefined,
+            process: mockProcess,
+          };
+        }
+        if (command[0] === 'sips' && command[1] === '-Z') {
+          return {
+            success: false,
+            output: '',
+            error: 'optimization failed',
+            process: mockProcess,
+          };
+        }
+        if (command[0] === 'sips' && command[1] === '-g') {
+          return {
+            success: true,
+            output: 'pixelWidth: 1024\npixelHeight: 768\n',
+            error: undefined,
+            process: mockProcess,
+          };
+        }
+        return {
+          success: true,
+          output: 'Screenshot saved',
+          error: undefined,
+          process: mockProcess,
+        };
+      };
+
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        readFile: async () => 'ZmFrZS1pbWFnZS1kYXRh',
+      });
+
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            returnFormat: 'base64',
+          },
+          mockExecutor,
+          mockFileSystemExecutor,
+          { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
+          { v4: () => 'test-uuid' },
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain('Format: image/png');
+      expect(allText(result)).toContain('Size: 1024x768px');
+      expect(
+        result.content.some((item) => item.type === 'image' && item.mimeType === 'image/png'),
+      ).toBe(true);
+    });
+
     it('should handle SystemError from command execution', async () => {
       const mockExecutor = async () => {
         throw new SystemError('System error occurred');

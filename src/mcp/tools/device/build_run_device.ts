@@ -25,7 +25,6 @@ import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/sche
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
 import { mapDevicePlatform } from './build-settings.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
-import { resolveDeviceName } from '../../../utils/device-name-resolver.ts';
 import { installAppOnDevice, launchAppOnDevice } from '../../../utils/device-steps.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import {
@@ -264,7 +263,6 @@ export async function build_run_deviceLogic(
   const ctx = getHandlerContext();
   const platform = mapDevicePlatform(params.platform);
   const configuration = params.configuration ?? 'Debug';
-  const deviceName = resolveDeviceName(params.deviceId);
 
   const invocationRequest: BuildInvocationRequest = {
     scheme: params.scheme,
