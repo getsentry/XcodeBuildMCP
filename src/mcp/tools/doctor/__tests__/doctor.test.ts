@@ -134,17 +134,17 @@ describe('doctor tool', () => {
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('does not emit progress events from the executor', async () => {
       const executeDoctor = createDoctorExecutor(createDeps());
-      const emitProgress = vi.fn();
+      const emitFragment = vi.fn();
 
       const result = await executeDoctor(
         {},
         {
           liveProgressEnabled: false,
-          emitProgress,
+          emitFragment,
         },
       );
 
-      expect(emitProgress).not.toHaveBeenCalled();
+      expect(emitFragment).not.toHaveBeenCalled();
       expect(result.didError).toBe(false);
     });
 

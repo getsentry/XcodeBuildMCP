@@ -89,21 +89,15 @@ function mockInvokeDirectThroughHandler() {
     .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
     .mockImplementation(async (tool, args, opts) => {
       const handlerContext: ToolHandlerContext = opts.handlerContext ?? {
-        emit: (event) => {
-          if (!('timestamp' in event)) {
-            opts.renderSession?.emit(event);
-          }
+        emit: (fragment) => {
+          opts.onProgress?.(fragment);
+          opts.renderSession?.emit(fragment);
         },
         attach: (image) => {
           opts.renderSession?.attach(image);
         },
-        liveProgressEnabled: false,
+        liveProgressEnabled: Boolean(opts.onProgress),
       };
-
-      if (opts.onProgress) {
-        handlerContext.liveProgressEnabled = true;
-        handlerContext.emitProgress = opts.onProgress;
-      }
 
       await tool.handler(args, handlerContext);
 

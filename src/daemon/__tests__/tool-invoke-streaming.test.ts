@@ -57,7 +57,7 @@ describe('daemon tool.invoke streaming', () => {
     );
   });
 
-  it('does not stream progress events outside live CLI contexts and returns a terminal structured result', async () => {
+  it('streams fragments to the daemon client callback and still returns a terminal structured result', async () => {
     const tool: ToolDefinition = {
       cliName: 'stream-tool',
       mcpName: 'stream_tool',
@@ -67,8 +67,18 @@ describe('daemon tool.invoke streaming', () => {
       mcpSchema: {},
       stateful: true,
       handler: async (_params, ctx) => {
-        ctx.emitProgress?.({ type: 'status', level: 'info', message: 'Starting build' });
-        ctx.emitProgress?.({ type: 'artifact', name: 'Build Log', path: '/tmp/build.log' });
+        ctx.emit({
+          kind: 'infrastructure',
+          fragment: 'status',
+          level: 'info',
+          message: 'Starting build',
+        });
+        ctx.emit({
+          kind: 'transcript',
+          fragment: 'process-line',
+          stream: 'stderr',
+          line: 'Build Log: /tmp/build.log',
+        });
         ctx.nextSteps = [{ label: 'Open the build log' }];
         ctx.structuredOutput = {
           schema: 'xcodebuildmcp.output.simulator-list',
@@ -105,13 +115,13 @@ describe('daemon tool.invoke streaming', () => {
       'stream_tool',
       {},
       {
-        onProgress: (event) => {
-          progress.push(event.type);
+        onFragment: (fragment) => {
+          progress.push(fragment.fragment);
         },
       },
     );
 
-    expect(progress).toEqual([]);
+    expect(progress).toEqual(['status', 'process-line']);
     expect(result).toEqual({
       structuredOutput: {
         schema: 'xcodebuildmcp.output.simulator-list',

@@ -10,7 +10,8 @@ import { createMockExecutor } from '../../test-utils/mock-executors.ts';
 import { createRenderSession } from '../../rendering/render.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
 import { getHandlerContext } from '../typed-tool-factory.ts';
-import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { AnyFragment } from '../../types/domain-fragments.ts';
+import type { RuntimeStatusFragment } from '../../types/runtime-status.ts';
 import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
 
 const testSchema = z.object({
@@ -23,7 +24,7 @@ type TestParams = z.infer<typeof testSchema>;
 function statusFragment(
   level: 'info' | 'warning' | 'error' | 'success',
   message: string,
-): DomainFragment {
+): RuntimeStatusFragment {
   return { kind: 'infrastructure', fragment: 'status', level, message };
 }
 
@@ -37,7 +38,7 @@ function invokeAndCollect(
   args: Record<string, unknown>,
 ): Promise<{ text: string; isError: boolean }> {
   const session = createRenderSession('text');
-  const items: DomainFragment[] = [];
+  const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: false,
     emit: (event) => {

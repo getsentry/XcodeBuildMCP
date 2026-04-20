@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { ToolResponse } from '../../types/common.ts';
-import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { AnyFragment, DomainFragment } from '../../types/domain-fragments.ts';
+import type { RuntimeStatusFragment } from '../../types/runtime-status.ts';
 import type { DaemonToolResult, ToolInvokeResult } from '../../daemon/protocol.ts';
 import type { ToolDefinition } from '../types.ts';
 import { createToolCatalog } from '../tool-catalog.ts';
@@ -18,7 +19,7 @@ const daemonClientMock = {
       (
         name: string,
         args: Record<string, unknown>,
-        options?: { onFragment?: (fragment: DomainFragment) => void },
+        options?: { onFragment?: (fragment: AnyFragment) => void },
       ) => Promise<ToolInvokeResult>
     >(),
   listTools: vi.fn<() => Promise<Array<{ name: string }>>>(),
@@ -46,7 +47,7 @@ vi.mock('../../cli/daemon-control.ts', () => ({
 function statusFragment(
   level: 'info' | 'warning' | 'error' | 'success',
   message: string,
-): DomainFragment {
+): RuntimeStatusFragment {
   return { kind: 'infrastructure', fragment: 'status', level, message };
 }
 
@@ -153,7 +154,7 @@ function emitNextStepsHandler(
   });
 }
 
-function emitErrorEventsHandler(events: DomainFragment[]): ToolDefinition['handler'] {
+function emitErrorEventsHandler(events: AnyFragment[]): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
     for (const event of events) {
       ctx.emit(event);

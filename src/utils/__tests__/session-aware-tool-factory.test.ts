@@ -17,7 +17,8 @@ import {
 } from '../config-store.ts';
 import { createRenderSession } from '../../rendering/render.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
-import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { AnyFragment } from '../../types/domain-fragments.ts';
+import type { RuntimeStatusFragment } from '../../types/runtime-status.ts';
 import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
 
 const cwd = '/repo';
@@ -30,7 +31,7 @@ async function initConfigStoreForTest(overrides?: RuntimeConfigOverrides): Promi
 function statusFragment(
   level: 'info' | 'warning' | 'error' | 'success',
   message: string,
-): DomainFragment {
+): RuntimeStatusFragment {
   return { kind: 'infrastructure', fragment: 'status', level, message };
 }
 
@@ -39,7 +40,7 @@ function invokeAndCollect(
   args: Record<string, unknown>,
 ): Promise<{ text: string; isError: boolean }> {
   const session = createRenderSession('text');
-  const items: DomainFragment[] = [];
+  const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: false,
     emit: (event) => {
@@ -237,7 +238,7 @@ describe('createSessionAwareTool', () => {
     const handlerNoXor = createSessionAwareTool<z.infer<typeof internalSchemaNoXor>>({
       internalSchema: internalSchemaNoXor,
       logicFunction: (async () => {
-        ctx.emit(statusFragment('success', 'OK'));
+        const ctx = getHandlerContext();
         ctx.emit(statusFragment('success', 'OK'));
       }) as (params: z.infer<typeof internalSchemaNoXor>, executor: unknown) => Promise<void>,
       getExecutor: () => createMockExecutor({ success: true }),
@@ -340,7 +341,7 @@ describe('createSessionAwareTool', () => {
       internalSchema: envSchema,
       logicFunction: async (params) => {
         const ctx = getHandlerContext();
-        ctx.emit(statusLine('success', JSON.stringify(params.env)));
+        ctx.emit(statusFragment('success', JSON.stringify(params.env)));
       },
       getExecutor: () => createMockExecutor({ success: true }),
       requirements: [{ allOf: ['scheme'] }],

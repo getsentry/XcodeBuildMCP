@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
 import type { StartedPipeline } from '../xcodebuild-pipeline.ts';
 import { finalizeInlineXcodebuild } from '../xcodebuild-output.ts';
-import type { AnyFragment, DomainFragment } from '../../types/domain-fragments.ts';
+import type { AnyFragment } from '../../types/domain-fragments.ts';
 
 function startPipeline(emit: (fragment: AnyFragment) => void = () => {}): StartedPipeline {
   const pipeline = createXcodebuildPipeline({
@@ -16,7 +16,7 @@ function startPipeline(emit: (fragment: AnyFragment) => void = () => {}): Starte
 
 describe('xcodebuild-output', () => {
   it('does not emit fallback events (fallback is handled by domain result creators)', () => {
-    const emitted: DomainFragment[] = [];
+    const emitted: AnyFragment[] = [];
     const started = startPipeline((fragment) => emitted.push(fragment));
     emitted.length = 0;
 
@@ -38,7 +38,7 @@ describe('xcodebuild-output', () => {
   });
 
   it('logs parser debug info without emitting progress events during finalize', () => {
-    const emitted: DomainFragment[] = [];
+    const emitted: AnyFragment[] = [];
     const started = startPipeline((fragment) => emitted.push(fragment));
     emitted.length = 0;
 
@@ -62,7 +62,7 @@ describe('xcodebuild-output', () => {
   });
 
   it('returns finalized state without synthesizing footer events beyond the build summary', () => {
-    const emitted: DomainFragment[] = [];
+    const emitted: AnyFragment[] = [];
     const started = startPipeline((fragment) => emitted.push(fragment));
     emitted.length = 0;
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
 import { STAGE_RANK } from '../../types/domain-fragments.ts';
-import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { AnyFragment, DomainFragment } from '../../types/domain-fragments.ts';
 import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
 import type { StructuredToolOutput } from '../../rendering/types.ts';
 
@@ -18,7 +18,7 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('produces MCP content from xcodebuild test output', () => {
-    const emittedEvents: DomainFragment[] = [];
+    const emittedEvents: AnyFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -89,7 +89,7 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('handles build output with warnings and errors', () => {
-    const emittedEvents: DomainFragment[] = [];
+    const emittedEvents: AnyFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'BUILD',
       toolName: 'build_sim',
@@ -119,7 +119,7 @@ describe('xcodebuild-pipeline', () => {
 
   it('supports multi-phase with minimumStage', () => {
     // Phase 1: build-for-testing
-    const phase1Events: DomainFragment[] = [];
+    const phase1Events: AnyFragment[] = [];
     const phase1 = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -141,7 +141,7 @@ describe('xcodebuild-pipeline', () => {
       | 'COMPILING'
       | undefined;
 
-    const phase2Events: DomainFragment[] = [];
+    const phase2Events: AnyFragment[] = [];
     const phase2 = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -167,7 +167,7 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('emitFragment passes tool-originated events through the pipeline', () => {
-    const emittedEvents: DomainFragment[] = [];
+    const emittedEvents: AnyFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'TEST',
       toolName: 'test_sim',
@@ -218,7 +218,7 @@ describe('xcodebuild-pipeline', () => {
   });
 
   it('renders test discovery in cli-text mode', () => {
-    const emittedEvents: DomainFragment[] = [
+    const emittedEvents: AnyFragment[] = [
       {
         kind: 'test-result',
         fragment: 'test-discovery',
@@ -280,7 +280,7 @@ describe('xcodebuild-pipeline', () => {
     process.env.XCODEBUILDMCP_RUNTIME = 'cli';
     process.env.XCODEBUILDMCP_CLI_OUTPUT_FORMAT = 'json';
 
-    const emittedEvents: DomainFragment[] = [];
+    const emittedEvents: AnyFragment[] = [];
     const pipeline = createXcodebuildPipeline({
       operation: 'BUILD',
       toolName: 'build_sim',
