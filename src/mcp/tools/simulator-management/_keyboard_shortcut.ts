@@ -8,6 +8,15 @@ export type KeyboardShortcutResult = { success: true } | { success: false; error
 type SimctlDevice = { udid: string; name: string; state: string };
 type SimctlList = { devices: Record<string, SimctlDevice[]> };
 
+function escapeAppleScriptStringLiteral(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 function resolveDevice(list: SimctlList, simulatorId: string): SimctlDevice | undefined {
   for (const runtime in list.devices) {
     const found = list.devices[runtime]?.find((d) => d.udid === simulatorId);
@@ -17,12 +26,18 @@ function resolveDevice(list: SimctlList, simulatorId: string): SimctlDevice | un
 }
 
 function buildFocusScript(deviceName: string): string {
-  const safeName = deviceName.replace(/"/g, '\\"');
+  const safeName = escapeAppleScriptStringLiteral(deviceName);
   return [
     'tell application "System Events"',
     '  tell process "Simulator"',
     '    set frontmost to true',
-    '    set matchingWindows to (every window whose title contains "' + safeName + '")',
+    '    set matchingWindows to (every window whose (title is "' +
+      safeName +
+      '" or title starts with "' +
+      safeName +
+      ' –" or title starts with "' +
+      safeName +
+      ' -"))',
     '    if (count of matchingWindows) is 0 then',
     '      return "NO_WINDOW"',
     '    end if',

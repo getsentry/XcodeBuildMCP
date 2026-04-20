@@ -22,6 +22,20 @@ const SHUTDOWN_JSON = JSON.stringify({
 });
 
 const EMPTY_JSON = JSON.stringify({ devices: {} });
+const ESCAPED_NAME_JSON = JSON.stringify({
+  devices: {
+    'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
+      { udid: 'escaped-uuid', name: 'Test\\Device"', state: 'Booted' },
+    ],
+  },
+});
+const PREFIX_NAME_JSON = JSON.stringify({
+  devices: {
+    'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
+      { udid: 'prefix-uuid', name: 'iPhone 15', state: 'Booted' },
+    ],
+  },
+});
 
 type Call = { command: string[] };
 
@@ -85,6 +99,36 @@ describe('sendKeyboardShortcut', () => {
     expect(keystrokeScript).toContain('keystroke "k"');
     expect(keystrokeScript).toContain('command down');
     expect(keystrokeScript).toContain('shift down');
+  });
+
+  it('escapes backslashes before embedding simulator names in the focus AppleScript', async () => {
+    const { executor, calls } = makeFifoExecutor([
+      { success: true, output: ESCAPED_NAME_JSON },
+      { success: true, output: '' },
+      { success: true, output: 'OK' },
+      { success: true, output: '' },
+    ]);
+
+    const result = await sendKeyboardShortcut('escaped-uuid', 'software-keyboard', executor);
+
+    expect(result.success).toBe(true);
+    expect(calls[2].command[2]).toContain('Test\\\\Device\\"');
+  });
+
+  it('matches the simulator window by exact title or runtime suffix instead of substring contains', async () => {
+    const { executor, calls } = makeFifoExecutor([
+      { success: true, output: PREFIX_NAME_JSON },
+      { success: true, output: '' },
+      { success: true, output: 'OK' },
+      { success: true, output: '' },
+    ]);
+
+    const result = await sendKeyboardShortcut('prefix-uuid', 'software-keyboard', executor);
+
+    expect(result.success).toBe(true);
+    expect(calls[2].command[2]).toContain('title is "iPhone 15"');
+    expect(calls[2].command[2]).toContain('title starts with "iPhone 15 –"');
+    expect(calls[2].command[2]).not.toContain('title contains');
   });
 
   it('errors when simulator UUID is not found', async () => {
