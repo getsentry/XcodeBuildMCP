@@ -91,24 +91,28 @@ function createBufferedHandlerContext(
   };
 }
 
-function writeJsonOutput(handlerContext: ToolHandlerContext): void {
+const JSON_ERROR_SCHEMA = 'xcodebuildmcp.output.error';
+const JSON_ERROR_SCHEMA_VERSION = '1';
+
+function writeJsonOutput(handlerContext: ToolHandlerContext): boolean {
   const structuredOutput = handlerContext.structuredOutput;
 
-  if (!structuredOutput) {
-    throw new Error('Tool did not produce structured output for --output json');
-  }
-
-  process.stdout.write(
-    JSON.stringify(
-      toStructuredEnvelope(
+  const envelope = structuredOutput
+    ? toStructuredEnvelope(
         structuredOutput.result,
         structuredOutput.schema,
         structuredOutput.schemaVersion,
-      ),
-      null,
-      2,
-    ) + '\n',
-  );
+      )
+    : {
+        schema: JSON_ERROR_SCHEMA,
+        schemaVersion: JSON_ERROR_SCHEMA_VERSION,
+        didError: true,
+        error: 'Tool did not produce structured output for --output json',
+        data: null,
+      };
+
+  process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
+  return envelope.didError;
 }
 
 /**
@@ -385,9 +389,7 @@ function registerToolSubcommand(
         }
 
         if (outputFormat === 'json') {
-          writeJsonOutput(handlerContext);
-
-          if (handlerContext.structuredOutput?.result.didError) {
+          if (writeJsonOutput(handlerContext)) {
             process.exitCode = 1;
           }
           return;

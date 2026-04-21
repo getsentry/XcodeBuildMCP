@@ -539,8 +539,13 @@ describe('registerToolCommands', () => {
     );
   });
 
-  it('throws when no structured output is available for json mode', async () => {
+  it('writes a JSON error envelope when no structured output is available for json mode', async () => {
     mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
 
     const tool = createTool({
       handler: vi.fn(async (_args, ctx) => {
@@ -554,9 +559,24 @@ describe('registerToolCommands', () => {
     });
     const app = createApp(createCatalog([tool]));
 
-    await expect(app.parseAsync(['simulator', 'run-tool', '--output', 'json'])).rejects.toThrow(
-      'Tool did not produce structured output',
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify(
+        {
+          schema: 'xcodebuildmcp.output.error',
+          schemaVersion: '1',
+          didError: true,
+          error: 'Tool did not produce structured output for --output json',
+          data: null,
+        },
+        null,
+        2,
+      )}\n`,
     );
+    expect(process.exitCode).toBe(1);
   });
 
   it('rejects json and jsonl output for xcode-ide tools', async () => {
