@@ -56,7 +56,7 @@ Use these sections under `## [Unreleased]`:
 - When running long test suites (snapshot tests, smoke tests), ALWAYS write full output to a log file and read it afterwards. NEVER pipe through `tail` or `grep` directly — that loses output you may need to debug failures.
 - Pattern: `DEVICE_ID=... npm run test:snapshot 2>&1 | tee /tmp/snapshot-results.txt` then read `/tmp/snapshot-results.txt` with the native read tool.
 - If you need a summary, read the log file and grep/filter it — the full output is always preserved.
-- Snapshot test command: `DEVICE_ID=33689F72-9B74-5406-9842-1CC6A6A96A88 npm run test:snapshot`
+- Snapshot test command: `DEVICE_ID=<YOUR_DEVICE_ID> npm run test:snapshot`
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the native read tool.

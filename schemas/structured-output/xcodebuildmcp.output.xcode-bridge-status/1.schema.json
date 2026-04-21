@@ -8,36 +8,6 @@
       "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/errorConsistency"
     }
   ],
-  "$defs": {
-    "bridgeStatus": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "workflowEnabled": { "type": "boolean" },
-        "bridgeAvailable": { "type": "boolean" },
-        "bridgePath": { "type": ["string", "null"] },
-        "xcodeRunning": { "type": ["boolean", "null"] },
-        "connected": { "type": "boolean" },
-        "bridgePid": { "type": ["integer", "null"] },
-        "proxiedToolCount": { "type": "integer", "minimum": 0 },
-        "lastError": { "type": ["string", "null"] },
-        "xcodePid": { "type": ["string", "null"] },
-        "xcodeSessionId": { "type": ["string", "null"] }
-      },
-      "required": [
-        "workflowEnabled",
-        "bridgeAvailable",
-        "bridgePath",
-        "xcodeRunning",
-        "connected",
-        "bridgePid",
-        "proxiedToolCount",
-        "lastError",
-        "xcodePid",
-        "xcodeSessionId"
-      ]
-    }
-  },
   "properties": {
     "schema": { "const": "xcodebuildmcp.output.xcode-bridge-status" },
     "schemaVersion": { "const": "1" },
@@ -51,7 +21,9 @@
           "type": "string",
           "enum": ["status", "disconnect"]
         },
-        "status": { "$ref": "#/$defs/bridgeStatus" }
+        "status": {
+          "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/bridgeStatus"
+        }
       },
       "required": ["action", "status"]
     }

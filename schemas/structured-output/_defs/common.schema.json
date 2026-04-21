@@ -395,6 +395,73 @@
         "bundleId",
         "env"
       ]
+    },
+    "bridgeStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowEnabled": {
+          "type": "boolean"
+        },
+        "bridgeAvailable": {
+          "type": "boolean"
+        },
+        "bridgePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "xcodeRunning": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "bridgePid": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "proxiedToolCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastError": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "xcodePid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "xcodeSessionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "workflowEnabled",
+        "bridgeAvailable",
+        "bridgePath",
+        "xcodeRunning",
+        "connected",
+        "bridgePid",
+        "proxiedToolCount",
+        "lastError",
+        "xcodePid",
+        "xcodeSessionId"
+      ]
     }
   }
 }

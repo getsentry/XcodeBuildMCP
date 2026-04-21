@@ -56,7 +56,7 @@ Use these sections under `## [Unreleased]`:
 - When running long test suites (snapshot tests, smoke tests), ALWAYS write full output to a log file and read it afterwards. NEVER pipe through `tail` or `grep` directly — that loses output you may need to debug failures.
 - Pattern: `DEVICE_ID=... npm run test:snapshot 2>&1 | tee /tmp/snapshot-results.txt` then read `/tmp/snapshot-results.txt` with the native read tool.
 - If you need a summary, read the log file and grep/filter it — the full output is always preserved.
-- Snapshot test command: `DEVICE_ID=33689F72-9B74-5406-9842-1CC6A6A96A88 npm run test:snapshot`
+- Snapshot test command: `DEVICE_ID=<YOUR_DEVICE_ID> npm run test:snapshot`
 - If physical-device snapshot tests hang after the final test summary, the likely cause is Apple post-failure diagnostics invoking `devicectl diagnose`, which may prompt for a macOS password and wedge in automated runs; see `docs/dev/device-snapshot-password-hang-rca.md`.
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
