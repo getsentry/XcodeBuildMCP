@@ -29,6 +29,6 @@ Hints
   Before running build/run/test/UI automation tools, set the desired device identifier in session defaults.
 
 Next steps:
-1. Build for device: build_device({ scheme: "YOUR_SCHEME", deviceId: "UUID_FROM_ABOVE" })
+1. Build for device: build_device({ scheme: "YOUR_SCHEME" })
 2. Run tests on device: test_device()
 3. Get app path: get_device_app_path()
