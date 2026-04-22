@@ -46,11 +46,11 @@ const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
   scheme: z.string().describe('The scheme to build'),
+  platform: devicePlatformSchema,
   configuration: z.string().optional().describe('Build configuration (Debug, Release)'),
   derivedDataPath: z.string().optional(),
   extraArgs: z.array(z.string()).optional(),
   preferXcodebuild: z.boolean().optional(),
-  platform: devicePlatformSchema,
 });
 
 const buildDeviceSchema = z.preprocess(
@@ -127,6 +127,9 @@ export async function buildDeviceLogic(
         scheme: params.scheme,
         ...(params.derivedDataPath !== undefined
           ? { derivedDataPath: params.derivedDataPath }
+          : {}),
+        ...(params.platform !== undefined
+          ? { platform: String(mapDevicePlatform(params.platform)) }
           : {}),
       },
     };
