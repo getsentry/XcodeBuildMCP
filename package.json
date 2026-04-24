@@ -91,7 +91,7 @@
     "bplist-parser": "^0.3.2",
     "chokidar": "^5.0.0",
     "glob": "^13.0.6",
-    "uuid": "^11.1.0",
+    "uuid": "^14.0.0",
     "yaml": "^2.4.5",
     "yargs": "^17.7.2",
     "yargs-parser": "^22.0.0",
