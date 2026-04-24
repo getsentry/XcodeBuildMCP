@@ -24,29 +24,6 @@ export function fixturePathFor(key: FixtureKey): string {
   return path.join(FIXTURES_DIR, key.runtime, key.workflow, `${key.scenario}.txt`);
 }
 
-const ANSI = {
-  reset: '\u001B[0m',
-  dim: '\u001B[2m',
-  red: '\u001B[31m',
-  green: '\u001B[32m',
-  redBg: '\u001B[97;41m',
-  greenBg: '\u001B[30;42m',
-  redLineBg: '\u001B[30;101m',
-  greenLineBg: '\u001B[30;102m',
-} as const;
-
-function supportsAnsiColors(): boolean {
-  return Boolean(process.stdout?.isTTY && process.env.NO_COLOR === undefined);
-}
-
-function colorize(text: string, code: string): string {
-  if (!supportsAnsiColors() || text.length === 0) {
-    return text;
-  }
-
-  return `${code}${text}${ANSI.reset}`;
-}
-
 function findCommonPrefixLength(left: string, right: string): number {
   let index = 0;
   while (index < left.length && index < right.length && left[index] === right[index]) {
@@ -69,66 +46,175 @@ function findCommonSuffixLength(left: string, right: string, prefixLength: numbe
   return index;
 }
 
-function formatInlineDiffLine(prefix: '-' | '+', value: string, otherValue: string): string {
+function formatInlineDiffContent(value: string, otherValue: string): string {
   const commonPrefix = findCommonPrefixLength(value, otherValue);
   const commonSuffix = findCommonSuffixLength(value, otherValue, commonPrefix);
   const start = value.slice(0, commonPrefix);
   const changed = value.slice(commonPrefix, value.length - commonSuffix);
   const end = value.slice(value.length - commonSuffix);
-  const lineColor = prefix === '-' ? ANSI.red : ANSI.green;
-  const changeColor = prefix === '-' ? ANSI.redBg : ANSI.greenBg;
 
-  return `${colorize(prefix, lineColor)} ${colorize(start, ANSI.dim)}${colorize(changed, changeColor)}${colorize(end, ANSI.dim)}`;
+  return `${start}${changed}${end}`;
 }
 
-function formatMultilineDiff(label: string, expected: string, actual: string): string {
-  const expectedLines = expected.split('\n');
-  const actualLines = actual.split('\n');
-  const maxLength = Math.max(expectedLines.length, actualLines.length);
+function formatInlineDiffLine(prefix: '-' | '+', value: string, otherValue: string): string {
+  return `${prefix} ${formatInlineDiffContent(value, otherValue)}`;
+}
 
-  let firstDiff = 0;
-  while (firstDiff < maxLength && expectedLines[firstDiff] === actualLines[firstDiff]) {
-    firstDiff += 1;
+type DiffEntry =
+  | { kind: 'context'; lineNumber: number; text: string }
+  | { kind: 'remove'; lineNumber: number; text: string }
+  | { kind: 'add'; lineNumber: number; text: string };
+
+function buildLineDiff(expectedLines: string[], actualLines: string[]): DiffEntry[] {
+  const columns = actualLines.length + 1;
+  const lengths = new Uint32Array((expectedLines.length + 1) * columns);
+  const at = (row: number, column: number) => row * columns + column;
+
+  for (let row = expectedLines.length - 1; row >= 0; row -= 1) {
+    for (let column = actualLines.length - 1; column >= 0; column -= 1) {
+      lengths[at(row, column)] =
+        expectedLines[row] === actualLines[column]
+          ? lengths[at(row + 1, column + 1)] + 1
+          : Math.max(lengths[at(row + 1, column)], lengths[at(row, column + 1)]);
+    }
   }
 
-  let suffixLength = 0;
-  while (
-    suffixLength < maxLength - firstDiff &&
-    expectedLines[expectedLines.length - 1 - suffixLength] ===
-      actualLines[actualLines.length - 1 - suffixLength]
-  ) {
-    suffixLength += 1;
-  }
+  const entries: DiffEntry[] = [];
+  let expectedIndex = 0;
+  let actualIndex = 0;
 
-  const contextStart = Math.max(0, firstDiff - 2);
-  const contextEnd = Math.min(maxLength, firstDiff + 3);
-  const lines: string[] = [label, ''];
-
-  for (let index = contextStart; index < contextEnd; index += 1) {
-    const expectedLine = expectedLines[index];
-    const actualLine = actualLines[index];
-    const lineNumber = String(index + 1).padStart(4, ' ');
-
-    if (expectedLine === actualLine) {
-      lines.push(colorize(` ${lineNumber} ${expectedLine ?? ''}`, ANSI.dim));
+  while (expectedIndex < expectedLines.length || actualIndex < actualLines.length) {
+    if (
+      expectedIndex < expectedLines.length &&
+      actualIndex < actualLines.length &&
+      expectedLines[expectedIndex] === actualLines[actualIndex]
+    ) {
+      entries.push({
+        kind: 'context',
+        lineNumber: expectedIndex + 1,
+        text: expectedLines[expectedIndex],
+      });
+      expectedIndex += 1;
+      actualIndex += 1;
       continue;
     }
 
-    if (expectedLine !== undefined) {
-      lines.push(
-        `${colorize('-', ANSI.red)}${colorize(` ${lineNumber} `, ANSI.dim)}${formatInlineDiffLine('-', expectedLine, actualLine ?? '').slice(2)}`,
-      );
+    if (
+      expectedIndex < expectedLines.length &&
+      (actualIndex === actualLines.length ||
+        lengths[at(expectedIndex + 1, actualIndex)] >= lengths[at(expectedIndex, actualIndex + 1)])
+    ) {
+      entries.push({
+        kind: 'remove',
+        lineNumber: expectedIndex + 1,
+        text: expectedLines[expectedIndex],
+      });
+      expectedIndex += 1;
+      continue;
     }
 
-    if (actualLine !== undefined) {
-      lines.push(
-        `${colorize('+', ANSI.green)}${colorize(` ${lineNumber} `, ANSI.dim)}${formatInlineDiffLine('+', actualLine, expectedLine ?? '').slice(2)}`,
+    entries.push({
+      kind: 'add',
+      lineNumber: actualIndex + 1,
+      text: actualLines[actualIndex],
+    });
+    actualIndex += 1;
+  }
+
+  return entries;
+}
+
+function createPairedDiffLines(entries: DiffEntry[]): Map<number, string> {
+  const pairs = new Map<number, string>();
+  let index = 0;
+
+  while (index < entries.length) {
+    if (entries[index].kind === 'context') {
+      index += 1;
+      continue;
+    }
+
+    const groupStart = index;
+    while (index < entries.length && entries[index].kind !== 'context') {
+      index += 1;
+    }
+
+    const group = entries.slice(groupStart, index);
+    const removals = group
+      .map((entry, offset) => ({ entry, index: groupStart + offset }))
+      .filter(
+        (item): item is { entry: Extract<DiffEntry, { kind: 'remove' }>; index: number } =>
+          item.entry.kind === 'remove',
       );
+    const additions = group
+      .map((entry, offset) => ({ entry, index: groupStart + offset }))
+      .filter(
+        (item): item is { entry: Extract<DiffEntry, { kind: 'add' }>; index: number } =>
+          item.entry.kind === 'add',
+      );
+
+    for (let pairIndex = 0; pairIndex < removals.length; pairIndex += 1) {
+      pairs.set(removals[pairIndex].index, additions[pairIndex]?.entry.text ?? '');
+    }
+    for (let pairIndex = 0; pairIndex < additions.length; pairIndex += 1) {
+      pairs.set(additions[pairIndex].index, removals[pairIndex]?.entry.text ?? '');
     }
   }
 
-  if (contextEnd < maxLength) {
-    lines.push(colorize(' …', ANSI.dim));
+  return pairs;
+}
+
+function formatDiffEntry(entry: DiffEntry, pairedLine: string): string {
+  const lineNumber = String(entry.lineNumber).padStart(4, ' ');
+
+  if (entry.kind === 'context') {
+    return ` ${lineNumber} ${entry.text}`;
+  }
+
+  const prefix = entry.kind === 'remove' ? '-' : '+';
+
+  return `${prefix}${lineNumber} ${formatInlineDiffContent(entry.text, pairedLine)}`;
+}
+
+function formatMultilineDiff(label: string, expected: string, actual: string): string {
+  const entries = buildLineDiff(expected.split('\n'), actual.split('\n'));
+  const changedIndexes = entries
+    .map((entry, index) => (entry.kind === 'context' ? -1 : index))
+    .filter((index) => index !== -1);
+
+  if (changedIndexes.length === 0) {
+    return label;
+  }
+
+  const pairedLines = createPairedDiffLines(entries);
+  const ranges: Array<{ start: number; end: number }> = [];
+
+  for (const changedIndex of changedIndexes) {
+    const start = Math.max(0, changedIndex - 2);
+    const end = Math.min(entries.length, changedIndex + 3);
+    const lastRange = ranges.at(-1);
+
+    if (lastRange && start <= lastRange.end) {
+      lastRange.end = Math.max(lastRange.end, end);
+    } else {
+      ranges.push({ start, end });
+    }
+  }
+
+  const lines: string[] = [label, ''];
+
+  ranges.forEach((range, rangeIndex) => {
+    if (rangeIndex > 0) {
+      lines.push(' …');
+    }
+
+    for (let index = range.start; index < range.end; index += 1) {
+      lines.push(formatDiffEntry(entries[index], pairedLines.get(index) ?? ''));
+    }
+  });
+
+  if (ranges.at(-1)!.end < entries.length) {
+    lines.push(' …');
   }
 
   return lines.join('\n');
