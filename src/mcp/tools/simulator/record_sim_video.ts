@@ -2,7 +2,7 @@ import { dirname } from 'node:path';
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
@@ -23,6 +23,7 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 // Base schema object (used for MCP schema exposure)
 const recordSimVideoSchemaObject = z.object({
@@ -64,17 +65,6 @@ type VideoRecordingCapture = {
   sessionId?: string;
 };
 
-function createDiagnostics(message: string) {
-  return {
-    warnings: [] as Array<{ message: string }>,
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
-
 function createRecordSimVideoResult(params: {
   simulatorId: string;
   didError: boolean;
@@ -94,7 +84,7 @@ function createRecordSimVideoResult(params: {
     },
     ...(params.capture ? { capture: params.capture } : {}),
     ...(params.diagnosticsMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticsMessage) }
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticsMessage] }) }
       : {}),
   } as RecordSimVideoResult;
 }
@@ -118,7 +108,7 @@ export function createRecordSimVideoExecutor(
     stopSimulatorVideoCapture: typeof stopSimulatorVideoCapture;
   },
   fs: FileSystemExecutor,
-): ToolExecutor<RecordSimVideoParams, RecordSimVideoResult> {
+): NonStreamingExecutor<RecordSimVideoParams, RecordSimVideoResult> {
   return async (params) => {
     if (!axe.areAxeToolsAvailable()) {
       return createRecordSimVideoResult({
@@ -152,8 +142,8 @@ export function createRecordSimVideoExecutor(
         return createRecordSimVideoResult({
           simulatorId: params.simulatorId,
           didError: true,
-          error: `Failed to start video recording: ${startRes.error}`,
-          diagnosticsMessage: startRes.error,
+          error: 'Failed to start video recording.',
+          diagnosticsMessage: startRes.error ?? 'Unknown error',
         });
       }
 
@@ -178,20 +168,20 @@ export function createRecordSimVideoExecutor(
       return createRecordSimVideoResult({
         simulatorId: params.simulatorId,
         didError: true,
-        error: `Failed to stop video recording: ${stopRes.error}`,
-        diagnosticsMessage: stopRes.error,
+        error: 'Failed to stop video recording.',
+        diagnosticsMessage: stopRes.error ?? 'Unknown error',
       });
     }
 
     try {
       if (params.outputFile) {
         if (!stopRes.parsedPath) {
-          const message = `Recording stopped but could not determine the recorded file path from AXe output. Raw output: ${stopRes.stdout ?? '(no output captured)'}`;
+          const diagnosticMessage = `Recording stopped but could not determine the recorded file path from AXe output. Raw output: ${stopRes.stdout ?? '(no output captured)'}`;
           return createRecordSimVideoResult({
             simulatorId: params.simulatorId,
             didError: true,
-            error: message,
-            diagnosticsMessage: message,
+            error: 'Recording stopped but could not determine the recorded file path.',
+            diagnosticsMessage: diagnosticMessage,
           });
         }
 
@@ -204,12 +194,12 @@ export function createRecordSimVideoExecutor(
         }
       }
     } catch (error) {
-      const message = `Recording stopped but failed to save/move the video file: ${error instanceof Error ? error.message : String(error)}`;
+      const diagnosticMessage = error instanceof Error ? error.message : String(error);
       return createRecordSimVideoResult({
         simulatorId: params.simulatorId,
         didError: true,
-        error: message,
-        diagnosticsMessage: message,
+        error: 'Recording stopped but failed to save the video file.',
+        diagnosticsMessage: diagnosticMessage,
       });
     }
 
@@ -246,9 +236,7 @@ export async function record_sim_videoLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeRecordSimVideo = createRecordSimVideoExecutor(executor, axe, video, fs);
-  const result = await executeRecordSimVideo(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeRecordSimVideo(params);
 
   setStructuredOutput(ctx, result);
   if (result.didError) {

@@ -1,28 +1,18 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const openSimSchema = z.object({});
 
 type OpenSimParams = z.infer<typeof openSimSchema>;
 type OpenSimResult = SimulatorActionResultDomainResult;
-
-function createDiagnostics(message: string) {
-  return {
-    warnings: [],
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
 
 function createOpenSimResult(params: {
   didError: boolean;
@@ -40,7 +30,7 @@ function createOpenSimResult(params: {
       type: 'open',
     },
     ...(params.diagnosticMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
       : {}),
   };
 }
@@ -55,7 +45,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: OpenSimResult): vo
 
 export function createOpenSimExecutor(
   executor: CommandExecutor,
-): ToolExecutor<OpenSimParams, OpenSimResult> {
+): NonStreamingExecutor<OpenSimParams, OpenSimResult> {
   return async (_params) => {
     try {
       const result = await executor(['open', '-a', 'Simulator'], 'Open Simulator', false);
@@ -64,7 +54,7 @@ export function createOpenSimExecutor(
         const diagnosticMessage = result.error ?? 'Unknown error';
         return createOpenSimResult({
           didError: true,
-          error: `Open simulator operation failed: ${diagnosticMessage}`,
+          error: 'Open simulator operation failed.',
           diagnosticMessage,
         });
       }
@@ -74,7 +64,7 @@ export function createOpenSimExecutor(
       const diagnosticMessage = toErrorMessage(error);
       return createOpenSimResult({
         didError: true,
-        error: `Open simulator operation failed: ${diagnosticMessage}`,
+        error: 'Open simulator operation failed.',
         diagnosticMessage,
       });
     }
@@ -89,9 +79,7 @@ export async function open_simLogic(
 
   const ctx = getHandlerContext();
   const executeOpenSim = createOpenSimExecutor(executor);
-  const result = await executeOpenSim(_params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeOpenSim(_params);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

@@ -60,7 +60,8 @@ describe('open_sim tool', () => {
       const result = await runLogic(() => open_simLogic({}, mockExecutor));
 
       const text = allText(result);
-      expect(text).toContain('Open simulator operation failed: Command failed');
+      expect(text).toContain('Open simulator operation failed.');
+      expect(text).toContain('Command failed');
       expect(result.isError).toBe(true);
     });
 
@@ -72,7 +73,8 @@ describe('open_sim tool', () => {
       const result = await runLogic(() => open_simLogic({}, mockExecutor));
 
       const text = allText(result);
-      expect(text).toContain('Open simulator operation failed: Test error');
+      expect(text).toContain('Open simulator operation failed.');
+      expect(text).toContain('Test error');
       expect(result.isError).toBe(true);
     });
 
@@ -84,7 +86,8 @@ describe('open_sim tool', () => {
       const result = await runLogic(() => open_simLogic({}, mockExecutor));
 
       const text = allText(result);
-      expect(text).toContain('Open simulator operation failed: String error');
+      expect(text).toContain('Open simulator operation failed.');
+      expect(text).toContain('String error');
       expect(result.isError).toBe(true);
     });
 

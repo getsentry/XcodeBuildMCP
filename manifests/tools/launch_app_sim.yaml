@@ -4,6 +4,9 @@ names:
   mcp: launch_app_sim
   cli: launch-app
 description: Launch app on simulator. Runtime logs are captured automatically and the log file path is included in the response.
+outputSchema:
+  schema: xcodebuildmcp.output.launch-result
+  version: "1"
 annotations:
   title: Launch App Simulator
   readOnlyHint: false

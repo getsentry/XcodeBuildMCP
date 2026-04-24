@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import { createMockExecutor, type CommandExecutor } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler, showBuildSettingsLogic } from '../show_build_settings.ts';
+import {
+  schema,
+  handler,
+  showBuildSettingsLogic,
+  createShowBuildSettingsExecutor,
+} from '../show_build_settings.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
@@ -105,6 +110,25 @@ Build settings for action build and target MyApp:
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps command failure summary short and preserves parsed diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error:
+          'xcodebuild: error: The workspace named "App" does not contain a scheme named "InvalidScheme".',
+      });
+      const execute = createShowBuildSettingsExecutor(mockExecutor);
+
+      const result = await execute({
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'InvalidScheme',
+      });
+
+      expect(result.error).toBe('Failed to show build settings.');
+      expect(result.diagnostics?.errors).toEqual([
+        { message: 'The workspace named "App" does not contain a scheme named "InvalidScheme".' },
+      ]);
     });
 
     it('should handle thrown errors', async () => {

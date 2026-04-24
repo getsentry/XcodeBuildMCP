@@ -20,7 +20,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -28,7 +28,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const LOG_PREFIX = '[AXe]';
 
@@ -48,7 +47,7 @@ export function createTypeTextExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<TypeTextParams, TypeTextResult> {
+): NonStreamingExecutor<TypeTextParams, TypeTextResult> {
   return async (params) => {
     const toolName = 'type_text';
     const { simulatorId, text } = params;
@@ -76,7 +75,7 @@ export function createTypeTextExecutor(
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) => `Failed to simulate text typing: ${axeError.message}`,
+        axeFailureMessage: () => 'Failed to simulate text typing.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -94,7 +93,7 @@ export async function type_textLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeTypeText = createTypeTextExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeTypeText(params, noopToolExecutionContext);
+  const result = await executeTypeText(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

@@ -10,7 +10,7 @@ import * as z from 'zod';
 import type { SharedBuildParams } from '../../../types/common.ts';
 import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -43,10 +43,11 @@ import {
 import {
   collectFallbackErrorMessages,
   createBuildRunDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use (Required)'),
@@ -172,7 +173,7 @@ export function createBuildRunSimExecutor(
   executor: CommandExecutor,
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
   prepared?: PreparedBuildRunSimExecution,
-): DomainStreamingExecutor<BuildRunSimulatorParams, BuildRunSimulatorResult> {
+): StreamingExecutor<BuildRunSimulatorParams, BuildRunSimulatorResult> {
   return async (params, ctx) => {
     const resolved = prepared ?? (await prepareBuildRunSimExecution(params, executor));
 
@@ -198,6 +199,7 @@ export function createBuildRunSimExecutor(
             buildLogPath: started.pipeline.logPath,
           },
           fallbackErrorMessages: collectFallbackErrorMessages(started, [validation.error]),
+          request: resolved.invocationRequest,
         });
       }
     }
@@ -221,6 +223,7 @@ export function createBuildRunSimExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -276,6 +279,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to get app path to launch: ${errorMessage}`,
         ]),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -303,6 +307,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           uuidResult.error ?? 'Failed to resolve simulator: no simulator identifier provided',
         ]),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -349,6 +354,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to boot simulator: ${errorMessage}`,
         ]),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -391,6 +397,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to install app on simulator: ${errorMessage}`,
         ]),
+        request: resolved.invocationRequest,
       });
     }
     ctx.emitFragment({
@@ -419,6 +426,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to extract bundle ID: ${errorMessage}`,
         ]),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -442,6 +450,7 @@ export function createBuildRunSimExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to launch app ${appBundlePath}: ${errorMessage}`,
         ]),
+        request: resolved.invocationRequest,
       });
     }
 
@@ -463,6 +472,7 @@ export function createBuildRunSimExecutor(
         ...(launchResult.logFilePath ? { runtimeLogPath: launchResult.logFilePath } : {}),
         ...(launchResult.osLogPath ? { osLogPath: launchResult.osLogPath } : {}),
       },
+      request: resolved.invocationRequest,
     });
   };
 }
@@ -500,12 +510,8 @@ export async function build_run_simLogic(
       simulatorName: params.simulatorName,
       simulatorId: params.simulatorId,
     };
-    const executionContext = createToolExecutionContext(
-      ctx,
-      'BUILD',
-      fallbackRequest,
-      'build-run-result',
-    );
+    ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', fallbackRequest));
+    const executionContext = createStreamingExecutionContext(ctx);
     const started = createDomainStreamingPipeline('build_run_sim', 'BUILD', executionContext);
     const result = createBuildRunDomainResult({
       started,
@@ -515,23 +521,18 @@ export async function build_run_simLogic(
         buildLogPath: started.pipeline.logPath,
       },
       fallbackErrorMessages: [`Error during simulator build and run: ${errorMessage}`],
+      request: fallbackRequest,
     });
     setXcodebuildStructuredOutput(ctx, 'build-run-result', result);
-    executionContext.emitResult(result);
     return;
   }
 
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'BUILD',
-    prepared.invocationRequest,
-    'build-run-result',
-  );
+  ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', prepared.invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunSim = createBuildRunSimExecutor(executor, launcher, prepared);
   const result = await executeBuildRunSim(params, executionContext);
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);
-  executionContext.emitResult(result);
 
   if (!result.didError && 'simulatorId' in result.artifacts && 'bundleId' in result.artifacts) {
     const simulatorId =

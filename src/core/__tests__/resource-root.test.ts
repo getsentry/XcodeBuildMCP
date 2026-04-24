@@ -7,6 +7,7 @@ import {
   getBundledFrameworksDir,
   getManifestsDir,
   getResourceRoot,
+  getStructuredOutputSchemasDir,
   resetResourceRootCacheForTests,
 } from '../resource-root.ts';
 
@@ -39,6 +40,9 @@ describe('resource-root', () => {
 
     expect(getResourceRoot()).toBe(resolve(explicitRoot));
     expect(getManifestsDir()).toBe(join(resolve(explicitRoot), 'manifests'));
+    expect(getStructuredOutputSchemasDir()).toBe(
+      join(resolve(explicitRoot), 'schemas', 'structured-output'),
+    );
     expect(getBundledAxePath()).toBe(join(resolve(explicitRoot), 'bundled', 'axe'));
   });
 

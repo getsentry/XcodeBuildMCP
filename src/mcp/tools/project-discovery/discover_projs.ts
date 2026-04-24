@@ -9,11 +9,12 @@ import * as z from 'zod';
 import * as path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { ProjectListDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
 import type { FileSystemExecutor } from '../../../utils/FileSystemExecutor.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const DEFAULT_MAX_DEPTH = 3;
 const SKIPPED_DIRS = new Set(['build', 'DerivedData', 'Pods', '.git', 'node_modules']);
@@ -154,6 +155,7 @@ interface DiscoverProjectsComputation {
   context: DiscoverProjectsExecutionContext;
   result?: DiscoverProjectsResult;
   error?: string;
+  diagnosticMessage?: string;
 }
 
 function isBundleLikePath(workspaceRoot: string): boolean {
@@ -214,13 +216,13 @@ async function discoverProjectsOrError(
     if (!stats.isDirectory()) {
       const errorMsg = `Scan path is not a directory: ${absoluteScanPath}`;
       log('error', errorMsg);
-      return { context, error: errorMsg };
+      return { context, error: errorMsg, diagnosticMessage: errorMsg };
     }
   } catch (error) {
     const { code, message } = getErrorDetails(error, 'Unknown error accessing scan path');
     const errorMsg = `Failed to access scan path: ${absoluteScanPath}. Error: ${message}`;
     log('error', `${errorMsg} - Code: ${code ?? 'N/A'}`);
-    return { context, error: errorMsg };
+    return { context, error: errorMsg, diagnosticMessage: errorMsg };
   }
 
   const results: DiscoverProjectsResult = { projects: [], workspaces: [] };
@@ -259,9 +261,9 @@ function createDiscoverProjectsResult(
     error: null,
     summary: {
       status: 'SUCCEEDED',
-      maxDepth: context.maxDepth,
       projectCount: result.projects.length,
       workspaceCount: result.workspaces.length,
+      maxDepth: context.maxDepth,
     },
     artifacts: {
       workspaceRoot: context.workspaceRoot,
@@ -275,16 +277,15 @@ function createDiscoverProjectsResult(
 function createDiscoverProjectsErrorResult(
   context: DiscoverProjectsExecutionContext,
   message: string,
+  diagnosticMessage?: string,
 ): DiscoverProjsResult {
   return {
     kind: 'project-list',
     didError: true,
-    error: message,
+    error: 'Failed to discover projects.',
     summary: {
       status: 'FAILED',
       maxDepth: context.maxDepth,
-      projectCount: 0,
-      workspaceCount: 0,
     },
     artifacts: {
       workspaceRoot: context.workspaceRoot,
@@ -292,6 +293,7 @@ function createDiscoverProjectsErrorResult(
     },
     projects: [],
     workspaces: [],
+    diagnostics: createBasicDiagnostics({ errors: [diagnosticMessage ?? message] }),
   };
 }
 
@@ -305,8 +307,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DiscoverProjsResul
 
 export function createDiscoverProjectsExecutor(
   fileSystemExecutor: FileSystemExecutor,
-): ToolExecutor<DiscoverProjsParams, DiscoverProjsResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<DiscoverProjsParams, DiscoverProjsResult> {
+  return async (params) => {
     const computation = await discoverProjectsOrError(params, fileSystemExecutor);
     const context = computation.context;
 
@@ -314,6 +316,7 @@ export function createDiscoverProjectsExecutor(
       return createDiscoverProjectsErrorResult(
         context,
         computation.error ?? 'Failed to discover projects',
+        computation.diagnosticMessage,
       );
     }
 
@@ -333,9 +336,7 @@ export async function discover_projsLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeDiscoverProjects = createDiscoverProjectsExecutor(fileSystemExecutor);
-  const result = await executeDiscoverProjects(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDiscoverProjects(params);
 
   setStructuredOutput(ctx, result);
 

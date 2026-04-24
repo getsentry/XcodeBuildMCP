@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { InstallResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -43,9 +43,7 @@ export async function install_app_deviceLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeInstallAppDevice = createInstallAppDeviceExecutor(executor);
-  const result = await executeInstallAppDevice(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeInstallAppDevice(params);
 
   setInstallResultStructuredOutput(ctx, result);
 
@@ -56,9 +54,9 @@ export async function install_app_deviceLogic(
 
 export function createInstallAppDeviceExecutor(
   executor: CommandExecutor,
-): ToolExecutor<InstallAppDeviceParams, InstallResultDomainResult> {
+): NonStreamingExecutor<InstallAppDeviceParams, InstallResultDomainResult> {
   return async (params) => {
-    const artifacts = { appPath: params.appPath, deviceId: params.deviceId };
+    const artifacts = { deviceId: params.deviceId, appPath: params.appPath };
     log('info', `Installing app on device ${params.deviceId}`);
 
     try {

@@ -16,13 +16,12 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   createCaptureFailureResult,
   createCaptureSuccessResult,
   setCaptureStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const LOG_PREFIX = '[Screenshot]';
 
@@ -196,7 +195,7 @@ interface ScreenshotExecutorDependencies {
 
 export function createScreenshotExecutor(
   dependencies: ScreenshotExecutorDependencies,
-): ToolExecutor<ScreenshotParams, ScreenshotResult> {
+): NonStreamingExecutor<ScreenshotParams, ScreenshotResult> {
   return async (params) => {
     const executor = dependencies.executor;
     const fileSystemExecutor = dependencies.fileSystemExecutor ?? getDefaultFileSystemExecutor();
@@ -326,28 +325,26 @@ export function createScreenshotExecutor(
         });
       } catch (fileError) {
         log('error', `${LOG_PREFIX}/screenshot: Failed to process image file: ${fileError}`);
+        const diagnosticMessage =
+          fileError instanceof Error ? fileError.message : String(fileError);
         return createCaptureFailureResult(
           simulatorId,
-          `Screenshot captured but failed to process image file: ${
-            fileError instanceof Error ? fileError.message : String(fileError)
-          }`,
+          'Screenshot captured but failed to process image file.',
+          {
+            details: [diagnosticMessage],
+          },
         );
       }
     } catch (error) {
       log('error', `${LOG_PREFIX}/screenshot: Failed - ${error}`);
       if (error instanceof SystemError) {
-        return createCaptureFailureResult(
-          simulatorId,
-          `System error executing screenshot: ${error.message}`,
-          {
-            details: [error.message],
-          },
-        );
+        return createCaptureFailureResult(simulatorId, 'Failed to capture screenshot.', {
+          details: [error.message],
+        });
       }
-      return createCaptureFailureResult(
-        simulatorId,
-        `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return createCaptureFailureResult(simulatorId, 'Unexpected screenshot failure.', {
+        details: [error instanceof Error ? error.message : String(error)],
+      });
     }
   };
 }
@@ -367,7 +364,7 @@ export async function screenshotLogic(
     uuidUtils,
     onAttachment: (attachment) => ctx.attach(attachment),
   });
-  const result = await executeScreenshot(params, noopToolExecutionContext);
+  const result = await executeScreenshot(params);
 
   setCaptureStructuredOutput(ctx, result);
 }

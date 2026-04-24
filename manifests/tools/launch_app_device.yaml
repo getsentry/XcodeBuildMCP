@@ -4,6 +4,9 @@ names:
   mcp: launch_app_device
   cli: launch
 description: Launch app on device.
+outputSchema:
+  schema: xcodebuildmcp.output.launch-result
+  version: "1"
 annotations:
   title: Launch App Device
   readOnlyHint: false

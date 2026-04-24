@@ -4,6 +4,9 @@ names:
   mcp: session_clear_defaults
   cli: clear-defaults
 description: Clear session defaults for the active profile or a specified profile.
+outputSchema:
+  schema: xcodebuildmcp.output.session-defaults
+  version: "1"
 annotations:
   title: Clear Session Defaults
   readOnlyHint: false

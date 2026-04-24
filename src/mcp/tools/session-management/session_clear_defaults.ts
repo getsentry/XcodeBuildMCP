@@ -4,7 +4,7 @@ import type {
   SessionDefaultsDomainResult,
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import { sessionDefaultKeys } from '../../../utils/session-defaults-schema.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
@@ -87,7 +87,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionClearDefaul
   };
 }
 
-export function createSessionClearDefaultsExecutor(): ToolExecutor<
+export function createSessionClearDefaultsExecutor(): NonStreamingExecutor<
   Params,
   SessionClearDefaultsResult
 > {
@@ -134,9 +134,7 @@ export async function sessionClearDefaultsLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
   const activeProfileBefore = sessionStore.getActiveProfile();
   const executeSessionClearDefaults = createSessionClearDefaultsExecutor();
-  const result = await executeSessionClearDefaults(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSessionClearDefaults(params);
 
   if (!result.didError) {
     result.operation = params.all

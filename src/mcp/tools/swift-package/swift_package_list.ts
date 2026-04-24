@@ -1,11 +1,10 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { ProcessListDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/command.ts';
 import { activeProcesses } from './active-processes.ts';
-import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
 
 type ListProcessInfo = {
   executableName?: string;
@@ -31,7 +30,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ProcessListDomainR
 
 export function createSwiftPackageListExecutor(
   dependencies: ProcessListDependencies = {},
-): ToolExecutor<SwiftPackageListParams, ProcessListDomainResult> {
+): NonStreamingExecutor<SwiftPackageListParams, ProcessListDomainResult> {
   return async () => {
     const processMap =
       dependencies.processMap ??
@@ -79,10 +78,7 @@ export async function swift_package_listLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSwiftPackageList = createSwiftPackageListExecutor(dependencies);
-  const result = await executeSwiftPackageList(
-    (params ?? {}) as SwiftPackageListParams,
-    noopToolExecutionContext,
-  );
+  const result = await executeSwiftPackageList((params ?? {}) as SwiftPackageListParams);
 
   setStructuredOutput(ctx, result);
 }

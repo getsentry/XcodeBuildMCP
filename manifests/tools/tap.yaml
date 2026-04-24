@@ -4,6 +4,9 @@ names:
   mcp: tap
   cli: tap
 description: Tap UI element by accessibility id/label (recommended) or coordinates as fallback.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Tap
   readOnlyHint: true

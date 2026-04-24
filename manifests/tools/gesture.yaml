@@ -4,6 +4,9 @@ names:
   mcp: gesture
   cli: gesture
 description: Simulator gesture preset.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Gesture
   readOnlyHint: true

@@ -4,6 +4,9 @@ names:
   mcp: get_app_bundle_id
   cli: get-app-bundle-id
 description: Extract bundle id from .app.
+outputSchema:
+  schema: xcodebuildmcp.output.bundle-id
+  version: "1"
 annotations:
   title: Get App Bundle ID
   readOnlyHint: true

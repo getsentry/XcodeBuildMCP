@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { createDoctorExecutor, schema, runDoctor, type DoctorDependencies } from '../doctor.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
@@ -132,20 +132,25 @@ describe('doctor tool', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('does not emit progress events from the executor', async () => {
+    it('returns a result without requiring an execution context', async () => {
       const executeDoctor = createDoctorExecutor(createDeps());
-      const emitFragment = vi.fn();
+      const result = await executeDoctor({});
 
-      const result = await executeDoctor(
-        {},
-        {
-          liveProgressEnabled: false,
-          emitFragment,
-        },
-      );
-
-      expect(emitFragment).not.toHaveBeenCalled();
       expect(result.didError).toBe(false);
+    });
+
+    it('keeps doctor executor failure summary short and preserves diagnostics', async () => {
+      const deps = createDeps();
+      deps.env.getSystemInfo = () => {
+        throw new Error('system profiler failed');
+      };
+      const executeDoctor = createDoctorExecutor(deps);
+
+      const result = await executeDoctor({});
+
+      expect(result.didError).toBe(true);
+      expect(result.error).toBe('Doctor failed.');
+      expect(result.diagnostics?.errors).toEqual([{ message: 'system profiler failed' }]);
     });
 
     it('should handle successful doctor execution', async () => {

@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugBreakpointResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
@@ -49,6 +50,7 @@ function createBreakpointSpec(params: DebugBreakpointAddParams): BreakpointSpec 
 function createDebugBreakpointAddResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   breakpoint: BreakpointSpec;
   breakpointId?: number;
 }): DebugBreakpointAddResult {
@@ -56,23 +58,30 @@ function createDebugBreakpointAddResult(params: {
     kind: 'debug-breakpoint-result',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     action: 'add',
     breakpoint:
       params.breakpoint.kind === 'function'
         ? {
-            kind: 'function',
-            name: params.breakpoint.name,
             ...(typeof params.breakpointId === 'number'
               ? { breakpointId: params.breakpointId }
               : {}),
+            kind: 'function',
+            name: params.breakpoint.name,
           }
         : {
+            ...(typeof params.breakpointId === 'number'
+              ? { breakpointId: params.breakpointId }
+              : {}),
             kind: 'file-line',
             file: params.breakpoint.file,
             line: params.breakpoint.line,
-            ...(typeof params.breakpointId === 'number'
-              ? { breakpointId: params.breakpointId }
-              : {}),
           },
   };
 }
@@ -87,7 +96,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugBreakpointAdd
 
 export function createDebugBreakpointAddExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugBreakpointAddParams, DebugBreakpointAddResult> {
+): NonStreamingExecutor<DebugBreakpointAddParams, DebugBreakpointAddResult> {
   return async (params) => {
     const spec = createBreakpointSpec(params);
 
@@ -102,9 +111,11 @@ export function createDebugBreakpointAddExecutor(
         breakpointId: result.id,
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugBreakpointAddResult({
         didError: true,
-        error: `Failed to add breakpoint: ${toErrorMessage(error)}`,
+        error: 'Failed to add breakpoint.',
+        diagnosticMessage,
         breakpoint: spec,
       });
     }
@@ -117,9 +128,7 @@ export async function debug_breakpoint_addLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugBreakpointAdd = createDebugBreakpointAddExecutor(ctx.debugger);
-  const result = await executeDebugBreakpointAdd(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugBreakpointAdd(params);
 
   setStructuredOutput(handlerCtx, result);
 }

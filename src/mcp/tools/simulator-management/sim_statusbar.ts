@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const simStatusbarSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -36,17 +37,6 @@ const simStatusbarSchema = z.object({
 type SimStatusbarParams = z.infer<typeof simStatusbarSchema>;
 type SimStatusbarResult = SimulatorActionResultDomainResult;
 
-function createDiagnostics(message: string) {
-  return {
-    warnings: [],
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
-
 function createSimStatusbarResult(params: {
   simulatorId: string;
   dataNetwork: SimStatusbarParams['dataNetwork'];
@@ -65,12 +55,12 @@ function createSimStatusbarResult(params: {
       type: 'statusbar',
       dataNetwork: params.dataNetwork,
     },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
     artifacts: {
       simulatorId: params.simulatorId,
     },
-    ...(params.diagnosticMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
-      : {}),
   };
 }
 
@@ -84,8 +74,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SimStatusbarResult
 
 export function createSimStatusbarExecutor(
   executor: CommandExecutor,
-): ToolExecutor<SimStatusbarParams, SimStatusbarResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<SimStatusbarParams, SimStatusbarResult> {
+  return async (params) => {
     try {
       const command =
         params.dataNetwork === 'clear'
@@ -108,7 +98,7 @@ export function createSimStatusbarExecutor(
           simulatorId: params.simulatorId,
           dataNetwork: params.dataNetwork,
           didError: true,
-          error: `Failed to set status bar: ${diagnosticMessage}`,
+          error: 'Failed to set status bar.',
           diagnosticMessage,
         });
       }
@@ -124,7 +114,7 @@ export function createSimStatusbarExecutor(
         simulatorId: params.simulatorId,
         dataNetwork: params.dataNetwork,
         didError: true,
-        error: `Failed to set status bar: ${diagnosticMessage}`,
+        error: 'Failed to set status bar.',
         diagnosticMessage,
       });
     }
@@ -143,9 +133,7 @@ export async function sim_statusbarLogic(
   const ctx = getHandlerContext();
   const executeSimStatusbar = createSimStatusbarExecutor(executor);
 
-  const result = await executeSimStatusbar(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSimStatusbar(params);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

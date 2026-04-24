@@ -4,7 +4,7 @@ import type {
   BuildResultArtifacts,
   ToolDomainResultBase,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -17,6 +17,7 @@ import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const baseOptions = {
   scheme: z.string().optional().describe('Optional: The scheme to clean'),
@@ -92,17 +93,12 @@ function createCleanArtifacts(
   configuration: string,
   platform: XcodePlatform,
 ): CleanResult['artifacts'] {
-  const artifacts: CleanResult['artifacts'] = {
+  return {
+    ...(params.workspacePath ? { workspacePath: params.workspacePath } : {}),
+    ...(params.scheme ? { scheme: params.scheme } : {}),
     configuration,
     platform: String(platform),
   };
-  if (params.workspacePath) {
-    artifacts.workspacePath = params.workspacePath;
-  }
-  if (params.scheme) {
-    artifacts.scheme = params.scheme;
-  }
-  return artifacts;
 }
 
 const STDERR_NOISE_PATTERNS: readonly RegExp[] = [
@@ -157,7 +153,7 @@ function resolveCleanPlatform(params: CleanParams): XcodePlatform | null {
 
 export function createCleanExecutor(
   executor: CommandExecutor,
-): ToolExecutor<CleanParams, CleanResult> {
+): NonStreamingExecutor<CleanParams, CleanResult> {
   return async (params) => {
     if (params.workspacePath && !params.scheme) {
       const message = 'scheme is required when workspacePath is provided.';
@@ -216,29 +212,27 @@ export function createCleanExecutor(
       const didError = response.isError === true;
       const stderrLines = extractStderrErrorLines(stderrChunks);
 
+      const diagnostics = createBasicDiagnostics({
+        errors: didError ? (stderrLines.length > 0 ? stderrLines : ['Unknown error']) : [],
+      });
+
       return createCleanResult(
         params,
         didError ? 'FAILED' : 'SUCCEEDED',
-        {
-          warnings: [],
-          errors: didError ? stderrLines.map((message) => ({ message })) : [],
-        },
-        didError ? `Clean failed: ${stderrLines.join('; ') || 'Unknown error'}` : null,
+        diagnostics,
+        didError ? 'Clean failed.' : null,
         {
           configuration,
           cleanPlatform,
         },
       );
     } catch (error) {
-      const message = `Clean failed: ${toErrorMessage(error)}`;
+      const diagnosticMessage = toErrorMessage(error);
       return createCleanResult(
         params,
         'FAILED',
-        {
-          warnings: [],
-          errors: [{ message }],
-        },
-        message,
+        createBasicDiagnostics({ errors: [diagnosticMessage] }),
+        'Clean failed.',
         {
           configuration,
           cleanPlatform,
@@ -251,9 +245,7 @@ export function createCleanExecutor(
 export async function cleanLogic(params: CleanParams, executor: CommandExecutor): Promise<void> {
   const ctx = getHandlerContext();
   const executeClean = createCleanExecutor(executor);
-  const result = await executeClean(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeClean(params);
 
   ctx.structuredOutput = { result, schema: STRUCTURED_OUTPUT_SCHEMA, schemaVersion: '1' };
 }

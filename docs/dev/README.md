@@ -5,6 +5,7 @@
 - [Code quality standards](CODE_QUALITY.md)
 - [Testing guidelines](TESTING.md)
 - [Architecture overview](ARCHITECTURE.md)
+- [Tool authoring cookbook](TOOL_AUTHORING_COOKBOOK.md)
 
 ## Build and tooling
 - [ESLint and type safety](ESLINT_TYPE_SAFETY.md)

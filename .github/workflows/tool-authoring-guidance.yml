@@ -1,0 +1,111 @@
+name: Tool Authoring Guidance
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  comment:
+    name: Comment when tool contracts change
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post contributor guidance
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- xcodebuildmcp-tool-authoring-guidance -->';
+            const watchedPrefixes = [
+              'manifests/',
+              'schemas/',
+              'src/mcp/tools/',
+            ];
+
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const changedFiles = files
+              .map((file) => file.filename)
+              .filter((filename) => watchedPrefixes.some((prefix) => filename.startsWith(prefix)))
+              .sort();
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pull_number,
+              per_page: 100,
+            });
+
+            const existingComment = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (changedFiles.length === 0) {
+              if (existingComment) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: existingComment.id,
+                });
+              }
+              return;
+            }
+
+            const maxFilesToShow = 30;
+            const shownFiles = changedFiles.slice(0, maxFilesToShow);
+            const hiddenCount = changedFiles.length - shownFiles.length;
+            const fileList = shownFiles.map((filename) => `- \`${filename}\``).join('\n');
+            const hiddenText = hiddenCount > 0 ? `\n- ...and ${hiddenCount} more` : '';
+
+            const body = `${marker}
+            ## Tool authoring reminder
+
+            This PR modifies tool contract files:
+
+            ${fileList}${hiddenText}
+
+            Please review the [Tool Authoring Cookbook](https://github.com/${owner}/${repo}/blob/main/docs/dev/TOOL_AUTHORING_COOKBOOK.md) before merging.
+
+            Checklist:
+            - Run \`npm run test:snapshots\` for any added, modified, or deleted tool.
+            - If fixtures need to change, regenerate them with \`npm run test:snapshots:update\` and review the diff.
+            - Add, update, or remove the matching MCP, CLI, and JSON fixtures for the changed tool surface.
+            - Run \`npm run test:schema-fixtures\` after changing structured output schemas or JSON fixtures.
+            - Keep tool manifests, workflow manifests, output schemas, structured content, generated docs, and fixtures aligned.
+            - If you changed tool metadata, run \`npm run docs:update\` and \`npm run docs:check\`.
+
+            Snapshot tests are intentionally not a required PR gate because they are slow and environment-sensitive. This reminder exists so contributors know when they need to run them locally for tool additions, changes, and removals.`;
+
+            const normalizedBody = body
+              .split('\n')
+              .map((line) => line.trimStart())
+              .join('\n');
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body: normalizedBody,
+              });
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body: normalizedBody,
+            });

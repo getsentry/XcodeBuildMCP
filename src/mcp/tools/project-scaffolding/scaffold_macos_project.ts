@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { join, dirname, basename } from 'node:path';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { ValidationError } from '../../../utils/errors.ts';
 import { TemplateManager } from '../../../utils/template/index.ts';
@@ -320,8 +320,8 @@ type ScaffoldMacOSProjectResult = ReturnType<typeof createScaffoldDomainResult>;
 export function createScaffoldMacOSProjectExecutor(
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
-): ToolExecutor<ScaffoldMacOSProjectParams, ScaffoldMacOSProjectResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<ScaffoldMacOSProjectParams, ScaffoldMacOSProjectResult> {
+  return async (params) => {
     try {
       const projectParams = { ...params, platform: 'macOS' as const };
       const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
@@ -360,9 +360,7 @@ export async function scaffold_macos_projectLogic(
     commandExecutor,
     fileSystemExecutor,
   );
-  const result = await executeScaffoldMacOSProject(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeScaffoldMacOSProject(params);
 
   setScaffoldStructuredOutput(ctx, result);
 

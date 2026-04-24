@@ -18,9 +18,9 @@ import { type TestPreflightResult } from './test-preflight.ts';
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
 
 import type { BuildTarget, TestResultDomainResult } from '../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../types/tool-execution.ts';
+import type { BuildInvocationRequest } from '../types/domain-fragments.ts';
+import type { StreamingExecutor } from '../types/tool-execution.ts';
 import {
-  createToolExecutionContext,
   createDomainStreamingPipeline,
   createTestDiscoveryFragment,
   createTestDomainResult,
@@ -81,12 +81,13 @@ export interface SharedTestExecutorOptions {
   preflight?: TestPreflightResult;
   toolName?: string;
   target?: BuildTarget;
+  request: BuildInvocationRequest;
 }
 
 export function createTestExecutor(
   executor: CommandExecutor = getDefaultCommandExecutor(),
-  options?: SharedTestExecutorOptions,
-): DomainStreamingExecutor<SharedTestExecutorParams, TestResultDomainResult> {
+  options: SharedTestExecutorOptions,
+): StreamingExecutor<SharedTestExecutorParams, TestResultDomainResult> {
   return async (params, ctx) => {
     log(
       'info',
@@ -97,9 +98,9 @@ export function createTestExecutor(
       ? { env: normalizeTestRunnerEnv(params.testRunnerEnv) }
       : undefined;
     const shouldUseTwoPhaseSimulatorExecution =
-      String(params.platform).includes('Simulator') && Boolean(options?.preflight);
-    const toolName = options?.toolName ?? 'test_sim';
-    const target = options?.target ?? getBuildTarget(params.platform);
+      String(params.platform).includes('Simulator') && Boolean(options.preflight);
+    const toolName = options.toolName ?? 'test_sim';
+    const target = options.target ?? getBuildTarget(params.platform);
     const started = createDomainStreamingPipeline(toolName, 'TEST', ctx, 'test-result');
     const platformOptions = {
       platform: params.platform,
@@ -110,7 +111,7 @@ export function createTestExecutor(
       packageCachePath: params.packageCachePath,
       logPrefix: 'Test Run',
     };
-    const discoveryEvent = createTestDiscoveryFragment(options?.preflight);
+    const discoveryEvent = createTestDiscoveryFragment(options.preflight);
 
     if (discoveryEvent) {
       started.pipeline.emitFragment(discoveryEvent);
@@ -120,7 +121,7 @@ export function createTestExecutor(
       if (shouldUseTwoPhaseSimulatorExecution) {
         const executionPlan = createSimulatorTwoPhaseExecutionPlan({
           extraArgs: params.extraArgs,
-          preflight: options?.preflight,
+          preflight: options.preflight,
           resultBundlePath: undefined,
         });
 
@@ -147,7 +148,8 @@ export function createTestExecutor(
               started.stderrLines,
               buildForTestingResult.content,
             ),
-            preflight: options?.preflight,
+            preflight: options.preflight,
+            request: options.request,
           });
         }
 
@@ -175,7 +177,8 @@ export function createTestExecutor(
             started.stderrLines,
             testWithoutBuildingResult.content,
           ),
-          preflight: options?.preflight,
+          preflight: options.preflight,
+          request: options.request,
         });
       }
 
@@ -203,7 +206,8 @@ export function createTestExecutor(
           started.stderrLines,
           singlePhaseResult.content,
         ),
-        preflight: options?.preflight,
+        preflight: options.preflight,
+        request: options.request,
       });
     } catch (error) {
       const errorMessage = toErrorMessage(error);
@@ -218,7 +222,8 @@ export function createTestExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [...started.stderrLines, errorMessage],
-        preflight: options?.preflight,
+        preflight: options.preflight,
+        request: options.request,
       });
     }
   };

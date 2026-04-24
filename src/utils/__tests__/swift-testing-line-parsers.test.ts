@@ -187,6 +187,17 @@ describe('Swift Testing line parsers', () => {
       });
     });
 
+    it('preserves the full raw line when an issue line has an unknown shape', () => {
+      const line =
+        '✘ Test "Parameterized failure" recorded an issue with 1 argument value → key:value: opaque failure';
+
+      expect(parseSwiftTestingIssueLine(line)).toEqual({
+        rawTestName: 'Parameterized failure',
+        testName: 'Parameterized failure',
+        message: line,
+      });
+    });
+
     it('should return null for non-matching lines', () => {
       expect(parseSwiftTestingIssueLine('✘ Test "Foo" failed after 0.001 seconds')).toBeNull();
     });

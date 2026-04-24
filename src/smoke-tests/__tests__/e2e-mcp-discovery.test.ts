@@ -1,8 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createMcpTestHarness, type McpTestHarness } from '../mcp-test-harness.ts';
 import { loadManifest } from '../../core/manifest/load-manifest.ts';
+import { getMcpOutputSchema } from '../../core/structured-output-schema.ts';
 
 let harness: McpTestHarness;
+
+const COMMON_DEFS_REF =
+  'https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json';
+
+function expectSelfContainedOutputSchema(outputSchema: unknown): void {
+  expect(outputSchema).toBeDefined();
+  expect(JSON.stringify(outputSchema)).not.toContain(COMMON_DEFS_REF);
+}
 
 beforeAll(async () => {
   harness = await createMcpTestHarness();
@@ -45,6 +54,58 @@ describe('MCP Discovery (e2e)', () => {
       expect(tool.inputSchema).toBeDefined();
       expect(tool.inputSchema.type).toBe('object');
     }
+  });
+
+  it('representative native tools advertise self-contained output schemas', async () => {
+    const result = await harness.client.listTools();
+    const expectedSchemas = new Map([
+      ['list_sims', 'xcodebuildmcp.output.simulator-list'],
+      ['build_sim', 'xcodebuildmcp.output.build-result'],
+      ['session_show_defaults', 'xcodebuildmcp.output.session-defaults'],
+      ['show_build_settings', 'xcodebuildmcp.output.build-settings'],
+    ]);
+
+    for (const [toolName, schemaName] of expectedSchemas) {
+      const tool = result.tools.find((candidate) => candidate.name === toolName);
+      expect(tool).toBeDefined();
+      expectSelfContainedOutputSchema(tool!.outputSchema);
+      expect(tool!.outputSchema).toEqual(getMcpOutputSchema({ schema: schemaName, version: '1' }));
+    }
+
+    const listSims = result.tools.find((tool) => tool.name === 'list_sims');
+    expect(listSims?.outputSchema?.$defs).toBeDefined();
+  });
+
+  it('every registered manifest tool with output metadata advertises an output schema', async () => {
+    const result = await harness.client.listTools();
+    const registeredTools = new Map(result.tools.map((tool) => [tool.name, tool]));
+    const manifest = loadManifest();
+    const failures: string[] = [];
+
+    for (const tool of manifest.tools.values()) {
+      const registeredTool = registeredTools.get(tool.names.mcp);
+      if (!registeredTool || !tool.outputSchema) {
+        continue;
+      }
+
+      if (!registeredTool.outputSchema) {
+        failures.push(`${tool.names.mcp}: missing outputSchema`);
+        continue;
+      }
+
+      const serialized = JSON.stringify(registeredTool.outputSchema);
+      if (serialized.includes(COMMON_DEFS_REF)) {
+        failures.push(`${tool.names.mcp}: outputSchema contains external common refs`);
+      }
+      if (
+        registeredTool.outputSchema.$id !==
+        `https://xcodebuildmcp.com/schemas/structured-output/${tool.outputSchema.schema}/${tool.outputSchema.version}.schema.json`
+      ) {
+        failures.push(`${tool.names.mcp}: outputSchema $id mismatch`);
+      }
+    }
+
+    expect(failures).toEqual([]);
   });
 
   it('every tool has a non-empty description', async () => {

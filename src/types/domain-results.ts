@@ -35,6 +35,7 @@ export interface ToolDomainResultBase {
   kind: string;
   didError: boolean;
   error: string | null;
+  diagnostics?: BasicDiagnostics;
 }
 export type AtLeastOne<T extends object> = {
   [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
@@ -452,6 +453,7 @@ export type BuildSettingsDomainResult = ToolDomainResultBase & {
 export type BundleIdDomainResult = ToolDomainResultBase & {
   kind: 'bundle-id';
   artifacts: { appPath: string; bundleId?: string };
+  diagnostics?: BasicDiagnostics;
 };
 export type CaptureResultDomainResult = ToolDomainResultBase & {
   kind: 'capture-result';

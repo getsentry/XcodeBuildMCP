@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DeviceListDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -10,6 +10,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const listDevicesSchema = z.object({});
 
@@ -22,7 +23,7 @@ const NEXT_STEP_PARAMS = {
 } as const;
 
 function isAvailableState(state: string): boolean {
-  return state === 'Available' || state === 'Connected';
+  return state === 'connected';
 }
 
 const PLATFORM_KEYWORDS: Array<{ keywords: string[]; label: string }> = [
@@ -100,14 +101,11 @@ function createDeviceListResult(devices: ListedDevice[]): ListDevicesResult {
 }
 
 function createDeviceListErrorResult(message: string): ListDevicesResult {
-  const normalizedMessage = message.startsWith('Failed to list devices:')
-    ? message
-    : `Failed to list devices: ${message}`;
-
   return {
     kind: 'device-list',
     didError: true,
-    error: normalizedMessage,
+    error: 'Failed to list devices.',
+    diagnostics: createBasicDiagnostics({ errors: [message] }),
     devices: [],
   };
 }
@@ -215,11 +213,11 @@ async function discoverDevices(
 
           let state: string;
           if (pairingState !== 'paired') {
-            state = 'Unpaired';
+            state = 'unpaired';
           } else if (hasDirectConnection) {
-            state = 'Available';
+            state = 'connected';
           } else {
-            state = 'Paired (not connected)';
+            state = 'disconnected';
           }
 
           devices.push({
@@ -299,7 +297,7 @@ export function createListDevicesExecutor(
     readFile?: (path: string, encoding?: string) => Promise<string>;
     unlink?: (path: string) => Promise<void>;
   },
-): ToolExecutor<ListDevicesParams, ListDevicesResult> {
+): NonStreamingExecutor<ListDevicesParams, ListDevicesResult> {
   return async (_params) => {
     try {
       const discovery = await discoverDevices(executor, pathDeps, fsDeps);
@@ -324,12 +322,7 @@ export async function list_devicesLogic(
 
   const ctx = getHandlerContext();
   const executeListDevices = createListDevicesExecutor(executor, pathDeps, fsDeps);
-  const result = await executeListDevices(
-    {},
-    {
-      liveProgressEnabled: false,
-    },
-  );
+  const result = await executeListDevices({});
 
   setStructuredOutput(ctx, result);
 

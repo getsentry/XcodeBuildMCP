@@ -77,7 +77,7 @@ describe('xcodebuild-pipeline', () => {
       structuredOutput,
     });
     expect(text).toContain('Test');
-    expect(text).toContain('Resolving packages');
+    expect(text).not.toContain('Resolving packages');
 
     expect(emittedEvents.length).toBeGreaterThan(0);
     const fragmentTypes = emittedEvents.map((e) => e.fragment);

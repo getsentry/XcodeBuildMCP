@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -65,9 +65,7 @@ export async function launch_app_simLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeLaunchAppSim = createLaunchAppSimExecutor(executor, launcher);
-  const result = await executeLaunchAppSim(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeLaunchAppSim(params);
 
   setLaunchResultStructuredOutput(ctx, result);
 
@@ -101,7 +99,7 @@ function buildSuccessArtifacts(
 export function createLaunchAppSimExecutor(
   executor: CommandExecutor,
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
-): ToolExecutor<LaunchAppSimParams, LaunchAppSimResult> {
+): NonStreamingExecutor<LaunchAppSimParams, LaunchAppSimResult> {
   return async (params) => {
     log('info', `Starting xcrun simctl launch request for simulator ${params.simulatorId}`);
 

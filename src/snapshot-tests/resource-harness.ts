@@ -13,15 +13,7 @@ const PROCESS_TREE_LINE_REGEX = /^ {2}\d+ \(ppid \d+\): .+$/gm;
 const ARGV_LINE_REGEX = /^( {2,}argv:) .+$/gm;
 const EXEC_PATH_LINE_REGEX = /^( {2,}execPath:) .+$/gm;
 const NVM_PATH_LINE_REGEX = /\/\.nvm\/versions\/node\/v[\d.]+\/bin/g;
-const NODE_MODULES_PATH_LINE_REGEX = /^ {2,}\/.*node_modules.*$\n?/gm;
-const NODE_GYP_BIN_PATH_LINE_REGEX = /^ {2,}\/.*node-gyp-bin$\n?/gm;
-const COLLAPSED_PROCESS_TREE_REGEX = /( {3}<PID> \(ppid <PID>\): <PROCESS>\n)+/g;
 const DEVICE_CONNECTION_STATUS_REGEX = /\[✓\]|\[✗\]/g;
-const MCP_RESOURCE_ENV_LINE_REGEX = /^ {2}XCODEBUILDMCP_(ENABLED_WORKFLOWS|RUNTIME):.*$\n?/gm;
-const RUNTIME_TOOL_REGISTRATION_SECTION_REGEX =
-  /Runtime Tool Registration\n[\s\S]*?\n(?=Xcode IDE Bridge \(mcpbridge\))/g;
-const RUNTIME_TOOL_REGISTRATION_PLACEHOLDER =
-  'Runtime Tool Registration\n  Enabled Workflows: 0\n  Registered Tools: 0\n  Note: Runtime registry unavailable.\n\n';
 
 function normalizeResourceOutput(text: string): string {
   let normalized = normalizeSnapshotOutput(text);
@@ -29,21 +21,10 @@ function normalizeResourceOutput(text: string): string {
   normalized = normalized.replace(PROCESS_RSS_BYTES_REGEX, '"rssBytes": <BYTES>');
   normalized = normalized.replace(PROCESS_HEAP_BYTES_REGEX, '"heapUsedBytes": <BYTES>');
   normalized = normalized.replace(PROCESS_TREE_LINE_REGEX, '   <PID> (ppid <PID>): <PROCESS>');
-  normalized = normalized.replace(
-    COLLAPSED_PROCESS_TREE_REGEX,
-    '   <PID> (ppid <PID>): <PROCESS>\n',
-  );
   normalized = normalized.replace(NVM_PATH_LINE_REGEX, '/.nvm/versions/node/<NODE_VERSION>/bin');
   normalized = normalized.replace(ARGV_LINE_REGEX, '$1 <ARGV>');
   normalized = normalized.replace(EXEC_PATH_LINE_REGEX, '$1 <EXEC_PATH>');
-  normalized = normalized.replace(NODE_MODULES_PATH_LINE_REGEX, '');
-  normalized = normalized.replace(NODE_GYP_BIN_PATH_LINE_REGEX, '');
   normalized = normalized.replace(DEVICE_CONNECTION_STATUS_REGEX, '[<STATUS>]');
-  normalized = normalized.replace(MCP_RESOURCE_ENV_LINE_REGEX, '');
-  normalized = normalized.replace(
-    RUNTIME_TOOL_REGISTRATION_SECTION_REGEX,
-    RUNTIME_TOOL_REGISTRATION_PLACEHOLDER,
-  );
   return normalized;
 }
 

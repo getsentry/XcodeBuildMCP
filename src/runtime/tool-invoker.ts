@@ -463,13 +463,11 @@ export class DefaultToolInvoker implements ToolInvoker {
 
             const ctx: ToolHandlerContext = {
               liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
+              streamingFragmentsEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
               emit: (fragment) => {
                 opts.renderSession!.emit(fragment);
               },
               attach: (image) => opts.renderSession!.attach(image),
-              ...(opts.handlerContext?.liveProgressEnabled === true
-                ? { emitLiveFragment: (fragment) => opts.renderSession!.emit(fragment) }
-                : {}),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
             };
@@ -511,13 +509,11 @@ export class DefaultToolInvoker implements ToolInvoker {
 
             const ctx: ToolHandlerContext = {
               liveProgressEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
+              streamingFragmentsEnabled: opts.handlerContext?.liveProgressEnabled ?? false,
               emit: (fragment) => {
                 session.emit(fragment);
               },
               attach: (image) => session.attach(image),
-              ...(opts.handlerContext?.liveProgressEnabled === true
-                ? { emitLiveFragment: (fragment) => session.emit(fragment) }
-                : {}),
               nextStepParams: daemonResult.nextStepParams,
               nextSteps: daemonResult.nextSteps,
               structuredOutput: daemonResult.structuredOutput ?? undefined,
@@ -539,19 +535,13 @@ export class DefaultToolInvoker implements ToolInvoker {
     try {
       const ctx: ToolHandlerContext = opts.handlerContext ?? {
         liveProgressEnabled: false,
+        streamingFragmentsEnabled: false,
         emit: (fragment) => {
           session.emit(fragment);
           opts.onProgress?.(fragment);
         },
         attach: (image) => {
           session.attach(image);
-        },
-        emitLiveFragment: (fragment) => {
-          if (!ctx.liveProgressEnabled) {
-            return;
-          }
-          session.emit(fragment);
-          opts.onProgress?.(fragment);
         },
       };
 

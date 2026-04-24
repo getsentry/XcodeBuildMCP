@@ -54,6 +54,15 @@ export const toolNamesSchema = z.object({
 
 export type ToolNames = z.infer<typeof toolNamesSchema>;
 
+export const outputSchemaMetadataSchema = z
+  .object({
+    schema: z.string().regex(/^xcodebuildmcp\.output\.[a-z0-9-]+$/),
+    version: z.string().regex(/^[0-9]+$/),
+  })
+  .strict();
+
+export type OutputSchemaMetadata = z.infer<typeof outputSchemaMetadataSchema>;
+
 /**
  * Static next-step template declared on a tool manifest.
  */
@@ -100,6 +109,9 @@ export const toolManifestEntrySchema = z.object({
 
   /** MCP annotations (hints for clients) */
   annotations: annotationsSchema.optional(),
+
+  /** Structured output schema advertised to MCP clients */
+  outputSchema: outputSchemaMetadataSchema.optional(),
 
   /** Static next-step templates for this tool */
   nextSteps: z.array(manifestNextStepTemplateSchema).default([]),

@@ -4,6 +4,9 @@ names:
   mcp: swift_package_build
   cli: build
 description: swift package target build.
+outputSchema:
+  schema: xcodebuildmcp.output.build-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

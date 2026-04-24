@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
@@ -22,11 +22,23 @@ import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/sche
 import {
   collectFallbackErrorMessages,
   createBuildDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+
+function createBuildDeviceRequest(params: BuildDeviceParams): BuildInvocationRequest {
+  return {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: params.configuration ?? 'Debug',
+    platform: 'iOS',
+    target: 'device',
+  };
+}
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -57,7 +69,7 @@ const publicSchemaObject = baseSchemaObject.omit({
 
 export function createBuildDeviceExecutor(
   executor: CommandExecutor,
-): DomainStreamingExecutor<BuildDeviceParams, BuildDeviceResult> {
+): StreamingExecutor<BuildDeviceParams, BuildDeviceResult> {
   return async (params, ctx) => {
     const processedParams = {
       ...params,
@@ -86,6 +98,7 @@ export function createBuildDeviceExecutor(
         buildLogPath: started.pipeline.logPath,
       },
       fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+      request: createBuildDeviceRequest(params),
     });
   };
 }
@@ -95,28 +108,14 @@ export async function buildDeviceLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const configuration = params.configuration ?? 'Debug';
+  const invocationRequest = createBuildDeviceRequest(params);
 
-  const invocationRequest: BuildInvocationRequest = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration,
-    platform: 'iOS',
-    target: 'device',
-  };
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'BUILD',
-    invocationRequest,
-    'build-result',
-  );
+  ctx.emit(createBuildInvocationFragment('build-result', 'BUILD', invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildDevice = createBuildDeviceExecutor(executor);
   const result = await executeBuildDevice(params, executionContext);
-  result.request = invocationRequest;
 
   setXcodebuildStructuredOutput(ctx, 'build-result', result);
-  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = {

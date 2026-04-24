@@ -4,6 +4,9 @@ names:
   mcp: debug_breakpoint_remove
   cli: remove-breakpoint
 description: Remove breakpoint.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-breakpoint-result
+  version: "1"
 routing:
   stateful: true
 annotations:

@@ -8,7 +8,7 @@
 
 import * as z from 'zod';
 import type { AppPathDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -92,7 +92,7 @@ function createRequest(params: GetSimulatorAppPathParams) {
 
 export function createGetSimAppPathExecutor(
   executor: CommandExecutor,
-): ToolExecutor<GetSimulatorAppPathParams, AppPathDomainResult> {
+): NonStreamingExecutor<GetSimulatorAppPathParams, AppPathDomainResult> {
   return async (params) => {
     const configuration = params.configuration ?? 'Debug';
     const useLatestOS = params.useLatestOS ?? true;
@@ -136,7 +136,7 @@ export function createGetSimAppPathExecutor(
         toErrorMessage(error),
         createRequest(params),
         'simulator',
-        'Failed to get app path',
+        'Failed to get app path.',
       );
     }
   };
@@ -151,9 +151,7 @@ export async function get_sim_app_pathLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeGetSimAppPath = createGetSimAppPathExecutor(executor);
-  const result = await executeGetSimAppPath(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetSimAppPath(params);
 
   setAppPathStructuredOutput(ctx, result);
 

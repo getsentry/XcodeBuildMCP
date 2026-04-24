@@ -4,6 +4,9 @@ names:
   mcp: test_device
   cli: test
 description: Test on device.
+outputSchema:
+  schema: xcodebuildmcp.output.test-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

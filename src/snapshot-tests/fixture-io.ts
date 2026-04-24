@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect } from 'vitest';
-import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 import type { FixtureKey, SnapshotRuntime } from './contracts.ts';
-import { normalizeStructuredEnvelope } from './json-normalize.ts';
 
 const FIXTURES_DIR = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
 
@@ -27,150 +24,131 @@ export function fixturePathFor(key: FixtureKey): string {
   return path.join(FIXTURES_DIR, key.runtime, key.workflow, `${key.scenario}.txt`);
 }
 
-function arrayItemIdentity(value: unknown): string | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
+const ANSI = {
+  reset: '\u001B[0m',
+  dim: '\u001B[2m',
+  red: '\u001B[31m',
+  green: '\u001B[32m',
+  redBg: '\u001B[97;41m',
+  greenBg: '\u001B[30;42m',
+  redLineBg: '\u001B[30;101m',
+  greenLineBg: '\u001B[30;102m',
+} as const;
 
-  if ('key' in value && typeof value.key === 'string') {
-    return `key:${value.key}`;
-  }
-
-  if ('name' in value && typeof value.name === 'string' && 'line' in value) {
-    return `name:${value.name}|line:${String(value.line)}`;
-  }
-
-  if ('suite' in value && typeof value.suite === 'string' && 'test' in value) {
-    return `suite:${value.suite}|test:${String(value.test)}`;
-  }
-
-  if ('path' in value && typeof value.path === 'string') {
-    return `path:${value.path}`;
-  }
-
-  return null;
+function supportsAnsiColors(): boolean {
+  return Boolean(process.stdout?.isTTY && process.env.NO_COLOR === undefined);
 }
 
-function stringsEquivalent(actual: string, expected: string, pathParts: string[]): boolean {
-  if (actual === expected) {
-    return true;
+function colorize(text: string, code: string): string {
+  if (!supportsAnsiColors() || text.length === 0) {
+    return text;
   }
 
-  if (expected === '<PATH>') {
-    return true;
-  }
-
-  const key = pathParts.at(-1);
-  if (key === 'error') {
-    if (actual.startsWith(expected)) {
-      return true;
-    }
-
-    if (expected === 'Query failed' && actual.startsWith('Failed to get app path:')) {
-      return true;
-    }
-
-    if (expected === 'Failed to get app path' && actual.startsWith('Failed to get app path:')) {
-      return true;
-    }
-
-    if (actual.includes(expected)) {
-      return true;
-    }
-  }
-
-  return false;
+  return `${code}${text}${ANSI.reset}`;
 }
 
-function shouldLooselyMatchNumber(pathParts: string[]): boolean {
-  return (
-    pathParts.includes('counts') ||
-    pathParts.at(-1)?.endsWith('Count') === true ||
-    pathParts.at(-1) === 'total'
-  );
+function findCommonPrefixLength(left: string, right: string): number {
+  let index = 0;
+  while (index < left.length && index < right.length && left[index] === right[index]) {
+    index += 1;
+  }
+  return index;
 }
 
-function expectJsonSubsetMatch(actual: unknown, expected: unknown, pathParts: string[] = []): void {
-  if (
-    expected === null ||
-    typeof expected === 'string' ||
-    typeof expected === 'number' ||
-    typeof expected === 'boolean'
+function findCommonSuffixLength(left: string, right: string, prefixLength: number): number {
+  let index = 0;
+  const leftMax = left.length - prefixLength;
+  const rightMax = right.length - prefixLength;
+  while (
+    index < leftMax &&
+    index < rightMax &&
+    left[left.length - 1 - index] === right[right.length - 1 - index]
   ) {
-    if (typeof expected === 'string' && typeof actual === 'string') {
-      expect(stringsEquivalent(actual, expected, pathParts)).toBe(true);
-      return;
-    }
-
-    if (
-      typeof expected === 'number' &&
-      typeof actual === 'number' &&
-      shouldLooselyMatchNumber(pathParts)
-    ) {
-      expect(actual).toBeGreaterThanOrEqual(0);
-      return;
-    }
-
-    expect(actual).toEqual(expected);
-    return;
+    index += 1;
   }
-
-  if (Array.isArray(expected)) {
-    expect(Array.isArray(actual)).toBe(true);
-    const actualArray = actual as unknown[];
-
-    if (expected.length === 0) {
-      return;
-    }
-
-    const expectedIdentities = expected.map(arrayItemIdentity);
-    if (expectedIdentities.every((identity) => identity !== null)) {
-      const actualByIdentity = new Map<string, unknown>();
-      for (const item of actualArray) {
-        const identity = arrayItemIdentity(item);
-        if (identity) {
-          actualByIdentity.set(identity, item);
-        }
-      }
-
-      expected.forEach((expectedItem, index) => {
-        const identity = expectedIdentities[index]!;
-        expect(actualByIdentity.has(identity)).toBe(true);
-        expectJsonSubsetMatch(actualByIdentity.get(identity), expectedItem, [
-          ...pathParts,
-          identity,
-        ]);
-      });
-      return;
-    }
-
-    expect(actualArray.length).toBeGreaterThanOrEqual(expected.length);
-    expected.forEach((expectedItem, index) => {
-      expectJsonSubsetMatch(actualArray[index], expectedItem, [...pathParts, String(index)]);
-    });
-    return;
-  }
-
-  expect(actual && typeof actual === 'object' && !Array.isArray(actual)).toBe(true);
-  const actualObject = actual as Record<string, unknown>;
-  const expectedObject = expected as Record<string, unknown>;
-
-  for (const [key, expectedValue] of Object.entries(expectedObject)) {
-    expect(actualObject).toHaveProperty(key);
-    expectJsonSubsetMatch(actualObject[key], expectedValue, [...pathParts, key]);
-  }
+  return index;
 }
 
-function expectMatchesJsonFixture(actual: string, fixturePath: string): void {
-  const expected = fs.readFileSync(fixturePath, 'utf8');
-  const actualEnvelope = normalizeStructuredEnvelope(
-    JSON.parse(actual) as StructuredOutputEnvelope<unknown>,
-  );
-  const expectedEnvelope = normalizeStructuredEnvelope(
-    JSON.parse(expected) as StructuredOutputEnvelope<unknown>,
-  );
+function formatInlineDiffLine(prefix: '-' | '+', value: string, otherValue: string): string {
+  const commonPrefix = findCommonPrefixLength(value, otherValue);
+  const commonSuffix = findCommonSuffixLength(value, otherValue, commonPrefix);
+  const start = value.slice(0, commonPrefix);
+  const changed = value.slice(commonPrefix, value.length - commonSuffix);
+  const end = value.slice(value.length - commonSuffix);
+  const lineColor = prefix === '-' ? ANSI.red : ANSI.green;
+  const changeColor = prefix === '-' ? ANSI.redBg : ANSI.greenBg;
 
-  expectJsonSubsetMatch(actualEnvelope, expectedEnvelope);
+  return `${colorize(prefix, lineColor)} ${colorize(start, ANSI.dim)}${colorize(changed, changeColor)}${colorize(end, ANSI.dim)}`;
+}
+
+function formatMultilineDiff(label: string, expected: string, actual: string): string {
+  const expectedLines = expected.split('\n');
+  const actualLines = actual.split('\n');
+  const maxLength = Math.max(expectedLines.length, actualLines.length);
+
+  let firstDiff = 0;
+  while (firstDiff < maxLength && expectedLines[firstDiff] === actualLines[firstDiff]) {
+    firstDiff += 1;
+  }
+
+  let suffixLength = 0;
+  while (
+    suffixLength < maxLength - firstDiff &&
+    expectedLines[expectedLines.length - 1 - suffixLength] ===
+      actualLines[actualLines.length - 1 - suffixLength]
+  ) {
+    suffixLength += 1;
+  }
+
+  const contextStart = Math.max(0, firstDiff - 2);
+  const contextEnd = Math.min(maxLength, firstDiff + 3);
+  const lines: string[] = [label, ''];
+
+  for (let index = contextStart; index < contextEnd; index += 1) {
+    const expectedLine = expectedLines[index];
+    const actualLine = actualLines[index];
+    const lineNumber = String(index + 1).padStart(4, ' ');
+
+    if (expectedLine === actualLine) {
+      lines.push(colorize(` ${lineNumber} ${expectedLine ?? ''}`, ANSI.dim));
+      continue;
+    }
+
+    if (expectedLine !== undefined) {
+      lines.push(
+        `${colorize('-', ANSI.red)}${colorize(` ${lineNumber} `, ANSI.dim)}${formatInlineDiffLine('-', expectedLine, actualLine ?? '').slice(2)}`,
+      );
+    }
+
+    if (actualLine !== undefined) {
+      lines.push(
+        `${colorize('+', ANSI.green)}${colorize(` ${lineNumber} `, ANSI.dim)}${formatInlineDiffLine('+', actualLine, expectedLine ?? '').slice(2)}`,
+      );
+    }
+  }
+
+  if (contextEnd < maxLength) {
+    lines.push(colorize(' …', ANSI.dim));
+  }
+
+  return lines.join('\n');
+}
+
+function formatFixtureDiff(label: string, expected: string, actual: string): string {
+  if (expected.includes('\n') || actual.includes('\n')) {
+    return formatMultilineDiff(label, expected, actual);
+  }
+
+  return [
+    label,
+    '',
+    formatInlineDiffLine('-', expected, actual),
+    formatInlineDiffLine('+', actual, expected),
+  ].join('\n');
+}
+
+function throwFixtureDiff(label: string, expected: string, actual: string): never {
+  throw new Error(formatFixtureDiff(label, expected, actual));
 }
 
 export function expectMatchesFixture(
@@ -194,13 +172,15 @@ export function expectMatchesFixture(
     );
   }
 
-  if (key.runtime === 'json') {
-    expectMatchesJsonFixture(actual, fixturePath);
-    return;
-  }
-
   const expected = fs.readFileSync(fixturePath, 'utf8');
-  expect(actual).toBe(expected);
+
+  if (actual !== expected) {
+    throwFixtureDiff(
+      `Fixture mismatch at ${path.relative(process.cwd(), fixturePath)}`,
+      expected,
+      actual,
+    );
+  }
 }
 
 export function createFixtureMatcher(

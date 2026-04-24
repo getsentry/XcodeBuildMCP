@@ -1,22 +1,17 @@
-import type { ToolDomainResult } from '../../types/domain-results.js';
-import type { DomainFragment } from '../../types/domain-fragments.js';
-import type {
-  ToolAttachment,
-  DomainStreamingExecutionContext,
-} from '../../types/tool-execution.js';
+import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { ToolAttachment, StreamingExecutionContext } from '../../types/tool-execution.ts';
 
-export interface DefaultToolExecutionContextOptions {
+export interface StreamingExecutionContextOptions {
   liveProgressEnabled?: boolean;
   onFragment?: (fragment: DomainFragment) => void;
 }
 
-export class DefaultToolExecutionContext implements DomainStreamingExecutionContext {
+export class DefaultStreamingExecutionContext implements StreamingExecutionContext {
   readonly liveProgressEnabled: boolean;
   private readonly attachments: ToolAttachment[] = [];
   private readonly fragmentCallback?: (fragment: DomainFragment) => void;
-  private result?: ToolDomainResult;
 
-  constructor(options: DefaultToolExecutionContextOptions = {}) {
+  constructor(options: StreamingExecutionContextOptions = {}) {
     this.liveProgressEnabled = options.liveProgressEnabled ?? true;
     this.fragmentCallback = options.onFragment;
   }
@@ -29,15 +24,7 @@ export class DefaultToolExecutionContext implements DomainStreamingExecutionCont
     this.fragmentCallback?.(fragment);
   }
 
-  emitResult(result: ToolDomainResult): void {
-    this.result = result;
-  }
-
   getAttachments(): readonly ToolAttachment[] {
     return [...this.attachments];
-  }
-
-  getResult(): ToolDomainResult | undefined {
-    return this.result;
   }
 }

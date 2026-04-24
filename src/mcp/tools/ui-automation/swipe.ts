@@ -21,7 +21,7 @@ import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -29,7 +29,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const swipeSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -66,11 +65,12 @@ export function createSwipeExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<SwipeParams, SwipeResult> {
+): NonStreamingExecutor<SwipeParams, SwipeResult> {
   return async (params) => {
     const toolName = 'swipe';
     const { simulatorId, x1, y1, x2, y2, duration, delta, preDelay, postDelay } = params;
-    const action = {
+    const baseAction = { type: 'swipe' as const };
+    const fullAction = {
       type: 'swipe' as const,
       from: { x: x1, y: y1 },
       to: { x: x2, y: y2 },
@@ -83,7 +83,7 @@ export function createSwipeExecutor(
       toolName,
     });
     if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      return createUiActionFailureResult(baseAction, simulatorId, guard.blockedMessage);
     }
 
     const commandArgs = [
@@ -119,16 +119,16 @@ export function createSwipeExecutor(
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [
+      return createUiActionSuccessResult(fullAction, simulatorId, [
         guard.warningText,
         getSnapshotUiWarning(simulatorId),
       ]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) => `Failed to simulate swipe: ${axeError.message}`,
+        axeFailureMessage: () => 'Failed to simulate swipe.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
+      return createUiActionFailureResult(baseAction, simulatorId, failure.message, {
         details: failure.diagnostics?.errors.map((entry) => entry.message),
       });
     }
@@ -143,7 +143,7 @@ export async function swipeLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSwipe = createSwipeExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeSwipe(params, noopToolExecutionContext);
+  const result = await executeSwipe(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

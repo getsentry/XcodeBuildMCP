@@ -4,6 +4,9 @@ names:
   mcp: build_macos
   cli: build
 description: Build macOS app.
+outputSchema:
+  schema: xcodebuildmcp.output.build-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

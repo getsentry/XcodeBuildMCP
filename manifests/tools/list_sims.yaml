@@ -4,6 +4,9 @@ names:
   mcp: list_sims
   cli: list
 description: List iOS simulators.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-list
+  version: "1"
 annotations:
   title: List Simulators
   readOnlyHint: true

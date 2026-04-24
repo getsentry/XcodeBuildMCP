@@ -9,82 +9,20 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
   const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
   let result = normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
 
-  if ((key === 'message' || key === 'error') && result.startsWith('Error: CLIError(')) {
-    result = result.slice('Error: '.length);
+  if (key === 'AXFrame') {
+    // Round embedded floats to 1 decimal place for rounding-stable comparison with
+    // the sibling `frame` object. e.g. 82.666664123535156 -> 82.7, 250.5 stays 250.5.
+    result = result.replace(/(\d+)\.(\d{2,})/g, (_full, intPart: string, fracPart: string) => {
+      const value = parseFloat(`${intPart}.${fracPart}`);
+      return (Math.round(value * 10) / 10).toString();
+    });
   }
 
-  if ((key === 'message' || key === 'error') && result.startsWith('Error: Error Domain=')) {
-    result = result.slice('Error: '.length);
-  }
-
-  if (result.includes('Error Domain=XCCovErrorDomain Code=0 "Failed to load result bundle"')) {
-    if (key === 'message') {
-      return 'Error Domain=XCCovErrorDomain Code=0 "Failed to load result bundle"';
-    }
-
-    if (key === 'error') {
-      if (result.startsWith('Failed to get coverage report:')) {
-        return 'Failed to get coverage report: Failed to load result bundle';
-      }
-
-      if (result.startsWith('Failed to get file coverage:')) {
-        return 'Failed to get file coverage: Failed to load result bundle';
-      }
-    }
-  }
-
-  if (key === 'error' && result.includes('xcodebuild: error:')) {
-    result = result.slice(result.indexOf('xcodebuild: error:'));
-  }
-
-  if (
-    key === 'sourceFilePath' ||
-    key === 'workspaceRoot' ||
-    key === 'scanPath' ||
-    key === 'executablePath' ||
-    key === 'location'
-  ) {
-    result = result.replace(/^<ROOT>\//, '');
-  }
-
-  if (key === 'state' && path.includes('devices')) {
-    if (result === 'Available') {
-      return 'connected';
-    }
-
-    if (result === 'Paired (not connected)') {
-      return 'disconnected';
-    }
-  }
-
+  // Simulator state (e.g. 'Booted' | 'Shutdown') is inherently volatile across
+  // test runs — any previous test may have booted or shut down a simulator.
+  // Replace with a stable placeholder.
   if (key === 'state' && path.includes('simulators')) {
     return '<SIM_STATE>';
-  }
-
-  if (key === 'test' || path.includes('selected')) {
-    result = result.replace(/\(\)$/, '');
-  }
-
-  if (key === 'suite' && result === '(Unknown Suite)') {
-    result = 'Unknown Suite';
-  }
-
-  if (key === 'message' && result.startsWith('Expectation failed: Bool(false)')) {
-    result = 'Expectation failed: Bool(false)';
-  }
-
-  if (
-    key === 'message' &&
-    (result.includes('snapshot_ui has not been called yet') ||
-      result.includes(
-        'Failed to parse executable: Attempting to read past the size of the binary data',
-      ))
-  ) {
-    return '';
-  }
-
-  if (path.at(-2) === 'stderr' && /^Build of product '.+' complete!/.test(result)) {
-    return '';
   }
 
   return result;
@@ -114,11 +52,6 @@ function normalizeNumber(path: string[], key: string | undefined, value: number)
 function normalizeValue(value: unknown, path: string[] = []): unknown {
   const key = path.at(-1);
 
-  // Normalize volatile UI hierarchy content to a stable placeholder
-  if (key === 'uiHierarchy' && Array.isArray(value)) {
-    return [{ normalized: true, elementCount: value.length }];
-  }
-
   if (typeof value === 'string') {
     return normalizeString(value, key, path);
   }
@@ -128,9 +61,7 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value
-      .map((item, index) => normalizeValue(item, [...path, String(index)]))
-      .filter((item) => item !== '');
+    return value.map((item, index) => normalizeValue(item, [...path, String(index)]));
   }
 
   if (value && typeof value === 'object') {
@@ -139,123 +70,28 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
       normalizeValue(entryValue, [...path, entryKey]),
     ]);
 
-    if (
-      normalizedEntries.length === 1 &&
-      normalizedEntries[0]?.[0] === 'message' &&
-      normalizedEntries[0][1] === ''
-    ) {
-      return '';
-    }
-
     return Object.fromEntries(normalizedEntries);
   }
 
   return value;
 }
 
-function postProcessNormalizedEnvelope(
-  envelope: StructuredOutputEnvelope<unknown>,
-): StructuredOutputEnvelope<unknown> {
-  const normalizedEnvelope = envelope as StructuredOutputEnvelope<Record<string, unknown>>;
-  const data = normalizedEnvelope.data;
-
-  if (normalizedEnvelope.schema === 'xcodebuildmcp.output.debug-stack-result') {
-    const rawThreads = Array.isArray(data?.threads) ? (data.threads as unknown[]) : [];
-    const threads = rawThreads.map((thread) => {
-      if (!isRecord(thread)) {
-        return thread;
-      }
-
-      const rawFrames = Array.isArray(thread.frames) ? (thread.frames as unknown[]) : [];
-      const frames = rawFrames
-        .filter((frame): frame is Record<string, unknown> => {
-          if (!isRecord(frame)) {
-            return false;
-          }
-
-          return (
-            String(frame.displayLocation ?? '').includes('CalculatorApp.debug.dylib') ||
-            frame.symbol === 'main'
-          );
-        })
-        .slice(0, 2)
-        .map((frame, index) => ({ ...frame, index }));
-
-      return {
-        ...thread,
-        threadId: 1,
-        truncated: true,
-        frames,
-      };
-    });
-
-    return {
-      ...normalizedEnvelope,
-      data: {
-        ...data,
-        threads,
-      },
-    };
-  }
-
-  if (
-    normalizedEnvelope.didError &&
-    data &&
-    typeof data === 'object' &&
-    !('diagnostics' in data) &&
-    typeof normalizedEnvelope.error === 'string'
-  ) {
-    if (
-      normalizedEnvelope.schema === 'xcodebuildmcp.output.scheme-list' ||
-      normalizedEnvelope.schema === 'xcodebuildmcp.output.build-settings'
-    ) {
-      const errorMessage = normalizedEnvelope.error.includes('xcodebuild: error:')
-        ? normalizedEnvelope.error.slice(normalizedEnvelope.error.indexOf('xcodebuild: error:'))
-        : normalizedEnvelope.error;
-
-      return {
-        ...normalizedEnvelope,
-        data: {
-          ...data,
-          diagnostics: {
-            warnings: [],
-            errors: [{ message: errorMessage }],
-          },
-        },
-      };
-    }
-
-    if (normalizedEnvelope.schema === 'xcodebuildmcp.output.project-list') {
-      const errorMessage = normalizedEnvelope.error.includes('Error: ')
-        ? normalizedEnvelope.error.slice(normalizedEnvelope.error.lastIndexOf('Error: ') + 7)
-        : normalizedEnvelope.error;
-
-      return {
-        ...normalizedEnvelope,
-        data: {
-          ...data,
-          diagnostics: {
-            warnings: [],
-            errors: [{ message: errorMessage }],
-          },
-        },
-      };
-    }
-  }
-
-  return normalizedEnvelope;
-}
-
 export function normalizeStructuredEnvelope(
   envelope: StructuredOutputEnvelope<unknown>,
 ): StructuredOutputEnvelope<unknown> {
-  return postProcessNormalizedEnvelope(
-    normalizeValue(envelope) as StructuredOutputEnvelope<unknown>,
+  return normalizeValue(envelope) as StructuredOutputEnvelope<unknown>;
+}
+
+function compactFrameObjects(json: string): string {
+  return json.replace(
+    /"frame": \{\n\s+"x": (\d+(?:\.\d+)?),\n\s+"y": (\d+(?:\.\d+)?),\n\s+"width": (\d+(?:\.\d+)?),\n\s+"height": (\d+(?:\.\d+)?)\n\s+\}/g,
+    '"frame": { "x": $1, "y": $2, "width": $3, "height": $4 }',
   );
 }
 
 export function formatStructuredEnvelopeFixture(
   envelope: StructuredOutputEnvelope<unknown>,
 ): string {
-  return `${JSON.stringify(normalizeStructuredEnvelope(envelope), null, 2)}\n`;
+  const json = JSON.stringify(normalizeStructuredEnvelope(envelope), null, 2);
+  return `${compactFrameObjects(json)}\n`;
 }

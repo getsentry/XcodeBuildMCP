@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
-import { schema, handler, discover_projsLogic, discoverProjects } from '../discover_projs.ts';
+import {
+  schema,
+  handler,
+  discover_projsLogic,
+  discoverProjects,
+  createDiscoverProjectsExecutor,
+} from '../discover_projs.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
@@ -144,6 +150,26 @@ describe('discover_projs plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps discovery errors short and preserves access diagnostics', async () => {
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async () => {
+          throw new Error('ENOENT: no such file or directory');
+        },
+        readdir: async () => [],
+      });
+      const execute = createDiscoverProjectsExecutor(mockFileSystemExecutor);
+
+      const result = await execute({ workspaceRoot: '/workspace', scanPath: '.', maxDepth: 5 });
+
+      expect(result.error).toBe('Failed to discover projects.');
+      expect(result.diagnostics?.errors).toEqual([
+        {
+          message:
+            'Failed to access scan path: /workspace. Error: ENOENT: no such file or directory',
+        },
+      ]);
     });
 
     it('returns error when scan path is not a directory', async () => {

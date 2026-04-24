@@ -4,6 +4,9 @@ names:
   mcp: launch_mac_app
   cli: launch
 description: Launch macOS app.
+outputSchema:
+  schema: xcodebuildmcp.output.launch-result
+  version: "1"
 annotations:
   title: Launch macOS App
   readOnlyHint: false

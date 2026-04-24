@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { WorkflowSelectionDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor, type CommandExecutor } from '../../../utils/execution/index.ts';
@@ -55,7 +55,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ManageWorkflowsRes
   };
 }
 
-export function createManageWorkflowsExecutor(): ToolExecutor<
+export function createManageWorkflowsExecutor(): NonStreamingExecutor<
   ManageWorkflowsParams,
   ManageWorkflowsResult
 > {
@@ -96,9 +96,7 @@ export async function manage_workflowsLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeManageWorkflows = createManageWorkflowsExecutor();
-  const result = await executeManageWorkflows(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeManageWorkflows(params);
 
   setStructuredOutput(ctx, result);
 }

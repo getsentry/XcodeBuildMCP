@@ -171,6 +171,7 @@ export async function buildToolCatalogFromManifest(opts: {
         workflow: workflow.id,
         description: toolManifest.description,
         annotations: toolManifest.annotations,
+        outputSchema: toolManifest.outputSchema,
         nextStepTemplates: toolManifest.nextSteps,
         mcpSchema: toolModule.schema,
         cliSchema: toolModule.schema,

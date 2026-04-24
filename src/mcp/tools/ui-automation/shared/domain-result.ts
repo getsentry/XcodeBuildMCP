@@ -3,19 +3,15 @@ import type {
   BasicDiagnostics,
   CapturePayload,
   CaptureResultDomainResult,
-  DiagnosticEntry,
   UiAction,
   UiActionResultDomainResult,
 } from '../../../../types/domain-results.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
+import { createBasicDiagnostics } from '../../../../utils/diagnostics.ts';
 import { AxeError, DependencyError, SystemError } from '../../../../utils/errors.ts';
 
 const UI_ACTION_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
 const CAPTURE_SCHEMA = 'xcodebuildmcp.output.capture-result';
-
-function toDiagnosticEntries(messages: readonly string[]): DiagnosticEntry[] {
-  return messages.map((message) => ({ message }));
-}
 
 function createDiagnostics(
   warnings: readonly string[] = [],
@@ -25,10 +21,7 @@ function createDiagnostics(
     return undefined;
   }
 
-  return {
-    warnings: toDiagnosticEntries(warnings),
-    errors: toDiagnosticEntries(errors),
-  };
+  return createBasicDiagnostics({ warnings, errors });
 }
 
 function compact(values: Array<string | null | undefined>): string[] {
@@ -136,21 +129,21 @@ export function mapAxeCommandError(
   if (error instanceof AxeError) {
     return {
       message: messages.axeFailureMessage(error),
-      diagnostics: createDiagnostics([], compact([error.axeOutput])),
+      diagnostics: createDiagnostics([], compact([error.axeOutput || error.message])),
     };
   }
 
   if (error instanceof SystemError) {
     return {
-      message:
-        messages.systemFailureMessage?.(error) ?? `System error executing axe: ${error.message}`,
+      message: messages.systemFailureMessage?.(error) ?? 'System error executing axe command.',
+      diagnostics: createDiagnostics([], compact([error.message])),
     };
   }
 
   const message = error instanceof Error ? error.message : String(error);
   return {
-    message:
-      messages.unexpectedFailureMessage?.(message) ?? `An unexpected error occurred: ${message}`,
+    message: messages.unexpectedFailureMessage?.(message) ?? 'Unexpected UI automation failure.',
+    diagnostics: createDiagnostics([], compact([message])),
   };
 }
 

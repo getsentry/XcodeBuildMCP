@@ -4,6 +4,9 @@ names:
   mcp: touch
   cli: touch
 description: Touch down/up at coords.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Touch
   readOnlyHint: true

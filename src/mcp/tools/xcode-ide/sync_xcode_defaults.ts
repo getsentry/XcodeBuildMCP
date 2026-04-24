@@ -5,7 +5,7 @@ import type {
   SessionDefaultsDomainResult,
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -96,7 +96,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SyncXcodeDefaultsR
 
 export function createSyncXcodeDefaultsExecutor(
   context: SyncXcodeDefaultsContext,
-): ToolExecutor<Params, SyncXcodeDefaultsResult> {
+): NonStreamingExecutor<Params, SyncXcodeDefaultsResult> {
   return async () => {
     const projectPath = resolveOptionalPath(context.cwd, context.projectPath);
     const workspacePath = resolveOptionalPath(context.cwd, context.workspacePath);
@@ -152,9 +152,7 @@ export async function syncXcodeDefaultsLogic(
 ): Promise<void> {
   const handlerContext = getHandlerContext();
   const executeSyncXcodeDefaults = createSyncXcodeDefaultsExecutor(context);
-  const result = await executeSyncXcodeDefaults(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSyncXcodeDefaults(params);
 
   setStructuredOutput(handlerContext, result);
 }

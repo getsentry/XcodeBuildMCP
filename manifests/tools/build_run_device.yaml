@@ -4,6 +4,9 @@ names:
   mcp: build_run_device
   cli: build-and-run
 description: Build, install, and launch on physical device. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.
+outputSchema:
+  schema: xcodebuildmcp.output.build-run-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

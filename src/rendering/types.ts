@@ -1,9 +1,5 @@
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
-import type {
-  AnyFragment,
-  BuildInvocationRequest,
-  DomainFragment,
-} from '../types/domain-fragments.ts';
+import type { AnyFragment } from '../types/domain-fragments.ts';
 import type { ToolDomainResult } from '../types/domain-results.ts';
 
 export type RenderStrategy = 'text' | 'cli-text' | 'raw';
@@ -42,8 +38,7 @@ export interface ToolHandlerContext {
   emit: (fragment: AnyFragment) => void;
   attach: (image: ImageAttachment) => void;
   liveProgressEnabled: boolean;
-  emitLiveFragment?: (fragment: AnyFragment) => void;
-  pendingInvocationRequest?: BuildInvocationRequest;
+  streamingFragmentsEnabled: boolean;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;

@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugSessionActionDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   createTypedToolWithContext,
@@ -22,12 +23,20 @@ type DebugContinueResult = DebugSessionActionDomainResult;
 function createDebugContinueResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   debugSessionId?: string;
 }): DebugContinueResult {
   return {
     kind: 'debug-session-action',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     action: 'continue',
     ...(params.debugSessionId
       ? {
@@ -51,7 +60,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugContinueResul
 
 export function createDebugContinueExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugContinueParams, DebugContinueResult> {
+): NonStreamingExecutor<DebugContinueParams, DebugContinueResult> {
   return async (params) => {
     const targetId = params.debugSessionId ?? debuggerManager.getCurrentSessionId() ?? undefined;
 
@@ -62,9 +71,11 @@ export function createDebugContinueExecutor(
         debugSessionId: targetId ?? debuggerManager.getCurrentSessionId() ?? undefined,
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugContinueResult({
         didError: true,
-        error: `Failed to resume debugger: ${toErrorMessage(error)}`,
+        error: 'Failed to resume debugger.',
+        diagnosticMessage,
       });
     }
   };
@@ -76,9 +87,7 @@ export async function debug_continueLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugContinue = createDebugContinueExecutor(ctx.debugger);
-  const result = await executeDebugContinue(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugContinue(params);
 
   setStructuredOutput(handlerCtx, result);
 }

@@ -4,6 +4,9 @@ names:
   mcp: swift_package_stop
   cli: stop
 description: Stop SwiftPM run.
+outputSchema:
+  schema: xcodebuildmcp.output.stop-result
+  version: "1"
 routing:
   stateful: true
 annotations:

@@ -6,7 +6,7 @@ import {
   type CommandExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { schema, sim_statusbarLogic } from '../sim_statusbar.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('sim_statusbar tool', () => {
   describe('Schema Validation', () => {
@@ -60,6 +60,9 @@ describe('sim_statusbar tool', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set status bar.');
+      expect(text).toContain('Simulator not found');
     });
 
     it('should handle exception with Error object', async () => {
@@ -78,6 +81,9 @@ describe('sim_statusbar tool', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set status bar.');
+      expect(text).toContain('Connection failed');
     });
 
     it('should verify command generation with mock executor for override', async () => {

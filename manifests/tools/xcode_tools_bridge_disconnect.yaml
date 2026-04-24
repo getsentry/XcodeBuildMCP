@@ -4,6 +4,9 @@ names:
   mcp: xcode_tools_bridge_disconnect
   cli: bridge-disconnect
 description: Disconnect bridge and unregister proxied `xcode_tools_*` tools.
+outputSchema:
+  schema: xcodebuildmcp.output.xcode-bridge-status
+  version: "1"
 predicates:
   - debugEnabled
 annotations:

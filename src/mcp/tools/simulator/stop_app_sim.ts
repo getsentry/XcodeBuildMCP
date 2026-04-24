@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -43,21 +43,10 @@ const internalSchemaObject = z.object({
 export type StopAppSimParams = z.infer<typeof internalSchemaObject>;
 type StopAppSimResult = StopResultDomainResult;
 
-function splitDiagnosticMessages(...messages: string[]): Array<{ message: string }> {
-  return messages
-    .flatMap((message) =>
-      message
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean),
-    )
-    .map((message) => ({ message }));
-}
-
 export function createStopAppSimExecutor(
   executor: CommandExecutor,
-): ToolExecutor<StopAppSimParams, StopAppSimResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<StopAppSimParams, StopAppSimResult> {
+  return async (params) => {
     const simulatorId = params.simulatorId;
     const artifacts = { simulatorId, bundleId: params.bundleId };
 
@@ -85,7 +74,6 @@ export function createStopAppSimExecutor(
         return buildStopFailure(
           artifacts,
           `Stop app in simulator operation failed: ${diagnosticMessages.join(' | ')}`,
-          splitDiagnosticMessages(...diagnosticMessages),
         );
       }
 
@@ -95,7 +83,6 @@ export function createStopAppSimExecutor(
       return buildStopFailure(
         artifacts,
         `Stop app in simulator operation failed: ${diagnosticMessage}`,
-        splitDiagnosticMessages(diagnosticMessage),
       );
     }
   };
@@ -111,9 +98,7 @@ export async function stop_app_simLogic(
 
   const ctx = getHandlerContext();
   const executeStopAppSim = createStopAppSimExecutor(executor);
-  const result = await executeStopAppSim(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeStopAppSim(params);
   setStopResultStructuredOutput(ctx, result);
 
   if (result.didError) {

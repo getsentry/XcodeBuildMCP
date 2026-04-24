@@ -4,7 +4,13 @@ import {
   createMockCommandResponse,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler, listSchemes, listSchemesLogic } from '../list_schemes.ts';
+import {
+  schema,
+  handler,
+  listSchemes,
+  listSchemesLogic,
+  createListSchemesExecutor,
+} from '../list_schemes.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
@@ -98,6 +104,21 @@ describe('list_schemes plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps command failure summary short and preserves parsed diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'xcodebuild: error: The project named "Missing" does not exist.',
+      });
+      const execute = createListSchemesExecutor(mockExecutor);
+
+      const result = await execute({ projectPath: '/path/to/Missing.xcodeproj' });
+
+      expect(result.error).toBe('Failed to list schemes.');
+      expect(result.diagnostics?.errors).toEqual([
+        { message: 'The project named "Missing" does not exist.' },
+      ]);
     });
 
     it('should return error when no schemes are found in output', async () => {

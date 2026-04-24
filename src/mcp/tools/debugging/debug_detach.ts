@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugSessionActionDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   createTypedToolWithContext,
@@ -22,12 +23,20 @@ type DebugDetachResult = DebugSessionActionDomainResult;
 function createDebugDetachResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   debugSessionId?: string;
 }): DebugDetachResult {
   return {
     kind: 'debug-session-action',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     action: 'detach',
     ...(params.debugSessionId
       ? {
@@ -50,7 +59,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugDetachResult)
 
 export function createDebugDetachExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugDetachParams, DebugDetachResult> {
+): NonStreamingExecutor<DebugDetachParams, DebugDetachResult> {
   return async (params) => {
     const targetId = params.debugSessionId ?? debuggerManager.getCurrentSessionId() ?? undefined;
 
@@ -61,9 +70,11 @@ export function createDebugDetachExecutor(
         debugSessionId: targetId,
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugDetachResult({
         didError: true,
-        error: `Failed to detach debugger: ${toErrorMessage(error)}`,
+        error: 'Failed to detach debugger.',
+        diagnosticMessage,
       });
     }
   };
@@ -75,9 +86,7 @@ export async function debug_detachLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugDetach = createDebugDetachExecutor(ctx.debugger);
-  const result = await executeDebugDetach(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugDetach(params);
 
   setStructuredOutput(handlerCtx, result);
 }

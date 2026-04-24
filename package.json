@@ -35,7 +35,7 @@
     "format:check": "prettier --check 'src/**/*.{js,ts}'",
     "typecheck": "npx tsc --noEmit && npx tsc -p tsconfig.test.json",
     "typecheck:tests": "npx tsc -p tsconfig.test.json",
-    "inspect": "npx @modelcontextprotocol/inspector node build/cli.js mcp",
+    "inspect": "npx @modelcontextprotocol/inspector@latest node build/cli.js mcp",
     "doctor": "node build/doctor-cli.js",
     "docs:update": "npx tsx scripts/update-tools-docs.ts",
     "docs:update:dry-run": "npx tsx scripts/update-tools-docs.ts --dry-run --verbose",
@@ -48,8 +48,10 @@
     "test": "vitest run",
     "test:schema-fixtures": "vitest run --config vitest.snapshot.config.ts src/snapshot-tests/__tests__/json-fixture-schema.test.ts",
     "test:snapshot": "npm run build && node build/cli.js daemon stop 2>/dev/null; vitest run --config vitest.snapshot.config.ts",
+    "test:snapshots": "npm run test:snapshot",
     "test:snapshot:device": "npm run build && node build/cli.js daemon stop 2>/dev/null; vitest run --config vitest.snapshot.config.ts src/snapshot-tests/__tests__/device.snapshot.test.ts",
     "test:snapshot:update": "npm run build && node build/cli.js daemon stop 2>/dev/null; UPDATE_SNAPSHOTS=1 vitest run --config vitest.snapshot.config.ts",
+    "test:snapshots:update": "npm run test:snapshot:update",
     "test:smoke": "npm run build && vitest run --config vitest.smoke.config.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -60,6 +62,7 @@
     "bundled",
     "plugins",
     "manifests",
+    "schemas",
     "skills"
   ],
   "keywords": [
@@ -120,6 +123,7 @@
       "command": "npm run build:tsup",
       "files": [
         "src/**/*.ts",
+        "schemas/**/*.json",
         "tsup.config.ts",
         "package.json"
       ],

@@ -7,7 +7,12 @@ import {
   type CommandExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler, get_mac_app_pathLogic } from '../get_mac_app_path.ts';
+import {
+  schema,
+  handler,
+  get_mac_app_pathLogic,
+  createGetMacAppPathExecutor,
+} from '../get_mac_app_path.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('get_mac_app_path plugin', () => {
@@ -442,6 +447,22 @@ FULL_PRODUCT_NAME = MyApp.app
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps query failure summary short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'xcodebuild: error: No such scheme',
+      });
+      const execute = createGetMacAppPathExecutor(mockExecutor);
+
+      const result = await execute({
+        workspacePath: '/path/to/MyProject.xcworkspace',
+        scheme: 'MyScheme',
+      });
+
+      expect(result.error).toBe('Query failed.');
+      expect(result.diagnostics?.errors).toEqual([{ message: 'No such scheme' }]);
     });
 
     it('should return exact missing build settings response', async () => {

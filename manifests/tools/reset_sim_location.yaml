@@ -4,6 +4,9 @@ names:
   mcp: reset_sim_location
   cli: reset-location
 description: Reset sim location.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Reset Simulator Location
   readOnlyHint: true

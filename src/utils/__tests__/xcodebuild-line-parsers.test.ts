@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseDurationMs, parseRawTestName } from '../xcodebuild-line-parsers.ts';
+import {
+  parseBuildErrorDiagnostic,
+  parseDurationMs,
+  parseRawTestName,
+} from '../xcodebuild-line-parsers.ts';
 
 describe('parseDurationMs', () => {
   it('parses xcodebuild-style seconds text into milliseconds', () => {
@@ -10,6 +14,17 @@ describe('parseDurationMs', () => {
   it('returns undefined for unparseable duration text', () => {
     expect(parseDurationMs('unknown')).toBeUndefined();
     expect(parseDurationMs()).toBeUndefined();
+  });
+});
+
+describe('parseBuildErrorDiagnostic', () => {
+  it('preserves the full raw line for diagnostic-looking errors without a known structure', () => {
+    const line = '2026-04-23 12:00:00.000 xcodebuild[123:456] error: IDE operation failed';
+
+    expect(parseBuildErrorDiagnostic(line)).toEqual({
+      message: line,
+      renderedLine: line,
+    });
   });
 });
 

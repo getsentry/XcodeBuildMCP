@@ -4,6 +4,9 @@ names:
   mcp: get_mac_app_path
   cli: get-app-path
 description: Get macOS built app path.
+outputSchema:
+  schema: xcodebuildmcp.output.app-path
+  version: "1"
 annotations:
   title: Get macOS App Path
   readOnlyHint: true

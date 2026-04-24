@@ -4,7 +4,7 @@ import type {
   SessionDefaultsDomainResult,
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { sessionStore } from '../../../utils/session-store.ts';
 import {
   createTypedToolWithContext,
@@ -68,7 +68,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionShowDefault
   };
 }
 
-export function createSessionShowDefaultsExecutor(): ToolExecutor<
+export function createSessionShowDefaultsExecutor(): NonStreamingExecutor<
   SessionShowDefaultsParams,
   SessionShowDefaultsResult
 > {
@@ -78,12 +78,7 @@ export function createSessionShowDefaultsExecutor(): ToolExecutor<
 export async function sessionShowDefaultsLogic(): Promise<void> {
   const ctx = getHandlerContext();
   const executeSessionShowDefaults = createSessionShowDefaultsExecutor();
-  const result = await executeSessionShowDefaults(
-    {},
-    {
-      liveProgressEnabled: false,
-    },
-  );
+  const result = await executeSessionShowDefaults({});
 
   setStructuredOutput(ctx, result);
 }

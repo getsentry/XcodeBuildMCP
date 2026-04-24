@@ -5,11 +5,6 @@ import { join } from 'node:path';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
-function normalizeTmpDir(text: string, tmpDir: string): string {
-  const escaped = tmpDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return text.replace(new RegExp(escaped, 'g'), '<TMPDIR>');
-}
-
 export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime): void {
   const expectFixture = createWorkflowFixtureMatcher(runtime, 'project-scaffolding');
 
@@ -36,7 +31,7 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectFixture(normalizeTmpDir(text, tmpDir), 'scaffold-ios--success');
+        expectFixture(text, 'scaffold-ios--success');
       }, 120000);
 
       it('error - existing project', async () => {
@@ -53,7 +48,7 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
           outputPath,
         });
         expect(isError).toBe(true);
-        expectFixture(normalizeTmpDir(text, tmpDir), 'scaffold-ios--error-existing');
+        expectFixture(text, 'scaffold-ios--error-existing');
       }, 120000);
     });
 
@@ -66,7 +61,7 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
         });
         expect(isError).toBe(false);
         expect(text.length).toBeGreaterThan(10);
-        expectFixture(normalizeTmpDir(text, tmpDir), 'scaffold-macos--success');
+        expectFixture(text, 'scaffold-macos--success');
       }, 120000);
 
       it('error - existing project', async () => {
@@ -83,7 +78,7 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
           outputPath,
         });
         expect(isError).toBe(true);
-        expectFixture(normalizeTmpDir(text, tmpDir), 'scaffold-macos--error-existing');
+        expectFixture(text, 'scaffold-macos--error-existing');
       }, 120000);
     });
   });

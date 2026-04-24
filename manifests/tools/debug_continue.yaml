@@ -4,6 +4,9 @@ names:
   mcp: debug_continue
   cli: continue
 description: Continue debug session.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-session-action
+  version: "1"
 routing:
   stateful: true
 annotations:

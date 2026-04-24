@@ -267,6 +267,43 @@ describe('list_devices plugin (device-shared)', () => {
       expect(text).toContain('0 physical devices discovered');
     });
 
+    it('keeps failure summary short and preserves discovery diagnostics', async () => {
+      const mockExecutor = async (command: string[]) => {
+        if (command.includes('devicectl')) {
+          return createMockCommandResponse({
+            success: false,
+            output: '',
+            error: 'devicectl failed with raw stderr',
+          });
+        }
+
+        return createMockCommandResponse({
+          success: false,
+          output: '',
+          error: 'xctrace failed with raw stderr',
+        });
+      };
+
+      const mockPathDeps = {
+        tmpdir: () => '/tmp',
+        join: (...paths: string[]) => paths.join('/'),
+      };
+
+      const mockFsDeps = {
+        readFile: async () => {
+          throw new Error('File not found');
+        },
+        unlink: async () => {},
+      };
+
+      const result = await runListDevicesLogic({}, mockExecutor, mockPathDeps, mockFsDeps);
+
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to list devices.');
+      expect(text).toContain('xctrace failed with raw stderr');
+    });
+
     it('should return successful no devices found response', async () => {
       const devicectlJson = {
         result: {

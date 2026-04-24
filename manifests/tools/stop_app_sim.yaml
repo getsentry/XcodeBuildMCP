@@ -4,6 +4,9 @@ names:
   mcp: stop_app_sim
   cli: stop
 description: Stop sim app.
+outputSchema:
+  schema: xcodebuildmcp.output.stop-result
+  version: "1"
 annotations:
   title: Stop App Simulator
   readOnlyHint: false

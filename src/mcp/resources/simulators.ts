@@ -23,6 +23,7 @@ export async function simulatorsResourceLogic(
   const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: false,
+    streamingFragmentsEnabled: false,
     emit: (fragment: AnyFragment) => {
       items.push(fragment);
       session.emit(fragment);

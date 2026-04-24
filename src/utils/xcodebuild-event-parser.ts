@@ -9,6 +9,7 @@ import {
   parseFailureDiagnostic,
   parseBuildErrorDiagnostic,
   parseDurationMs,
+  isBuildErrorDiagnosticLine,
 } from './xcodebuild-line-parsers.ts';
 import {
   parseXcodebuildSwiftTestingLine,
@@ -293,8 +294,8 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const totals = parseTotalsLine(line);
     if (totals) {
-      completedCount = totals.executed;
-      failedCount = totals.failed;
+      completedCount = Math.max(completedCount, totals.executed);
+      failedCount = Math.max(failedCount, totals.failed);
       emitTestProgress();
       return;
     }
@@ -325,8 +326,8 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const stSummary = parseSwiftTestingRunSummary(line);
     if (stSummary) {
-      completedCount = stSummary.executed;
-      failedCount = stSummary.failed;
+      completedCount = Math.max(completedCount, stSummary.executed);
+      failedCount = Math.max(failedCount, stSummary.failed);
       emitTestProgress();
       return;
     }
@@ -372,6 +373,18 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     }
 
     if (isIgnoredNoiseLine(line)) {
+      return;
+    }
+
+    if (isBuildErrorDiagnosticLine(line)) {
+      onEvent({
+        kind,
+        fragment: 'compiler-diagnostic',
+        operation,
+        severity: 'error',
+        message: line,
+        rawLine: line,
+      });
       return;
     }
 

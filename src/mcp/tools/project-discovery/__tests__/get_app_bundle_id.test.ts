@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
-import { schema, handler, get_app_bundle_idLogic } from '../get_app_bundle_id.ts';
+import {
+  schema,
+  handler,
+  get_app_bundle_idLogic,
+  createGetAppBundleIdExecutor,
+} from '../get_app_bundle_id.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
 import {
@@ -67,6 +72,21 @@ describe('get_app_bundle_id plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps missing app errors short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutorForCommands({});
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        existsSync: () => false,
+      });
+      const execute = createGetAppBundleIdExecutor(mockExecutor, mockFileSystemExecutor);
+
+      const result = await execute({ appPath: '/path/to/MyApp.app' });
+
+      expect(result.error).toBe('Failed to get bundle ID.');
+      expect(result.diagnostics?.errors).toEqual([
+        { message: "File not found: '/path/to/MyApp.app'. Please check the path and try again." },
+      ]);
     });
 
     it('should return success with bundle ID using defaults read', async () => {
@@ -145,6 +165,27 @@ describe('get_app_bundle_id plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps extraction errors short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutorForCommands({
+        'defaults read "/path/to/MyApp.app/Info" CFBundleIdentifier': new Error(
+          'defaults read failed',
+        ),
+        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/path/to/MyApp.app/Info.plist"':
+          new Error('Command failed'),
+      });
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        existsSync: () => true,
+      });
+      const execute = createGetAppBundleIdExecutor(mockExecutor, mockFileSystemExecutor);
+
+      const result = await execute({ appPath: '/path/to/MyApp.app' });
+
+      expect(result.error).toBe('Failed to get bundle ID.');
+      expect(result.diagnostics?.errors).toEqual([
+        { message: 'Could not extract bundle ID from Info.plist: Command failed' },
+      ]);
     });
 
     it('should reject non-string appPath values through the handler', async () => {

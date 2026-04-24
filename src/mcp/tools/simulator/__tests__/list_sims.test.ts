@@ -5,7 +5,6 @@ import {
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
 import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
-import { DefaultToolExecutionContext } from '../../../../utils/execution/index.ts';
 
 import {
   createListSimsExecutor,
@@ -276,13 +275,9 @@ describe('list_sims tool', () => {
         }),
         error: undefined,
       });
-      const fragments: import('../../../../types/domain-fragments.ts').DomainFragment[] = [];
-      const ctx = new DefaultToolExecutionContext({ onFragment: (f) => fragments.push(f) });
       const executeListSims = createListSimsExecutor(mockExecutor);
 
-      const result = await executeListSims({}, ctx);
-
-      expect(fragments).toEqual([]);
+      const result = await executeListSims({});
       expect(result).toEqual({
         kind: 'simulator-list',
         didError: false,

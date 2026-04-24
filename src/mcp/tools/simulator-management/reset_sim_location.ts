@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const resetSimulatorLocationSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -19,17 +20,6 @@ const resetSimulatorLocationSchema = z.object({
 
 type ResetSimulatorLocationParams = z.infer<typeof resetSimulatorLocationSchema>;
 type ResetSimulatorLocationResult = SimulatorActionResultDomainResult;
-
-function createDiagnostics(message: string) {
-  return {
-    warnings: [],
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
 
 function createResetSimulatorLocationResult(params: {
   simulatorId: string;
@@ -47,12 +37,12 @@ function createResetSimulatorLocationResult(params: {
     action: {
       type: 'reset-location',
     },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
     artifacts: {
       simulatorId: params.simulatorId,
     },
-    ...(params.diagnosticMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
-      : {}),
   };
 }
 
@@ -66,8 +56,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ResetSimulatorLoca
 
 export function createResetSimulatorLocationExecutor(
   executor: CommandExecutor,
-): ToolExecutor<ResetSimulatorLocationParams, ResetSimulatorLocationResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<ResetSimulatorLocationParams, ResetSimulatorLocationResult> {
+  return async (params) => {
     try {
       const result = await executor(
         ['xcrun', 'simctl', 'location', params.simulatorId, 'clear'],
@@ -80,7 +70,7 @@ export function createResetSimulatorLocationExecutor(
         return createResetSimulatorLocationResult({
           simulatorId: params.simulatorId,
           didError: true,
-          error: `Failed to reset simulator location: ${diagnosticMessage}`,
+          error: 'Failed to reset simulator location.',
           diagnosticMessage,
         });
       }
@@ -94,7 +84,7 @@ export function createResetSimulatorLocationExecutor(
       return createResetSimulatorLocationResult({
         simulatorId: params.simulatorId,
         didError: true,
-        error: `Failed to reset simulator location: ${diagnosticMessage}`,
+        error: 'Failed to reset simulator location.',
         diagnosticMessage,
       });
     }
@@ -110,9 +100,7 @@ export async function reset_sim_locationLogic(
   const ctx = getHandlerContext();
   const executeResetSimulatorLocation = createResetSimulatorLocationExecutor(executor);
 
-  const result = await executeResetSimulatorLocation(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeResetSimulatorLocation(params);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

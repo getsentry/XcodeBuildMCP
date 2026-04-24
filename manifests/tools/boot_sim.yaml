@@ -4,6 +4,9 @@ names:
   mcp: boot_sim
   cli: boot
 description: Boot iOS simulator for manual/non-build flows. Not required before simulator build-and-run (build_run_sim).
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Boot Simulator
   readOnlyHint: false

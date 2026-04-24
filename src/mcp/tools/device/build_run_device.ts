@@ -7,7 +7,7 @@
 import * as z from 'zod';
 import type { SharedBuildParams, NextStepParamsMap } from '../../../types/common.ts';
 import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -30,10 +30,23 @@ import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts'
 import {
   collectFallbackErrorMessages,
   createBuildRunDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+
+function createBuildRunDeviceRequest(params: BuildRunDeviceParams): BuildInvocationRequest {
+  return {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: params.configuration ?? 'Debug',
+    platform: String(mapDevicePlatform(params.platform)),
+    deviceId: params.deviceId,
+    target: 'device',
+  };
+}
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -62,10 +75,11 @@ type BuildRunDeviceResult = BuildRunResultDomainResult;
 export function createBuildRunDeviceExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
-): DomainStreamingExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
+): StreamingExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
   return async (params, ctx) => {
     const platform = mapDevicePlatform(params.platform);
     const configuration = params.configuration ?? 'Debug';
+    const request = createBuildRunDeviceRequest(params);
     const sharedBuildParams: SharedBuildParams = {
       projectPath: params.projectPath,
       workspacePath: params.workspacePath,
@@ -99,6 +113,7 @@ export function createBuildRunDeviceExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+        request,
       });
     }
 
@@ -136,6 +151,7 @@ export function createBuildRunDeviceExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to get app path to launch: ${errorMessage}`,
         ]),
+        request,
       });
     }
 
@@ -165,6 +181,7 @@ export function createBuildRunDeviceExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to extract bundle ID: ${errorMessage}`,
         ]),
+        request,
       });
     }
 
@@ -188,6 +205,7 @@ export function createBuildRunDeviceExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to install app on device: ${errorMessage}`,
         ]),
+        request,
       });
     }
     ctx.emitFragment({
@@ -223,6 +241,7 @@ export function createBuildRunDeviceExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to launch app on device: ${errorMessage}`,
         ]),
+        request,
       });
     }
 
@@ -240,6 +259,7 @@ export function createBuildRunDeviceExecutor(
         deviceId: params.deviceId,
         buildLogPath: started.pipeline.logPath,
       },
+      request,
     });
   };
 }
@@ -261,30 +281,14 @@ export async function build_run_deviceLogic(
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const platform = mapDevicePlatform(params.platform);
-  const configuration = params.configuration ?? 'Debug';
+  const invocationRequest = createBuildRunDeviceRequest(params);
 
-  const invocationRequest: BuildInvocationRequest = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration,
-    platform: String(platform),
-    deviceId: params.deviceId,
-    target: 'device',
-  };
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'BUILD',
-    invocationRequest,
-    'build-run-result',
-  );
+  ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunDevice = createBuildRunDeviceExecutor(executor, fileSystemExecutor);
   const result = await executeBuildRunDevice(params, executionContext);
-  result.request = invocationRequest;
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);
-  executionContext.emitResult(result);
 
   if (!result.didError) {
     const nextStepParams: NextStepParamsMap = {};

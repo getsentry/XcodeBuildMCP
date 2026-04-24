@@ -51,17 +51,12 @@ export function createMockToolHandlerContext(
   const attachments: ImageAttachment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: options.liveProgressEnabled ?? true,
+    streamingFragmentsEnabled: options.liveProgressEnabled ?? true,
     emit: (fragment: AnyFragment) => {
       events.push(fragment);
     },
     attach: (image) => {
       attachments.push(image);
-    },
-    emitLiveFragment: (fragment: AnyFragment) => {
-      if (!ctx.liveProgressEnabled) {
-        return;
-      }
-      events.push(fragment);
     },
   };
   const resultObj: MockToolHandlerResult = {
@@ -172,15 +167,12 @@ export async function callHandler(
   const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: true,
+    streamingFragmentsEnabled: true,
     emit: (fragment: AnyFragment) => {
       items.push(fragment);
       session.emit(fragment);
     },
     attach: (image) => session.attach(image),
-    emitLiveFragment: (fragment: AnyFragment) => {
-      items.push(fragment);
-      session.emit(fragment);
-    },
   };
   await handler(args, ctx);
   if (ctx.structuredOutput) {

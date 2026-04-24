@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SessionProfileDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { persistActiveSessionDefaultsProfile } from '../../../utils/config-store.ts';
@@ -60,7 +60,7 @@ function setStructuredOutput(
   };
 }
 
-export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
+export function createSessionUseDefaultsProfileExecutor(): NonStreamingExecutor<
   Params,
   SessionUseDefaultsProfileResult
 > {
@@ -122,9 +122,7 @@ export function createSessionUseDefaultsProfileExecutor(): ToolExecutor<
 export async function sessionUseDefaultsProfileLogic(params: Params): Promise<void> {
   const ctx = getHandlerContext();
   const executeSessionUseDefaultsProfile = createSessionUseDefaultsProfileExecutor();
-  const result = await executeSessionUseDefaultsProfile(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSessionUseDefaultsProfile(params);
 
   setStructuredOutput(ctx, result);
 }

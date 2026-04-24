@@ -4,6 +4,9 @@ names:
   mcp: list_schemes
   cli: list-schemes
 description: List Xcode schemes.
+outputSchema:
+  schema: xcodebuildmcp.output.scheme-list
+  version: "1"
 annotations:
   title: List Schemes
   readOnlyHint: true

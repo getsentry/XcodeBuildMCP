@@ -7,7 +7,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DoctorReportDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -15,13 +15,11 @@ import { version } from '../../../utils/version/index.ts';
 import type {
   HeaderRenderItem,
   SectionRenderItem,
-  DetailTreeRenderItem,
   StatusRenderItem,
 } from '../../../rendering/render-items.ts';
 import {
   formatHeaderEvent,
   formatSectionEvent,
-  formatDetailTreeEvent,
   formatStatusLineEvent,
 } from '../../../utils/renderers/event-formatting.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
@@ -32,6 +30,7 @@ import { peekXcodeToolsBridgeManager } from '../../../integrations/xcode-tools-b
 import { getMcpBridgeAvailability } from '../../../integrations/xcode-tools-bridge/core.ts';
 
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const LOG_PREFIX = '[Doctor]';
 const USER_HOME_PATH_PATTERN = /\/Users\/[^/\s]+/g;
@@ -413,7 +412,8 @@ function createDoctorErrorResult(message: string): DoctorResult {
   return {
     kind: 'doctor-report',
     didError: true,
-    error: message,
+    error: 'Doctor failed.',
+    diagnostics: createBasicDiagnostics({ errors: [message] }),
     serverVersion: String(version),
     checks: [],
   };
@@ -429,23 +429,19 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DoctorResult): voi
 
 export function createDoctorExecutor(
   deps: DoctorDependencies,
-): ToolExecutor<DoctorParams, DoctorResult> {
+): NonStreamingExecutor<DoctorParams, DoctorResult> {
   return async (params) => {
     try {
       const data = await collectDoctorData(params, deps);
       return createDoctorResult(data);
     } catch (error) {
-      const message = `Doctor failed: ${toErrorMessage(error)}`;
+      const message = toErrorMessage(error);
       return createDoctorErrorResult(message);
     }
   };
 }
 
-type DoctorRenderItem =
-  | HeaderRenderItem
-  | SectionRenderItem
-  | DetailTreeRenderItem
-  | StatusRenderItem;
+type DoctorRenderItem = HeaderRenderItem | SectionRenderItem | StatusRenderItem;
 
 function doctorHeader(
   operation: string,
@@ -468,10 +464,6 @@ function doctorSection(
   };
 }
 
-function doctorDetailTree(items: Array<{ label: string; value: string }>): DetailTreeRenderItem {
-  return { type: 'detail-tree', items };
-}
-
 function doctorStatus(level: StatusRenderItem['level'], message: string): StatusRenderItem {
   return { type: 'status', level, message };
 }
@@ -486,9 +478,6 @@ function renderDoctorItems(items: DoctorRenderItem[]): string {
         break;
       case 'section':
         output += `\n${formatSectionEvent(item)}\n`;
-        break;
-      case 'detail-tree':
-        output += `${formatDetailTreeEvent(item)}\n`;
         break;
       case 'status': {
         const compact = lastType === 'status' || lastType === 'summary';
@@ -535,11 +524,9 @@ export async function runDoctor(params: DoctorParams, deps: DoctorDependencies) 
 
     // System Information
     items.push(
-      doctorDetailTree(
-        Object.entries(doctorInfo.system).map(([key, value]) => ({
-          label: key,
-          value: String(value),
-        })),
+      doctorSection(
+        'System Information',
+        Object.entries(doctorInfo.system).map(([key, value]) => `${key}: ${value}`),
       ),
     );
 
@@ -766,9 +753,7 @@ export async function doctorToolLogic(
   const ctx = getHandlerContext();
   const deps = createDoctorDependencies(executor);
   const executeDoctor = createDoctorExecutor(deps);
-  const result = await executeDoctor(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDoctor(params);
 
   setStructuredOutput(ctx, result);
 }

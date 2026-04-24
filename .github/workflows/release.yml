@@ -56,6 +56,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate structured JSON fixtures against schemas
+        run: npm run test:schema-fixtures
+
       - name: Get version from tag or input
         id: get_version
         env:

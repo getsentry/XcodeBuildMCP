@@ -4,6 +4,9 @@ names:
   mcp: debug_lldb_command
   cli: lldb-command
 description: Run LLDB command.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-command-result
+  version: "1"
 routing:
   stateful: true
 annotations:

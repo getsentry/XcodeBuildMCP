@@ -116,6 +116,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   function writeSection(text: string): void {
     sink.clearTransient();
     pendingTransientRuntimeLine = null;
+    hasDurableRuntimeContent = true;
     sink.writeSection(text);
   }
 
@@ -129,6 +130,10 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
     const diagOpts = { baseDir: diagnosticBaseDir ?? undefined };
     const diagnosticSections: string[] = [];
 
+    if (includeCompilerErrors && groupedCompilerErrors.length > 0) {
+      diagnosticSections.push(formatGroupedCompilerErrors(groupedCompilerErrors, diagOpts));
+      groupedCompilerErrors.length = 0;
+    }
     if (groupedTestFailures.length > 0) {
       diagnosticSections.push(formatGroupedTestFailures(groupedTestFailures, diagOpts));
       groupedTestFailures.length = 0;
@@ -136,10 +141,6 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
     if (groupedWarnings.length > 0) {
       diagnosticSections.push(formatGroupedWarnings(groupedWarnings, diagOpts));
       groupedWarnings.length = 0;
-    }
-    if (includeCompilerErrors && groupedCompilerErrors.length > 0) {
-      diagnosticSections.push(formatGroupedCompilerErrors(groupedCompilerErrors, diagOpts));
-      groupedCompilerErrors.length = 0;
     }
 
     if (diagnosticSections.length === 0) {
@@ -171,14 +172,13 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'build-stage': {
+        // Build stages are progress indicators, rendered transiently in
+        // interactive terminals and dropped from non-interactive output
+        // (final snapshots shouldn't preserve transient progress).
         if (interactive) {
           pendingTransientRuntimeLine = formatBuildStageEvent(item);
           sink.updateTransient(formatTransientBuildStageEvent(item));
-        } else {
-          writeDurable(formatBuildStageEvent(item));
         }
-        lastVisibleEventType = 'build-stage';
-        lastStatusLineLevel = null;
         break;
       }
 
@@ -247,7 +247,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-discovery': {
-        writeDurable(formatTestDiscoveryEvent(item));
+        writeSection(formatTestDiscoveryEvent(item));
         lastVisibleEventType = 'test-discovery';
         lastStatusLineLevel = null;
         break;

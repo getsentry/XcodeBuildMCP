@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { schema, handler, get_mac_bundle_idLogic } from '../get_mac_bundle_id.ts';
+import {
+  schema,
+  handler,
+  get_mac_bundle_idLogic,
+  createGetMacBundleIdExecutor,
+} from '../get_mac_bundle_id.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
 import {
@@ -45,6 +50,24 @@ describe('get_mac_bundle_id plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps missing app errors short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutorForCommands({});
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        existsSync: () => false,
+      });
+      const execute = createGetMacBundleIdExecutor(mockExecutor, mockFileSystemExecutor);
+
+      const result = await execute({ appPath: '/Applications/MyApp.app' });
+
+      expect(result.error).toBe('Failed to get macOS bundle ID.');
+      expect(result.diagnostics?.errors).toEqual([
+        {
+          message:
+            "File not found: '/Applications/MyApp.app'. Please check the path and try again.",
+        },
+      ]);
     });
 
     it('should return success with bundle ID using defaults read', async () => {
@@ -120,6 +143,27 @@ describe('get_mac_bundle_id plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps extraction errors short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutorForCommands({
+        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
+          'Command failed',
+        ),
+        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
+          new Error('Command failed'),
+      });
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        existsSync: () => true,
+      });
+      const execute = createGetMacBundleIdExecutor(mockExecutor, mockFileSystemExecutor);
+
+      const result = await execute({ appPath: '/Applications/MyApp.app' });
+
+      expect(result.error).toBe('Failed to get macOS bundle ID.');
+      expect(result.diagnostics?.errors).toEqual([
+        { message: 'Could not extract bundle ID from Info.plist: Command failed' },
+      ]);
     });
   });
 });

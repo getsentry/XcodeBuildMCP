@@ -4,6 +4,9 @@ names:
   mcp: session_use_defaults_profile
   cli: use-defaults-profile
 description: Switch the active session defaults profile.
+outputSchema:
+  schema: xcodebuildmcp.output.session-profile
+  version: "1"
 annotations:
   title: Use Session Defaults Profile
   readOnlyHint: false

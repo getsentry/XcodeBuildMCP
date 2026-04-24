@@ -21,7 +21,7 @@ import {
 import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -29,7 +29,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const longPressSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -54,7 +53,7 @@ export function createLongPressExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<LongPressParams, LongPressResult> {
+): NonStreamingExecutor<LongPressParams, LongPressResult> {
   return async (params) => {
     const toolName = 'long_press';
     const { simulatorId, x, y, duration } = params;
@@ -96,8 +95,7 @@ export function createLongPressExecutor(
       ]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) =>
-          `Failed to simulate long press at (${x}, ${y}): ${axeError.message}`,
+        axeFailureMessage: () => `Failed to simulate long press at (${x}, ${y}).`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -115,7 +113,7 @@ export async function long_pressLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeLongPress = createLongPressExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeLongPress(params, noopToolExecutionContext);
+  const result = await executeLongPress(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

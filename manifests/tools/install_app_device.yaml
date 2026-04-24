@@ -4,6 +4,9 @@ names:
   mcp: install_app_device
   cli: install
 description: Install app on device.
+outputSchema:
+  schema: xcodebuildmcp.output.install-result
+  version: "1"
 annotations:
   title: Install App Device
   readOnlyHint: false

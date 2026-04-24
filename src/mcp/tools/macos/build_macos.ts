@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
@@ -17,11 +17,24 @@ import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolve
 import {
   collectFallbackErrorMessages,
   createBuildDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+
+function createBuildMacOSRequest(params: BuildMacOSParams): BuildInvocationRequest {
+  return {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: params.configuration ?? 'Debug',
+    platform: 'macOS',
+    arch: params.arch,
+    target: 'macos',
+  };
+}
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -57,7 +70,7 @@ type BuildMacOSResult = BuildResultDomainResult;
 
 export function createBuildMacOSExecutor(
   executor: CommandExecutor,
-): DomainStreamingExecutor<BuildMacOSParams, BuildMacOSResult> {
+): StreamingExecutor<BuildMacOSParams, BuildMacOSResult> {
   return async (params, ctx) => {
     const configuration = params.configuration ?? 'Debug';
     const started = createDomainStreamingPipeline('build_macos', 'BUILD', ctx, 'build-result');
@@ -113,6 +126,7 @@ export function createBuildMacOSExecutor(
         buildLogPath: started.pipeline.logPath,
       },
       fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+      request: createBuildMacOSRequest(params),
     });
   };
 }
@@ -122,31 +136,16 @@ export async function buildMacOSLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const configuration = params.configuration ?? 'Debug';
+  const invocationRequest = createBuildMacOSRequest(params);
 
   log('info', `Starting macOS build for scheme ${params.scheme}`);
 
-  const invocationRequest: BuildInvocationRequest = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration,
-    platform: 'macOS',
-    arch: params.arch,
-    target: 'macos',
-  };
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'BUILD',
-    invocationRequest,
-    'build-result',
-  );
+  ctx.emit(createBuildInvocationFragment('build-result', 'BUILD', invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildMacOS = createBuildMacOSExecutor(executor);
   const result = await executeBuildMacOS(params, executionContext);
-  result.request = invocationRequest;
 
   setXcodebuildStructuredOutput(ctx, 'build-result', result);
-  executionContext.emitResult(result);
 
   if (!result.didError) {
     ctx.nextStepParams = {

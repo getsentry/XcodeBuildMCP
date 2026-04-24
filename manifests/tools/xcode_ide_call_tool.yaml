@@ -4,6 +4,9 @@ names:
   mcp: xcode_ide_call_tool
   cli: call-tool
 description: Call a remote Xcode IDE MCP tool.
+outputSchema:
+  schema: xcodebuildmcp.output.xcode-bridge-call-result
+  version: "1"
 routing:
   stateful: true
 annotations:

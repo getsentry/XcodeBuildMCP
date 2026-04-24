@@ -4,7 +4,12 @@ import { ChildProcess } from 'child_process';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler, get_sim_app_pathLogic } from '../get_sim_app_path.ts';
+import {
+  schema,
+  handler,
+  get_sim_app_pathLogic,
+  createGetSimAppPathExecutor,
+} from '../get_sim_app_path.ts';
 import type { CommandExecutor } from '../../../../utils/CommandExecutor.ts';
 import { XcodePlatform } from '../../../../types/common.ts';
 import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
@@ -187,10 +192,28 @@ describe('get_sim_app_path tool', () => {
       expect(result.isError).toBe(true);
       const text = allText(result);
       expect(text).toContain('Get App Path');
-      expect(text).toContain('Errors (1):');
-      expect(text).toContain('✗ Failed to run xcodebuild');
+      expect(text).toContain('Errors');
+      expect(text).toContain('Failed to run xcodebuild');
       expect(text).toContain('Failed to get app path');
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps query failure summary short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'xcodebuild: error: No such scheme',
+      });
+      const execute = createGetSimAppPathExecutor(mockExecutor);
+
+      const result = await execute({
+        projectPath: '/path/to/project.xcodeproj',
+        scheme: 'MyScheme',
+        platform: XcodePlatform.iOSSimulator,
+        simulatorId: 'SIM-UUID',
+      });
+
+      expect(result.error).toBe('Failed to get app path.');
+      expect(result.diagnostics?.errors).toEqual([{ message: 'No such scheme' }]);
     });
   });
 });

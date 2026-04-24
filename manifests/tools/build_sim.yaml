@@ -4,6 +4,9 @@ names:
   mcp: build_sim
   cli: build
 description: Build for iOS sim (compile-only, no launch).
+outputSchema:
+  schema: xcodebuildmcp.output.build-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

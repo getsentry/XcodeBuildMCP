@@ -178,6 +178,46 @@ describe('xcodebuild-event-parser', () => {
     });
   });
 
+  it('emits raw error events for diagnostic-looking lines that cannot be structured', () => {
+    const events: DomainFragment[] = [];
+    const unrecognizedLines: string[] = [];
+    const parser = createXcodebuildEventParser({
+      operation: 'BUILD',
+      onEvent: (event) => events.push(event),
+      onUnrecognizedLine: (line) => unrecognizedLines.push(line),
+    });
+    const line = '2026-04-23 12:00:00.000 xcodebuild[123:456] error: IDE operation failed';
+
+    parser.onStderr(`${line}\n`);
+    parser.flush();
+
+    expect(unrecognizedLines).toEqual([]);
+    const errors = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'error',
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      fragment: 'compiler-diagnostic',
+      severity: 'error',
+      message: line,
+      rawLine: line,
+    });
+  });
+
+  it('emits swift-testing issue fallbacks as test failures with the full raw line', () => {
+    const line =
+      '✘ Test "Parameterized failure" recorded an issue with 1 argument value → key:value: opaque failure';
+    const events = collectEvents('TEST', [{ source: 'stdout', text: `${line}\n` }]);
+
+    const failures = events.filter((e) => e.fragment === 'test-failure');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({
+      fragment: 'test-failure',
+      test: 'Parameterized failure',
+      message: line,
+    });
+  });
+
   it('accumulates indented continuation lines into the preceding error', () => {
     const events = collectEvents('BUILD', [
       {

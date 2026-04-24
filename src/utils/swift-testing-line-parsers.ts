@@ -121,6 +121,19 @@ export function parseSwiftTestingIssueLine(line: string): ParsedFailureDiagnosti
     };
   }
 
+  const fallbackRegex = new RegExp(`^[✘] Test "(.+)"${OPTIONAL_AKA} recorded an issue\\b.*$`, 'u');
+  const fallbackMatch = line.match(fallbackRegex);
+  if (fallbackMatch) {
+    const [, rawTestName] = fallbackMatch;
+    const { suiteName, testName } = parseRawTestName(rawTestName);
+    return {
+      rawTestName,
+      suiteName,
+      testName,
+      message: line,
+    };
+  }
+
   return null;
 }
 

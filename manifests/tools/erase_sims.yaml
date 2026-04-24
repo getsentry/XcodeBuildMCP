@@ -4,6 +4,9 @@ names:
   mcp: erase_sims
   cli: erase
 description: Erase simulator.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Erase Simulators
   readOnlyHint: false

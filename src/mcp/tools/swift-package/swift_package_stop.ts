@@ -1,13 +1,13 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { getProcess, terminateTrackedProcess, type ProcessInfo } from './active-processes.ts';
 import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
-import { noopToolExecutionContext } from './noop-tool-execution-context.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const swiftPackageStopSchema = z.object({
   pid: z.number(),
@@ -48,7 +48,7 @@ export async function swift_package_stopLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSwiftPackageStop = createSwiftPackageStopExecutor(processManager, timeout);
-  const result = await executeSwiftPackageStop(params, noopToolExecutionContext);
+  const result = await executeSwiftPackageStop(params);
 
   setStructuredOutput(ctx, result);
 }
@@ -72,6 +72,7 @@ function createSwiftPackageStopResult(params: SwiftPackageStopParams): SwiftPack
 function createSwiftPackageStopErrorResult(
   params: SwiftPackageStopParams,
   message: string,
+  diagnosticMessage = message,
 ): SwiftPackageStopResult {
   return {
     kind: 'stop-result',
@@ -79,10 +80,7 @@ function createSwiftPackageStopErrorResult(
     error: message,
     summary: { status: 'FAILED' },
     artifacts: { processId: params.pid },
-    diagnostics: {
-      warnings: [],
-      errors: [],
-    },
+    diagnostics: createBasicDiagnostics({ errors: [diagnosticMessage] }),
   };
 }
 
@@ -97,23 +95,22 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageStopRe
 export function createSwiftPackageStopExecutor(
   processManager: ProcessManager = getDefaultProcessManager(),
   timeout = 5000,
-): ToolExecutor<SwiftPackageStopParams, SwiftPackageStopResult> {
+): NonStreamingExecutor<SwiftPackageStopParams, SwiftPackageStopResult> {
   return async (params) => {
     const processInfo = processManager.getProcess(params.pid);
     if (!processInfo) {
       const message = `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`;
-      return createSwiftPackageStopErrorResult(params, message);
+      return createSwiftPackageStopErrorResult(params, 'Swift package stop failed.', message);
     }
 
     const result = await processManager.terminateTrackedProcess(params.pid, timeout);
     if (result.status === 'not-found') {
       const message = `No running process found with PID ${params.pid}. Use swift_package_list to check active processes.`;
-      return createSwiftPackageStopErrorResult(params, message);
+      return createSwiftPackageStopErrorResult(params, 'Swift package stop failed.', message);
     }
 
     if (result.error) {
-      const message = `Failed to stop process: ${result.error}`;
-      return createSwiftPackageStopErrorResult(params, message);
+      return createSwiftPackageStopErrorResult(params, 'Failed to stop process.', result.error);
     }
 
     return createSwiftPackageStopResult(params);

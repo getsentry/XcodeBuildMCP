@@ -31,12 +31,46 @@ describe('schema', () => {
     }
 
     expect(toolResult.data.availability).toEqual({ mcp: true, cli: true });
+    expect(toolResult.data.outputSchema).toBeUndefined();
     expect(toolResult.data.nextSteps).toEqual([]);
     expect(toolResult.data.predicates).toEqual([]);
     expect(workflowResult.data.availability).toEqual({ mcp: true, cli: true });
     expect(workflowResult.data.predicates).toEqual([]);
     expect(workflowResult.data.tools).toEqual(['build_sim']);
     expect(getEffectiveCliName(toolResult.data)).toBe('build-sim');
+  });
+
+  it('parses output schema metadata for tool manifests', () => {
+    const result = toolManifestEntrySchema.safeParse({
+      id: 'list_sims',
+      module: 'mcp/tools/simulator/list_sims',
+      names: { mcp: 'list_sims' },
+      outputSchema: {
+        schema: 'xcodebuildmcp.output.simulator-list',
+        version: '1',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected output schema metadata to parse');
+    expect(result.data.outputSchema).toEqual({
+      schema: 'xcodebuildmcp.output.simulator-list',
+      version: '1',
+    });
+  });
+
+  it('rejects invalid output schema metadata', () => {
+    const result = toolManifestEntrySchema.safeParse({
+      id: 'list_sims',
+      module: 'mcp/tools/simulator/list_sims',
+      names: { mcp: 'list_sims' },
+      outputSchema: {
+        schema: 'simulator-list',
+        version: 'v1',
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('parses a resource manifest entry with defaults', () => {

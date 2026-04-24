@@ -4,6 +4,9 @@ names:
   mcp: session_show_defaults
   cli: show-defaults
 description: Show current active defaults. Required before your first build/run/test call in a session — do not assume defaults are configured.
+outputSchema:
+  schema: xcodebuildmcp.output.session-defaults
+  version: "1"
 annotations:
   title: Show Session Defaults
   readOnlyHint: true

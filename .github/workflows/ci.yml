@@ -47,6 +47,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate structured JSON fixtures against schemas
+        run: npm run test:schema-fixtures
+
       - name: Publish preview package for pull requests
         if: github.event_name == 'pull_request'
         run: npx pkg-pr-new publish --comment=update

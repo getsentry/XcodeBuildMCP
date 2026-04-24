@@ -1,5 +1,6 @@
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { ScaffoldResultDomainResult, ScaffoldSummary } from '../../../types/domain-results.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 export function createScaffoldDomainResult(params: {
   platform: ScaffoldSummary['platform'];
@@ -12,7 +13,7 @@ export function createScaffoldDomainResult(params: {
   return {
     kind: 'scaffold-result',
     didError: params.didError,
-    error: params.error ?? null,
+    error: params.didError ? 'Failed to scaffold project.' : null,
     summary: {
       status: params.didError ? 'FAILED' : 'SUCCEEDED',
       platform: params.platform,
@@ -22,6 +23,9 @@ export function createScaffoldDomainResult(params: {
       outputPath: params.outputPath,
       ...(params.workspacePath ? { workspacePath: params.workspacePath } : {}),
     },
+    ...(params.didError
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.error ?? 'Unknown error'] }) }
+      : {}),
   };
 }
 

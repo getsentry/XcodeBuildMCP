@@ -4,6 +4,9 @@ names:
   mcp: scaffold_ios_project
   cli: scaffold-ios
 description: Scaffold iOS project.
+outputSchema:
+  schema: xcodebuildmcp.output.scaffold-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

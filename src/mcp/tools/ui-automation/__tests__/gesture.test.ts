@@ -360,9 +360,9 @@ describe('Gesture Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        "Failed to execute gesture 'scroll-up': axe command 'gesture' failed.",
-      );
+      const text = allText(result);
+      expect(text).toContain("Failed to execute gesture 'scroll-up'.");
+      expect(text).toContain('axe command failed');
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -384,9 +384,9 @@ describe('Gesture Plugin', () => {
         ),
       );
 
-      expect(allText(result)).toMatch(
-        /System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: ENOENT: no such file or directory');
       expect(result.isError).toBe(true);
     });
 
@@ -409,9 +409,9 @@ describe('Gesture Plugin', () => {
         ),
       );
 
-      expect(allText(result)).toMatch(
-        /System error executing axe: Failed to execute axe command: Unexpected error/,
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: Unexpected error');
       expect(result.isError).toBe(true);
     });
 
@@ -435,9 +435,9 @@ describe('Gesture Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'System error executing axe: Failed to execute axe command: String error',
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

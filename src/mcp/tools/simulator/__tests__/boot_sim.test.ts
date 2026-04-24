@@ -70,7 +70,8 @@ describe('boot_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Boot simulator operation failed: Simulator not found');
+      expect(text).toContain('Boot simulator operation failed.');
+      expect(text).toContain('Simulator not found');
       expect(result.isError).toBe(true);
     });
 
@@ -84,7 +85,8 @@ describe('boot_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Boot simulator operation failed: Connection failed');
+      expect(text).toContain('Boot simulator operation failed.');
+      expect(text).toContain('Connection failed');
       expect(result.isError).toBe(true);
     });
 
@@ -98,7 +100,8 @@ describe('boot_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Boot simulator operation failed: String error');
+      expect(text).toContain('Boot simulator operation failed.');
+      expect(text).toContain('String error');
       expect(result.isError).toBe(true);
     });
 

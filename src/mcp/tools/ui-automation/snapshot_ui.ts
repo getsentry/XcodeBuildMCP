@@ -18,14 +18,13 @@ import type {
   AccessibilityNode,
   CaptureResultDomainResult,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   createCaptureFailureResult,
   createCaptureSuccessResult,
   mapAxeCommandError,
   setCaptureStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const snapshotUiSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -60,7 +59,7 @@ export function createSnapshotUiExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<SnapshotUiParams, SnapshotUiResult> {
+): NonStreamingExecutor<SnapshotUiParams, SnapshotUiResult> {
   return async (params) => {
     const toolName = 'snapshot_ui';
     const { simulatorId } = params;
@@ -101,8 +100,7 @@ export function createSnapshotUiExecutor(
       });
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) =>
-          `Failed to get accessibility hierarchy: ${axeError.message}`,
+        axeFailureMessage: () => 'Failed to get accessibility hierarchy.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createCaptureFailureResult(simulatorId, failure.message, {
@@ -120,7 +118,7 @@ export async function snapshot_uiLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSnapshotUi = createSnapshotUiExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeSnapshotUi(params, noopToolExecutionContext);
+  const result = await executeSnapshotUi(params);
 
   setCaptureStructuredOutput(ctx, result);
 

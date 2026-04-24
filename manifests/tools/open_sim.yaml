@@ -4,6 +4,9 @@ names:
   mcp: open_sim
   cli: open
 description: Open Simulator.app for visibility/manual workflows. Not required before simulator build-and-run (build_run_sim).
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Open Simulator
   readOnlyHint: true

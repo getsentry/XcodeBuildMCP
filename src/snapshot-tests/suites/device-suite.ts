@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import { isDeviceAvailable } from '../device-availability.ts';
 import {
   extractAppPathFromSnapshotOutput,
   extractProcessIdFromSnapshotOutput,
@@ -9,6 +10,14 @@ import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
 const BUNDLE_ID = 'io.sentry.calculatorapp';
 const DEVICE_ID = process.env.DEVICE_ID;
+const DEVICE_READY = isDeviceAvailable(DEVICE_ID);
+
+if (DEVICE_ID && !DEVICE_READY) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[device-suite] DEVICE_ID="${DEVICE_ID}" is set but the device is not reachable (locked, disconnected, or powered off). Device-dependent tests will be skipped.`,
+  );
+}
 
 export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
   const expectFixture = createWorkflowFixtureMatcher(runtime, 'device');
@@ -109,7 +118,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
       });
     });
 
-    describe.runIf(DEVICE_ID)('build-and-run (requires device)', () => {
+    describe.runIf(DEVICE_READY)('build-and-run (requires device)', () => {
       it('success', async () => {
         const { text, isError } = await harness.invoke('device', 'build-and-run', {
           workspacePath: WORKSPACE,
@@ -132,7 +141,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
       });
     });
 
-    describe.runIf(DEVICE_ID)('install (requires device)', () => {
+    describe.runIf(DEVICE_READY)('install (requires device)', () => {
       it('success', async () => {
         const appPathResult = await harness.invoke('device', 'get-app-path', {
           workspacePath: WORKSPACE,
@@ -151,7 +160,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 60_000);
     });
 
-    describe.runIf(DEVICE_ID)('launch (requires device)', () => {
+    describe.runIf(DEVICE_READY)('launch (requires device)', () => {
       it('success', async () => {
         const { text, isError } = await harness.invoke('device', 'launch', {
           deviceId: DEVICE_ID,
@@ -162,7 +171,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 60_000);
     });
 
-    describe.runIf(DEVICE_ID)('stop (requires device)', () => {
+    describe.runIf(DEVICE_READY)('stop (requires device)', () => {
       it('success', async () => {
         const launchResult = await harness.invoke('device', 'launch', {
           deviceId: DEVICE_ID,
@@ -184,7 +193,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
       }, 60_000);
     });
 
-    describe.runIf(DEVICE_ID)('test (requires device)', () => {
+    describe.runIf(DEVICE_READY)('test (requires device)', () => {
       it('success - targeted passing test', async () => {
         const { text, isError } = await harness.invoke('device', 'test', {
           workspacePath: WORKSPACE,

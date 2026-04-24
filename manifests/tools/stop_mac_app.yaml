@@ -4,6 +4,9 @@ names:
   mcp: stop_mac_app
   cli: stop
 description: Stop macOS app.
+outputSchema:
+  schema: xcodebuildmcp.output.stop-result
+  version: "1"
 annotations:
   title: Stop macOS App
   readOnlyHint: false

@@ -63,6 +63,9 @@ availability:           # Per-runtime availability flags
 predicates: string[]    # Predicate names for visibility filtering (default: [])
 routing:                # CLI daemon routing
   stateful: boolean     # Tool maintains state (default: false)
+outputSchema:           # MCP structured output schema advertised to clients
+  schema: string        # Schema name, e.g. xcodebuildmcp.output.build-result
+  version: string       # Schema version, e.g. "1"
 annotations:            # MCP tool annotations (hints for clients)
   title: string         # Human-readable title (optional)
   readOnlyHint: boolean # Tool only reads data (optional)
@@ -79,6 +82,9 @@ module: mcp/tools/simulator/list_sims
 names:
   mcp: list_sims
 description: "List available iOS simulators."
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-list
+  version: "1"
 availability:
   mcp: true
   cli: true
@@ -218,6 +224,8 @@ tools:
 | `availability.cli` | boolean | No | `true` | Available via CLI |
 | `predicates` | string[] | No | `[]` | Visibility predicates (all must pass) |
 | `routing.stateful` | boolean | No | `false` | Tool maintains state |
+| `outputSchema.schema` | string | No | - | Structured output schema advertised to MCP clients; must match `ctx.structuredOutput.schema` |
+| `outputSchema.version` | string | No | - | Structured output schema version advertised to MCP clients; must match `ctx.structuredOutput.schemaVersion` |
 | `annotations.title` | string | No | - | Human-readable title |
 | `annotations.readOnlyHint` | boolean | No | - | Tool only reads data |
 | `annotations.destructiveHint` | boolean | No | - | Tool may modify/delete data |
@@ -430,7 +438,8 @@ At startup, tools are registered dynamically from manifests:
        └── Look up tool manifest by ID
        └── Check tool availability and predicates
        └── importToolModule(module) → { schema, handler, annotations }
-       └── server.registerTool(mcpName, schema, handler)
+       └── Load outputSchema from schemas/structured-output/<schema>/<version>.schema.json
+       └── server.registerTool(mcpName, { inputSchema, outputSchema, annotations }, handler)
 ```
 
 Key files:
@@ -525,6 +534,7 @@ Example checklist:
 - [ ] Module path is correct
 - [ ] MCP name is unique
 - [ ] Tool is added to at least one workflow
+- [ ] `outputSchema` references the schema produced by `ctx.structuredOutput`, if the tool returns structured content
 - [ ] Predicates reference valid predicate names
 - [ ] Availability flags match intended runtimes
 

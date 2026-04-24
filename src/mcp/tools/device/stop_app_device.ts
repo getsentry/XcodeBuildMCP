@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -40,9 +40,7 @@ export async function stop_app_deviceLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeStopAppDevice = createStopAppDeviceExecutor(executor);
-  const result = await executeStopAppDevice(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeStopAppDevice(params);
 
   setStopResultStructuredOutput(ctx, result);
 
@@ -53,7 +51,7 @@ export async function stop_app_deviceLogic(
 
 export function createStopAppDeviceExecutor(
   executor: CommandExecutor,
-): ToolExecutor<StopAppDeviceParams, StopAppDeviceResult> {
+): NonStreamingExecutor<StopAppDeviceParams, StopAppDeviceResult> {
   return async (params) => {
     log('info', `Stopping app with PID ${params.processId} on device ${params.deviceId}`);
 

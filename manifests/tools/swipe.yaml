@@ -4,6 +4,9 @@ names:
   mcp: swipe
   cli: swipe
 description: Swipe between points.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Swipe
   readOnlyHint: true

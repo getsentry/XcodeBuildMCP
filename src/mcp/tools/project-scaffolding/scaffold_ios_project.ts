@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { join, dirname, basename } from 'node:path';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { ValidationError } from '../../../utils/errors.ts';
 import { TemplateManager } from '../../../utils/template/index.ts';
@@ -346,8 +346,8 @@ type ScaffoldIOSProjectResult = ReturnType<typeof createScaffoldDomainResult>;
 export function createScaffoldIOSProjectExecutor(
   commandExecutor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
-): ToolExecutor<ScaffoldIOSProjectParams, ScaffoldIOSProjectResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<ScaffoldIOSProjectParams, ScaffoldIOSProjectResult> {
+  return async (params) => {
     try {
       const projectParams = { ...params, platform: 'iOS' };
       const projectPath = await scaffoldProject(projectParams, commandExecutor, fileSystemExecutor);
@@ -385,9 +385,7 @@ export async function scaffold_ios_projectLogic(
     commandExecutor,
     fileSystemExecutor,
   );
-  const result = await executeScaffoldIOSProject(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeScaffoldIOSProject(params);
 
   setScaffoldStructuredOutput(ctx, result);
 

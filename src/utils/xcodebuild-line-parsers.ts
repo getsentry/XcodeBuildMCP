@@ -49,6 +49,12 @@ export interface ParsedBuildError {
   renderedLine: string;
 }
 
+const BUILD_ERROR_DIAGNOSTIC_PATTERN = /(?:^|[\s:])(?:fatal error|error):\s*\S/iu;
+
+export function isBuildErrorDiagnosticLine(line: string): boolean {
+  return BUILD_ERROR_DIAGNOSTIC_PATTERN.test(line);
+}
+
 function normalizeSuiteName(rawSuiteName: string): string {
   const parts = rawSuiteName.split('.').filter(Boolean);
   const normalized = parts.length >= 2 ? (parts.at(-1) ?? rawSuiteName) : rawSuiteName;
@@ -166,9 +172,14 @@ export function parseBuildErrorDiagnostic(line: string): ParsedBuildError | null
 
   // Prefixed error: xcodebuild: error: message / error: message
   const rawMatch = line.match(/^(?:[\w-]+:\s+)?(?:fatal error|error): (.+)$/u);
-  if (!rawMatch) {
+  if (rawMatch) {
+    const [, message] = rawMatch;
+    return { message, renderedLine: line };
+  }
+
+  if (!isBuildErrorDiagnosticLine(line)) {
     return null;
   }
-  const [, message] = rawMatch;
-  return { message, renderedLine: line };
+
+  return { message: line, renderedLine: line };
 }

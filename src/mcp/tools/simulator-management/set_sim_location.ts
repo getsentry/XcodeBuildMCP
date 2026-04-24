@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const setSimulatorLocationSchema = z.object({
   simulatorId: z.uuid().describe('UUID of the simulator to use (obtained from list_simulators)'),
@@ -21,17 +22,6 @@ const setSimulatorLocationSchema = z.object({
 
 type SetSimulatorLocationParams = z.infer<typeof setSimulatorLocationSchema>;
 type SetSimulatorLocationResult = SimulatorActionResultDomainResult;
-
-function createDiagnostics(message: string) {
-  return {
-    warnings: [],
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
 
 function createSetSimulatorLocationResult(params: {
   simulatorId: string;
@@ -55,12 +45,12 @@ function createSetSimulatorLocationResult(params: {
         longitude: params.longitude,
       },
     },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
     artifacts: {
       simulatorId: params.simulatorId,
     },
-    ...(params.diagnosticMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
-      : {}),
   };
 }
 
@@ -74,8 +64,8 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SetSimulatorLocati
 
 export function createSetSimulatorLocationExecutor(
   executor: CommandExecutor,
-): ToolExecutor<SetSimulatorLocationParams, SetSimulatorLocationResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<SetSimulatorLocationParams, SetSimulatorLocationResult> {
+  return async (params) => {
     const coords = `${params.latitude},${params.longitude}`;
 
     if (params.latitude < -90 || params.latitude > 90) {
@@ -114,7 +104,7 @@ export function createSetSimulatorLocationExecutor(
           latitude: params.latitude,
           longitude: params.longitude,
           didError: true,
-          error: `Failed to set simulator location: ${diagnosticMessage}`,
+          error: 'Failed to set simulator location.',
           diagnosticMessage,
         });
       }
@@ -132,7 +122,7 @@ export function createSetSimulatorLocationExecutor(
         latitude: params.latitude,
         longitude: params.longitude,
         didError: true,
-        error: `Failed to set simulator location: ${diagnosticMessage}`,
+        error: 'Failed to set simulator location.',
         diagnosticMessage,
       });
     }
@@ -148,13 +138,11 @@ export async function set_sim_locationLogic(
   const ctx = getHandlerContext();
   const executeSetSimulatorLocation = createSetSimulatorLocationExecutor(executor);
 
-  const result = await executeSetSimulatorLocation(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSetSimulatorLocation(params);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
-    if (result.error?.startsWith('Failed to set simulator location:')) {
+    if (result.error === 'Failed to set simulator location.') {
       log(
         'error',
         `Error during set simulator location for simulator ${params.simulatorId}: ${result.error}`,

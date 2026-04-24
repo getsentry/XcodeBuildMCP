@@ -42,10 +42,12 @@ export async function executeAxeCommand(
     );
 
     if (!result.success) {
+      const axeOutput =
+        result.error && result.error.trim().length > 0 ? result.error : result.output;
       throw new AxeError(
         `axe command '${commandName}' failed.`,
         commandName,
-        result.error ?? result.output,
+        axeOutput.trim(),
         simulatorId,
       );
     }

@@ -11,12 +11,11 @@ import type {
   XcodeBridgeSyncDomainResult,
   XcodeBridgeToolListDomainResult,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutionContext, ToolExecutor } from '../../../types/tool-execution.ts';
 import { getServer } from '../../../server/server-state.ts';
 import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tools-bridge/index.ts';
 import type { ImageAttachment, ToolHandlerContext } from '../../../rendering/types.ts';
 
-export class BridgeToolExecutionContext implements ToolExecutionContext {
+export class BridgeToolExecutionContext {
   readonly liveProgressEnabled = false;
 
   private nextStepParams?: NextStepParamsMap;
@@ -41,10 +40,15 @@ export class BridgeToolExecutionContext implements ToolExecutionContext {
   }
 }
 
+export type BridgeExecutor<TArgs, TResult extends ToolDomainResult> = (
+  args: TArgs,
+  ctx: BridgeToolExecutionContext,
+) => Promise<TResult>;
+
 export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult>(options: {
   callback: (bridge: XcodeToolsBridgeToolHandler, args: TArgs) => Promise<BridgeToolResult>;
   toDomainResult: (bridgeResult: BridgeToolResult, args: TArgs) => TResult;
-}): ToolExecutor<TArgs, TResult> {
+}): BridgeExecutor<TArgs, TResult> {
   return async (args, ctx) => {
     const bridge = getXcodeToolsBridgeToolHandler(getServer());
     const bridgeResult: BridgeToolResult = bridge
@@ -54,11 +58,11 @@ export function createBridgeToolExecutor<TArgs, TResult extends ToolDomainResult
           errorMessage: 'Unable to initialize xcode tools bridge',
         };
 
-    if (bridgeResult.images && isBridgeToolExecutionContext(ctx)) {
+    if (bridgeResult.images) {
       ctx.addBridgeImages(bridgeResult.images);
     }
 
-    if (bridgeResult.nextStepParams && isBridgeToolExecutionContext(ctx)) {
+    if (bridgeResult.nextStepParams) {
       ctx.setNextStepParams(bridgeResult.nextStepParams);
     }
 
@@ -152,13 +156,6 @@ export function toBridgeCallResultDomainResult(
       ? { structuredContent: payload.structuredContent }
       : {}),
   };
-}
-
-function isBridgeToolExecutionContext(ctx: ToolExecutionContext): ctx is ToolExecutionContext & {
-  setNextStepParams(nextStepParams?: NextStepParamsMap): void;
-  addBridgeImages(images: ImageAttachment[]): void;
-} {
-  return typeof (ctx as { setNextStepParams?: unknown }).setNextStepParams === 'function';
 }
 
 function createFallbackBridgeStatus(error: string | null): XcodeBridgeStatusInfo {

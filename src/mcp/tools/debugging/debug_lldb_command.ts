@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugCommandResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
 import {
@@ -29,12 +30,20 @@ function createDebugCommandResult(params: {
   command: string;
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   outputLines?: string[];
 }): DebugLldbCommandResult {
   return {
     kind: 'debug-command-result',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     command: params.command,
     outputLines: params.outputLines ?? [],
   };
@@ -55,7 +64,7 @@ function splitOutputLines(output: string): string[] {
 
 export function createDebugLldbCommandExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugLldbCommandParams, DebugLldbCommandResult> {
+): NonStreamingExecutor<DebugLldbCommandParams, DebugLldbCommandResult> {
   return async (params) => {
     try {
       const output = await debuggerManager.runCommand(params.debugSessionId, params.command, {
@@ -68,10 +77,12 @@ export function createDebugLldbCommandExecutor(
         outputLines: splitOutputLines(output),
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugCommandResult({
         command: params.command,
         didError: true,
-        error: `Failed to run LLDB command: ${toErrorMessage(error)}`,
+        error: 'Failed to run LLDB command.',
+        diagnosticMessage,
       });
     }
   };
@@ -83,9 +94,7 @@ export async function debug_lldb_commandLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugLldbCommand = createDebugLldbCommandExecutor(ctx.debugger);
-  const result = await executeDebugLldbCommand(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugLldbCommand(params);
 
   setStructuredOutput(handlerCtx, result);
 }

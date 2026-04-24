@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildSettingsDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -13,6 +13,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { extractQueryDiagnostics } from '../../../utils/xcodebuild-error-utils.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -68,19 +69,6 @@ function parseBuildSettingsEntries(output: string): Array<{ key: string; value: 
     });
 }
 
-function dedupeRepeatedErrorMessage(message: string): string {
-  const normalized = message.replace(/\r\n/g, '\n').trimEnd();
-  const lines = normalized.split('\n');
-  if (lines.length % 2 !== 0) {
-    return normalized;
-  }
-
-  const midpoint = lines.length / 2;
-  const firstHalf = lines.slice(0, midpoint).join('\n');
-  const secondHalf = lines.slice(midpoint).join('\n');
-  return firstHalf === secondHalf ? firstHalf : normalized;
-}
-
 function createShowBuildSettingsResult(
   pathValue: string,
   scheme: string,
@@ -103,16 +91,16 @@ function createShowBuildSettingsErrorResult(
   scheme: string,
   message: string,
 ): ShowBuildSettingsResult {
-  const normalizedMessage = dedupeRepeatedErrorMessage(message);
   return {
     kind: 'build-settings',
     didError: true,
-    error: normalizedMessage,
+    error: 'Failed to show build settings.',
     artifacts: {
       workspacePath: pathValue,
       scheme,
     },
     entries: [],
+    diagnostics: extractQueryDiagnostics(message),
   };
 }
 
@@ -126,7 +114,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ShowBuildSettingsR
 
 export function createShowBuildSettingsExecutor(
   executor: CommandExecutor,
-): ToolExecutor<ShowBuildSettingsParams, ShowBuildSettingsResult> {
+): NonStreamingExecutor<ShowBuildSettingsParams, ShowBuildSettingsResult> {
   return async (params) => {
     const hasProjectPath = typeof params.projectPath === 'string';
     const pathValue = hasProjectPath ? params.projectPath! : params.workspacePath!;
@@ -147,7 +135,7 @@ export function createShowBuildSettingsExecutor(
         return createShowBuildSettingsErrorResult(
           pathValue,
           params.scheme,
-          result.error || 'Unknown error',
+          result.error || result.output || 'Unknown error',
         );
       }
 
@@ -173,9 +161,7 @@ export async function showBuildSettingsLogic(
 
   const ctx = getHandlerContext();
   const executeShowBuildSettings = createShowBuildSettingsExecutor(executor);
-  const result = await executeShowBuildSettings(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeShowBuildSettings(params);
 
   setStructuredOutput(ctx, result);
 

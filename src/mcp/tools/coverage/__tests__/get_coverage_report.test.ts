@@ -5,7 +5,12 @@ import {
   __setTestFileSystemExecutorOverride,
   __clearTestExecutorOverrides,
 } from '../../../../utils/execution/index.ts';
-import { schema, handler, get_coverage_reportLogic } from '../get_coverage_report.ts';
+import {
+  schema,
+  handler,
+  get_coverage_reportLogic,
+  createGetCoverageReportExecutor,
+} from '../get_coverage_report.ts';
 import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 
 
@@ -350,6 +355,22 @@ describe('get_coverage_report', () => {
       expect(text).toContain('Failed to load result bundle');
     });
 
+    it('keeps command failure summary short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'Failed to load result bundle',
+      });
+      const execute = createGetCoverageReportExecutor({
+        executor: mockExecutor,
+        fileSystem: mockFileSystem,
+      });
+
+      const result = await execute({ xcresultPath: '/tmp/bad.xcresult', showFiles: false });
+
+      expect(result.error).toBe('Failed to get coverage report.');
+      expect(result.diagnostics?.errors).toEqual([{ message: 'Failed to load result bundle' }]);
+    });
+
     it('should return error when JSON parsing fails', async () => {
       const mockExecutor = createMockExecutor({
         success: true,
@@ -364,6 +385,26 @@ describe('get_coverage_report', () => {
       expect(result.isError).toBe(true);
       const text = allText(result);
       expect(text).toContain('Failed to parse coverage JSON output');
+    });
+
+    it('preserves invalid coverage JSON output as raw diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'not valid json',
+      });
+      const execute = createGetCoverageReportExecutor({
+        executor: mockExecutor,
+        fileSystem: mockFileSystem,
+      });
+
+      const result = await execute({ xcresultPath: '/tmp/test.xcresult', showFiles: false });
+
+      expect(result.error).toBe('Failed to parse coverage JSON output.');
+      expect(result.diagnostics).toEqual({
+        warnings: [],
+        errors: [{ message: 'Failed to parse coverage JSON output.' }],
+        rawOutput: ['not valid json'],
+      });
     });
 
     it('should return error when data format is unexpected', async () => {

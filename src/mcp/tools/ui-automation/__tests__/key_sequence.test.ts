@@ -333,9 +333,9 @@ describe('Key Sequence Tool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        "Failed to execute key sequence: axe command 'key-sequence' failed.",
-      );
+      const text = allText(result);
+      expect(text).toContain('Failed to execute key sequence.');
+      expect(text).toContain('Simulator not found');
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -359,9 +359,9 @@ describe('Key Sequence Tool', () => {
         ),
       );
 
-      expect(allText(result)).toMatch(
-        /System error executing axe: Failed to execute axe command: ENOENT: no such file or directory/,
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: ENOENT: no such file or directory');
       expect(result.isError).toBe(true);
     });
 
@@ -386,9 +386,9 @@ describe('Key Sequence Tool', () => {
         ),
       );
 
-      expect(allText(result)).toMatch(
-        /System error executing axe: Failed to execute axe command: Unexpected error/,
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: Unexpected error');
       expect(result.isError).toBe(true);
     });
 
@@ -414,9 +414,9 @@ describe('Key Sequence Tool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'System error executing axe: Failed to execute axe command: String error',
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

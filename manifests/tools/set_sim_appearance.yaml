@@ -4,6 +4,9 @@ names:
   mcp: set_sim_appearance
   cli: set-appearance
 description: Set sim appearance.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Set Simulator Appearance
   readOnlyHint: true

@@ -4,6 +4,9 @@ names:
   mcp: xcode_tools_bridge_sync
   cli: bridge-sync
 description: One-shot connect + tools/list sync (manual retry; avoids background prompt spam).
+outputSchema:
+  schema: xcodebuildmcp.output.xcode-bridge-sync
+  version: "1"
 predicates:
   - debugEnabled
 annotations:

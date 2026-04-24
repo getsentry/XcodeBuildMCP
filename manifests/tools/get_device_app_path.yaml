@@ -4,6 +4,9 @@ names:
   mcp: get_device_app_path
   cli: get-app-path
 description: Get device built app path.
+outputSchema:
+  schema: xcodebuildmcp.output.app-path
+  version: "1"
 annotations:
   title: Get Device App Path
   readOnlyHint: true

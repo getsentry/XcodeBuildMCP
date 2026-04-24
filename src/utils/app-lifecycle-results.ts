@@ -4,6 +4,7 @@ import type {
   LaunchResultDomainResult,
   StopResultDomainResult,
 } from '../types/domain-results.ts';
+import { createBasicDiagnostics } from './diagnostics.ts';
 
 export const INSTALL_RESULT_STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.install-result';
 export const LAUNCH_RESULT_STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.launch-result';
@@ -13,6 +14,23 @@ export type InstallResultArtifacts = InstallResultDomainResult['artifacts'];
 export type LaunchResultArtifacts = LaunchResultDomainResult['artifacts'];
 export type StopResultArtifacts = StopResultDomainResult['artifacts'];
 export type StopResultDiagnosticMessage = StopResultDomainResult['diagnostics']['errors'][number];
+
+function stripKnownPrefix(message: string, prefixes: readonly string[]): string {
+  for (const prefix of prefixes) {
+    if (message.startsWith(prefix)) {
+      return message.slice(prefix.length).trim();
+    }
+  }
+  return message;
+}
+
+function isMacLaunch(artifacts: LaunchResultArtifacts): boolean {
+  return !('simulatorId' in artifacts) && !('deviceId' in artifacts);
+}
+
+function isMacStop(artifacts: StopResultArtifacts): boolean {
+  return !('simulatorId' in artifacts) && !('deviceId' in artifacts) && 'appName' in artifacts;
+}
 
 export function buildInstallSuccess(artifacts: InstallResultArtifacts): InstallResultDomainResult {
   return {
@@ -29,13 +47,19 @@ export function buildInstallFailure(
   artifacts: InstallResultArtifacts,
   message: string,
 ): InstallResultDomainResult {
+  const diagnosticMessage = stripKnownPrefix(message, [
+    'Failed to install app:',
+    'Failed to install app on device:',
+    'Install app in simulator operation failed:',
+  ]);
+
   return {
     kind: 'install-result',
     didError: true,
-    error: message,
+    error: 'Failed to install app.',
     summary: { status: 'FAILED' },
     artifacts,
-    diagnostics: { warnings: [], errors: [] },
+    diagnostics: createBasicDiagnostics({ errors: [diagnosticMessage] }),
   };
 }
 
@@ -65,13 +89,20 @@ export function buildLaunchFailure(
   artifacts: LaunchResultArtifacts,
   message: string,
 ): LaunchResultDomainResult {
+  const diagnosticMessage = stripKnownPrefix(message, [
+    'Failed to launch app:',
+    'Failed to launch app on device:',
+    'Launch app in simulator operation failed:',
+    'Launch macOS app operation failed:',
+  ]);
+
   return {
     kind: 'launch-result',
     didError: true,
-    error: message,
+    error: isMacLaunch(artifacts) ? 'Failed to launch macOS app.' : 'Failed to launch app.',
     summary: { status: 'FAILED' },
     artifacts,
-    diagnostics: { warnings: [], errors: [] },
+    diagnostics: createBasicDiagnostics({ errors: [diagnosticMessage] }),
   };
 }
 
@@ -105,13 +136,24 @@ export function buildStopFailure(
   message: string,
   diagnosticErrors: StopResultDiagnosticMessage[] = [],
 ): StopResultDomainResult {
+  const diagnosticMessage = stripKnownPrefix(message, [
+    'Failed to stop app:',
+    'Failed to stop app on device:',
+    'Stop app in simulator operation failed:',
+    'Stop macOS app operation failed:',
+  ]);
+  const diagnostics =
+    diagnosticErrors.length > 0
+      ? { warnings: [], errors: diagnosticErrors }
+      : createBasicDiagnostics({ errors: [diagnosticMessage] });
+
   return {
     kind: 'stop-result',
     didError: true,
-    error: message,
+    error: isMacStop(artifacts) ? 'Failed to stop macOS app.' : 'Failed to stop app.',
     summary: { status: 'FAILED' },
     artifacts,
-    diagnostics: { warnings: [], errors: diagnosticErrors },
+    diagnostics,
   };
 }
 

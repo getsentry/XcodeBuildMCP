@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -29,9 +29,7 @@ export async function launch_mac_appLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeLaunchMacApp = createLaunchMacAppExecutor(executor, fileSystem);
-  const result = await executeLaunchMacApp(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeLaunchMacApp(params);
 
   setLaunchResultStructuredOutput(ctx, result);
 
@@ -44,7 +42,7 @@ export async function launch_mac_appLogic(
 export function createLaunchMacAppExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
-): ToolExecutor<LaunchMacAppParams, LaunchMacAppResult> {
+): NonStreamingExecutor<LaunchMacAppParams, LaunchMacAppResult> {
   return async (params) => {
     const baseArtifacts = { appPath: params.appPath };
 

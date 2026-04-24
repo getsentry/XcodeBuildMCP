@@ -97,6 +97,7 @@ function mockInvokeDirectThroughHandler() {
           opts.renderSession?.attach(image);
         },
         liveProgressEnabled: Boolean(opts.onProgress),
+        streamingFragmentsEnabled: Boolean(opts.onProgress),
       };
 
       await tool.handler(args, handlerContext);

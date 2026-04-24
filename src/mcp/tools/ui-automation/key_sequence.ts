@@ -19,7 +19,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -27,7 +27,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const keySequenceSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -47,7 +46,7 @@ export function createKeySequenceExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<KeySequenceParams, KeySequenceResult> {
+): NonStreamingExecutor<KeySequenceParams, KeySequenceResult> {
   return async (params) => {
     const toolName = 'key_sequence';
     const { simulatorId, keyCodes, delay } = params;
@@ -78,7 +77,7 @@ export function createKeySequenceExecutor(
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) => `Failed to execute key sequence: ${axeError.message}`,
+        axeFailureMessage: () => 'Failed to execute key sequence.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -96,7 +95,7 @@ export async function key_sequenceLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeKeySequence = createKeySequenceExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeKeySequence(params, noopToolExecutionContext);
+  const result = await executeKeySequence(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

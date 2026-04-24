@@ -4,6 +4,9 @@ names:
   mcp: swift_package_list
   cli: list
 description: List SwiftPM processes.
+outputSchema:
+  schema: xcodebuildmcp.output.process-list
+  version: "1"
 routing:
   stateful: true
 annotations:

@@ -90,6 +90,10 @@ export function getManifestsDir(): string {
   return path.join(getResourceRoot(), 'manifests');
 }
 
+export function getStructuredOutputSchemasDir(): string {
+  return path.join(getResourceRoot(), 'schemas', 'structured-output');
+}
+
 export function getBundledAxePath(): string {
   return path.join(getResourceRoot(), 'bundled', 'axe');
 }

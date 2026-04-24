@@ -21,19 +21,9 @@ const HEX_ADDRESS_REGEX = /0x[0-9a-fA-F]{8,}/g;
 const LLDB_FRAME_OFFSET_REGEX = /(`[^`\n]+):(\d+)$/gm;
 const LLDB_SYS_FRAME_FUNC_REGEX =
   /(frame #\d+: )\S+( at (?:\/usr\/lib\/|\/Library\/Developer\/CoreSimulator\/)[^`\n]*`)[^:\n]+(:<OFFSET>)/gm;
-const LLDB_LOWER_FRAMES_REGEX = /(  frame #\d+: (?:<FUNC> at [^\n]*|<ADDR>(?: at [^\n]*)?)\n)+/g;
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
 const LLDB_BREAKPOINT_LOCATIONS_REGEX = /locations = .+$/gm;
-const LLDB_BREAKPOINT_SUB_LOCATION_REGEX = /^\s+\d+\.\d+: where = [^\n]+\n?/gm;
-const LLDB_RUNTIME_ROOT_FRAME_REGEX =
-  /^\s*frame #(?:\d+|<N>): .*\/Library\/Developer\/CoreSimulator\/Volumes\/[^`\n]+`[^\n]*\n?/gm;
 const DERIVED_DATA_HASH_REGEX = /(DerivedData\/[A-Za-z0-9_]+)-[a-z]{28}\b/g;
-const PROGRESS_LINE_REGEX = /^›.*$/gm;
-const WARNINGS_BLOCK_REGEX = /Warnings \(\d+\):\n(?:\n? *⚠[^\n]*\n?)*/g;
-const XCODE_INFRA_ERRORS_REGEX =
-  /Compiler Errors \(\d+\):\n(?:\n? *✗ (?:unable to rename temporary|failed to emit precompiled|accessing build database)[^\n]*\n?(?:\n? {4}[^\n]*\n?)*)*/g;
-const SPM_STEP_LINE_REGEX = /^\[\d+\/\d+\] .+\n?/gm;
-const SPM_PLANNING_LINE_REGEX = /^Building for (?:debugging|release)\.\.\.\n?/gm;
 const LOCAL_TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/g;
 const XCTEST_PARENS_DURATION_REGEX = /\(\d+\.\d+\) seconds/g;
 const SWIFT_TESTING_DURATION_REGEX = /after \d+\.\d+ seconds/g;
@@ -51,29 +41,7 @@ const CODEX_WORKTREE_NODE_MODULES_REGEX =
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
-const ACTIVE_LAUNCH_OSLOG_SESSIONS_REGEX = /("activeLaunchOsLogSessions"\s*:\s*)\[[\s\S]*?\]/g;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
-
-function sortLinesInBlock(text: string, marker: RegExp): string {
-  const lines = text.split('\n');
-  const blocks: { start: number; end: number }[] = [];
-  let blockStart = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (marker.test(lines[i]!)) {
-      if (blockStart === -1) blockStart = i;
-    } else if (blockStart !== -1) {
-      blocks.push({ start: blockStart, end: i });
-      blockStart = -1;
-    }
-  }
-  if (blockStart !== -1) blocks.push({ start: blockStart, end: lines.length });
-  for (const block of blocks) {
-    const slice = lines.slice(block.start, block.end);
-    slice.sort();
-    lines.splice(block.start, block.end - block.start, ...slice);
-  }
-  return lines.join('\n');
-}
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -135,30 +103,14 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(/\(Booted\)/g, '(<SIM_STATE>)');
   normalized = normalized.replace(/\(Shutdown\)/g, '(<SIM_STATE>)');
 
-  // Normalize the entire accessibility hierarchy JSON block
-  // The hierarchy content is volatile (changes with simulator state/app)
-  // Replace with a stable placeholder preserving only the section structure
-  normalized = normalized.replace(
-    /(Accessibility Hierarchy\n\s*```json\n)\s*\[[\s\S]*?\n\s*\]\n(\s*```)/g,
-    '$1  [{ "normalized": true }]\n$2',
-  );
-
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
   normalized = normalized.replace(LLDB_FRAME_OFFSET_REGEX, '$1:<OFFSET>');
   normalized = normalized.replace(LLDB_SYS_FRAME_FUNC_REGEX, '$1<FUNC>$2<FUNC>$3');
-  normalized = normalized.replace(LLDB_LOWER_FRAMES_REGEX, '  <LOWER_FRAMES>\n');
   normalized = normalized.replace(LLDB_FRAME_NUMBER_REGEX, '  frame #<N>:');
   normalized = normalized.replace(LLDB_BREAKPOINT_LOCATIONS_REGEX, 'locations = <LOCATIONS>');
-  normalized = normalized.replace(LLDB_BREAKPOINT_SUB_LOCATION_REGEX, '');
-  normalized = normalized.replace(LLDB_RUNTIME_ROOT_FRAME_REGEX, '');
   normalized = normalized.replace(RESULT_BUNDLE_LINE_REGEX, '<RESULT_BUNDLE_ERROR>');
-  normalized = normalized.replace(PROGRESS_LINE_REGEX, '');
-  normalized = normalized.replace(WARNINGS_BLOCK_REGEX, '');
-  normalized = normalized.replace(XCODE_INFRA_ERRORS_REGEX, '');
 
-  normalized = normalized.replace(SPM_STEP_LINE_REGEX, '');
-  normalized = normalized.replace(SPM_PLANNING_LINE_REGEX, '');
   normalized = normalized.replace(LOCAL_TIMESTAMP_REGEX, '<TIMESTAMP>');
   normalized = normalized.replace(XCTEST_PARENS_DURATION_REGEX, '(<DURATION>) seconds');
   normalized = normalized.replace(SWIFT_TESTING_DURATION_REGEX, 'after <DURATION> seconds');
@@ -166,7 +118,6 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(TARGET_DEVICE_IDENTIFIER_REGEX, '$1<UUID>');
   normalized = normalized.replace(BUILD_SETTINGS_PATH_REGEX, '$1<PATH>');
-  normalized = normalized.replace(ACTIVE_LAUNCH_OSLOG_SESSIONS_REGEX, '$1[]');
   normalized = normalized.replace(CODEX_ARG0_PATH_REGEX, '<HOME>/.codex/tmp/arg0/codex-arg0<ARG0>');
   normalized = normalized.replace(ACQUIRED_USAGE_ASSERTION_TIME_REGEX, '$1<TIME>$2');
   normalized = normalized.replace(
@@ -187,7 +138,16 @@ export function normalizeSnapshotOutput(text: string): string {
     (_match: string, prefix: string, num: string) => `${prefix}${parseFloat(num).toFixed(1)}`,
   );
 
-  normalized = sortLinesInBlock(normalized, /^[◇✔✘] Test "/);
+  // Round floats embedded in AXFrame strings like `{{19.5, 357.5}, {82.666664123535156, 81}}`
+  // to 1 decimal for rounding-stable comparison.
+  normalized = normalized.replace(
+    /("AXFrame"\s*:\s*")([^"]*)(")/g,
+    (_match: string, prefix: string, value: string, suffix: string) =>
+      `${prefix}${value.replace(/(\d+)\.(\d{2,})/g, (__, intPart: string, fracPart: string) => {
+        const parsed = parseFloat(`${intPart}.${fracPart}`);
+        return (Math.round(parsed * 10) / 10).toString();
+      })}${suffix}`,
+  );
 
   normalized = normalized.replace(
     /(?<=Workspace root: )(?:<ROOT>\/[^\n]+|(?!\/)[^\n]+)/g,
@@ -197,11 +157,11 @@ export function normalizeSnapshotOutput(text: string): string {
 
   // Doctor-specific sanitization for volatile system information
   normalized = normalized.replace(/  version: v[\d.]+/g, '  version: <NODE_VERSION>');
-  normalized = normalized.replace(/(├|└)\s+release: [\d.]+/g, '$1 release: <OS_RELEASE>');
-  normalized = normalized.replace(/(├|└)\s+cpus: .+/g, '$1 cpus: <CPUS>');
-  normalized = normalized.replace(/(├|└)\s+memory: .+/g, '$1 memory: <MEMORY>');
-  normalized = normalized.replace(/(├|└)\s+tmpdir: \/var\/folders\/[^\n]+/g, '$1 tmpdir: <TMPDIR>');
-  normalized = normalized.replace(/(├|└)\s+homedir: [^\n]+/g, '$1 homedir: <HOME>');
+  normalized = normalized.replace(/^(  release: )[\d.]+/gm, '$1<OS_RELEASE>');
+  normalized = normalized.replace(/^(  cpus: ).+/gm, '$1<CPUS>');
+  normalized = normalized.replace(/^(  memory: ).+/gm, '$1<MEMORY>');
+  normalized = normalized.replace(/^(  tmpdir: )\/var\/folders\/[^\n]+/gm, '$1<TMPDIR>');
+  normalized = normalized.replace(/^(  homedir: )[^\n]+/gm, '$1<HOME>');
   normalized = normalized.replace(/  Server Version: [\d.]+[^\n]*/g, '  Server Version: <VERSION>');
   normalized = normalized.replace(/  tmpdir: \/var\/folders\/[^\n]+/g, '  tmpdir: <TMPDIR>');
   normalized = normalized.replace(/  TMPDIR: \/var\/folders\/[^\n]+/g, '  TMPDIR: <TMPDIR>');
@@ -225,18 +185,16 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(/  Total Unique Tools: \d+/g, '  Total Unique Tools: <COUNT>');
   normalized = normalized.replace(/  Workflow Count: \d+/g, '  Workflow Count: <COUNT>');
   normalized = normalized.replace(/  (\w[\w-]*): \d+ tools$/gm, '  $1: <N> tools');
-  // Sanitize cwd (volatile across environments — local dev, codex worktrees, CI)
   normalized = normalized.replace(/  cwd: [^\n]+/g, '  cwd: <CWD>');
-  // Sanitize environment-dependent capability flags
   normalized = normalized.replace(
     /Simulator Video Capture Supported \(AXe >= [\d.]+\): (?:Yes|No)/g,
     'Simulator Video Capture Supported (AXe >= <VERSION>): <AVAILABLE>',
   );
-  // Sanitize the entire PATH section (volatile across environments)
-  normalized = normalized.replace(/\nPATH\n(?:  [^\n]+\n)*/g, '\nPATH\n  <PATH_ENTRIES>\n');
 
-  normalized = normalized.replace(/(  <LOWER_FRAMES>\n){2,}/g, '  <LOWER_FRAMES>\n');
-  normalized = normalized.replace(/\n{3,}/g, '\n\n');
+  // PATH section body: every entry is an absolute system path that varies by
+  // host/user. Replace the entire body with a single stable placeholder.
+  normalized = normalized.replace(/(\nPATH\n)(?:  [^\n]+\n)+/g, '$1  <PATH_ENTRIES>\n');
+
   normalized = normalized.replace(TRAILING_WHITESPACE_REGEX, '');
   normalized = normalized.replace(/\n*$/, '\n');
 

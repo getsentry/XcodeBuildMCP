@@ -2,17 +2,17 @@ import type { RenderHints, ToolHandlerContext } from '../rendering/types.ts';
 import type {
   AppPathDomainResult,
   AppPathRequest,
+  BasicDiagnostics,
   BuildTarget,
   BundleIdDomainResult,
 } from '../types/domain-results.ts';
-import { extractQueryErrorMessages } from './xcodebuild-error-utils.ts';
+import { extractQueryDiagnostics } from './xcodebuild-error-utils.ts';
 
 export const APP_PATH_STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.app-path';
 export const BUNDLE_ID_STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.bundle-id';
 
 export function appPathErrorMessages(rawMessage: string): string[] {
-  const messages = extractQueryErrorMessages(rawMessage);
-  return messages.length > 0 ? messages : [rawMessage];
+  return extractQueryDiagnostics(rawMessage).errors.map((error) => error.message);
 }
 
 export function buildAppPathSuccess(
@@ -37,17 +37,13 @@ export function buildAppPathFailure(
   target: BuildTarget,
   errorLabel: string,
 ): AppPathDomainResult {
-  const messages = appPathErrorMessages(rawMessage);
   return {
     kind: 'app-path',
     didError: true,
     error: errorLabel,
     request,
     summary: { status: 'FAILED', target },
-    diagnostics: {
-      warnings: [],
-      errors: messages.map((message) => ({ message })),
-    },
+    diagnostics: extractQueryDiagnostics(rawMessage),
   };
 }
 
@@ -73,6 +69,7 @@ export function buildBundleIdResult(
   appPath: string,
   bundleId?: string,
   error?: string,
+  diagnostics?: BasicDiagnostics,
 ): BundleIdDomainResult {
   return {
     kind: 'bundle-id',
@@ -82,6 +79,7 @@ export function buildBundleIdResult(
       appPath,
       ...(bundleId ? { bundleId } : {}),
     },
+    ...(diagnostics ? { diagnostics } : {}),
   };
 }
 

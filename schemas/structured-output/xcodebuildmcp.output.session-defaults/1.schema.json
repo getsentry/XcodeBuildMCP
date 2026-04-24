@@ -44,6 +44,9 @@
           "additionalProperties": {
             "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/sessionDefaultsProfile"
           }
+        },
+        "operation": {
+          "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/sessionDefaultsOperation"
         }
       },
       "required": [

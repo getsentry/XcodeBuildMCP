@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { BuildRunResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
 import { XcodePlatform } from '../../../types/common.ts';
@@ -18,11 +18,24 @@ import { launchMacApp } from '../../../utils/macos-steps.ts';
 import {
   collectFallbackErrorMessages,
   createBuildRunDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+
+function createBuildRunMacOSRequest(params: BuildRunMacOSParams): BuildInvocationRequest {
+  return {
+    scheme: params.scheme,
+    workspacePath: params.workspacePath,
+    projectPath: params.projectPath,
+    configuration: params.configuration ?? 'Debug',
+    platform: 'macOS',
+    arch: params.arch,
+    target: 'macos',
+  };
+}
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -58,9 +71,10 @@ type BuildRunMacOSResult = BuildRunResultDomainResult;
 
 export function createBuildRunMacOSExecutor(
   executor: CommandExecutor,
-): DomainStreamingExecutor<BuildRunMacOSParams, BuildRunMacOSResult> {
+): StreamingExecutor<BuildRunMacOSParams, BuildRunMacOSResult> {
   return async (params, ctx) => {
     const configuration = params.configuration ?? 'Debug';
+    const request = createBuildRunMacOSRequest(params);
     const started = createDomainStreamingPipeline('build_run_macos', 'BUILD', ctx);
     const buildResult = await executeXcodeBuildCommand(
       { ...params, configuration },
@@ -81,6 +95,7 @@ export function createBuildRunMacOSExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+        request,
       });
     }
 
@@ -117,6 +132,7 @@ export function createBuildRunMacOSExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to get app path to launch: ${errorMessage}`,
         ]),
+        request,
       });
     }
 
@@ -146,6 +162,7 @@ export function createBuildRunMacOSExecutor(
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
           `Failed to launch app ${appPath}: ${macLaunchResult.error ?? 'Failed to launch app'}`,
         ]),
+        request,
       });
     }
 
@@ -173,6 +190,7 @@ export function createBuildRunMacOSExecutor(
         stdout: [],
         stderr: [],
       },
+      request,
     });
   };
 }
@@ -182,29 +200,14 @@ export async function buildRunMacOSLogic(
   executor: CommandExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const configuration = params.configuration ?? 'Debug';
+  const invocationRequest = createBuildRunMacOSRequest(params);
 
-  const invocationRequest: BuildInvocationRequest = {
-    scheme: params.scheme,
-    workspacePath: params.workspacePath,
-    projectPath: params.projectPath,
-    configuration,
-    platform: 'macOS',
-    arch: params.arch,
-    target: 'macos',
-  };
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'BUILD',
-    invocationRequest,
-    'build-run-result',
-  );
+  ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunMacOS = createBuildRunMacOSExecutor(executor);
   const result = await executeBuildRunMacOS(params, executionContext);
-  result.request = invocationRequest;
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);
-  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

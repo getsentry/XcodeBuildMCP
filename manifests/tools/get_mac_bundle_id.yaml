@@ -4,6 +4,9 @@ names:
   mcp: get_mac_bundle_id
   cli: get-macos-bundle-id
 description: Extract bundle id from macOS .app.
+outputSchema:
+  schema: xcodebuildmcp.output.bundle-id
+  version: "1"
 annotations:
   title: Get Mac Bundle ID
   readOnlyHint: true

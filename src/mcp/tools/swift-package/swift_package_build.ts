@@ -2,7 +2,7 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -15,7 +15,7 @@ import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipelin
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import {
   createBuildDomainResult,
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
@@ -47,11 +47,25 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageBuildR
   };
 }
 
+function createBuildSpmInvocationRequest(
+  resolvedPath: string,
+  params: SwiftPackageBuildParams,
+): BuildInvocationRequest {
+  return {
+    packagePath: resolvedPath,
+    ...(params.targetName ? { targetName: params.targetName } : {}),
+    ...(params.configuration ? { configuration: params.configuration } : {}),
+    target: 'swift-package' as const,
+  };
+}
+
 export function createSwiftPackageBuildExecutor(
   executor: CommandExecutor,
-): DomainStreamingExecutor<SwiftPackageBuildParams, SwiftPackageBuildResult> {
+  request?: BuildInvocationRequest,
+): StreamingExecutor<SwiftPackageBuildParams, SwiftPackageBuildResult> {
   return async (params, ctx) => {
     const resolvedPath = path.resolve(params.packagePath);
+    const resolvedRequest = request ?? createBuildSpmInvocationRequest(resolvedPath, params);
     const swiftArgs = ['build', '--package-path', resolvedPath];
 
     if (params.configuration?.toLowerCase() === 'release') {
@@ -92,6 +106,7 @@ export function createSwiftPackageBuildExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [...started.stderrLines, failureMessage],
+        request: resolvedRequest,
       });
     } catch (error) {
       const message = toErrorMessage(error);
@@ -104,6 +119,7 @@ export function createSwiftPackageBuildExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: [...started.stderrLines, message],
+        request: resolvedRequest,
       });
     }
   };
@@ -116,19 +132,13 @@ export async function swift_package_buildLogic(
   const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
 
-  const invocationRequest: BuildInvocationRequest = {
-    packagePath: resolvedPath,
-    ...(params.targetName ? { targetName: params.targetName } : {}),
-    ...(params.configuration ? { configuration: params.configuration } : {}),
-    target: 'swift-package' as const,
-  };
+  const invocationRequest = createBuildSpmInvocationRequest(resolvedPath, params);
   ctx.emit(createBuildInvocationFragment('build-result', 'BUILD', invocationRequest));
-  const executionContext = createToolExecutionContext(ctx);
-  const executeSwiftPackageBuild = createSwiftPackageBuildExecutor(executor);
+  const executionContext = createStreamingExecutionContext(ctx);
+  const executeSwiftPackageBuild = createSwiftPackageBuildExecutor(executor, invocationRequest);
   const result = await executeSwiftPackageBuild(params, executionContext);
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

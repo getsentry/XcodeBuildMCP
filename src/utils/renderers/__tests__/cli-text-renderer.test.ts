@@ -76,8 +76,18 @@ describe('cli-text-renderer', () => {
       message: 'Compiling',
     });
 
+    renderer.onFragment({
+      kind: 'infrastructure',
+      fragment: 'status',
+      level: 'info',
+      message: 'Starting xcodebuild',
+    });
+
     const output = stdoutWrite.mock.calls.flat().join('');
-    expect(output).toContain('  Derived Data: /tmp/DerivedData\n\n\u203A Compiling\n');
+    expect(output).toContain(
+      '  Derived Data: /tmp/DerivedData\n\n\u{2139}\u{FE0F} Starting xcodebuild\n',
+    );
+    expect(output).not.toContain('\u203A Compiling\n');
   });
 
   it('uses transient interactive updates for active phases and durable writes for lasting events', () => {
@@ -229,8 +239,9 @@ describe('cli-text-renderer', () => {
 
     const output = stdoutWrite.mock.calls.flat().join('');
     expect(output).toContain(
-      '\u203A Compiling\n\nCompiler Errors (1):\n\n  \u2717 unterminated string literal\n    /tmp/MCPTest/ContentView.swift:16:18',
+      '  Derived Data: /tmp/DerivedData\n\nCompiler Errors (1):\n\n  \u2717 unterminated string literal\n    /tmp/MCPTest/ContentView.swift:16:18',
     );
+    expect(output).not.toContain('\u203A Compiling\n');
     expect(output).not.toContain('error: unterminated string literal\n  ContentView.swift:16:18');
     expect(output).toContain('\n\n\u{274C} Build failed. (\u{23F1}\u{FE0F} 4.0s)');
   });
@@ -421,6 +432,49 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('└ App Path: /tmp/MyApp.app');
   });
 
+  it('renders structured-only non-build diagnostics with a short top-level error summary', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.scheme-list',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'scheme-list',
+          didError: true,
+          error: 'Failed to list schemes.',
+          artifacts: { workspacePath: '/tmp/Missing.xcworkspace' },
+          schemes: [],
+          diagnostics: {
+            warnings: [{ message: 'Using default destination because none was provided.' }],
+            errors: [
+              { message: 'xcodebuild: error: The workspace named "Missing" does not exist.' },
+            ],
+            rawOutput: ['Result bundle written to /tmp/result.xcresult'],
+          },
+        },
+      },
+    });
+
+    const errorsIndex = output.indexOf('Errors (1):');
+    const warningsIndex = output.indexOf('Warnings (1):');
+    const rawOutputIndex = output.indexOf('Raw Output:');
+    const statusIndex = output.indexOf('❌ Failed to list schemes.');
+
+    expect(output).toContain('🔍 List Schemes');
+    expect(errorsIndex).toBeGreaterThanOrEqual(0);
+    expect(warningsIndex).toBeGreaterThan(errorsIndex);
+    expect(rawOutputIndex).toBeGreaterThan(warningsIndex);
+    expect(statusIndex).toBeGreaterThan(rawOutputIndex);
+    expect(output).toContain(
+      '  ✗ xcodebuild: error: The workspace named "Missing" does not exist.',
+    );
+    expect(output).toContain('  ⚠ Using default destination because none was provided.');
+    expect(output).toContain('Result bundle written to /tmp/result.xcresult');
+    expect(output).not.toContain('🔴 Errors');
+    expect(output).not.toContain('🔴 Raw Output');
+    expect(output).not.toContain('❌ xcodebuild: error');
+    expect(output.match(/Failed to list schemes\./g)).toHaveLength(1);
+  });
+
   it('renders clean-style build results when no live xcodebuild output was seen', () => {
     const output = renderCliTextTranscript({
       structuredOutput: {
@@ -446,5 +500,86 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('Scheme: MyApp');
     expect(output).toContain('Workspace: /tmp/MyApp.xcworkspace');
     expect(output).toContain('✅ Clean successful');
+  });
+
+  it('renders structured-only build-result with request and no fragments', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: buildOutput({
+        request: {
+          scheme: 'MyApp',
+          projectPath: '/tmp/MyApp.xcodeproj',
+          configuration: 'Debug',
+          platform: 'iOS Simulator',
+        },
+        summary: { status: 'SUCCEEDED', durationMs: 3200 },
+        artifacts: { buildLogPath: '/tmp/build.log' },
+      }),
+    });
+
+    expect(output).toContain('🔨 Build');
+    expect(output).toContain('Scheme: MyApp');
+    expect(output).toContain('Configuration: Debug');
+    expect(output).toContain('✅ Build succeeded. (⏱️ 3.2s)');
+    expect(output).toContain('Build Logs: /tmp/build.log');
+  });
+
+  it('renders structured-only build-run-result with request and no fragments', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-run-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-run-result',
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED', durationMs: 5000 },
+          artifacts: { appPath: '/tmp/build/MyApp.app', buildLogPath: '/tmp/build.log' },
+          diagnostics: { warnings: [], errors: [] },
+        },
+      },
+    });
+
+    expect(output).toContain('🚀 Build & Run');
+    expect(output).toContain('Scheme: MyApp');
+    expect(output).toContain('✅ Build succeeded. (⏱️ 5.0s)');
+    expect(output).toContain('✅ Build & Run complete');
+    expect(output).toContain('App Path: /tmp/build/MyApp.app');
+  });
+
+  it('renders structured-only test-result with request and no fragments', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'test-result',
+          request: {
+            scheme: 'MyApp',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+          didError: false,
+          error: null,
+          summary: {
+            status: 'SUCCEEDED',
+            durationMs: 2100,
+            counts: { passed: 5, failed: 0, skipped: 1 },
+          },
+          artifacts: { buildLogPath: '/tmp/test.log' },
+          diagnostics: { warnings: [], errors: [], testFailures: [] },
+        },
+      },
+    });
+
+    expect(output).toContain('🧪 Test');
+    expect(output).toContain('Scheme: MyApp');
+    expect(output).toContain('5 tests passed, 1 skipped');
+    expect(output).toContain('Build Logs: /tmp/test.log');
   });
 });

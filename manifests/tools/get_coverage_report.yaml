@@ -4,6 +4,9 @@ names:
   mcp: get_coverage_report
   cli: get-coverage-report
 description: Show per-target code coverage from an xcresult bundle.
+outputSchema:
+  schema: xcodebuildmcp.output.coverage-result
+  version: "1"
 annotations:
   title: Get Coverage Report
   readOnlyHint: true

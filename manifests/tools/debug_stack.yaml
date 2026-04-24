@@ -4,6 +4,9 @@ names:
   mcp: debug_stack
   cli: stack
 description: Get backtrace.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-stack-result
+  version: "1"
 routing:
   stateful: true
 annotations:

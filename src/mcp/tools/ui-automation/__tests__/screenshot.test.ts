@@ -252,9 +252,9 @@ describe('Screenshot Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'Screenshot captured but failed to process image file: File not found',
-      );
+      const text = allText(result);
+      expect(text).toContain('Screenshot captured but failed to process image file.');
+      expect(text).toContain('File not found');
     });
 
     it('should handle file cleanup errors gracefully', async () => {
@@ -382,7 +382,9 @@ describe('Screenshot Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('System error executing screenshot: System error occurred');
+      const text = allText(result);
+      expect(text).toContain('Failed to capture screenshot.');
+      expect(text).toContain('System error occurred');
     });
 
     it('should handle unexpected Error objects', async () => {
@@ -401,7 +403,9 @@ describe('Screenshot Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('An unexpected error occurred: Unexpected error');
+      const text = allText(result);
+      expect(text).toContain('Unexpected screenshot failure.');
+      expect(text).toContain('Unexpected error');
     });
 
     it('should handle unexpected string errors', async () => {
@@ -420,7 +424,9 @@ describe('Screenshot Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('An unexpected error occurred: String error');
+      const text = allText(result);
+      expect(text).toContain('Unexpected screenshot failure.');
+      expect(text).toContain('String error');
     });
   });
 

@@ -4,7 +4,7 @@ import type {
   SessionDefaultsDomainResult,
   SessionDefaultsProfile,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   persistActiveSessionDefaultsProfile,
   persistSessionDefaultsPatch,
@@ -102,7 +102,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionSetDefaults
 
 export function createSessionSetDefaultsExecutor(
   context: SessionSetDefaultsContext,
-): ToolExecutor<Params, SessionSetDefaultsResult> {
+): NonStreamingExecutor<Params, SessionSetDefaultsResult> {
   return async (params) => {
     try {
       let activeProfile = sessionStore.getActiveProfile();
@@ -221,9 +221,7 @@ export async function sessionSetDefaultsLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSessionSetDefaults = createSessionSetDefaultsExecutor(context);
-  const result = await executeSessionSetDefaults(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSessionSetDefaults(params);
   const {
     profile: rawProfile,
     persist: _persist,

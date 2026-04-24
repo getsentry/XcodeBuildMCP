@@ -4,6 +4,9 @@ names:
   mcp: build_run_macos
   cli: build-and-run
 description: Build and run macOS app.
+outputSchema:
+  schema: xcodebuildmcp.output.build-run-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

@@ -4,6 +4,9 @@ names:
   mcp: debug_attach_sim
   cli: attach
 description: Attach LLDB to sim app.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-session-action
+  version: "1"
 routing:
   stateful: true
 annotations:

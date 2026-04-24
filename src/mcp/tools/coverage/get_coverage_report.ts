@@ -7,8 +7,8 @@
 
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
-import type { CoverageResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { BasicDiagnostics, CoverageResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -20,6 +20,7 @@ import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { createBasicDiagnostics, diagnosticsFromCommandFailure } from '../../../utils/diagnostics.ts';
 
 const getCoverageReportSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -82,17 +83,6 @@ type GetCoverageReportContext = {
   fileSystem: FileSystemExecutor;
 };
 
-function createDiagnostics(message: string) {
-  return {
-    warnings: [] as Array<{ message: string }>,
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
-
 function createCoverageReportResult(params: {
   xcresultPath: string;
   didError: boolean;
@@ -102,7 +92,7 @@ function createCoverageReportResult(params: {
   coveredLines?: number;
   executableLines?: number;
   targets?: CoverageReportTargetResult[];
-  diagnosticsMessage?: string;
+  diagnostics?: BasicDiagnostics;
 }): GetCoverageReportResult {
   return {
     kind: 'coverage-result',
@@ -122,7 +112,7 @@ function createCoverageReportResult(params: {
       ...(params.target ? { target: params.target } : {}),
     },
     ...(params.targets ? { targets: params.targets } : {}),
-    ...(params.diagnosticsMessage ? { diagnostics: createDiagnostics(params.diagnosticsMessage) } : {}),
+    ...(params.diagnostics ? { diagnostics: params.diagnostics } : {}),
   };
 }
 
@@ -136,7 +126,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetCoverageReportR
 
 export function createGetCoverageReportExecutor(
   context: GetCoverageReportContext,
-): ToolExecutor<GetCoverageReportParams, GetCoverageReportResult> {
+): NonStreamingExecutor<GetCoverageReportParams, GetCoverageReportResult> {
   return async (params) => {
     const { xcresultPath, target, showFiles } = params;
 
@@ -146,6 +136,7 @@ export function createGetCoverageReportExecutor(
         xcresultPath,
         didError: true,
         error: fileExistsValidation.errorMessage!,
+        diagnostics: createBasicDiagnostics({ errors: [fileExistsValidation.errorMessage!] }),
       });
     }
 
@@ -162,8 +153,8 @@ export function createGetCoverageReportExecutor(
       return createCoverageReportResult({
         xcresultPath,
         didError: true,
-        error: `Failed to get coverage report: ${commandResult.error ?? commandResult.output}`,
-        diagnosticsMessage: commandResult.output || commandResult.error || 'Unknown error',
+        error: 'Failed to get coverage report.',
+        diagnostics: diagnosticsFromCommandFailure(commandResult),
       });
     }
 
@@ -175,7 +166,10 @@ export function createGetCoverageReportExecutor(
         xcresultPath,
         didError: true,
         error: 'Failed to parse coverage JSON output.',
-        diagnosticsMessage: commandResult.output,
+        diagnostics: createBasicDiagnostics({
+          errors: ['Failed to parse coverage JSON output.'],
+          rawOutput: commandResult.output,
+        }),
       });
     }
 
@@ -194,7 +188,10 @@ export function createGetCoverageReportExecutor(
         xcresultPath,
         didError: true,
         error: 'Unexpected coverage data format.',
-        diagnosticsMessage: commandResult.output,
+        diagnostics: createBasicDiagnostics({
+          errors: ['Unexpected coverage data format.'],
+          rawOutput: commandResult.output,
+        }),
       });
     }
 
@@ -208,6 +205,7 @@ export function createGetCoverageReportExecutor(
           didError: true,
           error: `No targets found matching "${target}".`,
           target,
+          diagnostics: createBasicDiagnostics({ errors: [`No targets found matching "${target}".`] }),
         });
       }
     }
@@ -217,6 +215,9 @@ export function createGetCoverageReportExecutor(
         xcresultPath,
         didError: true,
         error: 'No coverage data found in the xcresult bundle.',
+        diagnostics: createBasicDiagnostics({
+          errors: ['No coverage data found in the xcresult bundle.'],
+        }),
       });
     }
 
@@ -267,9 +268,7 @@ export async function get_coverage_reportLogic(
   const ctx = getHandlerContext();
   const { xcresultPath } = params;
   const executeGetCoverageReport = createGetCoverageReportExecutor(context);
-  const result = await executeGetCoverageReport(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetCoverageReport(params);
 
   setStructuredOutput(ctx, result);
   if (!result.didError) {

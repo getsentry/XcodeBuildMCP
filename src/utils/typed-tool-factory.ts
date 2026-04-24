@@ -101,12 +101,7 @@ function createValidatedHandler<TParams, TContext>(
             session!.attach(image);
           },
           liveProgressEnabled: false,
-          emitLiveFragment: (fragment) => {
-            if (!ctx.liveProgressEnabled) {
-              return;
-            }
-            session!.emit(fragment);
-          },
+          streamingFragmentsEnabled: false,
         };
     const context =
       providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();
@@ -252,12 +247,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
             session!.attach(image);
           },
           liveProgressEnabled: false,
-          emitLiveFragment: (fragment) => {
-            if (!ctx.liveProgressEnabled) {
-              return;
-            }
-            session!.emit(fragment);
-          },
+          streamingFragmentsEnabled: false,
         };
     const context =
       providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();

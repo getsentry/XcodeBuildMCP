@@ -4,6 +4,9 @@ names:
   mcp: install_app_sim
   cli: install
 description: Install app on sim.
+outputSchema:
+  schema: xcodebuildmcp.output.install-result
+  version: "1"
 annotations:
   title: Install App Simulator
   readOnlyHint: false

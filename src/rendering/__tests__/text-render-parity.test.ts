@@ -279,6 +279,92 @@ describe('text render parity', () => {
     expect(output).not.toContain('xcodebuildmcp macos get-app-path');
   });
 
+  it('matches for structured-only build-result with request and no fragments', () => {
+    const fixture: TranscriptFixture = {
+      progressEvents: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-result',
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED', durationMs: 3200 },
+          artifacts: { buildLogPath: '/tmp/build.log' },
+          diagnostics: { warnings: [], errors: [] },
+        },
+      },
+    };
+
+    const rendered = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+      },
+      'text',
+    );
+    expect(rendered).toBe(captureCliText(fixture));
+    expect(rendered).toContain('Build');
+    expect(rendered).toContain('Scheme: MyApp');
+    expect(rendered).toContain('Build succeeded');
+  });
+
+  it('matches non-interactive cli text for structured-only non-build error diagnostics', () => {
+    const fixture: TranscriptFixture = {
+      progressEvents: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.scheme-list',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'scheme-list',
+          didError: true,
+          error: 'Failed to list schemes.',
+          artifacts: { workspacePath: '/tmp/Missing.xcworkspace' },
+          schemes: [],
+          diagnostics: {
+            warnings: [{ message: 'Using default destination because none was provided.' }],
+            errors: [
+              { message: 'xcodebuild: error: The workspace named "Missing" does not exist.' },
+            ],
+            rawOutput: ['Result bundle written to /tmp/result.xcresult'],
+          },
+        },
+      },
+    };
+
+    const rendered = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+      },
+      'text',
+    );
+
+    const errorsIndex = rendered.indexOf('Errors (1):');
+    const warningsIndex = rendered.indexOf('Warnings (1):');
+    const rawOutputIndex = rendered.indexOf('Raw Output:');
+    const statusIndex = rendered.indexOf('❌ Failed to list schemes.');
+
+    expect(rendered).toBe(captureCliText(fixture));
+    expect(errorsIndex).toBeGreaterThanOrEqual(0);
+    expect(warningsIndex).toBeGreaterThan(errorsIndex);
+    expect(rawOutputIndex).toBeGreaterThan(warningsIndex);
+    expect(statusIndex).toBeGreaterThan(rawOutputIndex);
+    expect(rendered).toContain(
+      '  ✗ xcodebuild: error: The workspace named "Missing" does not exist.',
+    );
+    expect(rendered).toContain('  ⚠ Using default destination because none was provided.');
+    expect(rendered).not.toContain('🔴 Errors');
+    expect(rendered).not.toContain('🔴 Raw Output');
+    expect(rendered).not.toContain('❌ xcodebuild: error');
+  });
+
   it('renders next steps in CLI syntax for CLI runtime text transcripts', () => {
     const fixture: TranscriptFixture = {
       progressEvents: [],

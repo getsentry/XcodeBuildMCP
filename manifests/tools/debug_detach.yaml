@@ -4,6 +4,9 @@ names:
   mcp: debug_detach
   cli: detach
 description: Detach debugger.
+outputSchema:
+  schema: xcodebuildmcp.output.debug-session-action
+  version: "1"
 routing:
   stateful: true
 annotations:

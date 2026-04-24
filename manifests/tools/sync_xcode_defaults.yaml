@@ -4,6 +4,9 @@ names:
   mcp: sync_xcode_defaults
   cli: sync-xcode-defaults
 description: Sync session defaults (scheme, simulator) from Xcode's current IDE selection.
+outputSchema:
+  schema: xcodebuildmcp.output.session-defaults
+  version: "1"
 predicates:
   - xcodeAutoSyncDisabled
 annotations:

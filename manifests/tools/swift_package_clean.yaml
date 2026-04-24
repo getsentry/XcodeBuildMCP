@@ -4,6 +4,9 @@ names:
   mcp: swift_package_clean
   cli: clean
 description: swift package clean.
+outputSchema:
+  schema: xcodebuildmcp.output.build-result
+  version: "1"
 annotations:
   title: Swift Package Clean
   readOnlyHint: false

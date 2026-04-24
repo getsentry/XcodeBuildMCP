@@ -15,7 +15,7 @@ import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -23,7 +23,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const baseTapSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -114,7 +113,7 @@ export function createTapExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<TapParams, TapResult> {
+): NonStreamingExecutor<TapParams, TapResult> {
   return async (params) => {
     const toolName = 'tap';
     const { simulatorId, x, y, id, label, preDelay, postDelay } = params;
@@ -180,8 +179,7 @@ export function createTapExecutor(
       ]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) =>
-          `Failed to simulate ${actionDescription.toLowerCase()}: ${axeError.message}`,
+        axeFailureMessage: () => `Failed to simulate ${actionDescription.toLowerCase()}.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -199,7 +197,7 @@ export async function tapLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeTap = createTapExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeTap(params, noopToolExecutionContext);
+  const result = await executeTap(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

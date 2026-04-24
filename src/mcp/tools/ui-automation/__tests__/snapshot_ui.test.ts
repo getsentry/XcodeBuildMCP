@@ -146,9 +146,9 @@ describe('Snapshot UI Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        "Failed to get accessibility hierarchy: axe command 'describe-ui' failed.",
-      );
+      const text = allText(result);
+      expect(text).toContain('Failed to get accessibility hierarchy.');
+      expect(text).toContain('axe command failed');
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -215,9 +215,9 @@ describe('Snapshot UI Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'System error executing axe: Failed to execute axe command: String error',
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

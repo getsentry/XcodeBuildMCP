@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { schema, handler, set_sim_appearanceLogic } from '../set_sim_appearance.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 import {
   createMockCommandResponse,
@@ -65,6 +65,9 @@ describe('set_sim_appearance plugin', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set simulator appearance.');
+      expect(text).toContain('Invalid device: invalid-uuid');
     });
 
     it('should surface session default requirement when simulatorId is missing', async () => {
@@ -90,6 +93,9 @@ describe('set_sim_appearance plugin', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set simulator appearance.');
+      expect(text).toContain('Network error');
     });
 
     it('should call correct command', async () => {

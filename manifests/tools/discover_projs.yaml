@@ -4,6 +4,9 @@ names:
   mcp: discover_projs
   cli: discover-projects
 description: Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.
+outputSchema:
+  schema: xcodebuildmcp.output.project-list
+  version: "1"
 annotations:
   title: Discover Projects
   readOnlyHint: true

@@ -9,13 +9,10 @@ import type {
 import type { RenderHints } from '../../rendering/types.ts';
 import type { XcodebuildOperation } from '../../types/domain-fragments.ts';
 import type {
-  CompilerErrorRenderItem,
-  CompilerWarningRenderItem,
   HeaderRenderItem,
   RenderItem,
   StatusRenderItem,
   TestDiscoveryRenderItem,
-  TestFailureRenderItem,
 } from '../../rendering/render-items.ts';
 import { displayPath } from '../build-preflight.ts';
 import { formatDeviceId } from '../device-name-resolver.ts';
@@ -199,6 +196,99 @@ function createSection(
   return { type: 'section', title, lines, ...options };
 }
 
+function getResultDiagnostics(
+  result: ToolDomainResult,
+): BasicDiagnostics | TestDiagnostics | undefined {
+  return 'diagnostics' in result
+    ? (result.diagnostics as BasicDiagnostics | TestDiagnostics | undefined)
+    : undefined;
+}
+
+function createMarkedDiagnosticLines(
+  entries: Array<{ message: string; location?: string }>,
+  marker: string,
+): string[] {
+  return entries.flatMap((entry, index) => {
+    const messageLines = entry.message.split('\n');
+    while (messageLines.length > 1 && messageLines.at(-1)?.trim().length === 0) {
+      messageLines.pop();
+    }
+
+    const [firstLine = '', ...additionalLines] = messageLines;
+    const lines = [`${marker} ${firstLine}`];
+    lines.push(...additionalLines.map((line) => `  ${line}`));
+    if (entry.location) {
+      lines.push(`  ${entry.location}`);
+    }
+    if (index < entries.length - 1) {
+      lines.push('');
+    }
+    return lines;
+  });
+}
+
+function createStandardDiagnosticSections(
+  diagnostics: BasicDiagnostics | TestDiagnostics | undefined,
+): SectionTextBlock[] {
+  const sections: SectionTextBlock[] = [];
+  if (!diagnostics) {
+    return sections;
+  }
+
+  if (diagnostics.errors.length > 0) {
+    sections.push(
+      createSection(
+        `Errors (${diagnostics.errors.length}):`,
+        createMarkedDiagnosticLines(diagnostics.errors, '✗'),
+        {
+          blankLineAfterTitle: true,
+        },
+      ),
+    );
+  }
+  if (diagnostics.warnings.length > 0) {
+    sections.push(
+      createSection(
+        `Warnings (${diagnostics.warnings.length}):`,
+        createMarkedDiagnosticLines(diagnostics.warnings, '⚠'),
+        { blankLineAfterTitle: true },
+      ),
+    );
+  }
+  if ('testFailures' in diagnostics && diagnostics.testFailures.length > 0) {
+    sections.push(
+      createSection(
+        `Test Failures (${diagnostics.testFailures.length}):`,
+        createMarkedDiagnosticLines(
+          diagnostics.testFailures.map((entry) => ({
+            message: formatTestFailureEntry(entry),
+            location: entry.location,
+          })),
+          '✗',
+        ),
+        { blankLineAfterTitle: true },
+      ),
+    );
+  }
+  if (diagnostics.rawOutput && diagnostics.rawOutput.length > 0) {
+    sections.push(
+      createSection('Raw Output:', diagnostics.rawOutput, { blankLineAfterTitle: true }),
+    );
+  }
+
+  return sections;
+}
+
+function createFailureStatusWithDiagnostics(
+  result: ToolDomainResult,
+  fallbackSummary: string,
+): TextRenderableItem[] {
+  return [
+    ...createStandardDiagnosticSections(getResultDiagnostics(result)),
+    createStatus('error', result.error ?? fallbackSummary),
+  ];
+}
+
 function createDetailTree(items: DetailTreeTextBlock['items']): DetailTreeTextBlock {
   return { type: 'detail-tree', items };
 }
@@ -211,46 +301,17 @@ function createTable(
   return { type: 'table', columns, rows, heading };
 }
 
-function createTextBlock(text: string): Extract<RenderItem, { type: 'text-block' }> {
-  return { type: 'text-block', text };
-}
-
 function formatDurationSeconds(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)}s`;
 }
 
-function formatDiagnosticEntry(entry: { message: string; location?: string }): string {
-  return entry.location ? `${entry.location}: ${entry.message}` : entry.message;
-}
-
-function formatTestFailureEntry(entry: {
-  suite: string;
-  test: string;
-  message: string;
-  location?: string;
-}): string {
+function formatTestFailureEntry(entry: { suite: string; test: string; message: string }): string {
   const identity = [entry.suite, entry.test].filter(Boolean).join(' / ');
-  const base = identity.length > 0 ? `${identity}: ${entry.message}` : entry.message;
-  return entry.location ? `${entry.location}: ${base}` : base;
+  return identity.length > 0 ? `${identity}: ${entry.message}` : entry.message;
 }
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function formatCountedMessagesBlock(
-  heading: string,
-  entries: Array<{ message: string; location?: string }>,
-  marker = '✗',
-): string {
-  const lines = [`${heading} (${entries.length}):`, ''];
-  entries.forEach((entry, index) => {
-    lines.push(`  ${marker} ${formatDiagnosticEntry(entry)}`);
-    if (index < entries.length - 1) {
-      lines.push('');
-    }
-  });
-  return lines.join('\n');
 }
 
 function formatSessionDefaultsValue(value: unknown): string {
@@ -429,7 +490,7 @@ function createDeviceListItems(
 ): TextRenderableItem[] {
   const header = createHeader('List Devices');
   if (result.didError) {
-    return [header, createStatus('error', result.error ?? 'Failed to list devices')];
+    return [header, ...createFailureStatusWithDiagnostics(result, 'Failed to list devices')];
   }
 
   const groupedByPlatform = new Map<string, typeof result.devices>();
@@ -484,7 +545,7 @@ function createSimulatorListItems(
 ): TextRenderableItem[] {
   const header = createHeader('List Simulators');
   if (result.didError) {
-    return [header, createStatus('error', result.error ?? 'Failed to list simulators')];
+    return [header, ...createFailureStatusWithDiagnostics(result, 'Failed to list simulators')];
   }
 
   const groupedByRuntime = new Map<string, typeof result.simulators>();
@@ -566,7 +627,7 @@ function createDoctorReportItems(
   ];
 
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Doctor failed.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Doctor failed.'));
   } else if (result.checks.some((check) => check.status === 'error')) {
     items.push(createStatus('warning', 'Doctor completed with diagnostic errors.'));
   } else if (result.checks.some((check) => check.status === 'warning')) {
@@ -590,7 +651,11 @@ function createWorkflowSelectionItems(
   const message = result.didError
     ? (result.error ?? 'Failed to update workflows.')
     : `Workflows enabled: ${result.enabledWorkflows.join(', ') || '(none)'} (${result.registeredToolCount} tools registered)`;
-  items.push(createStatus(result.didError ? 'error' : 'success', message));
+  if (result.didError) {
+    items.push(...createFailureStatusWithDiagnostics(result, message));
+  } else {
+    items.push(createStatus('success', message));
+  }
   return items;
 }
 
@@ -620,11 +685,11 @@ function createAppPathItems(
   const target = result.summary?.target;
 
   if (result.didError) {
-    if ('diagnostics' in result && result.diagnostics?.errors.length) {
-      items.push(createTextBlock(formatCountedMessagesBlock('Errors', result.diagnostics.errors)));
-    }
     items.push(
-      createStatus('error', target === 'simulator' ? 'Failed to get app path' : 'Query failed.'),
+      ...createFailureStatusWithDiagnostics(
+        result,
+        target === 'simulator' ? 'Failed to get app path' : 'Query failed.',
+      ),
     );
     return items;
   }
@@ -667,15 +732,16 @@ function createBundleIdItems(
     ]),
   ];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to get bundle ID.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to get bundle ID.'));
     return items;
   }
 
-  const lines = ['✅ Bundle ID'];
-  if (result.artifacts.bundleId) {
-    lines.push(`  └ ${result.artifacts.bundleId}`);
-  }
-  items.push(createTextBlock(lines.join('\n')));
+  items.push(
+    createSection(
+      '✅ Bundle ID',
+      result.artifacts.bundleId ? [`└ ${result.artifacts.bundleId}`] : [],
+    ),
+  );
   return items;
 }
 
@@ -700,12 +766,7 @@ function createInstallResultItems(
   ];
 
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Install failed.'));
-    if (isSimulator && result.diagnostics.errors.length > 0) {
-      items.push(
-        createTextBlock(result.diagnostics.errors.map((entry) => entry.message).join('\n')),
-      );
-    }
+    items.push(...createFailureStatusWithDiagnostics(result, 'Install failed.'));
     return items;
   }
 
@@ -750,7 +811,7 @@ function createLaunchResultItems(
 
   const items: TextRenderableItem[] = [createHeader(title, params)];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Launch failed.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Launch failed.'));
     return items;
   }
 
@@ -822,7 +883,7 @@ function createStopResultItems(
 
   const items: TextRenderableItem[] = [createHeader(title, params)];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Stop failed.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Stop failed.'));
     return items;
   }
 
@@ -844,7 +905,7 @@ function createSchemeListItems(
     ]),
   ];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to list schemes.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to list schemes.'));
     return items;
   }
 
@@ -869,12 +930,7 @@ function createBuildSettingsItems(
   ];
 
   if (result.didError) {
-    items.push(
-      createStatus(
-        'error',
-        result.diagnostics?.errors[0]?.message ?? result.error ?? 'Failed to show build settings.',
-      ),
-    );
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to show build settings.'));
     return items;
   }
 
@@ -909,7 +965,7 @@ function createProjectListItems(
   ];
 
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to discover projects.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to discover projects.'));
     return items;
   }
 
@@ -950,14 +1006,14 @@ function createScaffoldResultItems(
   ];
 
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to scaffold project.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to scaffold project.'));
     return items;
   }
 
   items.push(
-    createTextBlock(
-      `✅ Project scaffolded successfully\n  └ ${displayPath(result.artifacts.outputPath)}`,
-    ),
+    createSection('✅ Project scaffolded successfully', [
+      `└ ${displayPath(result.artifacts.outputPath)}`,
+    ]),
   );
   return items;
 }
@@ -973,16 +1029,19 @@ function createSessionDefaultsItems(
     result.profiles[Object.keys(result.profiles)[0]];
 
   if (mode === 'show') {
-    return [
-      createHeader('Show Defaults'),
-      createTextBlock(
-        Object.entries(result.profiles)
-          .map(([profileLabel, profile]) =>
-            formatSessionDefaultsProfileBlock(profileLabel, profile),
-          )
-          .join('\n\n'),
-      ),
-    ];
+    const items: TextRenderableItem[] = [createHeader('Show Defaults')];
+    for (const [profileLabel, profile] of Object.entries(result.profiles)) {
+      items.push(
+        createSection(
+          `📁 ${profileLabel}`,
+          SESSION_DEFAULT_KEYS.map((key, index) => {
+            const branch = index === SESSION_DEFAULT_KEYS.length - 1 ? '└' : '├';
+            return `${branch} ${key}: ${formatSessionDefaultsValue(profile[key])}`;
+          }),
+        ),
+      );
+    }
+    return items;
   }
 
   if (mode === 'sync-xcode') {
@@ -1043,7 +1102,12 @@ function createSessionDefaultsItems(
       'success',
       `Session defaults updated ${formatProfileAnnotationFromLabel(result.currentProfile)}`,
     ),
-    createTextBlock(formatSessionDefaultsTree(activeProfile).join('\n')),
+    createDetailTree(
+      SESSION_DEFAULT_KEYS.map((key) => ({
+        label: key,
+        value: formatSessionDefaultsValue(activeProfile[key]),
+      })),
+    ),
   ];
 
   const notices: string[] = [];
@@ -1070,7 +1134,9 @@ function createSessionProfileItems(
   ];
 
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to activate defaults profile.'));
+    items.push(
+      ...createFailureStatusWithDiagnostics(result, 'Failed to activate defaults profile.'),
+    );
     return items;
   }
 
@@ -1118,7 +1184,7 @@ function createSimulatorActionItems(
 
   const items: TextRenderableItem[] = [createHeader(titleMap[result.action.type], params)];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Simulator action failed.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Simulator action failed.'));
   } else {
     const successMessages: Record<typeof result.action.type, string> = {
       boot: 'Simulator booted successfully',
@@ -1129,17 +1195,12 @@ function createSimulatorActionItems(
       'set-appearance': `Appearance successfully set to ${result.action.type === 'set-appearance' ? result.action.appearance : 'requested'} mode`,
       statusbar: 'Status bar data network set successfully',
     };
-    items.push(createStatus('success', successMessages[result.action.type]));
-  }
-
-  if (result.diagnostics?.warnings.length) {
     items.push(
-      createSection(
-        'Warnings',
-        result.diagnostics.warnings.map((warning) => formatDiagnosticEntry(warning)),
-      ),
+      ...createStandardDiagnosticSections(result.diagnostics),
+      createStatus('success', successMessages[result.action.type]),
     );
   }
+
   return items;
 }
 
@@ -1158,7 +1219,7 @@ function createCaptureResultItems(
     ];
 
     if (result.didError) {
-      items.push(createStatus('error', result.error ?? 'Video recording failed.'));
+      items.push(...createFailureStatusWithDiagnostics(result, 'Video recording failed.'));
       return items;
     }
 
@@ -1198,36 +1259,19 @@ function createCaptureResultItems(
 
   if (result.didError) {
     items.push(
-      createStatus(
-        'error',
-        result.error ??
-          (isUiHierarchy
-            ? 'Failed to get accessibility hierarchy.'
-            : 'Failed to capture screenshot.'),
+      ...createFailureStatusWithDiagnostics(
+        result,
+        isUiHierarchy ? 'Failed to get accessibility hierarchy.' : 'Failed to capture screenshot.',
       ),
     );
-    if (isUiHierarchy && result.diagnostics?.errors.length) {
-      items.push(
-        createSection(
-          'Details',
-          result.diagnostics.errors.map((entry) =>
-            entry.message.startsWith('Error: ') ? entry.message : `Error: ${entry.message}`,
-          ),
-        ),
-      );
-    }
     return items;
   }
 
   if (isUiHierarchy) {
-    items.push(createStatus('success', 'Accessibility hierarchy retrieved successfully.'));
     const uiHierarchy = (result.capture as { type: 'ui-hierarchy'; uiHierarchy: unknown[] })
       .uiHierarchy;
     const uiHierarchyLines = formatUiHierarchyJsonLines(uiHierarchy);
-    items.push(
-      createSection('Accessibility Hierarchy', ['```json', ...uiHierarchyLines.slice(0, -1)]),
-    );
-    items.push(createTextBlock((uiHierarchyLines.at(-1) ?? ']') + '\n  ```'));
+    items.push(createSection('Accessibility Hierarchy', ['```json', ...uiHierarchyLines, '```']));
     items.push(
       createSection('Tips', [
         '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
@@ -1235,8 +1279,9 @@ function createCaptureResultItems(
         '- Screenshots are for visual verification only',
       ]),
     );
-    result.diagnostics?.warnings.forEach((warning) =>
-      items.push(createStatus('warning', warning.message)),
+    items.push(
+      ...createStandardDiagnosticSections(result.diagnostics),
+      createStatus('success', 'Accessibility hierarchy retrieved successfully.'),
     );
     return items;
   }
@@ -1305,10 +1350,9 @@ function createCoverageResultItems(
 
   if (result.didError) {
     items.push(
-      createStatus(
-        'error',
-        result.error ??
-          `Failed to get ${result.coverageScope === 'report' ? 'coverage report' : 'file coverage'}.`,
+      ...createFailureStatusWithDiagnostics(
+        result,
+        `Failed to get ${result.coverageScope === 'report' ? 'coverage report' : 'file coverage'}.`,
       ),
     );
     return items;
@@ -1347,7 +1391,7 @@ function createCoverageResultItems(
   }
 
   if (result.artifacts.sourceFilePath) {
-    items.push(createTextBlock(`File: ${displayPath(result.artifacts.sourceFilePath)}`));
+    items.push(createSection(`File: ${displayPath(result.artifacts.sourceFilePath)}`, []));
   }
   items.push(
     createStatus(
@@ -1416,9 +1460,9 @@ function createDebugBreakpointItems(
   const items: TextRenderableItem[] = [createHeader(title)];
   if (result.didError) {
     items.push(
-      createStatus(
-        'error',
-        result.error ?? `Failed to ${result.action === 'add' ? 'add' : 'remove'} breakpoint.`,
+      ...createFailureStatusWithDiagnostics(
+        result,
+        `Failed to ${result.action === 'add' ? 'add' : 'remove'} breakpoint.`,
       ),
     );
     return items;
@@ -1462,7 +1506,7 @@ function createDebugCommandItems(
     createHeader('LLDB Command', [{ label: 'Command', value: result.command }]),
   ];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to run LLDB command.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to run LLDB command.'));
     return items;
   }
 
@@ -1480,7 +1524,7 @@ function createDebugSessionActionItems(
     case 'attach': {
       const items: TextRenderableItem[] = [createHeader('Attach Debugger')];
       if (result.didError) {
-        items.push(createStatus('error', result.error ?? 'Failed to attach debugger.'));
+        items.push(...createFailureStatusWithDiagnostics(result, 'Failed to attach debugger.'));
         return items;
       }
 
@@ -1504,25 +1548,31 @@ function createDebugSessionActionItems(
       return items;
     }
     case 'continue':
-      return [
-        createHeader('Continue'),
-        createStatus(
-          result.didError ? 'error' : 'success',
-          result.didError
-            ? (result.error ?? 'Failed to resume debugger.')
-            : `Resumed debugger session${result.session ? ` ${result.session.debugSessionId}` : ''}`,
-        ),
-      ];
+      return result.didError
+        ? [
+            createHeader('Continue'),
+            ...createFailureStatusWithDiagnostics(result, 'Failed to resume debugger.'),
+          ]
+        : [
+            createHeader('Continue'),
+            createStatus(
+              'success',
+              `Resumed debugger session${result.session ? ` ${result.session.debugSessionId}` : ''}`,
+            ),
+          ];
     case 'detach':
-      return [
-        createHeader('Detach'),
-        createStatus(
-          result.didError ? 'error' : 'success',
-          result.didError
-            ? (result.error ?? 'Failed to detach debugger.')
-            : `Detached debugger session${result.session ? ` ${result.session.debugSessionId}` : ''}`,
-        ),
-      ];
+      return result.didError
+        ? [
+            createHeader('Detach'),
+            ...createFailureStatusWithDiagnostics(result, 'Failed to detach debugger.'),
+          ]
+        : [
+            createHeader('Detach'),
+            createStatus(
+              'success',
+              `Detached debugger session${result.session ? ` ${result.session.debugSessionId}` : ''}`,
+            ),
+          ];
   }
 }
 
@@ -1531,7 +1581,7 @@ function createDebugStackItems(
 ): TextRenderableItem[] {
   const items: TextRenderableItem[] = [createHeader('Stack Trace')];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to get stack.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to get stack.'));
     return items;
   }
 
@@ -1547,7 +1597,7 @@ function createDebugVariablesItems(
 ): TextRenderableItem[] {
   const items: TextRenderableItem[] = [createHeader('Variables')];
   if (result.didError) {
-    items.push(createStatus('error', result.error ?? 'Failed to get variables.'));
+    items.push(...createFailureStatusWithDiagnostics(result, 'Failed to get variables.'));
     return items;
   }
 
@@ -1610,18 +1660,10 @@ function createCleanResultItems(
 
   const items: TextRenderableItem[] = [createHeader(title, params)];
   if (result.didError) {
-    const diagnosticMessage =
-      'diagnostics' in result && result.diagnostics?.errors[0]?.message
-        ? result.diagnostics.errors[0].message
-        : undefined;
     items.push(
-      createStatus(
-        'error',
-        isSwiftPackage
-          ? (result.error ?? 'Swift package clean failed.')
-          : diagnosticMessage
-            ? `Clean failed: ${diagnosticMessage}`
-            : (result.error ?? 'Clean failed.'),
+      ...createFailureStatusWithDiagnostics(
+        result,
+        isSwiftPackage ? 'Swift package clean failed.' : 'Clean failed.',
       ),
     );
     return items;
@@ -1637,46 +1679,7 @@ function createCleanResultItems(
 }
 
 function createDiagnosticSections(result: ToolDomainResult): SectionTextBlock[] {
-  const sections: SectionTextBlock[] = [];
-  if (result.didError && result.error) {
-    sections.push(createSection('Error', [result.error], { icon: 'red-circle' }));
-  }
-  if (!('diagnostics' in result) || !result.diagnostics) {
-    return sections;
-  }
-
-  const diagnostics = result.diagnostics as BasicDiagnostics | TestDiagnostics;
-  if (diagnostics.errors.length > 0) {
-    sections.push(
-      createSection(
-        'Errors',
-        diagnostics.errors.map((entry) => formatDiagnosticEntry(entry)),
-        { icon: 'red-circle' },
-      ),
-    );
-  }
-  if (diagnostics.warnings.length > 0) {
-    sections.push(
-      createSection(
-        'Warnings',
-        diagnostics.warnings.map((entry) => formatDiagnosticEntry(entry)),
-        { icon: 'yellow-circle' },
-      ),
-    );
-  }
-  if ('testFailures' in diagnostics && diagnostics.testFailures.length > 0) {
-    sections.push(
-      createSection(
-        'Test Failures',
-        diagnostics.testFailures.map((entry) => formatTestFailureEntry(entry)),
-        { icon: 'red-circle' },
-      ),
-    );
-  }
-  if (diagnostics.rawOutput && diagnostics.rawOutput.length > 0) {
-    sections.push(createSection('Raw Output', diagnostics.rawOutput, { icon: 'red-circle' }));
-  }
-  return sections;
+  return createStandardDiagnosticSections(getResultDiagnostics(result));
 }
 
 function createSummaryBlock(result: ToolDomainResult): SummaryTextBlock | null {
@@ -1732,79 +1735,10 @@ function createTestDiscoveryProgress(
   };
 }
 
-function createCompilerWarningEvent(
-  operation: XcodebuildOperation,
-  entry: { message: string; location?: string },
-): CompilerWarningRenderItem {
-  return {
-    type: 'compiler-warning',
-    operation,
-    message: entry.message,
-    location: entry.location,
-    rawLine: entry.location ? `${entry.location}: warning: ${entry.message}` : entry.message,
-  };
-}
-
-function createCompilerErrorEvent(
-  operation: XcodebuildOperation,
-  entry: { message: string; location?: string },
-): CompilerErrorRenderItem {
-  return {
-    type: 'compiler-error',
-    operation,
-    message: entry.message,
-    location: entry.location,
-    rawLine: entry.location ? `${entry.location}: error: ${entry.message}` : entry.message,
-  };
-}
-
-function createTestFailureEvent(entry: {
-  suite: string;
-  test: string;
-  message: string;
-  location?: string;
-}): TestFailureRenderItem {
-  return {
-    type: 'test-failure',
-    operation: 'TEST',
-    suite: entry.suite,
-    test: entry.test,
-    message: entry.message,
-    location: entry.location,
-  };
-}
-
-function createBuildLikeDiagnosticEvents(
+function createBuildLikeDiagnosticItems(
   result: Extract<ToolDomainResult, { kind: 'build-result' | 'build-run-result' | 'test-result' }>,
 ): TextRenderableItem[] {
-  const operation = inferXcodebuildOperation(result) ?? 'BUILD';
-  const items: TextRenderableItem[] = [];
-
-  if (!('diagnostics' in result) || !result.diagnostics) {
-    return items;
-  }
-
-  for (const warning of result.diagnostics.warnings) {
-    items.push(createCompilerWarningEvent(operation, warning));
-  }
-
-  for (const error of result.diagnostics.errors) {
-    items.push(createCompilerErrorEvent(operation, error));
-  }
-
-  if (result.kind === 'test-result' && 'testFailures' in result.diagnostics) {
-    for (const failure of result.diagnostics.testFailures) {
-      items.push(createTestFailureEvent(failure));
-    }
-  }
-
-  if (result.diagnostics.rawOutput) {
-    for (const line of result.diagnostics.rawOutput) {
-      items.push({ type: 'status', level: 'error', message: line } as StatusRenderItem);
-    }
-  }
-
-  return items;
+  return createStandardDiagnosticSections('diagnostics' in result ? result.diagnostics : undefined);
 }
 
 function createBuildRunSyntheticStepItems(
@@ -2038,9 +1972,13 @@ export function createStreamingTailItems(result: ToolDomainResult): TextRenderab
   }
 
   if ('rawOutput' in result.diagnostics && Array.isArray(result.diagnostics.rawOutput)) {
-    for (const line of result.diagnostics.rawOutput) {
-      items.push({ type: 'status', level: 'error', message: line } as StatusRenderItem);
-    }
+    items.push(
+      ...createStandardDiagnosticSections({
+        warnings: [],
+        errors: [],
+        rawOutput: result.diagnostics.rawOutput,
+      }),
+    );
   }
 
   return items;
@@ -2129,20 +2067,8 @@ function createSpecialCaseItems(
           { label: 'Simulator', value: result.artifacts.simulatorId },
         ]),
       ];
-      const details = result.diagnostics?.errors ?? [];
-      const warnings = result.diagnostics?.warnings ?? [];
       if (result.didError) {
-        items.push(createStatus('error', result.error ?? 'UI action failed.'));
-        if (details.length > 0) {
-          items.push(
-            createSection(
-              'Details',
-              details.map((entry) =>
-                entry.message.startsWith('Error: ') ? entry.message : `Error: ${entry.message}`,
-              ),
-            ),
-          );
-        }
+        items.push(...createFailureStatusWithDiagnostics(result, 'UI action failed.'));
         return items;
       }
       let successMessage = 'UI action completed successfully.';
@@ -2194,8 +2120,8 @@ function createSpecialCaseItems(
           break;
       }
       items.push(
+        ...createStandardDiagnosticSections(result.diagnostics),
         createStatus('success', successMessage),
-        ...warnings.map((warning) => createStatus('warning', warning.message)),
       );
       return items;
     }
@@ -2206,7 +2132,7 @@ function createSpecialCaseItems(
         items.push(createSection('Status', [JSON.stringify(result.status, null, 2)]));
       }
       if (result.didError) {
-        items.push(createStatus('error', result.error ?? `${title} failed`));
+        items.push(...createFailureStatusWithDiagnostics(result, `${title} failed`));
       } else if (result.action === 'disconnect') {
         items.push(createStatus('success', 'Bridge disconnected'));
       }
@@ -2214,7 +2140,10 @@ function createSpecialCaseItems(
     }
     case 'xcode-bridge-sync':
       return result.didError
-        ? [createHeader('Bridge Sync'), createStatus('error', result.error ?? 'Bridge sync failed')]
+        ? [
+            createHeader('Bridge Sync'),
+            ...createFailureStatusWithDiagnostics(result, 'Bridge sync failed'),
+          ]
         : [
             createHeader('Bridge Sync'),
             createSection('Sync Result', [
@@ -2226,7 +2155,7 @@ function createSpecialCaseItems(
       return result.didError
         ? [
             createHeader('Xcode IDE List Tools'),
-            createStatus('error', result.error ?? 'Failed to list bridge tools'),
+            ...createFailureStatusWithDiagnostics(result, 'Failed to list bridge tools'),
           ]
         : [
             createHeader('Xcode IDE List Tools'),
@@ -2240,10 +2169,12 @@ function createSpecialCaseItems(
         createHeader('Xcode IDE Call Tool', [{ label: 'Remote Tool', value: result.remoteTool }]),
       ];
       if (result.didError) {
-        items.push(createStatus('error', result.error ?? `Tool "${result.remoteTool}" failed`));
         if (result.content.length > 0) {
           items.push(createSection('Relayed Content', renderBridgeCallContent(result.content)));
         }
+        items.push(
+          ...createFailureStatusWithDiagnostics(result, `Tool "${result.remoteTool}" failed`),
+        );
         return items;
       }
       if (result.content.length > 0) {
@@ -2296,7 +2227,8 @@ export function renderDomainResultTextItems(
         items.push(discovery);
       }
     }
-    items.push(...createBuildLikeDiagnosticEvents(result));
+    const tailItems = createBuildLikeTailItems(result);
+    items.push(...createBuildLikeDiagnosticItems(result));
     if (result.kind === 'build-run-result') {
       items.push(...createBuildRunSyntheticStepItems(result));
     }
@@ -2304,7 +2236,7 @@ export function renderDomainResultTextItems(
     if (summary) {
       items.push(summary);
     }
-    items.push(...createBuildLikeTailItems(result));
+    items.push(...tailItems);
     return items;
   }
 

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { InstallResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -57,9 +57,7 @@ export async function install_app_simLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeInstallAppSim = createInstallAppSimExecutor(executor, fileSystem);
-  const result = await executeInstallAppSim(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeInstallAppSim(params);
 
   setInstallResultStructuredOutput(ctx, result);
 
@@ -105,9 +103,9 @@ async function extractBundleId(
 export function createInstallAppSimExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
-): ToolExecutor<InstallAppSimParams, InstallResultDomainResult> {
+): NonStreamingExecutor<InstallAppSimParams, InstallResultDomainResult> {
   return async (params) => {
-    const artifacts = { appPath: params.appPath, simulatorId: params.simulatorId };
+    const artifacts = { simulatorId: params.simulatorId, appPath: params.appPath };
 
     const appPathExistsValidation = validateFileExists(params.appPath, fileSystem);
     if (!appPathExistsValidation.isValid) {

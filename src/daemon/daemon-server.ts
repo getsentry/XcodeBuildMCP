@@ -179,13 +179,11 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
 
               const handlerContext: ToolHandlerContext = {
                 liveProgressEnabled: false,
+                streamingFragmentsEnabled: true,
                 emit: (fragment) => {
                   streamFragment(fragment);
                 },
                 attach: () => {},
-                emitLiveFragment: (fragment) => {
-                  streamFragment(fragment);
-                },
               };
 
               await invoker.invokeDirect(resolved.tool, params.args ?? {}, {

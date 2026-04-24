@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { AppPathDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -68,7 +68,7 @@ function createRequest(params: GetDeviceAppPathParams) {
 
 export function createGetDeviceAppPathExecutor(
   executor: CommandExecutor,
-): ToolExecutor<GetDeviceAppPathParams, AppPathDomainResult> {
+): NonStreamingExecutor<GetDeviceAppPathParams, AppPathDomainResult> {
   return async (params) => {
     const platform = mapDevicePlatform(params.platform);
     const configuration = params.configuration ?? 'Debug';
@@ -93,7 +93,7 @@ export function createGetDeviceAppPathExecutor(
         toErrorMessage(error),
         createRequest(params),
         'device',
-        'Query failed',
+        'Query failed.',
       );
     }
   };
@@ -105,9 +105,7 @@ export async function get_device_app_pathLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeGetDeviceAppPath = createGetDeviceAppPathExecutor(executor);
-  const result = await executeGetDeviceAppPath(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetDeviceAppPath(params);
 
   setAppPathStructuredOutput(ctx, result);
 

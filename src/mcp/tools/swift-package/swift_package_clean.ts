@@ -2,12 +2,13 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const STRUCTURED_OUTPUT_SCHEMA = 'xcodebuildmcp.output.build-result';
 
@@ -34,7 +35,7 @@ function createSwiftPackageCleanResult(
   return {
     kind: 'build-result',
     didError: !success,
-    error: success ? null : `Swift package clean failed: ${errorMessage ?? 'Unknown error'}`,
+    error: success ? null : 'Swift package clean failed.',
     summary: {
       status: success ? 'SUCCEEDED' : 'FAILED',
       target: 'swift-package',
@@ -42,23 +43,15 @@ function createSwiftPackageCleanResult(
     artifacts: {
       packagePath: resolvedPath,
     },
-    diagnostics: {
-      warnings: [],
-      errors:
-        success || !errorMessage
-          ? []
-          : [
-              {
-                message: errorMessage.replace(/^error:\s*/i, '').trim(),
-              },
-            ],
-    },
+    diagnostics: createBasicDiagnostics({
+      errors: success ? [] : [errorMessage ?? 'Unknown error'],
+    }),
   };
 }
 
 export function createSwiftPackageCleanExecutor(
   executor: CommandExecutor,
-): ToolExecutor<SwiftPackageCleanParams, SwiftPackageCleanResult> {
+): NonStreamingExecutor<SwiftPackageCleanParams, SwiftPackageCleanResult> {
   return async (params) => {
     const resolvedPath = path.resolve(params.packagePath);
     const swiftArgs = ['package', '--package-path', resolvedPath, 'clean'];
@@ -86,9 +79,7 @@ export async function swift_package_cleanLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeSwiftPackageClean = createSwiftPackageCleanExecutor(executor);
-  const result = await executeSwiftPackageClean(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeSwiftPackageClean(params);
 
   setStructuredOutput(ctx, result);
 }

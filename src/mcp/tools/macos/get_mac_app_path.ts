@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { XcodePlatform } from '../../../types/common.ts';
 import type { AppPathDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -65,7 +65,7 @@ function createRequest(params: GetMacosAppPathParams) {
 
 export function createGetMacAppPathExecutor(
   executor: CommandExecutor,
-): ToolExecutor<GetMacosAppPathParams, AppPathDomainResult> {
+): NonStreamingExecutor<GetMacosAppPathParams, AppPathDomainResult> {
   return async (params) => {
     const configuration = params.configuration ?? 'Debug';
 
@@ -94,7 +94,7 @@ export function createGetMacAppPathExecutor(
         toErrorMessage(error),
         createRequest(params),
         'macos',
-        'Query failed',
+        'Query failed.',
       );
     }
   };
@@ -106,9 +106,7 @@ export async function get_mac_app_pathLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeGetMacAppPath = createGetMacAppPathExecutor(executor);
-  const result = await executeGetMacAppPath(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetMacAppPath(params);
 
   setAppPathStructuredOutput(ctx, result);
 

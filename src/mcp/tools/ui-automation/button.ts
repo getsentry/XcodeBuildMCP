@@ -14,14 +14,13 @@ import {
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const buttonSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -44,7 +43,7 @@ export function createButtonExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<ButtonParams, ButtonResult> {
+): NonStreamingExecutor<ButtonParams, ButtonResult> {
   return async (params) => {
     const toolName = 'button';
     const { simulatorId, buttonType, duration } = params;
@@ -72,8 +71,7 @@ export function createButtonExecutor(
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) =>
-          `Failed to press button '${buttonType}': ${axeError.message}`,
+        axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -91,7 +89,7 @@ export async function buttonLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeButton = createButtonExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeButton(params, noopToolExecutionContext);
+  const result = await executeButton(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

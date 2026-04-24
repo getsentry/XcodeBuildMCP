@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorListDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -160,8 +160,8 @@ function createSimulatorListErrorResult(message: string): SimulatorListResult {
 
 export function createListSimsExecutor(
   executor: CommandExecutor,
-): ToolExecutor<ListSimsParams, SimulatorListResult> {
-  return async (params, _ctx) => {
+): NonStreamingExecutor<ListSimsParams, SimulatorListResult> {
+  return async (params) => {
     try {
       const simulators = await listSimulators(executor, params);
 
@@ -188,9 +188,7 @@ export async function list_simsLogic(
 
   const ctx = getHandlerContext();
   const executeListSims = createListSimsExecutor(executor);
-  const result = await executeListSims(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeListSims(params);
 
   setStructuredOutput(ctx, result);
 

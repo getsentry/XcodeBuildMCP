@@ -404,9 +404,9 @@ describe('Type Text Tool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        "Failed to simulate text typing: axe command 'type' failed.",
-      );
+      const text = allText(result);
+      expect(text).toContain('Failed to simulate text typing.');
+      expect(text).toContain('Text field not found');
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -473,9 +473,9 @@ describe('Type Text Tool', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'System error executing axe: Failed to execute axe command: String error',
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

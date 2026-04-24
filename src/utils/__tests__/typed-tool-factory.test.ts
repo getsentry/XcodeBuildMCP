@@ -41,6 +41,7 @@ function invokeAndCollect(
   const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
     liveProgressEnabled: false,
+    streamingFragmentsEnabled: false,
     emit: (event) => {
       items.push(event);
       session.emit(event);

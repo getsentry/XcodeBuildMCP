@@ -5,7 +5,12 @@ import {
   createMockCommandResponse,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler, get_device_app_pathLogic } from '../get_device_app_path.ts';
+import {
+  schema,
+  handler,
+  get_device_app_pathLogic,
+  createGetDeviceAppPathExecutor,
+} from '../get_device_app_path.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { runLogic } from '../../../../test-utils/test-helpers.ts';
 
@@ -298,6 +303,22 @@ describe('get_device_app_path plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('keeps query failure summary short and preserves diagnostics', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'xcodebuild: error: The project does not exist.',
+      });
+      const execute = createGetDeviceAppPathExecutor(mockExecutor);
+
+      const result = await execute({
+        projectPath: '/path/to/nonexistent.xcodeproj',
+        scheme: 'MyScheme',
+      });
+
+      expect(result.error).toBe('Query failed.');
+      expect(result.diagnostics?.errors).toEqual([{ message: 'The project does not exist.' }]);
     });
 
     it('should return exact parse failure response', async () => {

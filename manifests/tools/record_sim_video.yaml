@@ -4,6 +4,9 @@ names:
   mcp: record_sim_video
   cli: record-video
 description: Record sim video.
+outputSchema:
+  schema: xcodebuildmcp.output.capture-result
+  version: "1"
 routing:
   stateful: true
 annotations:

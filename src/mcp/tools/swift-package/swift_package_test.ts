@@ -2,7 +2,7 @@ import * as z from 'zod';
 import path from 'node:path';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
@@ -14,7 +14,7 @@ import {
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import {
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   createTestDomainResult,
 } from '../../../utils/xcodebuild-domain-results.ts';
@@ -49,6 +49,18 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SwiftPackageTestRe
   };
 }
 
+function createTestSpmInvocationRequest(
+  resolvedPath: string,
+  params: SwiftPackageTestParams,
+): BuildInvocationRequest {
+  return {
+    scheme: path.basename(resolvedPath),
+    configuration: (params.configuration ?? 'debug').toLowerCase(),
+    platform: 'Swift Package',
+    target: 'swift-package' as const,
+  };
+}
+
 function getFallbackErrorMessages(
   started: ReturnType<typeof createDomainStreamingPipeline>,
   extraMessages: string[] = [],
@@ -58,9 +70,11 @@ function getFallbackErrorMessages(
 
 export function createSwiftPackageTestExecutor(
   executor: CommandExecutor,
-): DomainStreamingExecutor<SwiftPackageTestParams, SwiftPackageTestResult> {
+  request?: BuildInvocationRequest,
+): StreamingExecutor<SwiftPackageTestParams, SwiftPackageTestResult> {
   return async (params, ctx) => {
     const resolvedPath = path.resolve(params.packagePath);
+    const resolvedRequest = request ?? createTestSpmInvocationRequest(resolvedPath, params);
     const swiftArgs = ['test', '--package-path', resolvedPath];
     const started = createDomainStreamingPipeline('swift_package_test', 'TEST', ctx, 'test-result');
 
@@ -75,6 +89,7 @@ export function createSwiftPackageTestExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: ["Invalid configuration. Use 'debug' or 'release'."],
+        request: resolvedRequest,
       });
     }
 
@@ -118,6 +133,7 @@ export function createSwiftPackageTestExecutor(
           ...(result.success || !shouldIncludePackagePath ? {} : { packagePath: resolvedPath }),
         },
         fallbackErrorMessages: getFallbackErrorMessages(started, [failureMessage]),
+        request: resolvedRequest,
       });
     } catch (error) {
       const message = toErrorMessage(error);
@@ -130,6 +146,7 @@ export function createSwiftPackageTestExecutor(
           packagePath: resolvedPath,
         },
         fallbackErrorMessages: getFallbackErrorMessages(started, [message]),
+        request: resolvedRequest,
       });
     }
   };
@@ -142,19 +159,13 @@ export async function swift_package_testLogic(
   const ctx = getHandlerContext();
   const resolvedPath = path.resolve(params.packagePath);
 
-  const invocationRequest: BuildInvocationRequest = {
-    scheme: path.basename(resolvedPath),
-    configuration: (params.configuration ?? 'debug').toLowerCase(),
-    platform: 'Swift Package',
-    target: 'swift-package' as const,
-  };
+  const invocationRequest = createTestSpmInvocationRequest(resolvedPath, params);
   ctx.emit(createBuildInvocationFragment('test-result', 'TEST', invocationRequest));
-  const executionContext = createToolExecutionContext(ctx);
-  const executeSwiftPackageTest = createSwiftPackageTestExecutor(executor);
+  const executionContext = createStreamingExecutionContext(ctx);
+  const executeSwiftPackageTest = createSwiftPackageTestExecutor(executor, invocationRequest);
   const result = await executeSwiftPackageTest(params, executionContext);
 
   setStructuredOutput(ctx, result);
-  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

@@ -4,6 +4,9 @@ names:
   mcp: screenshot
   cli: screenshot
 description: Capture screenshot.
+outputSchema:
+  schema: xcodebuildmcp.output.capture-result
+  version: "1"
 annotations:
   title: Screenshot
   readOnlyHint: true

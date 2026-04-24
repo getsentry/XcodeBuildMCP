@@ -4,6 +4,9 @@ names:
   mcp: xcode_tools_bridge_status
   cli: bridge-status
 description: Show xcrun mcpbridge availability and proxy tool sync status.
+outputSchema:
+  schema: xcodebuildmcp.output.xcode-bridge-status
+  version: "1"
 predicates:
   - debugEnabled
 annotations:

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { StopResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -27,9 +27,7 @@ export async function stop_mac_appLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeStopMacApp = createStopMacAppExecutor(executor);
-  const result = await executeStopMacApp(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeStopMacApp(params);
 
   setStopResultStructuredOutput(ctx, result);
 
@@ -54,7 +52,7 @@ function createStopMacAppArtifacts(params: StopMacAppParams): StopResultArtifact
 
 export function createStopMacAppExecutor(
   executor: CommandExecutor,
-): ToolExecutor<StopMacAppParams, StopMacAppResult> {
+): NonStreamingExecutor<StopMacAppParams, StopMacAppResult> {
   return async (params) => {
     const artifacts = createStopMacAppArtifacts(params);
 

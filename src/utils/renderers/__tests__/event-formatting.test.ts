@@ -22,7 +22,7 @@ describe('event formatting', () => {
         operation: 'Build & Run',
         params: [{ label: 'Scheme', value: 'MyApp' }],
       }),
-    ).toBe('\u{1F680} Build & Run\n\n   Scheme: MyApp\n');
+    ).toBe('\u{1F680} Build & Run\n\n   Scheme: MyApp');
   });
 
   it('groups test selection params with human-readable labels in header output', () => {
@@ -46,7 +46,6 @@ describe('event formatting', () => {
         '   Selective Testing:',
         '     MyAppTests/MyAppTests/testLaunch',
         '     Skip Testing: MyAppTests/MyAppTests/testFlaky',
-        '',
       ].join('\n'),
     );
   });
@@ -154,7 +153,6 @@ describe('event formatting', () => {
         '',
         '  \u2717 unterminated string literal',
         '    example_projects/macOS/MCPTest/ContentView.swift:16:18',
-        '',
       ].join('\n'),
     );
   });

@@ -4,6 +4,9 @@ names:
   mcp: button
   cli: button
 description: Press simulator hardware button.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Hardware Button
   readOnlyHint: true

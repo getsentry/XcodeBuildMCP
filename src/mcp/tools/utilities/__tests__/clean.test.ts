@@ -6,7 +6,8 @@ import {
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('clean (unified) tool', () => {
   beforeEach(() => {
@@ -64,6 +65,26 @@ describe('clean (unified) tool', () => {
       cleanLogic({ workspacePath: '/w.xcworkspace', scheme: 'App' } as any, mock),
     );
     expect(result.isError).toBeFalsy();
+  });
+
+  it('keeps clean failure summary short and preserves diagnostics', async () => {
+    const mock: CommandExecutor = async (_command, _label, _useShell, opts) => {
+      opts?.onStderr?.('xcodebuild: error: workspace not found\n');
+      return createMockCommandResponse({
+        success: false,
+        output: '',
+        error: 'xcodebuild: error: workspace not found',
+      });
+    };
+
+    const result = await runLogic(() =>
+      cleanLogic({ workspacePath: '/missing.xcworkspace', scheme: 'App' } as any, mock),
+    );
+
+    expect(result.isError).toBe(true);
+    const text = allText(result);
+    expect(text).toContain('Clean failed.');
+    expect(text).toContain('xcodebuild: error: workspace not found');
   });
 
   it('handler validation: requires scheme when workspacePath is provided', async () => {

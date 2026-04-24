@@ -7,8 +7,8 @@
 
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
-import type { CoverageResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { BasicDiagnostics, CoverageResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { validateFileExists } from '../../../utils/validation.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -20,6 +20,7 @@ import {
   createTypedToolWithContext,
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
+import { createBasicDiagnostics, diagnosticsFromCommandFailure } from '../../../utils/diagnostics.ts';
 
 const getFileCoverageSchema = z.object({
   xcresultPath: z.string().describe('Path to the .xcresult bundle'),
@@ -85,17 +86,6 @@ interface LineRange {
   end: number;
 }
 
-function createDiagnostics(message: string) {
-  return {
-    warnings: [] as Array<{ message: string }>,
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
-
 function createFileCoverageResult(params: {
   xcresultPath: string;
   file: string;
@@ -106,7 +96,7 @@ function createFileCoverageResult(params: {
   coveredLines?: number;
   executableLines?: number;
   functions?: NonNullable<GetFileCoverageResult['functions']>;
-  diagnosticsMessage?: string;
+  diagnostics?: BasicDiagnostics;
   uncoveredLineRanges?: LineRange[];
 }): GetFileCoverageResult {
   return {
@@ -128,7 +118,7 @@ function createFileCoverageResult(params: {
       ...(params.sourceFilePath ? { sourceFilePath: params.sourceFilePath } : {}),
     },
     ...(params.functions ? { functions: params.functions } : {}),
-    ...(params.diagnosticsMessage ? { diagnostics: createDiagnostics(params.diagnosticsMessage) } : {}),
+    ...(params.diagnostics ? { diagnostics: params.diagnostics } : {}),
     ...(params.uncoveredLineRanges !== undefined
       ? { uncoveredLineRanges: params.uncoveredLineRanges }
       : {}),
@@ -181,7 +171,7 @@ function buildCoverageFunctions(entry: FileFunctionCoverage): NonNullable<GetFil
 
 export function createGetFileCoverageExecutor(
   context: GetFileCoverageContext,
-): ToolExecutor<GetFileCoverageParams, GetFileCoverageResult> {
+): NonStreamingExecutor<GetFileCoverageParams, GetFileCoverageResult> {
   return async (params) => {
     const { xcresultPath, file, showLines } = params;
 
@@ -192,6 +182,7 @@ export function createGetFileCoverageExecutor(
         file,
         didError: true,
         error: fileExistsValidation.errorMessage!,
+        diagnostics: createBasicDiagnostics({ errors: [fileExistsValidation.errorMessage!] }),
       });
     }
 
@@ -208,8 +199,8 @@ export function createGetFileCoverageExecutor(
         xcresultPath,
         file,
         didError: true,
-        error: `Failed to get file coverage: ${funcResult.error ?? funcResult.output}`,
-        diagnosticsMessage: funcResult.output || funcResult.error || 'Unknown error',
+        error: 'Failed to get file coverage.',
+        diagnostics: diagnosticsFromCommandFailure(funcResult),
       });
     }
 
@@ -222,7 +213,10 @@ export function createGetFileCoverageExecutor(
         file,
         didError: true,
         error: 'Failed to parse coverage JSON output.',
-        diagnosticsMessage: funcResult.output,
+        diagnostics: createBasicDiagnostics({
+          errors: ['Failed to parse coverage JSON output.'],
+          rawOutput: funcResult.output,
+        }),
       });
     }
 
@@ -252,6 +246,7 @@ export function createGetFileCoverageExecutor(
         file,
         didError: true,
         error: `No coverage data found for "${file}".`,
+        diagnostics: createBasicDiagnostics({ errors: [`No coverage data found for "${file}".`] }),
       });
     }
 
@@ -293,9 +288,7 @@ export async function get_file_coverageLogic(
   const ctx = getHandlerContext();
   const { xcresultPath } = params;
   const executeGetFileCoverage = createGetFileCoverageExecutor(context);
-  const result = await executeGetFileCoverage(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetFileCoverage(params);
 
   setStructuredOutput(ctx, result);
   if (!result.didError) {

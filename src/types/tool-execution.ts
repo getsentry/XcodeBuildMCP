@@ -1,31 +1,34 @@
-import type { ToolDomainResult } from './domain-results.js';
-import type { AnyFragment } from './domain-fragments.js';
+import type { ToolDomainResult } from './domain-results.ts';
+import type { AnyFragment } from './domain-fragments.ts';
 
 export interface ToolAttachment {
   path: string;
   mimeType: string;
 }
 
-export interface ToolExecutionContext {
+/**
+ * Execution context for streaming executors (build / test / build-run tools).
+ * Provides fragment emission for live progress streaming.
+ */
+export interface StreamingExecutionContext {
   liveProgressEnabled: boolean;
   attach?(image: ToolAttachment): void;
-  emitFragment?(fragment: AnyFragment): void;
-}
-
-/**
- * Extended execution context for tools that have been migrated to the
- * domain-fragment streaming model. Guarantees `emitFragment` is present.
- */
-export interface DomainStreamingExecutionContext extends ToolExecutionContext {
   emitFragment(fragment: AnyFragment): void;
 }
 
-export type DomainStreamingExecutor<TArgs, TResult extends ToolDomainResult> = (
+/**
+ * Executor for non-streaming tools. Unary: accepts args, returns a result.
+ * No execution context — these tools cannot emit fragments.
+ */
+export type NonStreamingExecutor<TArgs, TResult extends ToolDomainResult> = (
   args: TArgs,
-  ctx: DomainStreamingExecutionContext,
 ) => Promise<TResult>;
 
-export type ToolExecutor<TArgs, TResult extends ToolDomainResult> = (
+/**
+ * Executor for streaming tools (build, test, build-run).
+ * Receives a streaming execution context for live fragment emission.
+ */
+export type StreamingExecutor<TArgs, TResult extends ToolDomainResult> = (
   args: TArgs,
-  ctx: ToolExecutionContext,
+  ctx: StreamingExecutionContext,
 ) => Promise<TResult>;

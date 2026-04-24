@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -43,17 +44,6 @@ const publicSchemaObject = z.strictObject(
   } as const).shape,
 );
 
-function createDiagnostics(message: string) {
-  return {
-    warnings: [],
-    errors: message
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((entry) => ({ message: entry })),
-  };
-}
-
 function createBootSimResult(params: {
   simulatorId: string;
   didError: boolean;
@@ -70,12 +60,12 @@ function createBootSimResult(params: {
     action: {
       type: 'boot',
     },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
     artifacts: {
       simulatorId: params.simulatorId,
     },
-    ...(params.diagnosticMessage
-      ? { diagnostics: createDiagnostics(params.diagnosticMessage) }
-      : {}),
   };
 }
 
@@ -89,7 +79,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: BootSimResult): vo
 
 export function createBootSimExecutor(
   executor: CommandExecutor,
-): ToolExecutor<BootSimParams, BootSimResult> {
+): NonStreamingExecutor<BootSimParams, BootSimResult> {
   return async (params) => {
     try {
       const result = await executor(
@@ -103,7 +93,7 @@ export function createBootSimExecutor(
         return createBootSimResult({
           simulatorId: params.simulatorId,
           didError: true,
-          error: `Boot simulator operation failed: ${diagnosticMessage}`,
+          error: 'Boot simulator operation failed.',
           diagnosticMessage,
         });
       }
@@ -117,7 +107,7 @@ export function createBootSimExecutor(
       return createBootSimResult({
         simulatorId: params.simulatorId,
         didError: true,
-        error: `Boot simulator operation failed: ${diagnosticMessage}`,
+        error: 'Boot simulator operation failed.',
         diagnosticMessage,
       });
     }
@@ -132,9 +122,7 @@ export async function boot_simLogic(
 
   const ctx = getHandlerContext();
   const executeBootSim = createBootSimExecutor(executor);
-  const result = await executeBootSim(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeBootSim(params);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {

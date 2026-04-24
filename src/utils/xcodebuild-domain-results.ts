@@ -1,6 +1,7 @@
 import type { ToolHandlerContext } from '../rendering/types.js';
 import type {
   BasicDiagnostics,
+  DiagnosticEntry,
   BuildResultArtifacts,
   BuildResultDomainResult,
   BuildRunResultArtifacts,
@@ -17,14 +18,15 @@ import type {
   TestDiscoveryFragment,
   XcodebuildOperation,
 } from '../types/domain-fragments.js';
-import type { DomainStreamingExecutionContext } from '../types/tool-execution.js';
+import type { StreamingExecutionContext } from '../types/tool-execution.js';
 
 import { finalizeInlineXcodebuild } from './xcodebuild-output.js';
 import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
 import { createXcodebuildPipeline } from './xcodebuild-pipeline.js';
 import type { XcodebuildRunState } from './xcodebuild-run-state.js';
 import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.js';
-import { createToolExecutionContext } from './tool-execution-compat.js';
+import { createStreamingExecutionContext } from './tool-execution-compat.js';
+import { isBuildErrorDiagnosticLine } from './xcodebuild-line-parsers.js';
 
 const MAX_DISCOVERED_TESTS = 6;
 
@@ -68,6 +70,55 @@ function collectRawOutput(
   return lines.length > 0 ? lines : undefined;
 }
 
+function normalizeDiagnosticText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isLineRepresentedByDiagnostic(
+  line: string,
+  diagnostics: readonly DiagnosticEntry[],
+): boolean {
+  const normalizedLine = normalizeDiagnosticText(line);
+
+  return diagnostics.some((diagnostic) => {
+    const normalizedMessages = diagnostic.message
+      .split(/\r?\n/u)
+      .map(normalizeDiagnosticText)
+      .filter(Boolean);
+    if (normalizedMessages.includes(normalizedLine)) {
+      return true;
+    }
+
+    const representedMessage = normalizedMessages.find((message) =>
+      normalizedLine.endsWith(message),
+    );
+    if (!representedMessage) {
+      return false;
+    }
+
+    const normalizedLocation = diagnostic.location
+      ? normalizeDiagnosticText(diagnostic.location)
+      : null;
+    return normalizedLocation ? normalizedLine.includes(normalizedLocation) : true;
+  });
+}
+
+function collectDiagnosticRawOutput(
+  fallbackErrorMessages: readonly string[] | undefined,
+  parsedErrors: readonly DiagnosticEntry[],
+): string[] | undefined {
+  const rawOutput = collectRawOutput(fallbackErrorMessages);
+  if (!rawOutput || parsedErrors.length === 0) {
+    return rawOutput;
+  }
+
+  const diagnosticLines = rawOutput.filter(
+    (line) =>
+      isBuildErrorDiagnosticLine(line) && !isLineRepresentedByDiagnostic(line, parsedErrors),
+  );
+  return diagnosticLines.length > 0 ? diagnosticLines : undefined;
+}
+
 function createBasicDiagnostics(
   state: XcodebuildRunState,
   didError: boolean,
@@ -85,8 +136,9 @@ function createBasicDiagnostics(
       }))
     : [];
 
-  const rawOutput =
-    didError && state.errors.length === 0 ? collectRawOutput(fallbackErrorMessages) : undefined;
+  const rawOutput = didError
+    ? collectDiagnosticRawOutput(fallbackErrorMessages, errors)
+    : undefined;
 
   return { warnings, errors, ...(rawOutput ? { rawOutput } : {}) };
 }
@@ -189,7 +241,7 @@ export interface ProgressStreamingXcodebuildExecution extends StartedPipeline {
 export function createDomainStreamingPipeline(
   toolName: string,
   operation: XcodebuildOperation,
-  ctx: DomainStreamingExecutionContext,
+  ctx: StreamingExecutionContext,
   kind: BuildLikeKind = 'build-run-result',
 ): ProgressStreamingXcodebuildExecution {
   const innerPipeline = createXcodebuildPipeline({
@@ -253,12 +305,12 @@ export function createBuildDomainResult(options: {
   target: BuildTarget;
   artifacts: BuildResultArtifacts;
   fallbackErrorMessages?: readonly string[];
-  request?: BuildInvocationRequest;
+  request: BuildInvocationRequest;
 }): BuildResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const result: BuildResultDomainResult = {
     kind: 'build-result',
-    ...(options.request ? { request: options.request } : {}),
+    request: options.request,
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
     summary: {
@@ -284,12 +336,12 @@ export function createBuildRunDomainResult(options: {
   artifacts: BuildRunResultArtifacts;
   fallbackErrorMessages?: readonly string[];
   output?: BuildRunResultDomainResult['output'];
-  request?: BuildInvocationRequest;
+  request: BuildInvocationRequest;
 }): BuildRunResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const result: BuildRunResultDomainResult = {
     kind: 'build-run-result',
-    ...(options.request ? { request: options.request } : {}),
+    request: options.request,
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Build failed',
     summary: {
@@ -298,12 +350,12 @@ export function createBuildRunDomainResult(options: {
       target: options.target,
     },
     artifacts: options.artifacts,
+    ...(options.output ? { output: options.output } : {}),
     diagnostics: createBasicDiagnostics(
       pipelineResult.state,
       !options.succeeded,
       options.fallbackErrorMessages,
     ),
-    ...(options.output ? { output: options.output } : {}),
   };
 
   return result;
@@ -316,7 +368,7 @@ export function createTestDomainResult(options: {
   artifacts: TestResultArtifacts;
   fallbackErrorMessages?: readonly string[];
   preflight?: TestPreflightResult;
-  request?: BuildInvocationRequest;
+  request: BuildInvocationRequest;
 }): TestResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const state = pipelineResult.state;
@@ -326,13 +378,12 @@ export function createTestDomainResult(options: {
   const testSelectionInfo = createTestSelectionInfo(options.preflight);
   const result: TestResultDomainResult = {
     kind: 'test-result',
-    ...(options.request ? { request: options.request } : {}),
+    request: options.request,
     didError: !options.succeeded,
     error: options.succeeded ? null : 'Tests failed',
     summary: {
       status: options.succeeded ? 'SUCCEEDED' : 'FAILED',
       durationMs,
-      target: options.target,
       ...(hasTestCounts(state)
         ? {
             counts: {
@@ -342,10 +393,11 @@ export function createTestDomainResult(options: {
             },
           }
         : {}),
+      target: options.target,
     },
     artifacts: options.artifacts,
-    diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
     ...(testSelectionInfo ? { tests: testSelectionInfo } : {}),
+    diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
   };
 
   return result;
@@ -389,4 +441,4 @@ export function collectFallbackErrorMessages(
   ];
 }
 
-export { createToolExecutionContext };
+export { createStreamingExecutionContext };

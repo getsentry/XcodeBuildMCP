@@ -4,6 +4,9 @@ names:
   mcp: snapshot_ui
   cli: snapshot-ui
 description: Print view hierarchy with precise view coordinates (x, y, width, height) for visible elements.
+outputSchema:
+  schema: xcodebuildmcp.output.capture-result
+  version: "1"
 nextSteps:
   - label: Refresh after layout changes
     toolId: snapshot_ui

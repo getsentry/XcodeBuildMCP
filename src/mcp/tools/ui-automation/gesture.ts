@@ -20,7 +20,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -28,7 +28,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const gestureSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -93,7 +92,7 @@ export function createGestureExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<GestureParams, GestureResult> {
+): NonStreamingExecutor<GestureParams, GestureResult> {
   return async (params) => {
     const toolName = 'gesture';
     const { simulatorId, preset, screenWidth, screenHeight, duration, delta, preDelay, postDelay } =
@@ -137,8 +136,7 @@ export function createGestureExecutor(
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) =>
-          `Failed to execute gesture '${preset}': ${axeError.message}`,
+        axeFailureMessage: () => `Failed to execute gesture '${preset}'.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -156,7 +154,7 @@ export async function gestureLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeGesture = createGestureExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeGesture(params, noopToolExecutionContext);
+  const result = await executeGesture(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

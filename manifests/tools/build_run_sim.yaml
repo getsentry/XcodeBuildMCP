@@ -4,6 +4,9 @@ names:
   mcp: build_run_sim
   cli: build-and-run
 description: Build, install, and launch on iOS Simulator; boots simulator and attempts to open Simulator.app as needed. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.
+outputSchema:
+  schema: xcodebuildmcp.output.build-run-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

@@ -4,6 +4,9 @@ names:
   mcp: long_press
   cli: long-press
 description: Long press at coords.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Long Press
   readOnlyHint: true

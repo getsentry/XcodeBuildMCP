@@ -5,7 +5,8 @@ import type {
   DebugStackResultDomainResult,
   DebugThread,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   createTypedToolWithContext,
@@ -28,12 +29,20 @@ type DebugStackResult = DebugStackResultDomainResult;
 function createDebugStackResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   threads?: DebugThread[];
 }): DebugStackResult {
   return {
     kind: 'debug-stack-result',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     ...(params.threads ? { threads: params.threads } : {}),
   };
 }
@@ -141,7 +150,7 @@ function parseStackOutput(output: string, params: DebugStackParams): DebugThread
 
 export function createDebugStackExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugStackParams, DebugStackResult> {
+): NonStreamingExecutor<DebugStackParams, DebugStackResult> {
   return async (params) => {
     try {
       const output = await debuggerManager.getStack(params.debugSessionId, {
@@ -154,9 +163,11 @@ export function createDebugStackExecutor(
         threads: parseStackOutput(output, params),
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugStackResult({
         didError: true,
-        error: `Failed to get stack: ${toErrorMessage(error)}`,
+        error: 'Failed to get stack.',
+        diagnosticMessage,
       });
     }
   };
@@ -168,9 +179,7 @@ export async function debug_stackLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugStack = createDebugStackExecutor(ctx.debugger);
-  const result = await executeDebugStack(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugStack(params);
 
   setStructuredOutput(handlerCtx, result);
 }

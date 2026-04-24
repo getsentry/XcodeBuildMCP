@@ -4,6 +4,9 @@ names:
   mcp: build_device
   cli: build
 description: Build for device.
+outputSchema:
+  schema: xcodebuildmcp.output.build-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

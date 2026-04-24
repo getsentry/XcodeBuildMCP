@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { LaunchResultDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -52,9 +52,7 @@ export async function launch_app_deviceLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeLaunchAppDevice = createLaunchAppDeviceExecutor(executor, fileSystem);
-  const result = await executeLaunchAppDevice(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeLaunchAppDevice(params);
 
   setLaunchResultStructuredOutput(ctx, result);
 
@@ -76,7 +74,7 @@ function getProcessId(result: LaunchAppDeviceResult): number | undefined {
 export function createLaunchAppDeviceExecutor(
   executor: CommandExecutor,
   fileSystem: FileSystemExecutor,
-): ToolExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult> {
+): NonStreamingExecutor<LaunchAppDeviceParams, LaunchAppDeviceResult> {
   return async (params) => {
     log('info', `Launching app ${params.bundleId} on device ${params.deviceId}`);
 

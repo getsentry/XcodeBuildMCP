@@ -28,6 +28,36 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "request": {
+          "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/appPathRequest"
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "SUCCEEDED",
+                "FAILED"
+              ]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "target": {
+              "enum": [
+                "simulator",
+                "device",
+                "macos",
+                "swift-package"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
         "artifacts": {
           "type": "object",
           "additionalProperties": false,

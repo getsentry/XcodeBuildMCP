@@ -1,5 +1,6 @@
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolSchemaShape } from '../core/plugin-types.ts';
+import type { StructuredOutputSchemaRef } from '../core/structured-output-schema.ts';
 import type {
   RenderSession,
   StructuredToolOutput,
@@ -32,6 +33,7 @@ export interface ToolDefinition {
 
   description?: string;
   annotations?: ToolAnnotations;
+  outputSchema?: StructuredOutputSchemaRef;
 
   /** Static next-step templates declared in the manifest */
   nextStepTemplates?: NextStepTemplate[];

@@ -28,6 +28,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "request": {
+          "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/buildInvocationRequest"
+        },
         "summary": {
           "type": "object",
           "additionalProperties": false,

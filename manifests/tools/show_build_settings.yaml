@@ -4,6 +4,9 @@ names:
   mcp: show_build_settings
   cli: show-build-settings
 description: Show build settings.
+outputSchema:
+  schema: xcodebuildmcp.output.build-settings
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

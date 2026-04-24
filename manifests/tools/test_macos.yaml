@@ -4,6 +4,9 @@ names:
   mcp: test_macos
   cli: test
 description: Test macOS target.
+outputSchema:
+  schema: xcodebuildmcp.output.test-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

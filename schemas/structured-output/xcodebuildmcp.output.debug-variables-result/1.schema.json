@@ -111,6 +111,18 @@
           ]
         },
         {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "diagnostics": {
+              "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/basicDiagnostics"
+            }
+          },
+          "required": [
+            "diagnostics"
+          ]
+        },
+        {
           "type": "null"
         }
       ]

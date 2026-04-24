@@ -4,6 +4,9 @@ names:
   mcp: key_sequence
   cli: key-sequence
 description: Press a sequence of keys by their keycodes.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "1"
 annotations:
   title: Key Sequence
   readOnlyHint: true

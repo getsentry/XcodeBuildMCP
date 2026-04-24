@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { schema, reset_sim_locationLogic } from '../reset_sim_location.ts';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
 
 describe('reset_sim_location plugin', () => {
   describe('Schema Validation', () => {
@@ -52,6 +52,9 @@ describe('reset_sim_location plugin', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to reset simulator location.');
+      expect(text).toContain('Command failed');
     });
 
     it('should handle exception during execution', async () => {
@@ -67,6 +70,9 @@ describe('reset_sim_location plugin', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to reset simulator location.');
+      expect(text).toContain('Network error');
     });
 
     it('should call correct command', async () => {

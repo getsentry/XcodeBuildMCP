@@ -169,6 +169,9 @@ describe('set_sim_location tool', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set simulator location.');
+      expect(text).toContain('Simulator not found');
     });
 
     it('should handle exception with Error object', async () => {
@@ -186,6 +189,9 @@ describe('set_sim_location tool', () => {
       );
 
       expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to set simulator location.');
+      expect(text).toContain('Connection failed');
     });
 
     it('should handle boundary values for coordinates', async () => {

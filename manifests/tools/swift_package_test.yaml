@@ -4,6 +4,9 @@ names:
   mcp: swift_package_test
   cli: test
 description: Run swift package target tests.
+outputSchema:
+  schema: xcodebuildmcp.output.test-result
+  version: "1"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

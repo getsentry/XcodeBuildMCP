@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -24,10 +24,11 @@ import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/sche
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -115,13 +116,14 @@ export function createTestDeviceExecutor(
   executor: CommandExecutor = getDefaultCommandExecutor(),
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   prepared?: PreparedTestDeviceExecution,
-): DomainStreamingExecutor<TestDeviceParams, TestDeviceResult> {
+): StreamingExecutor<TestDeviceParams, TestDeviceResult> {
   return async (params, ctx) => {
     const resolved = prepared ?? (await prepareTestDeviceExecution(params, fileSystemExecutor));
     const executeTest = createTestExecutor(executor, {
       preflight: resolved.preflight,
       toolName: 'test_device',
       target: 'device',
+      request: resolved.invocationRequest,
     });
 
     return executeTest(
@@ -152,18 +154,12 @@ export async function testDeviceLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareTestDeviceExecution(params, fileSystemExecutor);
 
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'TEST',
-    prepared.invocationRequest,
-    'test-result',
-  );
+  ctx.emit(createBuildInvocationFragment('test-result', 'TEST', prepared.invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeTestDevice = createTestDeviceExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestDevice(params, executionContext);
 
-  result.request = prepared.invocationRequest;
   setXcodebuildStructuredOutput(ctx, 'test-result', result);
-  executionContext.emitResult(result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({

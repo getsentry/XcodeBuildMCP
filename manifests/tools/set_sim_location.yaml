@@ -4,6 +4,9 @@ names:
   mcp: set_sim_location
   cli: set-location
 description: Set sim location.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Set Simulator Location
   readOnlyHint: true

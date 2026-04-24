@@ -21,7 +21,7 @@ import {
 import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
@@ -29,7 +29,6 @@ import {
   mapAxeCommandError,
   setUiActionStructuredOutput,
 } from './shared/domain-result.ts';
-import { noopToolExecutionContext } from './shared/noop-tool-execution-context.ts';
 
 const touchSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
@@ -55,16 +54,17 @@ export function createTouchExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): ToolExecutor<TouchParams, TouchResult> {
+): NonStreamingExecutor<TouchParams, TouchResult> {
   return async (params) => {
     const toolName = 'touch';
     const { simulatorId, x, y, down, up, delay } = params;
     const actionText = down && up ? 'touch down+up' : down ? 'touch down' : 'touch up';
-    const action = { type: 'touch' as const, event: actionText, x, y };
+    const baseAction = { type: 'touch' as const };
+    const fullAction = { type: 'touch' as const, event: actionText, x, y };
 
     if (!down && !up) {
       return createUiActionFailureResult(
-        action,
+        baseAction,
         simulatorId,
         'At least one of "down" or "up" must be true',
       );
@@ -76,7 +76,7 @@ export function createTouchExecutor(
       toolName,
     });
     if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      return createUiActionFailureResult(baseAction, simulatorId, guard.blockedMessage);
     }
 
     const commandArgs = ['touch', '-x', String(x), '-y', String(y)];
@@ -98,16 +98,16 @@ export function createTouchExecutor(
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'touch', executor, axeHelpers);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [
+      return createUiActionSuccessResult(fullAction, simulatorId, [
         guard.warningText,
         getSnapshotUiWarning(simulatorId),
       ]);
     } catch (error) {
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: (axeError) => `Failed to execute touch event: ${axeError.message}`,
+        axeFailureMessage: () => 'Failed to execute touch event.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
+      return createUiActionFailureResult(baseAction, simulatorId, failure.message, {
         details: failure.diagnostics?.errors.map((entry) => entry.message),
       });
     }
@@ -122,7 +122,7 @@ export async function touchLogic(
 ): Promise<void> {
   const ctx = getHandlerContext();
   const executeTouch = createTouchExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeTouch(params, noopToolExecutionContext);
+  const result = await executeTouch(params);
 
   setUiActionStructuredOutput(ctx, result);
 }

@@ -7,7 +7,7 @@
 
 import * as z from 'zod';
 import type { BundleIdDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/command.ts';
 import { getDefaultFileSystemExecutor, getDefaultCommandExecutor } from '../../../utils/command.ts';
@@ -19,6 +19,7 @@ import {
   setBundleIdStructuredOutput,
 } from '../../../utils/app-query-results.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const getAppBundleIdSchema = z.object({
   appPath: z.string().describe('Path to the .app bundle'),
@@ -30,15 +31,17 @@ type GetAppBundleIdResult = BundleIdDomainResult;
 export function createGetAppBundleIdExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
-): ToolExecutor<GetAppBundleIdParams, GetAppBundleIdResult> {
+): NonStreamingExecutor<GetAppBundleIdParams, GetAppBundleIdResult> {
   return async (params) => {
     const appPath = params.appPath;
 
     if (!fileSystemExecutor.existsSync(appPath)) {
+      const message = `File not found: '${appPath}'. Please check the path and try again.`;
       return buildBundleIdResult(
         appPath,
         undefined,
-        `File not found: '${appPath}'. Please check the path and try again.`,
+        'Failed to get bundle ID.',
+        createBasicDiagnostics({ errors: [message] }),
       );
     }
 
@@ -51,7 +54,13 @@ export function createGetAppBundleIdExecutor(
 
       return buildBundleIdResult(appPath, bundleId.trim());
     } catch (error) {
-      return buildBundleIdResult(appPath, undefined, toErrorMessage(error));
+      const message = toErrorMessage(error);
+      return buildBundleIdResult(
+        appPath,
+        undefined,
+        'Failed to get bundle ID.',
+        createBasicDiagnostics({ errors: [message] }),
+      );
     }
   };
 }
@@ -70,9 +79,7 @@ export async function get_app_bundle_idLogic(
 
   const ctx = getHandlerContext();
   const executeGetAppBundleId = createGetAppBundleIdExecutor(executor, fileSystemExecutor);
-  const result = await executeGetAppBundleId(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeGetAppBundleId(params);
 
   setBundleIdStructuredOutput(ctx, result);
 

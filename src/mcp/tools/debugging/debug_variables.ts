@@ -5,7 +5,8 @@ import type {
   DebugVariable,
   DebugVariablesResultDomainResult,
 } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   createTypedToolWithContext,
@@ -27,12 +28,20 @@ type DebugVariablesResult = DebugVariablesResultDomainResult;
 function createDebugVariablesResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   scopes?: NonNullable<Extract<DebugVariablesResult, { scopes: unknown }>['scopes']>;
 }): DebugVariablesResult {
   return {
     kind: 'debug-variables-result',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     ...(params.scopes ? { scopes: params.scopes } : {}),
   };
 }
@@ -181,7 +190,7 @@ function parseVariablesOutput(output: string) {
 
 export function createDebugVariablesExecutor(
   debuggerManager: DebuggerToolContext['debugger'],
-): ToolExecutor<DebugVariablesParams, DebugVariablesResult> {
+): NonStreamingExecutor<DebugVariablesParams, DebugVariablesResult> {
   return async (params) => {
     try {
       const output = await debuggerManager.getVariables(params.debugSessionId, {
@@ -193,9 +202,11 @@ export function createDebugVariablesExecutor(
         scopes: parseVariablesOutput(output),
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugVariablesResult({
         didError: true,
-        error: `Failed to get variables: ${toErrorMessage(error)}`,
+        error: 'Failed to get variables.',
+        diagnosticMessage,
       });
     }
   };
@@ -207,9 +218,7 @@ export async function debug_variablesLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugVariables = createDebugVariablesExecutor(ctx.debugger);
-  const result = await executeDebugVariables(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugVariables(params);
 
   setStructuredOutput(handlerCtx, result);
 }

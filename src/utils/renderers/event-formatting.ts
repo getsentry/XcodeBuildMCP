@@ -218,15 +218,19 @@ function parseHumanDiagnostic(
 
 export function formatHeaderEvent(event: HeaderRenderItem): string {
   const emoji = OPERATION_EMOJI[event.operation] ?? '\u{2699}\u{FE0F}';
-  const lines: string[] = [`${emoji} ${event.operation}`, ''];
+  const lines: string[] = [`${emoji} ${event.operation}`];
 
   const onlyTestingParams = event.params.filter((param) => param.label === '-only-testing');
   const skipTestingParams = event.params.filter((param) => param.label === '-skip-testing');
+  const regularParams = event.params.filter(
+    (param) => param.label !== '-only-testing' && param.label !== '-skip-testing',
+  );
 
-  for (const param of event.params) {
-    if (param.label === '-only-testing' || param.label === '-skip-testing') {
-      continue;
-    }
+  if (event.params.length > 0) {
+    lines.push('');
+  }
+
+  for (const param of regularParams) {
     lines.push(`   ${param.label}: ${param.value}`);
   }
 
@@ -240,9 +244,6 @@ export function formatHeaderEvent(event: HeaderRenderItem): string {
     }
   }
 
-  if (event.params.length > 0) {
-    lines.push('');
-  }
   return lines.join('\n');
 }
 
@@ -387,7 +388,7 @@ export function formatGroupedCompilerErrors(
     lines.pop();
   }
 
-  return lines.join('\n') + '\n';
+  return lines.join('\n');
 }
 
 const BUILD_STAGE_LABEL: Record<Exclude<BuildStageRenderItem['stage'], 'COMPLETED'>, string> = {

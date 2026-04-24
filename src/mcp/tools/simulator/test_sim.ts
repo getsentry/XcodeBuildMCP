@@ -8,7 +8,7 @@
 
 import * as z from 'zod';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
-import type { DomainStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
@@ -31,12 +31,13 @@ import { inferPlatform, type InferPlatformResult } from '../../../utils/infer-pl
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { resolveSimulatorIdOrName } from '../../../utils/simulator-resolver.ts';
 import {
-  createToolExecutionContext,
+  createStreamingExecutionContext,
   createDomainStreamingPipeline,
   createTestDomainResult,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z
@@ -183,7 +184,7 @@ export function createTestSimExecutor(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor = getDefaultFileSystemExecutor(),
   prepared?: PreparedTestSimExecution,
-): DomainStreamingExecutor<TestSimulatorParams, TestSimulatorResult> {
+): StreamingExecutor<TestSimulatorParams, TestSimulatorResult> {
   return async (params, ctx) => {
     const resolved =
       prepared ?? (await prepareTestSimExecution(params, executor, fileSystemExecutor));
@@ -209,6 +210,7 @@ export function createTestSimExecutor(
         fallbackErrorMessages: [
           resolved.resolutionError ?? 'Failed to resolve simulator identifier for test execution.',
         ],
+        request: resolved.invocationRequest,
       });
     }
 
@@ -216,6 +218,7 @@ export function createTestSimExecutor(
       preflight: resolved.preflight,
       toolName: 'test_sim',
       target: 'simulator',
+      request: resolved.invocationRequest,
     });
 
     return executeTest(
@@ -247,17 +250,12 @@ export async function test_simLogic(
   const ctx = getHandlerContext();
   const prepared = await prepareTestSimExecution(params, executor, fileSystemExecutor);
 
-  const executionContext = createToolExecutionContext(
-    ctx,
-    'TEST',
-    prepared.invocationRequest,
-    'test-result',
-  );
+  ctx.emit(createBuildInvocationFragment('test-result', 'TEST', prepared.invocationRequest));
+  const executionContext = createStreamingExecutionContext(ctx);
   const executeTestSim = createTestSimExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestSim(params, executionContext);
 
   setXcodebuildStructuredOutput(ctx, 'test-result', result);
-  executionContext.emitResult(result);
 }
 
 const publicSchemaObject = baseSchemaObject.omit({

@@ -76,17 +76,13 @@ function createBufferedHandlerContext(
 ): ToolHandlerContext {
   return {
     liveProgressEnabled: opts.liveProgressEnabled,
+    streamingFragmentsEnabled: opts.liveProgressEnabled,
     emit: (fragment) => {
       session.emit(fragment);
       opts?.onProgress?.(fragment);
     },
     attach: (image) => {
       session.attach(image);
-    },
-    emitLiveFragment: (fragment) => {
-      if (!opts.liveProgressEnabled) return;
-      session.emit(fragment);
-      opts?.onProgress?.(fragment);
     },
   };
 }

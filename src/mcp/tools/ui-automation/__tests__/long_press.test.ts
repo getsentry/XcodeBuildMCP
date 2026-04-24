@@ -368,9 +368,9 @@ describe('Long Press Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        "Failed to simulate long press at (100, 200): axe command 'touch' failed.",
-      );
+      const text = allText(result);
+      expect(text).toContain('Failed to simulate long press at (100, 200).');
+      expect(text).toContain('axe command failed');
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -449,9 +449,9 @@ describe('Long Press Plugin', () => {
       );
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(
-        'System error executing axe: Failed to execute axe command: String error',
-      );
+      const text = allText(result);
+      expect(text).toContain('System error executing axe command.');
+      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { DebugSessionActionDomainResult } from '../../../types/domain-results.ts';
-import type { ToolExecutor } from '../../../types/tool-execution.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { nullifyEmptyStrings, withSimulatorIdOrName } from '../../../utils/schema-helpers.ts';
@@ -59,6 +60,7 @@ type DebugAttachSimResult = DebugSessionActionDomainResult;
 function createDebugAttachResult(params: {
   didError: boolean;
   error?: string;
+  diagnosticMessage?: string;
   debugSessionId?: string;
   executionState?: 'paused' | 'running';
   simulatorId?: string;
@@ -77,6 +79,13 @@ function createDebugAttachResult(params: {
     kind: 'debug-session-action',
     didError: params.didError,
     error: params.error ?? null,
+    ...(params.didError
+      ? {
+          diagnostics: createBasicDiagnostics({
+            errors: [params.diagnosticMessage ?? params.error ?? 'Unknown error'],
+          }),
+        }
+      : {}),
     action: 'attach',
     ...(params.debugSessionId
       ? {
@@ -101,7 +110,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugAttachSimResu
 
 export function createDebugAttachSimExecutor(
   toolContext: DebuggerToolContext,
-): ToolExecutor<DebugAttachSimParams, DebugAttachSimResult> {
+): NonStreamingExecutor<DebugAttachSimParams, DebugAttachSimResult> {
   return async (params) => {
     const { executor, debugger: debuggerManager } = toolContext;
 
@@ -113,7 +122,8 @@ export function createDebugAttachSimExecutor(
     if (simResult.error) {
       return createDebugAttachResult({
         didError: true,
-        error: simResult.error,
+        error: 'Failed to attach debugger.',
+        diagnosticMessage: simResult.error,
       });
     }
 
@@ -121,7 +131,8 @@ export function createDebugAttachSimExecutor(
     if (!simulatorId) {
       return createDebugAttachResult({
         didError: true,
-        error: 'Simulator resolution failed: Unable to determine simulator UUID',
+        error: 'Failed to attach debugger.',
+        diagnosticMessage: 'Simulator resolution failed: Unable to determine simulator UUID',
       });
     }
 
@@ -134,9 +145,11 @@ export function createDebugAttachSimExecutor(
           bundleId: params.bundleId,
         });
       } catch (error) {
+        const diagnosticMessage = toErrorMessage(error);
         return createDebugAttachResult({
           didError: true,
-          error: `Failed to resolve simulator PID: ${toErrorMessage(error)}`,
+          error: 'Failed to attach debugger.',
+          diagnosticMessage,
           simulatorId,
         });
       }
@@ -145,7 +158,8 @@ export function createDebugAttachSimExecutor(
     if (!pid) {
       return createDebugAttachResult({
         didError: true,
-        error: 'Missing PID: Unable to resolve process ID to attach',
+        error: 'Failed to attach debugger.',
+        diagnosticMessage: 'Missing PID: Unable to resolve process ID to attach',
         simulatorId,
       });
     }
@@ -179,7 +193,8 @@ export function createDebugAttachSimExecutor(
             }
             return createDebugAttachResult({
               didError: true,
-              error: `Failed to resume debugger after attach: ${message}`,
+              error: 'Failed to attach debugger.',
+              diagnosticMessage: `Failed to resume debugger after attach: ${message}`,
               simulatorId,
               processId: pid,
             });
@@ -201,7 +216,8 @@ export function createDebugAttachSimExecutor(
             }
             return createDebugAttachResult({
               didError: true,
-              error: `Failed to pause debugger after attach: ${message}`,
+              error: 'Failed to attach debugger.',
+              diagnosticMessage: `Failed to pause debugger after attach: ${message}`,
               simulatorId,
               processId: pid,
             });
@@ -221,9 +237,11 @@ export function createDebugAttachSimExecutor(
         processId: pid,
       });
     } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
       return createDebugAttachResult({
         didError: true,
-        error: `Failed to attach debugger: ${toErrorMessage(error)}`,
+        error: 'Failed to attach debugger.',
+        diagnosticMessage,
         simulatorId,
         processId: pid,
       });
@@ -237,9 +255,7 @@ export async function debug_attach_simLogic(
 ): Promise<void> {
   const handlerCtx = getHandlerContext();
   const executeDebugAttachSim = createDebugAttachSimExecutor(ctx);
-  const result = await executeDebugAttachSim(params, {
-    liveProgressEnabled: false,
-  });
+  const result = await executeDebugAttachSim(params);
 
   setStructuredOutput(handlerCtx, result);
   if (result.didError) {
