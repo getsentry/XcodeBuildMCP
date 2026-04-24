@@ -1,4 +1,8 @@
 
 🐛 Continue
 
-❌ Failed to resume debugger: No active debug session. Provide debugSessionId or attach first.
+Errors (1):
+
+  ✗ No active debug session. Provide debugSessionId or attach first.
+
+❌ Failed to resume debugger.

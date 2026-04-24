@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.build-settings",
   "schemaVersion": "1",
   "didError": true,
-  "error": "xcodebuild: error: The workspace named \"CalculatorApp\" does not contain a scheme named \"NONEXISTENT\".",
+  "error": "Failed to show build settings.",
   "data": {
     "artifacts": {
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
@@ -13,7 +13,7 @@
       "warnings": [],
       "errors": [
         {
-          "message": "xcodebuild: error: The workspace named \"CalculatorApp\" does not contain a scheme named \"NONEXISTENT\". The \"-list\" option can be used to find the names of the schemes in the workspace."
+          "message": "The workspace named \"CalculatorApp\" does not contain a scheme named \"NONEXISTENT\". The \"-list\" option can be used to find the names of the schemes in the workspace."
         }
       ]
     }

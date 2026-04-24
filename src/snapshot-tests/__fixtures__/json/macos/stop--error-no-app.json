@@ -2,17 +2,22 @@
   "schema": "xcodebuildmcp.output.stop-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Stop macOS app operation failed: kill: 999999: No such process",
+  "error": "Failed to stop macOS app.",
   "data": {
     "summary": {
       "status": "FAILED"
     },
     "artifacts": {
-      "processId": 999999
+      "processId": 99999,
+      "appName": "PID 999999"
     },
     "diagnostics": {
       "warnings": [],
-      "errors": []
+      "errors": [
+        {
+          "message": "kill: 999999: No such process"
+        }
+      ]
     }
   }
 }

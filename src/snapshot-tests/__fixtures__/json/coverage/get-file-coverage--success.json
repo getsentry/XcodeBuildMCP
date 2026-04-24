@@ -14,7 +14,7 @@
     "artifacts": {
       "xcresultPath": "<TMPDIR>/TestResults.xcresult",
       "file": "CalculatorService.swift",
-      "sourceFilePath": "example_projects/iOS_Calculator/CalculatorAppPackage/Sources/CalculatorAppFeature/CalculatorService.swift"
+      "sourceFilePath": "<ROOT>/example_projects/iOS_Calculator/CalculatorAppPackage/Sources/CalculatorAppFeature/CalculatorService.swift"
     },
     "functions": {
       "notCovered": [
@@ -29,6 +29,42 @@
           "name": "CalculatorService.setError(_:)",
           "coveredLines": 0,
           "executableLines": 5
+        },
+        {
+          "line": 58,
+          "name": "implicit closure #2 in CalculatorService.inputNumber(_:)",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 98,
+          "name": "implicit closure #3 in CalculatorService.calculate()",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 99,
+          "name": "implicit closure #4 in CalculatorService.calculate()",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 162,
+          "name": "implicit closure #1 in CalculatorService.deleteLastDigit()",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 172,
+          "name": "implicit closure #2 in CalculatorService.deleteLastDigit()",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 214,
+          "name": "implicit closure #4 in CalculatorService.formatNumber(_:)",
+          "coveredLines": 0,
+          "executableLines": 1
         }
       ],
       "partialCoverage": [
@@ -40,11 +76,25 @@
           "executableLines": 14
         },
         {
+          "line": 184,
+          "name": "CalculatorService.updateExpressionDisplay()",
+          "coveragePct": 80,
+          "coveredLines": 8,
+          "executableLines": 10
+        },
+        {
           "line": 93,
           "name": "CalculatorService.calculate()",
           "coveragePct": 84.2,
           "coveredLines": 32,
           "executableLines": 38
+        },
+        {
+          "line": 195,
+          "name": "CalculatorService.formatNumber(_:)",
+          "coveragePct": 85.7,
+          "coveredLines": 18,
+          "executableLines": 21
         }
       ],
       "fullCoverageCount": 27,

@@ -4,6 +4,16 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "MCPTest",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "onlyTesting": [
+        "MCPTestTests/MCPTestTests/appNameIsCorrect()",
+        "MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect"
+      ],
+      "skipTesting": []
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,
@@ -19,7 +29,7 @@
     },
     "tests": {
       "selected": [
-        "MCPTestTests/MCPTestTests/appNameIsCorrect()",
+        "MCPTestTests/MCPTestTests/appNameIsCorrect",
         "MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect"
       ],
       "discovered": {
@@ -31,7 +41,14 @@
       }
     },
     "diagnostics": {
-      "warnings": [],
+      "warnings": [
+        {
+          "message": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app/Contents/Frameworks/XCTestCore.framework/Versions/A/XCTestCore: Failed to parse executable: Attempting to read past the size of the binary data. startingAt: 2179072, typeSize: 4 (UInt32), dataSize: 458752"
+        },
+        {
+          "message": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app/Contents/Frameworks/Testing.framework/Versions/A/Testing: Failed to parse executable: Attempting to read past the size of the binary data. startingAt: 3604480, typeSize: 4 (UInt32), dataSize: 589824"
+        }
+      ],
       "errors": [],
       "testFailures": []
     }

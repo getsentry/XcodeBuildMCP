@@ -4,6 +4,16 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulatorName": "iPhone 17",
+      "onlyTesting": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
+      "skipTesting": []
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,
@@ -18,6 +28,9 @@
       "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_sim_<TIMESTAMP>_pid<PID>.log"
     },
     "tests": {
+      "selected": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
       "discovered": {
         "total": 1,
         "items": [

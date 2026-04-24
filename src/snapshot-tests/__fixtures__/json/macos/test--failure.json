@@ -4,6 +4,13 @@
   "didError": true,
   "error": "Tests failed",
   "data": {
+    "request": {
+      "scheme": "MCPTest",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "onlyTesting": [],
+      "skipTesting": []
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
@@ -34,13 +41,13 @@
       "testFailures": [
         {
           "suite": "MCPTestsXCTests",
-          "test": "testDeliberateFailure",
+          "test": "testDeliberateFailure()",
           "message": "XCTAssertTrue failed - This test is designed to fail for snapshot testing",
           "location": "MCPTestsXCTests.swift:11"
         },
         {
           "suite": "MCPTestTests",
-          "test": "deliberateFailure",
+          "test": "deliberateFailure()",
           "message": "Expectation failed: 1 == 2: This test is designed to fail for snapshot testing",
           "location": "MCPTestTests.swift:11"
         }

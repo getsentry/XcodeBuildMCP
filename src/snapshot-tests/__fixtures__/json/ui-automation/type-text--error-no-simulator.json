@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to simulate text typing: axe command 'type' failed.",
+  "error": "Failed to simulate text typing.",
   "data": {
     "summary": {
       "status": "FAILED"

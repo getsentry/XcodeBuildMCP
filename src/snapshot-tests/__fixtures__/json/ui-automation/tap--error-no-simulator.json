@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to simulate tap at (100, 100): axe command 'tap' failed.",
+  "error": "Failed to simulate tap at (100, 100).",
   "data": {
     "summary": {
       "status": "FAILED"

@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to execute key sequence: axe command 'key-sequence' failed.",
+  "error": "Failed to execute key sequence.",
   "data": {
     "summary": {
       "status": "FAILED"

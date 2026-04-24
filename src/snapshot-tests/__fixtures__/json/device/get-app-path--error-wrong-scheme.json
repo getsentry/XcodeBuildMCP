@@ -2,8 +2,18 @@
   "schema": "xcodebuildmcp.output.app-path",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Query failed",
+  "error": "Query failed.",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS"
+    },
+    "summary": {
+      "status": "FAILED",
+      "target": "device"
+    },
     "diagnostics": {
       "warnings": [],
       "errors": [

@@ -4,4 +4,8 @@
    Simulator: <UUID>
    Coordinates: 37.7749,-122.4194
 
-❌ Failed to set simulator location: Invalid device: <UUID>
+Errors (1):
+
+  ✗ Invalid device: <UUID>
+
+❌ Failed to set simulator location.

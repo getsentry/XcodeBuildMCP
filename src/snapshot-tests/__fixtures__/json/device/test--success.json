@@ -4,6 +4,17 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "configuration": "Debug",
+      "platform": "iOS",
+      "deviceId": "<UUID>",
+      "target": "device",
+      "onlyTesting": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
+      "skipTesting": []
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

@@ -12,15 +12,13 @@ Discovered 4 test(s):
    MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
    MCPTestTests/MCPTestsXCTests/testDeliberateFailure
 
-MCPTestsXCTests
-  ✗ testDeliberateFailure():
-      - XCTAssertTrue failed - This test is designed to fail for snapshot testing
-        MCPTestsXCTests.swift:11
+Test Failures (2):
 
-MCPTestTests
-  ✗ deliberateFailure():
-      - Expectation failed: 1 == 2: This test is designed to fail for snapshot testing
-        MCPTestTests.swift:11
+  ✗ MCPTestsXCTests / testDeliberateFailure(): XCTAssertTrue failed - This test is designed to fail for snapshot testing
+    MCPTestsXCTests.swift:11
+
+  ✗ MCPTestTests / deliberateFailure(): Expectation failed: 1 == 2: This test is designed to fail for snapshot testing
+    MCPTestTests.swift:11
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

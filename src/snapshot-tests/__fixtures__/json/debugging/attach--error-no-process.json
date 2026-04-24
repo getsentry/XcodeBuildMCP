@@ -2,8 +2,16 @@
   "schema": "xcodebuildmcp.output.debug-session-action",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to resolve simulator PID: Invalid device: <UUID>",
+  "error": "Failed to attach debugger.",
   "data": {
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Invalid device: <UUID>"
+        }
+      ]
+    },
     "action": "attach",
     "artifacts": {
       "simulatorId": "<UUID>"

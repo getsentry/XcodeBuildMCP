@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to simulate key press (code: 4): axe command 'key' failed.",
+  "error": "Failed to simulate key press (code: 4).",
   "data": {
     "summary": {
       "status": "FAILED"

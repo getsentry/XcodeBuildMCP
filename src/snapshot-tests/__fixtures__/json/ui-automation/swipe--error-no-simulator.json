@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to simulate swipe: axe command 'swipe' failed.",
+  "error": "Failed to simulate swipe.",
   "data": {
     "summary": {
       "status": "FAILED"

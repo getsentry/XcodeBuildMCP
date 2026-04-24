@@ -4,6 +4,14 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS",
+      "deviceId": "<UUID>",
+      "target": "device"
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

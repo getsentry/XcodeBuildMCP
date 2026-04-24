@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.coverage-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to get file coverage: Failed to load result bundle",
+  "error": "Failed to get file coverage.",
   "data": {
     "summary": {
       "status": "FAILED"
@@ -16,7 +16,7 @@
       "warnings": [],
       "errors": [
         {
-          "message": "Error Domain=XCCovErrorDomain Code=0 \"Failed to load result bundle\""
+          "message": "Error Domain=XCCovErrorDomain Code=0 \"Failed to load result bundle\" UserInfo={NSLocalizedDescription=Failed to load result bundle, NSUnderlyingError=<ADDR> {Error Domain=XCResultStorage.ResultBundleFactory.Error Code=0 \"Failed to create a new result bundle reader, underlying error: Info.plist at <TMPDIR>/invalid.xcresult/Info.plist does not exist, the result bundle might be corrupted or the provided path is not a result bundle\"}}"
         }
       ]
     }

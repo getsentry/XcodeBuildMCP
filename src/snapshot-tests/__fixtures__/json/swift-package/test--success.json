@@ -4,6 +4,12 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "spm",
+      "configuration": "debug",
+      "platform": "Swift Package",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

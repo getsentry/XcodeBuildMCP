@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.build-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Swift package clean failed: error: chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT",
+  "error": "Swift package clean failed.",
   "data": {
     "summary": {
       "status": "FAILED",

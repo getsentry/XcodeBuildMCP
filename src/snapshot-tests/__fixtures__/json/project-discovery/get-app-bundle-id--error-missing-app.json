@@ -2,10 +2,18 @@
   "schema": "xcodebuildmcp.output.bundle-id",
   "schemaVersion": "1",
   "didError": true,
-  "error": "File not found: '/nonexistent/path/Fake.app'. Please check the path and try again.",
+  "error": "Failed to get bundle ID.",
   "data": {
     "artifacts": {
       "appPath": "/nonexistent/path/Fake.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "File not found: '/nonexistent/path/Fake.app'. Please check the path and try again."
+        }
+      ]
     }
   }
 }

@@ -5,7 +5,20 @@
 
 Frames:
   Thread <THREAD_ID> (Thread 1)
-  <LOWER_FRAMES>
+  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
+  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
+  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
+  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
+  frame #<N>: <ADDR> at <ADDR>:1
   frame #<N>: static CalculatorApp.$main() at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>
   frame #<N>: main at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>
-  <LOWER_FRAMES>
+  frame #<N>: <FUNC> at /Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/usr/lib/dyld_sim`<FUNC>:<OFFSET>
+  frame #<N>: <FUNC> at /usr/lib/dyld`<FUNC>:<OFFSET>

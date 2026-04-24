@@ -3,4 +3,8 @@
 
    App: PID 999999
 
-❌ Stop macOS app operation failed: kill: 999999: No such process
+Errors (1):
+
+  ✗ kill: 999999: No such process
+
+❌ Failed to stop macOS app.

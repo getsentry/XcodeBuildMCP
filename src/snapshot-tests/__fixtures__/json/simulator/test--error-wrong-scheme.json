@@ -4,6 +4,14 @@
   "didError": true,
   "error": "Tests failed",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulatorName": "iPhone 17",
+      "onlyTesting": [],
+      "skipTesting": []
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

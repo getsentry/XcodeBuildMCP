@@ -4,6 +4,13 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "MCPTest",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "target": "macos"
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

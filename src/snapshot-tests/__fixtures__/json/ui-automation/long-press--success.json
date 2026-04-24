@@ -15,6 +15,14 @@
     },
     "artifacts": {
       "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [
+        {
+          "message": "snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots."
+        }
+      ],
+      "errors": []
     }
   }
 }

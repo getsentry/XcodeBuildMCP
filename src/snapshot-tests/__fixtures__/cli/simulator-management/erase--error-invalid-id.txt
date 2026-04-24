@@ -3,4 +3,8 @@
 
    Simulator: <UUID>
 
-❌ Failed to erase simulator: Invalid device: <UUID>
+Errors (1):
+
+  ✗ Invalid device: <UUID>
+
+❌ Failed to erase simulator.

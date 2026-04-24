@@ -42,6 +42,9 @@
         "bundleId": null,
         "env": null
       }
+    },
+    "operation": {
+      "type": "show"
     }
   }
 }

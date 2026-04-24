@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to press button 'home': axe command 'button' failed.",
+  "error": "Failed to press button 'home'.",
   "data": {
     "summary": {
       "status": "FAILED"

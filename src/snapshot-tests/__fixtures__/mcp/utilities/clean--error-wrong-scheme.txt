@@ -6,4 +6,8 @@
    Configuration: Debug
    Platform: iOS
 
-❌ Clean failed: xcodebuild: error: The workspace named "CalculatorApp" does not contain a scheme named "NONEXISTENT". The "-list" option can be used to find the names of the schemes in the workspace.
+Errors (1):
+
+  ✗ xcodebuild: error: The workspace named "CalculatorApp" does not contain a scheme named "NONEXISTENT". The "-list" option can be used to find the names of the schemes in the workspace.
+
+❌ Clean failed.

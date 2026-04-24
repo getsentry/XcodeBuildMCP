@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.simulator-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Boot simulator operation failed: Invalid device or device pair: <UUID>",
+  "error": "Boot simulator operation failed.",
   "data": {
     "summary": {
       "status": "FAILED"

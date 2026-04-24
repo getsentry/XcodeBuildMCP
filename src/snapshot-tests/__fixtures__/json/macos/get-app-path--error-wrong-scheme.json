@@ -2,8 +2,18 @@
   "schema": "xcodebuildmcp.output.app-path",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Query failed",
+  "error": "Query failed.",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "configuration": "Debug",
+      "platform": "macOS"
+    },
+    "summary": {
+      "status": "FAILED",
+      "target": "macos"
+    },
     "diagnostics": {
       "warnings": [],
       "errors": [

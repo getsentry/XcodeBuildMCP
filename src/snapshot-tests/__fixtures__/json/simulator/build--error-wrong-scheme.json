@@ -4,6 +4,13 @@
   "didError": true,
   "error": "Build failed",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulatorName": "iPhone 17"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

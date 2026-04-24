@@ -3,6 +3,8 @@
 
    Simulator: <UUID>
 
-✅ Swipe from (200, 400) to (200, 200) simulated successfully.
+Warnings (1):
 
-⚠️ Warning: snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.
+  ⚠ snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.
+
+✅ Swipe from (200, 400) to (200, 200) simulated successfully.

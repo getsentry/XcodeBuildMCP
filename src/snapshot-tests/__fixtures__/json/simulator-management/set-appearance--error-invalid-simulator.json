@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.simulator-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to set simulator appearance: Invalid device: <UUID>",
+  "error": "Failed to set simulator appearance.",
   "data": {
     "summary": {
       "status": "FAILED"

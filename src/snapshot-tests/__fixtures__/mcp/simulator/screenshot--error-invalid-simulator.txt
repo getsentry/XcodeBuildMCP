@@ -3,4 +3,8 @@
 
    Simulator: <UUID>
 
-❌ System error executing screenshot: Failed to capture screenshot: Invalid device: <UUID>
+Errors (1):
+
+  ✗ Failed to capture screenshot: Invalid device: <UUID>
+
+❌ Failed to capture screenshot.

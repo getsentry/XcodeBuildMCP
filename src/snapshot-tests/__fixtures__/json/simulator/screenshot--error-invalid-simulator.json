@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.capture-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "System error executing screenshot: Failed to capture screenshot: Invalid device: <UUID>",
+  "error": "Failed to capture screenshot.",
   "data": {
     "summary": {
       "status": "FAILED"

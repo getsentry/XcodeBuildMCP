@@ -4,13 +4,19 @@
   "didError": true,
   "error": "Build failed",
   "data": {
+    "request": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "executableName": "nonexistent-executable",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/spm"
+      "packagePath": "<ROOT>/example_projects/spm",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

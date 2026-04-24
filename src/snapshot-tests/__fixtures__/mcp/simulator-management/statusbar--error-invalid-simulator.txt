@@ -4,4 +4,8 @@
    Simulator: <UUID>
    Data Network: wifi
 
-❌ Failed to set status bar: Invalid device: <UUID>
+Errors (1):
+
+  ✗ Invalid device: <UUID>
+
+❌ Failed to set status bar.

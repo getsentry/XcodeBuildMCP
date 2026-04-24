@@ -9,7 +9,9 @@
       "Current breakpoints:",
       "1: file = 'ContentView.swift', line = 42, exact_match = 0, locations = <LOCATIONS>",
       "  Names:",
-      "    dap"
+      "    dap",
+      "",
+      "  1.1: where = CalculatorApp.debug.dylib`closure #1 in closure #1 in closure #1 in ContentView.body.getter + 1428 at ContentView.swift:42:31, address = <ADDR>, resolved, hit count = 0"
     ]
   }
 }

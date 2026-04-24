@@ -4,4 +4,8 @@
    xcresult: <TMPDIR>/invalid.xcresult
    File: SomeFile.swift
 
-❌ Failed to get file coverage: Error: Error Domain=XCCovErrorDomain Code=0 "Failed to load result bundle" UserInfo={NSLocalizedDescription=Failed to load result bundle, NSUnderlyingError=<ADDR> {Error Domain=XCResultStorage.ResultBundleFactory.Error Code=0 "Failed to create a new result bundle reader, underlying error: Info.plist at <TMPDIR>/invalid.xcresult/Info.plist does not exist, the result bundle might be corrupted or the provided path is not a result bundle"}}
+Errors (1):
+
+  ✗ Error Domain=XCCovErrorDomain Code=0 "Failed to load result bundle" UserInfo={NSLocalizedDescription=Failed to load result bundle, NSUnderlyingError=<ADDR> {Error Domain=XCResultStorage.ResultBundleFactory.Error Code=0 "Failed to create a new result bundle reader, underlying error: Info.plist at <TMPDIR>/invalid.xcresult/Info.plist does not exist, the result bundle might be corrupted or the provided path is not a result bundle"}}
+
+❌ Failed to get file coverage.

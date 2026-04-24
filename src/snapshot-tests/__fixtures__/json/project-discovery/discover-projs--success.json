@@ -11,8 +11,8 @@
       "maxDepth": 3
     },
     "artifacts": {
-      "workspaceRoot": "<PATH>",
-      "scanPath": "<PATH>"
+      "workspaceRoot": "<ROOT>/example_projects/iOS_Calculator",
+      "scanPath": "example_projects/iOS_Calculator"
     },
     "projects": [
       {

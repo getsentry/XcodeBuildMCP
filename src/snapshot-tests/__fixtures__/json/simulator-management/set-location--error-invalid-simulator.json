@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.simulator-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to set simulator location: Invalid device: <UUID>",
+  "error": "Failed to set simulator location.",
   "data": {
     "summary": {
       "status": "FAILED"

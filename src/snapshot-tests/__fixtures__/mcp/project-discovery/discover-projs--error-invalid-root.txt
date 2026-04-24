@@ -5,4 +5,8 @@
    Scan path: /nonexistent/path
    Max depth: 3
 
-❌ Failed to access scan path: /nonexistent/path. Error: ENOENT: no such file or directory, stat '/nonexistent/path'
+Errors (1):
+
+  ✗ Failed to access scan path: /nonexistent/path. Error: ENOENT: no such file or directory, stat '/nonexistent/path'
+
+❌ Failed to discover projects.

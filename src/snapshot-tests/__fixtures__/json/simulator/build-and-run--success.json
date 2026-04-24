@@ -4,6 +4,13 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulatorName": "iPhone 17"
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

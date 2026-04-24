@@ -4,6 +4,10 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "SUCCEEDED",
       "durationMs": 1234,

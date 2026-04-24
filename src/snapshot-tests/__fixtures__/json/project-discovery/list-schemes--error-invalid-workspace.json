@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.scheme-list",
   "schemaVersion": "1",
   "didError": true,
-  "error": "xcodebuild: error: '/nonexistent/path/Fake.xcworkspace' does not exist.",
+  "error": "Failed to list schemes.",
   "data": {
     "artifacts": {
       "workspacePath": "/nonexistent/path/Fake.xcworkspace"
@@ -12,7 +12,7 @@
       "warnings": [],
       "errors": [
         {
-          "message": "xcodebuild: error: '/nonexistent/path/Fake.xcworkspace' does not exist."
+          "message": "'/nonexistent/path/Fake.xcworkspace' does not exist."
         }
       ]
     }

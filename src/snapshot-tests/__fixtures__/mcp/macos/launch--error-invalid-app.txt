@@ -3,4 +3,8 @@
 
    App: <TMPDIR>/NonExistent.app
 
-❌ File not found: '<TMPDIR>/NonExistent.app'. Please check the path and try again.
+Errors (1):
+
+  ✗ File not found: '<TMPDIR>/NonExistent.app'. Please check the path and try again.
+
+❌ Failed to launch macOS app.

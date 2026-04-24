@@ -5,15 +5,16 @@
    Server Version: <VERSION>
    Output Mode: Redacted (default)
 
-  ├ platform: darwin
-  ├ release: <OS_RELEASE>
-  ├ arch: arm64
-  ├ cpus: <CPUS>
-  ├ memory: <MEMORY>
-  ├ hostname: <redacted>
-  ├ username: <redacted>
-  ├ homedir: <HOME>
-  └ tmpdir: <TMPDIR>
+System Information
+  platform: darwin
+  release: <OS_RELEASE>
+  arch: arm64
+  cpus: <CPUS>
+  memory: <MEMORY>
+  hostname: <redacted>
+  username: <redacted>
+  homedir: <HOME>
+  tmpdir: <TMPDIR>
 
 Node.js Information
   version: <NODE_VERSION>
@@ -27,6 +28,14 @@ Node.js Information
 
 Process Tree
   Running under Xcode: No
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
    <PID> (ppid <PID>): <PROCESS>
 
 Xcode Information
@@ -51,6 +60,8 @@ Environment Variables
   XBMCP_LAUNCH_JSON_WAIT_MS: (not set)
   XCODEBUILDMCP_DEBUGGER_BACKEND: (not set)
   XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE: (not set)
+  XCODEBUILDMCP_ENABLED_WORKFLOWS:
+  XCODEBUILDMCP_RUNTIME: mcp
   XCODEBUILDMCP_SILENCE_LOGS: true
 
 PATH
@@ -95,9 +106,9 @@ Manifest Tool Inventory
   xcode-ide: <N> tools
 
 Runtime Tool Registration
-  Enabled Workflows: 0
-  Registered Tools: 0
-  Note: Runtime registry unavailable.
+  Enabled Workflows: 2
+  Registered Tools: 24
+  Workflows: session-management, simulator
 
 Xcode IDE Bridge (mcpbridge)
   Workflow enabled: No

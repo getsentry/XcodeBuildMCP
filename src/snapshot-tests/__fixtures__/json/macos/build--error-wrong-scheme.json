@@ -4,6 +4,13 @@
   "didError": true,
   "error": "Build failed",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "target": "macos"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

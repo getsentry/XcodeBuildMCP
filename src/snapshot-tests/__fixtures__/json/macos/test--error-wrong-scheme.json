@@ -4,6 +4,13 @@
   "didError": true,
   "error": "Tests failed",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "onlyTesting": [],
+      "skipTesting": []
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

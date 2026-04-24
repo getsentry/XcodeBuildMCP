@@ -4,6 +4,10 @@
   "didError": true,
   "error": "Build failed",
   "data": {
+    "request": {
+      "packagePath": "<ROOT>/example_projects/NONEXISTENT",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

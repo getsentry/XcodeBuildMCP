@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.project-list",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to access scan path: /nonexistent/path",
+  "error": "Failed to discover projects.",
   "data": {
     "summary": {
       "status": "FAILED",
@@ -18,7 +18,7 @@
       "warnings": [],
       "errors": [
         {
-          "message": "ENOENT: no such file or directory, stat '/nonexistent/path'"
+          "message": "Failed to access scan path: /nonexistent/path. Error: ENOENT: no such file or directory, stat '/nonexistent/path'"
         }
       ]
     }

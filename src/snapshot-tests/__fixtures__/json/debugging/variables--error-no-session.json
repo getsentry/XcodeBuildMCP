@@ -2,6 +2,15 @@
   "schema": "xcodebuildmcp.output.debug-variables-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to get variables: No active debug session. Provide debugSessionId or attach first.",
-  "data": null
+  "error": "Failed to get variables.",
+  "data": {
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "No active debug session. Provide debugSessionId or attach first."
+        }
+      ]
+    }
+  }
 }

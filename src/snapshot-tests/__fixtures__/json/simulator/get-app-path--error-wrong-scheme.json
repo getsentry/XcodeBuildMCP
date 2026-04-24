@@ -2,8 +2,19 @@
   "schema": "xcodebuildmcp.output.app-path",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to get app path",
+  "error": "Failed to get app path.",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulator": "iPhone 17"
+    },
+    "summary": {
+      "status": "FAILED",
+      "target": "simulator"
+    },
     "diagnostics": {
       "warnings": [],
       "errors": [

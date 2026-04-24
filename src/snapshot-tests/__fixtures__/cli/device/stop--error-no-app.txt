@@ -4,7 +4,11 @@
    Device: <UUID>
    PID: <PID>
 
-❌ Failed to stop app: Failed to load provisioning paramter list due to error: Error Domain=com.apple.dt.CoreDeviceError Code=1002 "No provider was found." UserInfo={NSLocalizedDescription=No provider was found.}.
-`devicectl manage create` may support a reduced set of arguments.
-ERROR: The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))
-       DeviceName = <UUID>
+Errors (1):
+
+  ✗ Failed to load provisioning paramter list due to error: Error Domain=com.apple.dt.CoreDeviceError Code=1002 "No provider was found." UserInfo={NSLocalizedDescription=No provider was found.}.
+    `devicectl manage create` may support a reduced set of arguments.
+    ERROR: The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))
+           DeviceName = <UUID>
+
+❌ Failed to stop app.

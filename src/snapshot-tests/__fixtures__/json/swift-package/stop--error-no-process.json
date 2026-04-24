@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.stop-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "No running process found with PID 999999. Use swift_package_list to check active processes.",
+  "error": "Swift package stop failed.",
   "data": {
     "summary": {
       "status": "FAILED"
@@ -12,7 +12,11 @@
     },
     "diagnostics": {
       "warnings": [],
-      "errors": []
+      "errors": [
+        {
+          "message": "No running process found with PID 999999. Use swift_package_list to check active processes."
+        }
+      ]
     }
   }
 }

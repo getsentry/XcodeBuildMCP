@@ -4,6 +4,12 @@
   "didError": true,
   "error": "Tests failed",
   "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "configuration": "debug",
+      "platform": "Swift Package",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,

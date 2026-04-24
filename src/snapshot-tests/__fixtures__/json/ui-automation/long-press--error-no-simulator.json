@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to simulate long press at (100, 400): axe command 'touch' failed.",
+  "error": "Failed to simulate long press at (100, 400).",
   "data": {
     "summary": {
       "status": "FAILED"

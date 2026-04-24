@@ -4,11 +4,17 @@
   "didError": true,
   "error": "Tests failed",
   "data": {
+    "request": {
+      "scheme": "spm",
+      "configuration": "debug",
+      "platform": "Swift Package",
+      "target": "swift-package"
+    },
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
       "counts": {
-        "passed": 8,
+        "passed": 5,
         "failed": 2,
         "skipped": 0
       },
@@ -25,12 +31,12 @@
           "suite": "CalculatorAppTests",
           "test": "testCalculatorServiceFailure",
           "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
-          "location": "example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49"
+          "location": "<ROOT>/example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49"
         },
         {
-          "suite": "Unknown Suite",
+          "suite": "(Unknown Suite)",
           "test": "test",
-          "message": "Expectation failed: Bool(false)",
+          "message": "Expectation failed: Bool(false)\nTest failed",
           "location": "SimpleTests.swift:57"
         }
       ]

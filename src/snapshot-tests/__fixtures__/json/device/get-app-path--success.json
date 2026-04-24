@@ -4,6 +4,16 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "device"
+    },
     "artifacts": {
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app"
     }

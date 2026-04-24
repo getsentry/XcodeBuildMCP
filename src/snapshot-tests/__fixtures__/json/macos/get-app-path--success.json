@@ -4,6 +4,16 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "MCPTest",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "configuration": "Debug",
+      "platform": "macOS"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "macos"
+    },
     "artifacts": {
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app"
     }

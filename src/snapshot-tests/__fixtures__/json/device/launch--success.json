@@ -8,8 +8,8 @@
       "status": "SUCCEEDED"
     },
     "artifacts": {
-      "bundleId": "io.sentry.calculatorapp",
       "deviceId": "<UUID>",
+      "bundleId": "io.sentry.calculatorapp",
       "processId": 99999
     },
     "diagnostics": {

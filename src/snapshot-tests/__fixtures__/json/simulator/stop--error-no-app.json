@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.stop-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Stop app in simulator operation failed: An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):\nSimulator device failed to terminate com.nonexistent.app.\nfound nothing to terminate\nUnderlying error (domain=NSPOSIXErrorDomain, code=3):\n\tThe request to terminate \"com.nonexistent.app\" failed. found nothing to terminate\n\tfound nothing to terminate",
+  "error": "Failed to stop app.",
   "data": {
     "summary": {
       "status": "FAILED"
@@ -13,7 +13,11 @@
     },
     "diagnostics": {
       "warnings": [],
-      "errors": []
+      "errors": [
+        {
+          "message": "An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):\nSimulator device failed to terminate com.nonexistent.app.\nfound nothing to terminate\nUnderlying error (domain=NSPOSIXErrorDomain, code=3):\n\tThe request to terminate \"com.nonexistent.app\" failed. found nothing to terminate\n\tfound nothing to terminate"
+        }
+      ]
     }
   }
 }

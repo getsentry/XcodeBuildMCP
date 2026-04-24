@@ -3,5 +3,8 @@
 
    Workspace: /nonexistent/path/Fake.xcworkspace
 
-❌ <TIMESTAMP> <RESULT_BUNDLE_ERROR>
-xcodebuild: error: '/nonexistent/path/Fake.xcworkspace' does not exist.
+Errors (1):
+
+  ✗ '/nonexistent/path/Fake.xcworkspace' does not exist.
+
+❌ Failed to list schemes.

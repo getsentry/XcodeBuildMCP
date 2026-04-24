@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.scaffold-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Xcode project files already exist in <TMPDIR>/ios-existing",
+  "error": "Failed to scaffold project.",
   "data": {
     "summary": {
       "status": "FAILED",
@@ -11,6 +11,14 @@
     "artifacts": {
       "projectName": "SnapshotTestApp",
       "outputPath": "<TMPDIR>/ios-existing"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Xcode project files already exist in <TMPDIR>/ios-existing"
+        }
+      ]
     }
   }
 }

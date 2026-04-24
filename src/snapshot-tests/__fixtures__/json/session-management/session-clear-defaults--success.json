@@ -24,6 +24,11 @@
         "bundleId": null,
         "env": null
       }
+    },
+    "operation": {
+      "type": "clear",
+      "scope": "profile",
+      "profile": "(default)"
     }
   }
 }

@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.simulator-action-result",
   "schemaVersion": "1",
   "didError": true,
-  "error": "Failed to erase simulator: Invalid device: <UUID>",
+  "error": "Failed to erase simulator.",
   "data": {
     "summary": {
       "status": "FAILED"

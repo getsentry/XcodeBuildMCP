@@ -4,6 +4,18 @@
   "didError": false,
   "error": null,
   "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulator": "iPhone 17"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "simulator",
+      "durationMs": 1234
+    },
     "artifacts": {
       "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
     }

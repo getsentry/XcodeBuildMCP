@@ -5,4 +5,8 @@
    Path: <TMPDIR>/macos-existing
    Platform: macOS
 
-❌ Xcode project files already exist in <TMPDIR>/macos-existing
+Errors (1):
+
+  ✗ Xcode project files already exist in <TMPDIR>/macos-existing
+
+❌ Failed to scaffold project.

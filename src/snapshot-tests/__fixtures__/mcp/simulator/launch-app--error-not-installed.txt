@@ -4,4 +4,8 @@
    Simulator: <UUID>
    Bundle ID: com.nonexistent.app
 
-❌ App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.
+Errors (1):
+
+  ✗ App is not installed on the simulator. Please use install_app_sim before launching. Workflow: build -> install -> launch.
+
+❌ Failed to launch app.
