@@ -899,10 +899,12 @@ function createStopResultItems(
 function createSchemeListItems(
   result: Extract<ToolDomainResult, { kind: 'scheme-list' }>,
 ): TextRenderableItem[] {
+  const [label, pathValue] =
+    'projectPath' in result.artifacts
+      ? (['Project', result.artifacts.projectPath] as const)
+      : (['Workspace', result.artifacts.workspacePath] as const);
   const items: TextRenderableItem[] = [
-    createHeader('List Schemes', [
-      { label: 'Workspace', value: displayPath(result.artifacts.workspacePath) },
-    ]),
+    createHeader('List Schemes', [{ label, value: displayPath(pathValue) }]),
   ];
   if (result.didError) {
     items.push(...createFailureStatusWithDiagnostics(result, 'Failed to list schemes.'));

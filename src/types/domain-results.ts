@@ -547,7 +547,7 @@ export type ScaffoldResultDomainResult = ToolDomainResultBase & {
 };
 export type SchemeListDomainResult = ToolDomainResultBase & {
   kind: 'scheme-list';
-  artifacts: { workspacePath: string };
+  artifacts: { workspacePath: string } | { projectPath: string };
   schemes: string[];
   diagnostics?: BasicDiagnostics;
 };

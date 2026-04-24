@@ -121,6 +121,50 @@ describe('list_schemes plugin', () => {
       ]);
     });
 
+    it('populates projectPath in artifacts when a project is provided', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: `Information about project "MyProject":
+    Schemes:
+        MyProject`,
+      });
+      const execute = createListSchemesExecutor(mockExecutor);
+
+      const result = await execute({ projectPath: '/path/to/MyProject.xcodeproj' });
+
+      expect(result.artifacts).toEqual({ projectPath: '/path/to/MyProject.xcodeproj' });
+      expect('workspacePath' in result.artifacts).toBe(false);
+    });
+
+    it('populates workspacePath in artifacts when a workspace is provided', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: `Information about workspace "MyWorkspace":
+    Schemes:
+        MyApp`,
+      });
+      const execute = createListSchemesExecutor(mockExecutor);
+
+      const result = await execute({ workspacePath: '/path/to/MyProject.xcworkspace' });
+
+      expect(result.artifacts).toEqual({ workspacePath: '/path/to/MyProject.xcworkspace' });
+      expect('projectPath' in result.artifacts).toBe(false);
+    });
+
+    it('populates projectPath in artifacts on failure when a project was provided', async () => {
+      const mockExecutor = createMockExecutor({
+        success: false,
+        error: 'xcodebuild: error: The project named "Missing" does not exist.',
+      });
+      const execute = createListSchemesExecutor(mockExecutor);
+
+      const result = await execute({ projectPath: '/path/to/Missing.xcodeproj' });
+
+      expect(result.didError).toBe(true);
+      expect(result.artifacts).toEqual({ projectPath: '/path/to/Missing.xcodeproj' });
+      expect('workspacePath' in result.artifacts).toBe(false);
+    });
+
     it('should return error when no schemes are found in output', async () => {
       const mockExecutor = createMockExecutor({
         success: true,

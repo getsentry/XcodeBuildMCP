@@ -61,26 +61,37 @@ export async function listSchemes(
   return parseSchemesFromXcodebuildListOutput(result.output);
 }
 
-function createListSchemesResult(pathValue: string, schemes: string[]): ListSchemesResult {
+type SchemeListArtifacts = ListSchemesResult['artifacts'];
+
+function buildSchemeListArtifacts(params: ListSchemesParams): SchemeListArtifacts {
+  if (params.projectPath) {
+    return { projectPath: params.projectPath };
+  }
+  return { workspacePath: params.workspacePath ?? '' };
+}
+
+function createListSchemesResult(
+  artifacts: SchemeListArtifacts,
+  schemes: string[],
+): ListSchemesResult {
   return {
     kind: 'scheme-list',
     didError: false,
     error: null,
-    artifacts: {
-      workspacePath: pathValue,
-    },
+    artifacts,
     schemes,
   };
 }
 
-function createListSchemesErrorResult(pathValue: string, message: string): ListSchemesResult {
+function createListSchemesErrorResult(
+  artifacts: SchemeListArtifacts,
+  message: string,
+): ListSchemesResult {
   return {
     kind: 'scheme-list',
     didError: true,
     error: 'Failed to list schemes.',
-    artifacts: {
-      workspacePath: pathValue,
-    },
+    artifacts,
     schemes: [],
     diagnostics: extractQueryDiagnostics(message),
   };
@@ -98,13 +109,13 @@ export function createListSchemesExecutor(
   executor: CommandExecutor,
 ): NonStreamingExecutor<ListSchemesParams, ListSchemesResult> {
   return async (params) => {
-    const pathValue = params.projectPath ?? params.workspacePath ?? '';
+    const artifacts = buildSchemeListArtifacts(params);
 
     try {
       const schemes = await listSchemes(params, executor);
-      return createListSchemesResult(pathValue, schemes);
+      return createListSchemesResult(artifacts, schemes);
     } catch (error) {
-      return createListSchemesErrorResult(pathValue, toErrorMessage(error));
+      return createListSchemesErrorResult(artifacts, toErrorMessage(error));
     }
   };
 }

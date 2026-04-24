@@ -29,15 +29,31 @@
       "additionalProperties": false,
       "properties": {
         "artifacts": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "workspacePath": {
-              "type": "string"
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "workspacePath": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workspacePath"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "projectPath": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "projectPath"
+              ]
             }
-          },
-          "required": [
-            "workspacePath"
           ]
         },
         "schemes": {
