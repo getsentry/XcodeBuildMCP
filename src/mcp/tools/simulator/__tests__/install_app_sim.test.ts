@@ -292,7 +292,7 @@ describe('install_app_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('Failed to install app');
       expect(text).toContain('Install failed');
       expect(result.isError).toBe(true);
     });
@@ -316,7 +316,7 @@ describe('install_app_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('Failed to install app');
       expect(text).toContain('Command execution failed');
       expect(result.isError).toBe(true);
     });
@@ -340,7 +340,7 @@ describe('install_app_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Install app in simulator operation failed');
+      expect(text).toContain('Failed to install app');
       expect(text).toContain('String error');
       expect(result.isError).toBe(true);
     });

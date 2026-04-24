@@ -233,7 +233,7 @@ describe('stop_app_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Stop app in simulator operation failed');
+      expect(text).toContain('Failed to stop app');
       expect(text).toContain('Simulator not found');
       expect(result.isError).toBe(true);
     });
@@ -283,7 +283,7 @@ describe('stop_app_sim tool', () => {
       );
 
       const text = allText(result);
-      expect(text).toContain('Stop app in simulator operation failed');
+      expect(text).toContain('Failed to stop app');
       expect(text).toContain('Unexpected error');
       expect(result.isError).toBe(true);
     });

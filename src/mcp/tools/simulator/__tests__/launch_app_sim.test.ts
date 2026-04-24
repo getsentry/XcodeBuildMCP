@@ -255,7 +255,7 @@ describe('launch_app_sim tool', () => {
       );
 
       const text = result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
-      expect(text).toContain('Launch app in simulator operation failed');
+      expect(text).toContain('Failed to launch app');
       expect(text).toContain('Launch failed');
       expect(result.isError).toBe(true);
     });

@@ -266,7 +266,7 @@ describe('debug_attach_sim', () => {
 
       expect(result.isError).toBe(true);
       const text = allText(result);
-      expect(text).toContain('Failed to resolve simulator PID');
+      expect(text).toContain('Failed to attach debugger');
     });
 
     it('should include nextStepParams on success', async () => {
