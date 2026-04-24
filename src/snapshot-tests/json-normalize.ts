@@ -49,6 +49,10 @@ function normalizeNumber(path: string[], key: string | undefined, value: number)
   }
 }
 
+function isBuildSettingsPathEntry(value: Record<string, unknown>, path: string[]): boolean {
+  return path.includes('entries') && value.key === 'PATH' && typeof value.value === 'string';
+}
+
 function normalizeValue(value: unknown, path: string[] = []): unknown {
   const key = path.at(-1);
 
@@ -64,10 +68,12 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
     return value.map((item, index) => normalizeValue(item, [...path, String(index)]));
   }
 
-  if (value && typeof value === 'object') {
+  if (isRecord(value)) {
     const normalizedEntries = Object.entries(value).map(([entryKey, entryValue]) => [
       entryKey,
-      normalizeValue(entryValue, [...path, entryKey]),
+      isBuildSettingsPathEntry(value, path) && entryKey === 'value'
+        ? '<PATH_ENTRIES>'
+        : normalizeValue(entryValue, [...path, entryKey]),
     ]);
 
     return Object.fromEntries(normalizedEntries);
