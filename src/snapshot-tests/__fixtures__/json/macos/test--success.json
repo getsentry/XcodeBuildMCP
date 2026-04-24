@@ -41,14 +41,7 @@
       }
     },
     "diagnostics": {
-      "warnings": [
-        {
-          "message": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app/Contents/Frameworks/XCTestCore.framework/Versions/A/XCTestCore: Failed to parse executable: Attempting to read past the size of the binary data. startingAt: 2179072, typeSize: 4 (UInt32), dataSize: 458752"
-        },
-        {
-          "message": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app/Contents/Frameworks/Testing.framework/Versions/A/Testing: Failed to parse executable: Attempting to read past the size of the binary data. startingAt: 3604480, typeSize: 4 (UInt32), dataSize: 589824"
-        }
-      ],
+      "warnings": [],
       "errors": [],
       "testFailures": []
     }

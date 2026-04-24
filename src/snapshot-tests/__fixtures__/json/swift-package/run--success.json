@@ -27,7 +27,7 @@
       "stderr": [
         "Building for debugging...",
         "[0/6] Write sources",
-        "[0/6] Write spm-entitlement.plist",
+        "[1/6] Write spm-entitlement.plist",
         "[2/6] Write swift-version--6988338F2F200930.txt",
         "[4/8] Compiling spm main.swift",
         "[5/8] Emitting module spm",
