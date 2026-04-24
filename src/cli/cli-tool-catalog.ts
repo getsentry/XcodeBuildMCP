@@ -11,14 +11,7 @@ import { jsonSchemaToZod } from '../integrations/xcode-tools-bridge/jsonschema-t
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
 import { log } from '../utils/logging/index.ts';
-import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
-
-function infrastructureStatus(
-  level: RuntimeStatusFragment['level'],
-  message: string,
-): RuntimeStatusFragment {
-  return { kind: 'infrastructure', fragment: 'status', level, message };
-}
+import { infrastructureStatus } from '../types/runtime-status.ts';
 
 interface BuildCliToolCatalogOptions {
   socketPath: string;

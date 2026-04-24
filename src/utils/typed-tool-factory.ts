@@ -5,16 +5,9 @@ import { createRenderSession } from '../rendering/render.ts';
 import { renderCliTextTranscript } from './renderers/cli-text-renderer.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import type { AnyFragment, DomainFragment } from '../types/domain-fragments.ts';
-import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
+import { infrastructureStatus } from '../types/runtime-status.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
-
-function infrastructureStatus(
-  level: RuntimeStatusFragment['level'],
-  message: string,
-): RuntimeStatusFragment {
-  return { kind: 'infrastructure', fragment: 'status', level, message };
-}
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
 import { mergeSessionDefaultArgs } from './session-default-args.ts';
 

@@ -9,3 +9,10 @@ export interface RuntimeStatusFragment {
   level: 'info' | 'warning' | 'error' | 'success';
   message: string;
 }
+
+export function infrastructureStatus(
+  level: RuntimeStatusFragment['level'],
+  message: string,
+): RuntimeStatusFragment {
+  return { kind: 'infrastructure', fragment: 'status', level, message };
+}
