@@ -489,8 +489,8 @@ describe('registerToolCommands', () => {
     ).resolves.toBeDefined();
 
     expect(stdoutChunks.join('')).toBe(
-      `${JSON.stringify({ type: 'fragment', fragment: { kind: 'presentation', fragment: 'status', level: 'info', message: 'Starting work' } })}\n` +
-        `${JSON.stringify({ type: 'fragment', fragment: { kind: 'presentation', fragment: 'artifact', name: 'Build Log', path: '/tmp/build.log' } })}\n`,
+      `${JSON.stringify({ event: 'presentation.status', level: 'info', message: 'Starting work' })}\n` +
+        `${JSON.stringify({ event: 'presentation.artifact', name: 'Build Log', path: '/tmp/build.log' })}\n`,
     );
   });
 
@@ -536,7 +536,11 @@ describe('registerToolCommands', () => {
 
     expect(observedSessionFragmentCount).toBe(1);
     expect(stdoutChunks.join('')).toBe(
-      `${JSON.stringify({ type: 'fragment', fragment: streamedFragment })}\n`,
+      `${JSON.stringify({
+        event: 'transcript.process-line',
+        stream: 'stderr',
+        line: 'Build Log: /tmp/build.log\n',
+      })}\n`,
     );
   });
 

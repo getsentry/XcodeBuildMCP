@@ -18,6 +18,7 @@ import {
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
+import { toCliJsonlEvent } from './jsonl-event.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -354,8 +355,7 @@ function registerToolSubcommand(
         const writeJsonlFragment =
           outputFormat === 'jsonl'
             ? (fragment: AnyFragment) => {
-                const line = { type: 'fragment' as const, fragment };
-                process.stdout.write(JSON.stringify(line) + '\n');
+                process.stdout.write(JSON.stringify(toCliJsonlEvent(fragment)) + '\n');
               }
             : undefined;
         const handlerContext = createBufferedHandlerContext(session, {
