@@ -13,6 +13,7 @@ import {
 import path from 'path';
 import os from 'node:os';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
+import { expandHomePrefix } from './expand-home.ts';
 import type { XcodebuildPipeline } from './xcodebuild-pipeline.ts';
 import { createNoticeFragment } from './xcodebuild-output.ts';
 
@@ -22,10 +23,11 @@ export interface BuildCommandResult {
 }
 
 function resolvePathFromCwd(pathValue: string): string {
-  if (path.isAbsolute(pathValue)) {
-    return pathValue;
+  const expanded = expandHomePrefix(pathValue);
+  if (path.isAbsolute(expanded)) {
+    return expanded;
   }
-  return path.resolve(process.cwd(), pathValue);
+  return path.resolve(process.cwd(), expanded);
 }
 
 function getDefaultSwiftPackageCachePath(): string {

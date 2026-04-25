@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import path from 'node:path';
+import { homedir } from 'node:os';
 import { createMockExecutor } from '../../test-utils/mock-executors.ts';
 import { executeXcodeBuildCommand } from '../build-utils.ts';
 import { XcodePlatform } from '../xcode.ts';
@@ -476,6 +477,47 @@ describe('build-utils Sentry Classification', () => {
       expect(capturedOptions).toEqual(
         expect.objectContaining({ cwd: path.dirname(expectedProjectPath) }),
       );
+    });
+
+    it('should expand ~ in projectPath and derivedDataPath before execution', async () => {
+      let capturedCommand: string[] | undefined;
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'BUILD SUCCEEDED',
+        exitCode: 0,
+        onExecute: (command) => {
+          capturedCommand = command;
+        },
+      });
+
+      const tildeProjectPath = '~/Code/App.xcodeproj';
+      const tildeDerivedDataPath = '~/.foo/derivedData';
+      const expectedProjectPath = path.join(homedir(), 'Code/App.xcodeproj');
+      const expectedDerivedDataPath = path.join(homedir(), '.foo/derivedData');
+
+      await executeXcodeBuildCommand(
+        {
+          scheme: 'TestScheme',
+          configuration: 'Debug',
+          projectPath: tildeProjectPath,
+          derivedDataPath: tildeDerivedDataPath,
+        },
+        {
+          platform: XcodePlatform.iOSSimulator,
+          simulatorName: 'iPhone 17 Pro',
+          useLatestOS: true,
+          logPrefix: 'iOS Simulator Build',
+        },
+        false,
+        'build',
+        mockExecutor,
+        undefined,
+        createMockPipeline(),
+      );
+
+      expect(capturedCommand).toBeDefined();
+      expect(capturedCommand).toContain(expectedProjectPath);
+      expect(capturedCommand).toContain(expectedDerivedDataPath);
     });
   });
 });
