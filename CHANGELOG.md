@@ -19,6 +19,10 @@
 
 - Expanded leading `~` and `~/` prefixes in configured `derivedDataPath`, `projectPath`, `workspacePath`, `axePath`, and the iOS/macOS template paths so values like `~/.foo/derivedData` resolve under the user's home directory instead of creating a literal `~` directory under the project root. As part of this change, configured absolute paths are now lexically normalized (e.g. `/a/b/../c` collapses to `/a/c`) before being passed to `xcodebuild` ([#283](https://github.com/getsentry/XcodeBuildMCP/issues/283), supersedes [#301](https://github.com/getsentry/XcodeBuildMCP/pull/301) by [@trmquang93](https://github.com/trmquang93)).
 
+### Changed
+
+- Auto-scope DerivedData per workspace/project path when no explicit `derivedDataPath` is configured. The session store now derives a hashed sub-directory under the global DerivedData root from the active workspace or project path, so concurrent agents and git worktrees no longer share a single explicit DerivedData and corrupt incremental builds. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
+
 ## [2.3.2]
 
 ### Fixed
