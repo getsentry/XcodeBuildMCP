@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
 import { extractBundleIdFromAppPath } from '../bundle-id.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 
@@ -19,11 +20,13 @@ type CapturedCall = {
   logPrefix?: string;
 };
 
+const stubProcess = { pid: 1, on: () => stubProcess } as unknown as ChildProcess;
+
 function createCapturingExecutor(calls: CapturedCall[]): CommandExecutor {
   return async (command, logPrefix) => {
     calls.push({ command: [...command], logPrefix });
     // Simulate 'defaults' returning a fake bundle ID
-    return { success: true, output: 'com.example.app' };
+    return { success: true, output: 'com.example.app', process: stubProcess };
   };
 }
 

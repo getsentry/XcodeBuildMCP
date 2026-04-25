@@ -1,17 +1,22 @@
 import { describe, it, expect } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
+import type { WriteStream } from 'node:fs';
 import { get_mac_bundle_idLogic } from '../../mcp/tools/project-discovery/get_mac_bundle_id.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 import type { FileSystemExecutor } from '../FileSystemExecutor.ts';
+import { runLogic } from '../../test-utils/test-helpers.ts';
 
 type CapturedCall = {
   command: string[];
   logPrefix?: string;
 };
 
+const stubProcess = { pid: 1, on: () => stubProcess } as unknown as ChildProcess;
+
 function createCapturingExecutor(calls: CapturedCall[]): CommandExecutor {
   return async (command, logPrefix) => {
     calls.push({ command: [...command], logPrefix });
-    return { success: true, output: 'com.example.macapp' };
+    return { success: true, output: 'com.example.macapp', process: stubProcess };
   };
 }
 
@@ -21,7 +26,7 @@ function createMockFileSystem(existingPaths: string[]): FileSystemExecutor {
     mkdir: async () => {},
     readFile: async () => '',
     writeFile: async () => {},
-    createWriteStream: () => ({}) as any,
+    createWriteStream: () => ({}) as unknown as WriteStream,
     cp: async () => {},
     readdir: async () => [],
     stat: async () => ({ isDirectory: () => false, mtimeMs: 0 }),
@@ -38,7 +43,7 @@ describe('get_mac_bundle_id.ts — CWE-78 shell injection vectors', () => {
     const maliciousPath = '/Applications/Evil" $(id) ".app';
     const fs = createMockFileSystem([maliciousPath]);
 
-    await get_mac_bundle_idLogic({ appPath: maliciousPath }, executor, fs);
+    await runLogic(() => get_mac_bundle_idLogic({ appPath: maliciousPath }, executor, fs));
 
     expect(calls).toHaveLength(1);
     const shellCommand = calls[0].command;
@@ -56,9 +61,8 @@ describe('get_mac_bundle_id.ts — CWE-78 shell injection vectors', () => {
     const safePath = '/Applications/MyApp.app';
     const fs = createMockFileSystem([safePath]);
 
-    const result = await get_mac_bundle_idLogic({ appPath: safePath }, executor, fs);
+    await runLogic(() => get_mac_bundle_idLogic({ appPath: safePath }, executor, fs));
 
-    expect(result.isError).toBe(false);
     expect(calls).toHaveLength(1);
     expect(calls[0].command[2]).toContain(safePath);
   });
