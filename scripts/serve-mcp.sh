@@ -75,4 +75,4 @@ exec npx supergateway \
   --stdio "node ${PROJECT_ROOT}/build/cli.js mcp" \
   --outputTransport streamableHttp \
   --cors \
-  "${FILTERED_ARGS[@]}"
+  ${FILTERED_ARGS[@]+"${FILTERED_ARGS[@]}"}
