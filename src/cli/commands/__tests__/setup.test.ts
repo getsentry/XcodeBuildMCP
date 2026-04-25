@@ -1300,4 +1300,351 @@ sessionDefaults:
     expect(env.XCODEBUILDMCP_PLATFORM).toBeUndefined();
     expect(env.XCODEBUILDMCP_SIMULATOR_ID).toBe('SIM-1');
   });
+
+  it('clears stale deviceId, simulatorId, and simulatorName for macOS-only re-runs', async () => {
+    let storedConfig = [
+      'enabledWorkflows:',
+      '  - simulator',
+      '  - logging',
+      'sessionDefaults:',
+      '  scheme: App',
+      '  workspacePath: ./App.xcworkspace',
+      '  deviceId: STALE-DEVICE',
+      '  simulatorId: STALE-SIM',
+      '  simulatorName: Old iPhone',
+      '  platform: iOS Simulator',
+      '',
+    ].join('\n');
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async () =>
+      createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['macOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.platform).toBe('macOS');
+    expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
+    expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
+  });
+
+  it('persists platform=tvOS Simulator and a tvOS-runtime simulator for tvOS-only YAML setup', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                { name: 'iPhone 15', udid: 'IOS-1', state: 'Shutdown', isAvailable: true },
+              ],
+              'tvOS 17.0': [
+                { name: 'Apple TV 4K', udid: 'TVOS-1', state: 'Shutdown', isAvailable: true },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['tvOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.platform).toBe('tvOS Simulator');
+    expect(parsed.sessionDefaults?.simulatorId).toBe('TVOS-1');
+    expect(parsed.sessionDefaults?.simulatorName).toBe('Apple TV 4K');
+  });
+
+  it('persists platform=watchOS Simulator and a watchOS-runtime simulator for watchOS-only YAML setup', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                { name: 'iPhone 15', udid: 'IOS-1', state: 'Shutdown', isAvailable: true },
+              ],
+              'watchOS 10.0': [
+                {
+                  name: 'Apple Watch Series 9',
+                  udid: 'WATCH-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['watchOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.platform).toBe('watchOS Simulator');
+    expect(parsed.sessionDefaults?.simulatorId).toBe('WATCH-1');
+    expect(parsed.sessionDefaults?.simulatorName).toBe('Apple Watch Series 9');
+  });
+
+  it('persists platform=visionOS Simulator and an xrOS-runtime simulator for visionOS-only YAML setup', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                { name: 'iPhone 15', udid: 'IOS-1', state: 'Shutdown', isAvailable: true },
+              ],
+              'xrOS 1.0': [
+                { name: 'Apple Vision Pro', udid: 'XROS-1', state: 'Shutdown', isAvailable: true },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['visionOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.platform).toBe('visionOS Simulator');
+    expect(parsed.sessionDefaults?.simulatorId).toBe('XROS-1');
+    expect(parsed.sessionDefaults?.simulatorName).toBe('Apple Vision Pro');
+  });
+
+  it('matches a SimRuntime-style visionOS runtime via the xrOS keyword', async () => {
+    let storedConfig = '';
+
+    const fs = createMockFileSystemExecutor({
+      existsSync: (targetPath) => targetPath === configPath && storedConfig.length > 0,
+      stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+      readdir: async (targetPath) => {
+        if (targetPath === cwd) {
+          return [
+            {
+              name: 'App.xcworkspace',
+              isDirectory: () => true,
+              isSymbolicLink: () => false,
+            },
+          ];
+        }
+        return [];
+      },
+      readFile: async (targetPath) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected read path: ${targetPath}`);
+        return storedConfig;
+      },
+      writeFile: async (targetPath, content) => {
+        if (targetPath !== configPath) throw new Error(`Unexpected write path: ${targetPath}`);
+        storedConfig = content;
+      },
+    });
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
+                { name: 'iPhone 15', udid: 'IOS-1', state: 'Shutdown', isAvailable: true },
+              ],
+              'com.apple.CoreSimulator.SimRuntime.xrOS-1-0': [
+                { name: 'Apple Vision Pro', udid: 'XROS-1', state: 'Shutdown', isAvailable: true },
+              ],
+            },
+          }),
+        });
+      }
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createPlatformPrompter(['visionOS']),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(storedConfig) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.simulatorId).toBe('XROS-1');
+  });
 });
