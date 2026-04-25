@@ -346,5 +346,32 @@ describe('build_device plugin', () => {
       ]);
       expect(spy.commandCalls[0].logPrefix).toBe('iOS Device Build');
     });
+
+    it('should target watchOS platform when platform=watchOS is provided', async () => {
+      const spy = createSpyExecutor();
+
+      const { result } = await runToolLogic(() =>
+        buildDeviceLogic(
+          {
+            projectPath: '/path/to/MyWatchApp.xcodeproj',
+            scheme: 'MyWatchApp',
+            platform: 'watchOS',
+          },
+          spy.executor,
+        ),
+      );
+
+      expect(spy.commandCalls).toHaveLength(1);
+      const args = spy.commandCalls[0].args;
+      const destinationIndex = args.indexOf('-destination');
+      expect(destinationIndex).toBeGreaterThan(-1);
+      expect(args[destinationIndex + 1]).toBe('generic/platform=watchOS');
+      expect(spy.commandCalls[0].logPrefix).toBe('watchOS Device Build');
+      expect(result.nextStepParams).toEqual(
+        expect.objectContaining({
+          get_device_app_path: expect.objectContaining({ platform: 'watchOS' }),
+        }),
+      );
+    });
   });
 });
