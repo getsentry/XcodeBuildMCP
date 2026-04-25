@@ -76,15 +76,15 @@ jobs:
 
             ${fileList}${hiddenText}
 
-            Please review the [Tool Authoring Cookbook](https://github.com/${owner}/${repo}/blob/main/docs/dev/TOOL_AUTHORING_COOKBOOK.md) before merging.
+            Please review the [Tool Authoring guide](https://xcodebuildmcp.com/docs/tool-authoring) before merging.
 
             Checklist:
             - Run \`npm run test:snapshots\` for any added, modified, or deleted tool.
             - If fixtures need to change, regenerate them with \`npm run test:snapshots:update\` and review the diff.
             - Add, update, or remove the matching MCP, CLI, and JSON fixtures for the changed tool surface.
             - Run \`npm run test:schema-fixtures\` after changing structured output schemas or JSON fixtures.
-            - Keep tool manifests, workflow manifests, output schemas, structured content, generated docs, and fixtures aligned.
-            - If you changed tool metadata, run \`npm run docs:update\` and \`npm run docs:check\`.
+            - Keep tool manifests, workflow manifests, output schemas, structured content, and fixtures aligned.
+            - If you changed tool metadata, run \`npm run docs:check\`.
 
             Snapshot tests are intentionally not a required PR gate because they are slow and environment-sensitive. This reminder exists so contributors know when they need to run them locally for tool additions, changes, and removals.`;
 

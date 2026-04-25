@@ -330,8 +330,6 @@ RELEASE_MANAGED_FILES=(
   "package.json"
   "package-lock.json"
   "README.md"
-  "docs/SKILLS.md"
-  "docs/GETTING_STARTED.md"
   "server.json"
 )
 
@@ -426,11 +424,10 @@ if [[ "$SKIP_VERSION_UPDATE" == "false" ]]; then
 
   # README update
   echo ""
-  echo "📝 Updating install tags in README.md and docs/GETTING_STARTED.md..."
+  echo "📝 Updating install tags in README.md..."
   README_AT_TAG_REGEX='xcodebuildmcp@([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?|latest|beta|alpha)'
   README_URLENCODED_AT_TAG_REGEX='xcodebuildmcp%40([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?|latest|beta|alpha)'
   run sed_inplace "s/${README_AT_TAG_REGEX}/xcodebuildmcp@${NPM_TAG}/g" README.md
-  run sed_inplace "s/${README_AT_TAG_REGEX}/xcodebuildmcp@${NPM_TAG}/g" docs/GETTING_STARTED.md
   run sed_inplace "s/${README_URLENCODED_AT_TAG_REGEX}/xcodebuildmcp%40${NPM_TAG}/g" README.md
 
   echo "📝 Updating Cursor install link config in README.md..."
@@ -450,9 +447,9 @@ if [[ "$SKIP_VERSION_UPDATE" == "false" ]]; then
   echo ""
   echo "📦 Committing version changes..."
   if [[ -f server.json ]]; then
-    run git add package.json package-lock.json README.md docs/SKILLS.md docs/GETTING_STARTED.md CHANGELOG.md server.json
+    run git add package.json package-lock.json README.md CHANGELOG.md server.json
   else
-    run git add package.json package-lock.json README.md docs/SKILLS.md docs/GETTING_STARTED.md CHANGELOG.md
+    run git add package.json package-lock.json README.md CHANGELOG.md
   fi
   run git commit -m "Release v$VERSION"
 else

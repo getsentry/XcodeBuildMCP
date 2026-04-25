@@ -5,7 +5,7 @@
 XcodeBuildMCP is an MCP server exposing Xcode / Swift workflows as **tools** and **resources**.
 Stack: TypeScript · Node.js · plugin-based auto-discovery (`src/mcp/tools`, `src/mcp/resources`).
 
-For full details see [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+For full details see [README.md](README.md) and [Architecture](https://xcodebuildmcp.com/docs/architecture).
 
 ---
 
@@ -55,8 +55,9 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 
 ## 4. Documentation Checklist
 
-* `docs/TOOLS.md` must exactly mirror the structure of `src/mcp/tools/**` (exclude `__tests__` and `*-shared`).
-  *Diff heuristic*: if a PR adds/removes a tool but does **not** change `docs/TOOLS.md` ⇒ **warning**.
+* Tool manifests, schemas, and implementations must stay aligned when tools are added, removed, or renamed.
+  *Diff heuristic*: tool changes without corresponding manifest/schema/fixture updates ⇒ **warning**.
+* Public tool docs live at https://xcodebuildmcp.com/docs/tools and are synced from release data; do not require static in-repo tools-doc parity.
 * Update public docs when CLI parameters or tool names change.
 
 ---
@@ -76,7 +77,7 @@ export const handler = (p: FooBarParams) => fooBarLogic(p);
 
 1. **External-boundary violations**: confirm tests use injected executors/filesystem for external side effects.
 2. **DI compliance**: check direct `child_process` / `fs` imports in MCP tool logic; standalone utilities with simple commands are acceptable.
-3. **Docs accuracy**: compare `docs/TOOLS.md` against `src/mcp/tools/**`.
+3. **Docs accuracy**: compare tool manifests, schemas, fixtures, and implementation changes; public tool docs are generated at https://xcodebuildmcp.com/docs/tools.
 4. **Style**: ensure ESLint and Prettier pass (`npm run lint`, `npm run format:check`).
 
 ---

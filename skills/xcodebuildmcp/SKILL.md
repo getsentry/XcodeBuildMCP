@@ -19,7 +19,7 @@ Capabilities:
 - SwiftPM: Build, run, test, and manage Swift Package Manager projects
 - Project scaffolding: Generate new iOS/macOS project templates
 
-Only simulator workflow tools are enabled by default. If capabilities like device, macOS, debugging, or UI automation are not available, the user must configure XcodeBuildMCP to enable them. See https://github.com/getsentry/XcodeBuildMCP/blob/main/docs/CONFIGURATION.md for workflow configuration.
+Only simulator workflow tools are enabled by default. If capabilities like device, macOS, debugging, or UI automation are not available, the user must configure XcodeBuildMCP to enable them. See https://xcodebuildmcp.com/docs/configuration for workflow configuration.
 
 ## Step 1: Establish Session Context
 

@@ -28,7 +28,6 @@ When reading issues:
 - Technical prose only, be kind but direct (e.g., "Thanks @user" not "Thanks so much @user!")
 
 ## Docs
-- If modifying or adding/removing tools run `npm run docs:update` to update the TOOLS.md file, never edit this file directly.
 -
 ### Changelog
 Location: `CHANGELOG.md`
@@ -61,7 +60,7 @@ Use these sections under `## [Unreleased]`:
   - Do NOT just kill the run — first inspect the process tree (`ps -ef | grep -E "vitest|xcodebuild|simctl|devicectl"`) to identify what's stuck.
   - Common hang causes: locked physical device, stale simulator state, `devicectl diagnose` waiting for password, orphaned daemon process.
   - Capture what you find before killing, so the root cause can be fixed rather than papered over.
-- If physical-device snapshot tests hang after the final test summary, the likely cause is Apple post-failure diagnostics invoking `devicectl diagnose`, which may prompt for a macOS password and wedge in automated runs; see `docs/dev/device-snapshot-password-hang-rca.md`.
+- If physical-device snapshot tests hang after the final test summary, the likely cause is Apple post-failure diagnostics invoking `devicectl diagnose`, which may prompt for a macOS password and wedge in automated runs.
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the native read tool.

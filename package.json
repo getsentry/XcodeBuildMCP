@@ -37,8 +37,6 @@
     "typecheck:tests": "npx tsc -p tsconfig.test.json",
     "inspect": "npx @modelcontextprotocol/inspector@latest node build/cli.js mcp",
     "doctor": "node build/doctor-cli.js",
-    "docs:update": "npx tsx scripts/update-tools-docs.ts",
-    "docs:update:dry-run": "npx tsx scripts/update-tools-docs.ts --dry-run --verbose",
     "docs:check": "node scripts/check-docs-cli-commands.js",
     "bench:test-sim": "npx tsx scripts/benchmark-simulator-test.ts",
     "capture:xcodebuild": "npx tsx scripts/capture-xcodebuild-wrapper.ts",

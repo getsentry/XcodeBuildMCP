@@ -28,7 +28,6 @@ When reading issues:
 - Technical prose only, be kind but direct (e.g., "Thanks @user" not "Thanks so much @user!")
 
 ## Docs
-- If modifying or adding/removing tools run `npm run docs:update` to update the TOOLS.md file, never edit this file directly.
 -
 ### Changelog
 Location: `CHANGELOG.md`

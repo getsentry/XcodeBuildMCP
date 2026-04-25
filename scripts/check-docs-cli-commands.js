@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,13 +43,7 @@ function loadToolCatalog() {
 }
 
 function getConsumerDocs() {
-  const docsDir = path.join(repoRoot, 'docs');
-  const docsFiles = readdirSync(docsDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => path.join(docsDir, entry.name))
-    .sort();
-
-  return [path.join(repoRoot, 'README.md'), path.join(repoRoot, 'CHANGELOG.md'), ...docsFiles];
+  return [path.join(repoRoot, 'README.md'), path.join(repoRoot, 'CHANGELOG.md')];
 }
 
 function buildValidationSets(catalog) {
@@ -182,7 +176,7 @@ function main() {
     );
   }
 
-  console.log('✅ Docs CLI command check passed (README.md + CHANGELOG.md + docs/*.md).');
+  console.log('✅ Docs CLI command check passed (README.md + CHANGELOG.md).');
 }
 
 main();

@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "scripts/check-code-patterns.js",
     "scripts/probe-xcode-mcpbridge.ts",
     "scripts/repro-mcp-parent-exit-helper.mjs",
     "src/integrations/xcode-tools-bridge/__tests__/fixtures/fake-xcode-tools-server.mjs"
