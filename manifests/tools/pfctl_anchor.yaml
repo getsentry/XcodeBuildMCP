@@ -1,0 +1,14 @@
+id: pfctl_anchor
+module: mcp/tools/build-tools/pfctl_anchor
+names:
+  mcp: pfctl_anchor
+  cli: pfctl
+description: Inspect PF firewall anchor rules (read-only). Cannot modify firewall state. Requires passwordless sudo for pfctl on host.
+outputSchema:
+  schema: xcodebuildmcp.output.command-result
+  version: "1"
+annotations:
+  title: PF Anchor Inspector
+  readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

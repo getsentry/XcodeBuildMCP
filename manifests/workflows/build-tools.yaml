@@ -1,0 +1,8 @@
+id: build-tools
+title: Build Pipeline Tools
+description: Extended build pipeline — project generation (xcodegen), DMG creation, code signing/notarization, and PF firewall anchor inspection.
+tools:
+  - xcodegen_generate
+  - create_dmg
+  - codesign_app
+  - pfctl_anchor

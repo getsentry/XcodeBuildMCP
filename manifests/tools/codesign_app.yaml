@@ -1,0 +1,16 @@
+id: codesign_app
+module: mcp/tools/build-tools/codesign_app
+names:
+  mcp: codesign_app
+  cli: codesign
+description: Code-sign and optionally notarize a macOS application or DMG.
+outputSchema:
+  schema: xcodebuildmcp.output.command-result
+  version: "1"
+predicates:
+  - hideWhenXcodeAgentMode
+annotations:
+  title: Code Sign App
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false

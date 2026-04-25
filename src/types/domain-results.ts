@@ -30,6 +30,7 @@ export type ToolDomainResultKind =
   | 'xcode-bridge-call-result'
   | 'xcode-bridge-status'
   | 'xcode-bridge-sync'
+  | 'command-result'
   | 'xcode-bridge-tool-list';
 export interface ToolDomainResultBase {
   kind: string;
@@ -621,6 +622,13 @@ export type XcodeBridgeToolListDomainResult = ToolDomainResultBase & {
   toolCount: number;
   tools: XcodeBridgeToolDescriptor[];
 };
+export type CommandResultDomainResult = ToolDomainResultBase & {
+  kind: 'command-result';
+  command: string;
+  summary: StatusSummary;
+  output: string;
+  diagnostics: BasicDiagnostics;
+};
 export type WorkflowSelectionDomainResult = ToolDomainResultBase & {
   kind: 'workflow-selection';
   enabledWorkflows: string[];
@@ -658,4 +666,5 @@ export type ToolDomainResult =
   | XcodeBridgeCallResultDomainResult
   | XcodeBridgeStatusDomainResult
   | XcodeBridgeSyncDomainResult
+  | CommandResultDomainResult
   | XcodeBridgeToolListDomainResult;

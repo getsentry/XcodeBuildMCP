@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.command-result/1.schema.json",
+  "title": "Command Result",
+  "description": "Structured output envelope for shell command execution results.",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/errorConsistency"
+    }
+  ],
+  "properties": {
+    "schema": {
+      "const": "xcodebuildmcp.output.command-result"
+    },
+    "schemaVersion": {
+      "const": "1"
+    },
+    "didError": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": ["string", "null"]
+    },
+    "data": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The tool/command that was executed"
+            },
+            "summary": {
+              "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/statusSummary"
+            },
+            "output": {
+              "type": "string",
+              "description": "Stdout from the command"
+            },
+            "diagnostics": {
+              "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/basicDiagnostics"
+            }
+          },
+          "required": ["command", "summary", "diagnostics"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+}

@@ -1,0 +1,21 @@
+id: xcodegen_generate
+module: mcp/tools/build-tools/xcodegen_generate
+names:
+  mcp: xcodegen_generate
+  cli: xcodegen
+description: Generate Xcode project from xcodegen spec (project.yml).
+outputSchema:
+  schema: xcodebuildmcp.output.command-result
+  version: "1"
+predicates:
+  - hideWhenXcodeAgentMode
+annotations:
+  title: Xcodegen Generate
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false
+nextSteps:
+  - label: Build macOS app
+    toolId: build_macos
+    priority: 1
+    when: success

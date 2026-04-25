@@ -1,0 +1,21 @@
+id: create_dmg
+module: mcp/tools/build-tools/create_dmg
+names:
+  mcp: create_dmg
+  cli: dmg
+description: Create DMG disk image from built macOS application.
+outputSchema:
+  schema: xcodebuildmcp.output.command-result
+  version: "1"
+predicates:
+  - hideWhenXcodeAgentMode
+annotations:
+  title: Create DMG
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false
+nextSteps:
+  - label: Sign the app
+    toolId: codesign_app
+    priority: 1
+    when: success

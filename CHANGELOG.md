@@ -5,6 +5,13 @@
 ### Added
 
 - Added `xcodebuildmcp upgrade` command to check for updates and upgrade in place. Supports `--check` (report-only) and `--yes`/`-y` (skip confirmation). Detects install method (Homebrew, npm-global, npx) and queries the appropriate channel source (`brew info`, `npm view`, or GitHub Releases) for the latest version. Non-interactive environments exit 1 when an auto-upgrade is possible but `--yes` was not supplied.
+- Added `build-tools` workflow group with 4 new tools for macOS build pipeline automation
+- Added `xcodegen_generate` tool for generating Xcode projects from xcodegen specs
+- Added `create_dmg` tool for creating DMG disk images with path traversal and symlink escape protection
+- Added `codesign_app` tool for code signing and optional notarization (sign, verify, notarize, staple)
+- Added `pfctl_anchor` tool for read-only PF firewall anchor inspection
+- Added `xcodebuildmcp.output.command-result` structured output schema shared by all build-tools
+- Added `CommandResultDomainResult` type to domain results union
 
 ## [2.3.2]
 
