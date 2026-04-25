@@ -52,26 +52,30 @@ describe('create_dmg tool', () => {
 
   describe('validateScriptPath', () => {
     it('should reject absolute scriptPath', () => {
-      const error = _validateScriptPath('/usr/bin/evil', '/project');
-      expect(error).toContain('must be relative');
+      const result = _validateScriptPath('/usr/bin/evil', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('must be relative');
     });
 
     it('should reject path traversal', () => {
-      const error = _validateScriptPath('../evil.sh', '/project');
-      expect(error).toContain('path traversal');
+      const result = _validateScriptPath('../evil.sh', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('path traversal');
     });
 
     it('should reject nested path traversal', () => {
-      const error = _validateScriptPath('Scripts/../../evil.sh', '/project');
-      expect(error).toContain('path traversal');
+      const result = _validateScriptPath('Scripts/../../evil.sh', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('path traversal');
     });
 
     it('should return error when script not found', () => {
       mockedRealpathSync.mockImplementation(() => {
         throw new Error('ENOENT');
       });
-      const error = _validateScriptPath('Scripts/create-dmg.sh', '/project');
-      expect(error).toContain('Script not found');
+      const result = _validateScriptPath('Scripts/create-dmg.sh', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('Script not found');
     });
 
     it('should return error when project path not found', () => {
@@ -80,8 +84,9 @@ describe('create_dmg tool', () => {
         if (pathStr === '/project/Scripts/create-dmg.sh') return pathStr;
         throw new Error('ENOENT');
       });
-      const error = _validateScriptPath('Scripts/create-dmg.sh', '/project');
-      expect(error).toContain('Project path not found');
+      const result = _validateScriptPath('Scripts/create-dmg.sh', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('Project path not found');
     });
 
     it('should reject symlink escape', () => {
@@ -90,18 +95,21 @@ describe('create_dmg tool', () => {
         if (pathStr.includes('create-dmg.sh')) return '/outside/evil.sh';
         return '/project';
       });
-      const error = _validateScriptPath('Scripts/create-dmg.sh', '/project');
-      expect(error).toContain('symlink escape');
+      const result = _validateScriptPath('Scripts/create-dmg.sh', '/project');
+      expect('error' in result).toBe(true);
+      if ('error' in result) expect(result.error).toContain('symlink escape');
     });
 
-    it('should accept valid script within project', () => {
+    it('should accept valid script within project and return realScriptPath', () => {
       mockedRealpathSync.mockImplementation((p: fs.PathLike) => {
         const pathStr = String(p);
         if (pathStr.includes('create-dmg.sh')) return '/project/Scripts/create-dmg.sh';
         return '/project';
       });
-      const error = _validateScriptPath('Scripts/create-dmg.sh', '/project');
-      expect(error).toBeNull();
+      const result = _validateScriptPath('Scripts/create-dmg.sh', '/project');
+      expect('realScriptPath' in result).toBe(true);
+      if ('realScriptPath' in result)
+        expect(result.realScriptPath).toBe('/project/Scripts/create-dmg.sh');
     });
   });
 
@@ -211,6 +219,29 @@ describe('create_dmg tool', () => {
       );
 
       expect(result.isError()).toBe(true);
+    });
+
+    it('should not pass outputPath when appPath is omitted', async () => {
+      mockedRealpathSync.mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        if (pathStr.includes('create-dmg.sh')) return '/project/Scripts/create-dmg.sh';
+        return '/project';
+      });
+
+      let capturedCommand: string[] | undefined;
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: '',
+        onExecute: (cmd) => {
+          capturedCommand = cmd;
+        },
+      });
+
+      await runToolLogic(() =>
+        createDmgLogic({ projectPath: '/project', outputPath: '/dist/App.dmg' }, mockExecutor),
+      );
+
+      expect(capturedCommand).toEqual(['/bin/sh', '/project/Scripts/create-dmg.sh']);
     });
 
     it('should use default script path when scriptPath not provided', async () => {

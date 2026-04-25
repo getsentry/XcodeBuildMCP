@@ -1,12 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
-  STRUCTURED_OUTPUT_SCHEMA,
+  setStructuredOutput,
   createCommandSuccess,
   createCommandFailure,
 } from './command-result-helpers.ts';
@@ -27,23 +26,15 @@ const createDmgSchema = z.object({
 
 type CreateDmgParams = z.infer<typeof createDmgSchema>;
 
-function setStructuredOutput(
-  ctx: ToolHandlerContext,
-  result: ReturnType<typeof createCommandSuccess>,
-): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
-function validateScriptPath(resolvedScript: string, projectPath: string): string | null {
+function validateScriptPath(
+  resolvedScript: string,
+  projectPath: string,
+): { error: string } | { realScriptPath: string } {
   if (resolvedScript.startsWith('/')) {
-    return `scriptPath must be relative, not absolute: ${resolvedScript}`;
+    return { error: `scriptPath must be relative, not absolute: ${resolvedScript}` };
   }
   if (resolvedScript.includes('..')) {
-    return `scriptPath must not contain path traversal (..): ${resolvedScript}`;
+    return { error: `scriptPath must not contain path traversal (..): ${resolvedScript}` };
   }
 
   const absoluteScriptPath = path.join(projectPath, resolvedScript);
@@ -52,24 +43,26 @@ function validateScriptPath(resolvedScript: string, projectPath: string): string
   try {
     realScriptPath = fs.realpathSync(absoluteScriptPath);
   } catch {
-    return `Script not found: ${absoluteScriptPath}`;
+    return { error: `Script not found: ${absoluteScriptPath}` };
   }
 
   let realProjectPath: string;
   try {
     realProjectPath = fs.realpathSync(projectPath);
   } catch {
-    return `Project path not found: ${projectPath}`;
+    return { error: `Project path not found: ${projectPath}` };
   }
 
   if (
     realScriptPath !== realProjectPath &&
     !realScriptPath.startsWith(realProjectPath + path.sep)
   ) {
-    return `Script resolves outside project directory (possible symlink escape): ${resolvedScript}`;
+    return {
+      error: `Script resolves outside project directory (possible symlink escape): ${resolvedScript}`,
+    };
   }
 
-  return null;
+  return { realScriptPath };
 }
 
 export async function createDmgLogic(
@@ -80,20 +73,18 @@ export async function createDmgLogic(
   const resolvedScript = params.scriptPath ?? 'Scripts/create-dmg.sh';
   const commandLabel = `create-dmg (${resolvedScript})`;
 
-  const validationError = validateScriptPath(resolvedScript, params.projectPath);
-  if (validationError != null) {
-    const result = createCommandFailure(commandLabel, validationError);
+  const validation = validateScriptPath(resolvedScript, params.projectPath);
+  if ('error' in validation) {
+    const result = createCommandFailure(commandLabel, validation.error);
     setStructuredOutput(ctx, result);
     return;
   }
 
-  const realScriptPath = fs.realpathSync(path.join(params.projectPath, resolvedScript));
-
-  const args: string[] = ['/bin/sh', realScriptPath];
+  const args: string[] = ['/bin/sh', validation.realScriptPath];
   if (params.appPath != null) {
     args.push(params.appPath);
   }
-  if (params.outputPath != null) {
+  if (params.appPath != null && params.outputPath != null) {
     args.push(params.outputPath);
   }
 
@@ -124,6 +115,7 @@ export async function createDmgLogic(
 }
 
 export { validateScriptPath as _validateScriptPath };
+export type ValidateResult = ReturnType<typeof validateScriptPath>;
 
 export const schema = createDmgSchema.shape;
 

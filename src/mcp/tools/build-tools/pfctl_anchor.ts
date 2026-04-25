@@ -1,10 +1,9 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
-  STRUCTURED_OUTPUT_SCHEMA,
+  setStructuredOutput,
   createCommandSuccess,
   createCommandFailure,
 } from './command-result-helpers.ts';
@@ -32,17 +31,6 @@ const pfctlSchema = pfctlBaseSchema.refine(
 
 type PfctlParams = z.infer<typeof pfctlSchema>;
 
-function setStructuredOutput(
-  ctx: ToolHandlerContext,
-  result: ReturnType<typeof createCommandSuccess>,
-): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
-
 function buildCommand(params: PfctlParams): string[] {
   const base = ['sudo', '-n', 'pfctl', '-a', params.anchorName];
 
@@ -58,21 +46,22 @@ function buildCommand(params: PfctlParams): string[] {
 
 export async function pfctlLogic(params: PfctlParams, executor: CommandExecutor): Promise<void> {
   const ctx = getHandlerContext();
-  const command = buildCommand(params);
   const commandLabel = `pfctl -a ${params.anchorName} (${params.action})`;
 
-  try {
-    if (params.action === 'test-syntax' && params.rulesFile != null) {
-      if (!/\.(conf|rules)$/.test(params.rulesFile)) {
-        const result = createCommandFailure(
-          commandLabel,
-          `rulesFile must end with .conf or .rules: ${params.rulesFile}`,
-        );
-        setStructuredOutput(ctx, result);
-        return;
-      }
+  if (params.action === 'test-syntax' && params.rulesFile != null) {
+    if (!/\.(conf|rules)$/.test(params.rulesFile)) {
+      const result = createCommandFailure(
+        commandLabel,
+        `rulesFile must end with .conf or .rules: ${params.rulesFile}`,
+      );
+      setStructuredOutput(ctx, result);
+      return;
     }
+  }
 
+  const command = buildCommand(params);
+
+  try {
     const response = await executor(command, 'PF Anchor Inspection', false);
 
     if (response.success) {

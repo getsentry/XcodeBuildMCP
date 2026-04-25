@@ -55,9 +55,24 @@ echo "Workflows:  ${XCODEBUILDMCP_ENABLED_WORKFLOWS}"
 echo "PATH includes: $(which xcodegen 2>/dev/null || echo '(xcodegen not found)'), $(which codesign 2>/dev/null || echo '(codesign not found)')"
 echo ""
 
+# Filter out --port from passthrough args to avoid duplication
+FILTERED_ARGS=()
+skip_next=false
+for arg in "$@"; do
+  if $skip_next; then
+    skip_next=false
+    continue
+  fi
+  if [[ "$arg" == "--port" ]]; then
+    skip_next=true
+    continue
+  fi
+  FILTERED_ARGS+=("$arg")
+done
+
 exec npx supergateway \
   --port "$PORT" \
   --stdio "node ${PROJECT_ROOT}/build/cli.js mcp" \
   --outputTransport streamableHttp \
   --cors \
-  "$@"
+  "${FILTERED_ARGS[@]}"

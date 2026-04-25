@@ -1,10 +1,9 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
-  STRUCTURED_OUTPUT_SCHEMA,
+  setStructuredOutput,
   createCommandSuccess,
   createCommandFailure,
 } from './command-result-helpers.ts';
@@ -15,17 +14,6 @@ const xcodegenSchema = z.object({
 });
 
 type XcodegenParams = z.infer<typeof xcodegenSchema>;
-
-function setStructuredOutput(
-  ctx: ToolHandlerContext,
-  result: ReturnType<typeof createCommandSuccess>,
-): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
 
 export async function xcodegenLogic(
   params: XcodegenParams,

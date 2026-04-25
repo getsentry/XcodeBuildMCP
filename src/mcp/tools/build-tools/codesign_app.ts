@@ -1,10 +1,9 @@
 import * as z from 'zod';
-import type { ToolHandlerContext } from '../../../rendering/types.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
-  STRUCTURED_OUTPUT_SCHEMA,
+  setStructuredOutput,
   createCommandSuccess,
   createCommandFailure,
 } from './command-result-helpers.ts';
@@ -32,23 +31,12 @@ const codesignBaseSchema = z.object({
   bundleId: z.string().min(1).optional().describe('Bundle ID (required for notarization)'),
 });
 
-const codesignSchema = codesignBaseSchema.refine(
-  (val) => !val.notarize || (val.teamId != null && val.bundleId != null),
-  { message: 'teamId and bundleId are required when notarize is true', path: ['teamId'] },
-);
+const codesignSchema = codesignBaseSchema.refine((val) => !val.notarize || val.teamId != null, {
+  message: 'teamId is required when notarize is true',
+  path: ['teamId'],
+});
 
 type CodesignParams = z.infer<typeof codesignSchema>;
-
-function setStructuredOutput(
-  ctx: ToolHandlerContext,
-  result: ReturnType<typeof createCommandSuccess>,
-): void {
-  ctx.structuredOutput = {
-    result,
-    schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
-  };
-}
 
 export async function codesignLogic(
   params: CodesignParams,
