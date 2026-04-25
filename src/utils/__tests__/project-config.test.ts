@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
+import { homedir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import { createMockFileSystemExecutor } from '../../test-utils/mock-executors.ts';
 import {
@@ -157,6 +158,62 @@ describe('project-config', () => {
       const defaults = result.config.sessionDefaults ?? {};
       expect(defaults.workspacePath).toBe('/repo/App.xcworkspace');
       expect(defaults.derivedDataPath).toBe('/repo/.derivedData');
+    });
+
+    it('should expand ~ prefixes in session defaults paths', async () => {
+      const yaml = [
+        'schemaVersion: 1',
+        'sessionDefaults:',
+        '  projectPath: "~/Code/App.xcodeproj"',
+        '  derivedDataPath: "~/.foo/derivedData"',
+        '',
+      ].join('\n');
+
+      const { fs } = createFsFixture({ exists: true, readFile: yaml });
+      const result = await loadProjectConfig({ fs, cwd });
+      if (!result.found) throw new Error('expected config to be found');
+
+      const defaults = result.config.sessionDefaults ?? {};
+      expect(defaults.projectPath).toBe(path.join(homedir(), 'Code/App.xcodeproj'));
+      expect(defaults.derivedDataPath).toBe(path.join(homedir(), '.foo/derivedData'));
+    });
+
+    it('should expand ~ prefixes in top-level path keys', async () => {
+      const yaml = [
+        'schemaVersion: 1',
+        'axePath: "~/tools/axe"',
+        'iosTemplatePath: "~/templates/ios"',
+        '',
+      ].join('\n');
+
+      const { fs } = createFsFixture({ exists: true, readFile: yaml });
+      const result = await loadProjectConfig({ fs, cwd });
+      if (!result.found) throw new Error('expected config to be found');
+
+      expect(result.config.axePath).toBe(path.join(homedir(), 'tools/axe'));
+      expect(result.config.iosTemplatePath).toBe(path.join(homedir(), 'templates/ios'));
+    });
+
+    it('should expand ~ prefixes in session defaults profiles', async () => {
+      const yaml = [
+        'schemaVersion: 1',
+        'sessionDefaultsProfiles:',
+        '  ios:',
+        '    workspacePath: "~/Code/App.xcworkspace"',
+        '    derivedDataPath: "~/.cache/dd"',
+        '',
+      ].join('\n');
+
+      const { fs } = createFsFixture({ exists: true, readFile: yaml });
+      const result = await loadProjectConfig({ fs, cwd });
+      if (!result.found) throw new Error('expected config to be found');
+
+      expect(result.config.sessionDefaultsProfiles?.ios?.workspacePath).toBe(
+        path.join(homedir(), 'Code/App.xcworkspace'),
+      );
+      expect(result.config.sessionDefaultsProfiles?.ios?.derivedDataPath).toBe(
+        path.join(homedir(), '.cache/dd'),
+      );
     });
 
     it('normalizes namespaced session defaults profiles and active profile', async () => {
