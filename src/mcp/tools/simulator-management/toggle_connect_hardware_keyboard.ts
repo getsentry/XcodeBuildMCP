@@ -1,4 +1,7 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -6,9 +9,10 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { sendKeyboardShortcut } from './_keyboard_shortcut.ts';
 
 const toggleConnectHardwareKeyboardSchema = z.object({
@@ -16,22 +20,49 @@ const toggleConnectHardwareKeyboardSchema = z.object({
 });
 
 type ToggleConnectHardwareKeyboardParams = z.infer<typeof toggleConnectHardwareKeyboardSchema>;
+type ToggleConnectHardwareKeyboardResult = SimulatorActionResultDomainResult;
 
-export async function toggle_connect_hardware_keyboardLogic(
-  params: ToggleConnectHardwareKeyboardParams,
+function createToggleConnectHardwareKeyboardResult(params: {
+  simulatorId: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): ToggleConnectHardwareKeyboardResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'toggle-connect-hardware-keyboard',
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
+    artifacts: {
+      simulatorId: params.simulatorId,
+    },
+  };
+}
+
+function setStructuredOutput(
+  ctx: ToolHandlerContext,
+  result: ToggleConnectHardwareKeyboardResult,
+): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createToggleConnectHardwareKeyboardExecutor(
   executor: CommandExecutor,
-): Promise<void> {
-  log('info', `Toggling hardware keyboard connection on simulator ${params.simulatorId}`);
-
-  const headerEvent = header('Toggle Connect Hardware Keyboard', [
-    { label: 'Simulator', value: params.simulatorId },
-  ]);
-
-  const ctx = getHandlerContext();
-
-  return withErrorHandling(
-    ctx,
-    async () => {
+): NonStreamingExecutor<ToggleConnectHardwareKeyboardParams, ToggleConnectHardwareKeyboardResult> {
+  return async (params) => {
+    try {
       const result = await sendKeyboardShortcut(
         params.simulatorId,
         'connect-hardware-keyboard',
@@ -39,22 +70,49 @@ export async function toggle_connect_hardware_keyboardLogic(
       );
 
       if (!result.success) {
-        log('error', `Failed to toggle hardware keyboard: ${result.error}`);
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', result.error));
-        return;
+        return createToggleConnectHardwareKeyboardResult({
+          simulatorId: params.simulatorId,
+          didError: true,
+          error: 'Failed to toggle hardware keyboard.',
+          diagnosticMessage: result.error,
+        });
       }
 
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Sent Connect Hardware Keyboard (Cmd+Shift+K)'));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to toggle hardware keyboard: ${message}`,
-      logMessage: ({ message }) =>
-        `Error toggling hardware keyboard for simulator ${params.simulatorId}: ${message}`,
-    },
-  );
+      return createToggleConnectHardwareKeyboardResult({
+        simulatorId: params.simulatorId,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createToggleConnectHardwareKeyboardResult({
+        simulatorId: params.simulatorId,
+        didError: true,
+        error: 'Failed to toggle hardware keyboard.',
+        diagnosticMessage,
+      });
+    }
+  };
+}
+
+export async function toggle_connect_hardware_keyboardLogic(
+  params: ToggleConnectHardwareKeyboardParams,
+  executor: CommandExecutor,
+): Promise<void> {
+  log('info', `Toggling hardware keyboard connection on simulator ${params.simulatorId}`);
+
+  const ctx = getHandlerContext();
+  const executeToggleConnectHardwareKeyboard =
+    createToggleConnectHardwareKeyboardExecutor(executor);
+
+  const result = await executeToggleConnectHardwareKeyboard(params);
+  setStructuredOutput(ctx, result);
+
+  if (result.didError) {
+    log(
+      'error',
+      `Error toggling hardware keyboard for simulator ${params.simulatorId}: ${result.error ?? 'Unknown error'}`,
+    );
+  }
 }
 
 const publicSchemaObject = z.strictObject(
@@ -67,10 +125,9 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ToggleConnectHardwareKeyboardParams>({
-  internalSchema: toggleConnectHardwareKeyboardSchema as unknown as z.ZodType<
-    ToggleConnectHardwareKeyboardParams,
-    unknown
-  >,
+  internalSchema: toInternalSchema<ToggleConnectHardwareKeyboardParams>(
+    toggleConnectHardwareKeyboardSchema,
+  ),
   logicFunction: toggle_connect_hardware_keyboardLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

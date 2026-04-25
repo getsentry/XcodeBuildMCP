@@ -409,6 +409,12 @@ export interface SimulatorActionStatusbar {
   type: 'statusbar';
   dataNetwork?: string;
 }
+export interface SimulatorActionToggleSoftwareKeyboard {
+  type: 'toggle-software-keyboard';
+}
+export interface SimulatorActionToggleConnectHardwareKeyboard {
+  type: 'toggle-connect-hardware-keyboard';
+}
 export type SimulatorAction =
   | SimulatorActionBoot
   | SimulatorActionErase
@@ -416,7 +422,9 @@ export type SimulatorAction =
   | SimulatorActionResetLocation
   | SimulatorActionSetLocation
   | SimulatorActionSetAppearance
-  | SimulatorActionStatusbar;
+  | SimulatorActionStatusbar
+  | SimulatorActionToggleSoftwareKeyboard
+  | SimulatorActionToggleConnectHardwareKeyboard;
 export interface AppPathRequest {
   scheme?: string;
   projectPath?: string;

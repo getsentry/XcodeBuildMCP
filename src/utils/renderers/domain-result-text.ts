@@ -1165,6 +1165,8 @@ function createSimulatorActionItems(
     'set-location': 'Set Location',
     'set-appearance': 'Set Appearance',
     statusbar: 'Statusbar',
+    'toggle-software-keyboard': 'Toggle Software Keyboard',
+    'toggle-connect-hardware-keyboard': 'Toggle Connect Hardware Keyboard',
   };
 
   const params: HeaderRenderItem['params'] = [];
@@ -1196,6 +1198,8 @@ function createSimulatorActionItems(
       'set-location': 'Location set successfully',
       'set-appearance': `Appearance successfully set to ${result.action.type === 'set-appearance' ? result.action.appearance : 'requested'} mode`,
       statusbar: 'Status bar data network set successfully',
+      'toggle-software-keyboard': 'Sent Toggle Software Keyboard (Cmd+K)',
+      'toggle-connect-hardware-keyboard': 'Sent Connect Hardware Keyboard (Cmd+Shift+K)',
     };
     items.push(
       ...createStandardDiagnosticSections(result.diagnostics),

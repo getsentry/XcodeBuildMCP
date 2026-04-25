@@ -144,6 +144,30 @@
               "required": [
                 "type"
               ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "toggle-software-keyboard"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "toggle-connect-hardware-keyboard"
+                }
+              },
+              "required": [
+                "type"
+              ]
             }
           ]
         },

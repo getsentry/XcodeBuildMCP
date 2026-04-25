@@ -1,4 +1,7 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
@@ -6,9 +9,10 @@ import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
   getHandlerContext,
+  toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 import { sendKeyboardShortcut } from './_keyboard_shortcut.ts';
 
 const toggleSoftwareKeyboardSchema = z.object({
@@ -16,6 +20,72 @@ const toggleSoftwareKeyboardSchema = z.object({
 });
 
 type ToggleSoftwareKeyboardParams = z.infer<typeof toggleSoftwareKeyboardSchema>;
+type ToggleSoftwareKeyboardResult = SimulatorActionResultDomainResult;
+
+function createToggleSoftwareKeyboardResult(params: {
+  simulatorId: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): ToggleSoftwareKeyboardResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'toggle-software-keyboard',
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
+    artifacts: {
+      simulatorId: params.simulatorId,
+    },
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: ToggleSoftwareKeyboardResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createToggleSoftwareKeyboardExecutor(
+  executor: CommandExecutor,
+): NonStreamingExecutor<ToggleSoftwareKeyboardParams, ToggleSoftwareKeyboardResult> {
+  return async (params) => {
+    try {
+      const result = await sendKeyboardShortcut(params.simulatorId, 'software-keyboard', executor);
+
+      if (!result.success) {
+        return createToggleSoftwareKeyboardResult({
+          simulatorId: params.simulatorId,
+          didError: true,
+          error: 'Failed to toggle software keyboard.',
+          diagnosticMessage: result.error,
+        });
+      }
+
+      return createToggleSoftwareKeyboardResult({
+        simulatorId: params.simulatorId,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createToggleSoftwareKeyboardResult({
+        simulatorId: params.simulatorId,
+        didError: true,
+        error: 'Failed to toggle software keyboard.',
+        diagnosticMessage,
+      });
+    }
+  };
+}
 
 export async function toggle_software_keyboardLogic(
   params: ToggleSoftwareKeyboardParams,
@@ -23,34 +93,18 @@ export async function toggle_software_keyboardLogic(
 ): Promise<void> {
   log('info', `Toggling software keyboard on simulator ${params.simulatorId}`);
 
-  const headerEvent = header('Toggle Software Keyboard', [
-    { label: 'Simulator', value: params.simulatorId },
-  ]);
-
   const ctx = getHandlerContext();
+  const executeToggleSoftwareKeyboard = createToggleSoftwareKeyboardExecutor(executor);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const result = await sendKeyboardShortcut(params.simulatorId, 'software-keyboard', executor);
+  const result = await executeToggleSoftwareKeyboard(params);
+  setStructuredOutput(ctx, result);
 
-      if (!result.success) {
-        log('error', `Failed to toggle software keyboard: ${result.error}`);
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', result.error));
-        return;
-      }
-
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', 'Sent Toggle Software Keyboard (Cmd+K)'));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to toggle software keyboard: ${message}`,
-      logMessage: ({ message }) =>
-        `Error toggling software keyboard for simulator ${params.simulatorId}: ${message}`,
-    },
-  );
+  if (result.didError) {
+    log(
+      'error',
+      `Error toggling software keyboard for simulator ${params.simulatorId}: ${result.error ?? 'Unknown error'}`,
+    );
+  }
 }
 
 const publicSchemaObject = z.strictObject(
@@ -63,10 +117,7 @@ export const schema = getSessionAwareToolSchemaShape({
 });
 
 export const handler = createSessionAwareTool<ToggleSoftwareKeyboardParams>({
-  internalSchema: toggleSoftwareKeyboardSchema as unknown as z.ZodType<
-    ToggleSoftwareKeyboardParams,
-    unknown
-  >,
+  internalSchema: toInternalSchema<ToggleSoftwareKeyboardParams>(toggleSoftwareKeyboardSchema),
   logicFunction: toggle_software_keyboardLogic,
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],

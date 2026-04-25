@@ -4,6 +4,9 @@ names:
   mcp: toggle_software_keyboard
   cli: toggle-software-keyboard
 description: Toggle the iOS Simulator software keyboard (Cmd+K). Shows or hides the on-screen keyboard. Requires the simulator to be booted and Accessibility permission for the MCP host.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Toggle Software Keyboard
   readOnlyHint: false
