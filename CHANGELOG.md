@@ -13,6 +13,10 @@
 - When a single platform is selected, `xcodebuildmcp setup` now writes `platform` to `sessionDefaults` in `config.yaml` and includes `XCODEBUILDMCP_PLATFORM` in `--format mcp-json` output. For multi-platform projects the platform key is omitted so the agent can choose per-command ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
 - The `setup` wizard remembers previous choices on re-run: existing `config.yaml` values (including the new `platform`) are pre-loaded as defaults for every prompt ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
 
+### Fixed
+
+- Expanded leading `~` (and `~/` or `~\` on Windows) prefixes in configured `derivedDataPath`, `projectPath`, `workspacePath`, `axePath`, and the iOS/macOS template paths so values like `~/.foo/derivedData` resolve under the user's home directory instead of creating a literal `~` directory under the project root ([#283](https://github.com/getsentry/XcodeBuildMCP/issues/283), supersedes [#301](https://github.com/getsentry/XcodeBuildMCP/pull/301) by [@trmquang93](https://github.com/trmquang93)).
+
 ## [2.3.2]
 
 ### Fixed
