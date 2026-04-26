@@ -9,7 +9,5 @@
  * @returns A single-quoted, safely escaped string
  */
 export function shellEscapeArg(arg: string): string {
-  // Replace each single quote with: end current quote, escaped single quote, start new quote
-  // Then wrap the whole thing in single quotes
   return "'" + arg.replace(/'/g, "'\\''") + "'";
 }
