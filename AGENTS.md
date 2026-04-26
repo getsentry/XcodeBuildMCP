@@ -6,7 +6,7 @@
 - `npm run test:smoke` - Smoke tests (builds first, serial execution)
 - `npm run lint` / `npm run lint:fix` - ESLint
 - `npm run format` / `npm run format:check` - Prettier
-- `npm run typecheck` - TypeScript type checking (`tsc --noEmit`, plus test config)
+- `npm run typecheck` - TypeScript type checking (src + test config)
 - `npm run docs:check` - Validate docs match CLI surface
 
 ## Architecture
@@ -18,7 +18,7 @@ ESM TypeScript project (`type: module`). Key layers:
 - `src/core/manifest/` - YAML manifest loading, validation, tool module imports
 - `src/mcp/tools/` - Tool implementations grouped by workflow (mirrors `manifests/workflows/`)
 - `src/mcp/resources/` - MCP resource implementations
-- `src/integrations/` - External integrations (Xcode mcpbridge proxy)
+- `src/integrations/` - External integrations (Xcode tools bridge)
 - `src/utils/` - Shared helpers (execution, logging, validation, responses)
 - `src/visibility/` - Tool/workflow exposure predicates
 - `src/daemon/` - Background daemon for persistent sessions
@@ -66,8 +66,8 @@ ESM TypeScript project (`type: module`). Key layers:
 ## Tool Development
 - Tool manifests in `manifests/tools/*.yaml` define `id`, `module`, `names.mcp` (snake_case), optional `names.cli` (kebab-case), predicates, and annotations
 - Workflow manifests in `manifests/workflows/*.yaml` group tools and define exposure rules
-- Tool modules export a Zod schema, a pure `*Logic` function, and a `handler` via `createTypedTool` or `createSessionAwareTool`
-- Resources export `{ uri, name, description, mimeType, handler }`
+- Tool modules export a Zod `schema`, a pure `*Logic` function, and a `handler` built with `createTypedTool` or `createSessionAwareTool`
+- Resource modules export a `handler` (and a pure `*Logic` function); `uri`, `name`, `description`, and `mimeType` are declared in `manifests/resources/*.yaml`
 
 ## Commands
 - NEVER commit unless user asks
