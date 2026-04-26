@@ -26,6 +26,13 @@ export type SessionDefaults = {
   env?: Record<string, string>;
 };
 
+function computeScopedDerivedDataPath(anchor: string): string {
+  const resolved = path.resolve(anchor);
+  const hash = crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12);
+  const name = path.basename(resolved, path.extname(resolved));
+  return path.join(DERIVED_DATA_DIR, `${name}-${hash}`);
+}
+
 class SessionStore {
   private globalDefaults: SessionDefaults = {};
   private profiles: Record<string, SessionDefaults> = {};
@@ -140,10 +147,7 @@ class SessionStore {
     if (!result.derivedDataPath) {
       const anchor = result.workspacePath ?? result.projectPath;
       if (anchor) {
-        const resolved = path.resolve(anchor);
-        const hash = crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12);
-        const name = path.basename(resolved, path.extname(resolved));
-        result.derivedDataPath = path.join(DERIVED_DATA_DIR, `${name}-${hash}`);
+        result.derivedDataPath = computeScopedDerivedDataPath(anchor);
       }
     }
 
