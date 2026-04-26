@@ -23,7 +23,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
 import { extractBundleIdFromAppPath } from '../../../utils/bundle-id.ts';
-import { mapDevicePlatform } from './build-settings.ts';
+import { devicePlatformSchema, mapDevicePlatform } from './build-settings.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { installAppOnDevice, launchAppOnDevice } from '../../../utils/device-steps.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
@@ -53,7 +53,7 @@ const baseSchemaObject = z.object({
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
   scheme: z.string().describe('The scheme to build and run'),
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
-  platform: z.enum(['iOS', 'watchOS', 'tvOS', 'visionOS']).optional().describe('default: iOS'),
+  platform: devicePlatformSchema,
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
   derivedDataPath: z.string().optional(),
   extraArgs: z.array(z.string()).optional(),
@@ -269,7 +269,6 @@ const publicSchemaObject = baseSchemaObject.omit({
   workspacePath: true,
   scheme: true,
   deviceId: true,
-  platform: true,
   configuration: true,
   derivedDataPath: true,
   preferXcodebuild: true,

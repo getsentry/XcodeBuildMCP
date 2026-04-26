@@ -59,13 +59,15 @@ describe('test_device plugin', () => {
       expect(schemaObj.safeParse({}).success).toBe(true);
       expect(schemaObj.safeParse({ derivedDataPath: '/path/to/derived-data' }).success).toBe(false);
       expect(schemaObj.safeParse({ preferXcodebuild: true }).success).toBe(false);
-      expect(schemaObj.safeParse({ platform: 'iOS' }).success).toBe(false);
+      expect(schemaObj.safeParse({ platform: 'iOS' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'tvOS Simulator' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'macOS' }).success).toBe(false);
       expect(schemaObj.safeParse({ projectPath: '/path/to/project.xcodeproj' }).success).toBe(
         false,
       );
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'progress', 'testRunnerEnv']);
+      expect(schemaKeys).toEqual(['extraArgs', 'platform', 'progress', 'testRunnerEnv']);
     });
 
     it('should validate XOR between projectPath and workspacePath', async () => {

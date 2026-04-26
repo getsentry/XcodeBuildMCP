@@ -33,12 +33,15 @@ describe('build_run_device tool', () => {
       expect(schemaObj.safeParse({}).success).toBe(true);
       expect(schemaObj.safeParse({ extraArgs: ['-quiet'] }).success).toBe(true);
       expect(schemaObj.safeParse({ env: { FOO: 'bar' } }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'tvOS' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'tvOS Simulator' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'macOS' }).success).toBe(false);
 
       expect(schemaObj.safeParse({ scheme: 'App' }).success).toBe(false);
       expect(schemaObj.safeParse({ deviceId: 'device-id' }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['env', 'extraArgs']);
+      expect(schemaKeys).toEqual(['env', 'extraArgs', 'platform']);
     });
   });
 

@@ -8,8 +8,8 @@
 import * as z from 'zod';
 import type { BuildResultDomainResult } from '../../../types/domain-results.ts';
 import type { StreamingExecutor } from '../../../types/tool-execution.ts';
-import { XcodePlatform } from '../../../types/common.ts';
 import { executeXcodeBuildCommand } from '../../../utils/build/index.ts';
+import { devicePlatformSchema, mapDevicePlatform } from './build-settings.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -35,7 +35,7 @@ function createBuildDeviceRequest(params: BuildDeviceParams): BuildInvocationReq
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
     configuration: params.configuration ?? 'Debug',
-    platform: 'iOS',
+    platform: String(mapDevicePlatform(params.platform)),
     target: 'device',
   };
 }
@@ -48,6 +48,7 @@ const baseSchemaObject = z.object({
   derivedDataPath: z.string().optional(),
   extraArgs: z.array(z.string()).optional(),
   preferXcodebuild: z.boolean().optional(),
+  platform: devicePlatformSchema,
 });
 
 const buildDeviceSchema = z.preprocess(
@@ -71,6 +72,7 @@ export function createBuildDeviceExecutor(
   executor: CommandExecutor,
 ): StreamingExecutor<BuildDeviceParams, BuildDeviceResult> {
   return async (params, ctx) => {
+    const platform = mapDevicePlatform(params.platform);
     const processedParams = {
       ...params,
       configuration: params.configuration ?? 'Debug',
@@ -80,8 +82,8 @@ export function createBuildDeviceExecutor(
     const buildResult = await executeXcodeBuildCommand(
       processedParams,
       {
-        platform: XcodePlatform.iOS,
-        logPrefix: 'iOS Device Build',
+        platform,
+        logPrefix: `${platform} Device Build`,
       },
       params.preferXcodebuild ?? false,
       'build',

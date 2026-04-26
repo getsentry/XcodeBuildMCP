@@ -18,7 +18,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
-import { mapDevicePlatform } from './build-settings.ts';
+import { devicePlatformSchema, mapDevicePlatform } from './build-settings.ts';
 import { resolveAppPathFromBuildSettings } from '../../../utils/app-path-resolver.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
@@ -32,7 +32,7 @@ import {
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
-  platform: z.enum(['iOS', 'watchOS', 'tvOS', 'visionOS']).optional().describe('default: iOS'),
+  platform: devicePlatformSchema,
 };
 
 const baseSchemaObject = z.object({
@@ -53,7 +53,6 @@ const publicSchemaObject = baseSchemaObject.omit({
   workspacePath: true,
   scheme: true,
   configuration: true,
-  platform: true,
 } as const);
 
 function createRequest(params: GetDeviceAppPathParams) {

@@ -5,6 +5,12 @@ import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, buildDeviceLogic } from '../build_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+
+const runHandlerWithExecutor = handler as unknown as (
+  args: Record<string, unknown>,
+  executor: CommandExecutor,
+) => Promise<{ isError?: boolean }>;
 
 function createSpyExecutor(): {
   commandCalls: Array<{ args: string[]; logPrefix?: string }>;
@@ -41,8 +47,12 @@ describe('build_device plugin', () => {
         false,
       );
 
+      expect(schemaObj.safeParse({ platform: 'tvOS' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'tvOS Simulator' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'macOS' }).success).toBe(false);
+
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs']);
+      expect(schemaKeys).toEqual(['extraArgs', 'platform']);
     });
   });
 
@@ -200,6 +210,39 @@ describe('build_device plugin', () => {
         'build',
       ]);
       expect(spy.commandCalls[0].logPrefix).toBe('iOS Device Build');
+    });
+
+    it('should build for a selected non-iOS device platform', async () => {
+      const spy = createSpyExecutor();
+
+      sessionStore.setDefaults({
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+      });
+
+      const result = await runHandlerWithExecutor({ platform: 'tvOS' }, spy.executor);
+
+      expect(result.isError).toBeUndefined();
+      expect(spy.commandCalls).toHaveLength(1);
+      expect(spy.commandCalls[0].args).toContain('generic/platform=tvOS');
+      expect(spy.commandCalls[0].logPrefix).toBe('tvOS Device Build');
+    });
+
+    it('should normalize simulator session platforms for device builds', async () => {
+      const spy = createSpyExecutor();
+
+      sessionStore.setDefaults({
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+        platform: 'tvOS Simulator',
+      });
+
+      const result = await runHandlerWithExecutor({}, spy.executor);
+
+      expect(result.isError).toBeUndefined();
+      expect(spy.commandCalls).toHaveLength(1);
+      expect(spy.commandCalls[0].args).toContain('generic/platform=tvOS');
+      expect(spy.commandCalls[0].logPrefix).toBe('tvOS Device Build');
     });
 
     it('should return exact successful build response', async () => {

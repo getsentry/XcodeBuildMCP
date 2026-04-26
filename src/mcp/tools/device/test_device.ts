@@ -9,6 +9,7 @@ import * as z from 'zod';
 import type { TestResultDomainResult } from '../../../types/domain-results.ts';
 import type { StreamingExecutor } from '../../../types/tool-execution.ts';
 import { XcodePlatform } from '../../../types/common.ts';
+import { devicePlatformSchema, mapDevicePlatform } from './build-settings.ts';
 import { createTestExecutor } from '../../../utils/test/index.ts';
 import type { CommandExecutor, FileSystemExecutor } from '../../../utils/execution/index.ts';
 import {
@@ -39,7 +40,7 @@ const baseSchemaObject = z.object({
   derivedDataPath: z.string().optional(),
   extraArgs: z.array(z.string()).optional(),
   preferXcodebuild: z.boolean().optional(),
-  platform: z.enum(['iOS', 'watchOS', 'tvOS', 'visionOS']).optional(),
+  platform: devicePlatformSchema,
   testRunnerEnv: z
     .record(z.string(), z.string())
     .optional()
@@ -68,7 +69,6 @@ const publicSchemaObject = baseSchemaObject.omit({
   configuration: true,
   derivedDataPath: true,
   preferXcodebuild: true,
-  platform: true,
 } as const);
 
 interface PreparedTestDeviceExecution {
@@ -83,7 +83,7 @@ async function prepareTestDeviceExecution(
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestDeviceExecution> {
   const configuration = params.configuration ?? 'Debug';
-  const platform = (params.platform as XcodePlatform) || XcodePlatform.iOS;
+  const platform = mapDevicePlatform(params.platform);
   const preflight = await resolveTestPreflight(
     {
       projectPath: params.projectPath,

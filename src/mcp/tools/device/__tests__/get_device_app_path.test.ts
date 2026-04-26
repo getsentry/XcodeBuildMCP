@@ -24,16 +24,18 @@ describe('get_device_app_path plugin', () => {
       expect(typeof handler).toBe('function');
     });
 
-    it('should expose empty public schema', () => {
+    it('should expose only session-free fields in public schema', () => {
       const schemaObj = z.strictObject(schema);
       expect(schemaObj.safeParse({}).success).toBe(true);
-      expect(schemaObj.safeParse({ platform: 'iOS' }).success).toBe(false);
+      expect(schemaObj.safeParse({ platform: 'iOS' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'tvOS Simulator' }).success).toBe(true);
+      expect(schemaObj.safeParse({ platform: 'macOS' }).success).toBe(false);
       expect(schemaObj.safeParse({ projectPath: '/path/to/project.xcodeproj' }).success).toBe(
         false,
       );
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual([]);
+      expect(schemaKeys).toEqual(['platform']);
     });
   });
 
