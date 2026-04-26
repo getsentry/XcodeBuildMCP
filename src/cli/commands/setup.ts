@@ -182,26 +182,16 @@ function normalizeExistingDefaults(config?: ProjectConfig): {
 function inferPlatformsFromExisting(config?: ProjectConfig): SetupPlatform[] {
   if (!config) return [];
 
-  const platform = config.sessionDefaults?.platform;
-  if (platform != null && SESSION_DEFAULT_TO_SETUP_PLATFORM[platform] != null) {
-    return [SESSION_DEFAULT_TO_SETUP_PLATFORM[platform]];
+  const stored = config.setupPreferences?.platforms;
+  if (stored && stored.length > 0) {
+    return [...stored];
   }
 
-  // Multi-platform or legacy config: macOS is recovered from the workflow set,
-  // the non-macOS component from the cached simulatorPlatform.
-  const results: SetupPlatform[] = [];
+  // No stored preference: only macOS is unambiguously recoverable from enabledWorkflows.
+  // Simulator-platform identity (iOS vs tvOS vs watchOS vs visionOS) cannot be inferred
+  // from workflow ids alone, so leave it blank and let the wizard re-prompt.
   const workflows = new Set(config.enabledWorkflows ?? []);
-  if (workflows.has('macos')) results.push('macOS');
-
-  const simPlatform = config.sessionDefaults?.simulatorPlatform;
-  const fromSim = simPlatform != null ? SESSION_DEFAULT_TO_SETUP_PLATFORM[simPlatform] : undefined;
-  if (fromSim != null && fromSim !== 'macOS') {
-    results.push(fromSim);
-  } else if (workflows.has('simulator')) {
-    results.push('iOS');
-  }
-
-  return results;
+  return workflows.has('macos') ? ['macOS'] : [];
 }
 
 function derivePlatformSessionDefault(platforms: SetupPlatform[]): string | undefined {
@@ -347,9 +337,9 @@ function getChangedFields(
       afterValue: afterDefaults.simulatorName,
     },
     {
-      label: 'sessionDefaults.platform',
-      beforeValue: beforeDefaults.platform,
-      afterValue: afterDefaults.platform,
+      label: 'setupPreferences.platforms',
+      beforeValue: beforeConfig?.setupPreferences?.platforms,
+      afterValue: afterConfig.setupPreferences?.platforms,
     },
   ];
 
@@ -1113,11 +1103,6 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
     deleteSessionDefaultKeys.push('simulatorId', 'simulatorName');
   }
 
-  const derivedPlatform = derivePlatformSessionDefault(selection.platforms);
-  if (!derivedPlatform) {
-    deleteSessionDefaultKeys.push('platform');
-  }
-
   const persistedProjectPath =
     selection.projectPath != null
       ? relativePathOrAbsolute(selection.projectPath, resolvedDeps.cwd)
@@ -1141,8 +1126,9 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
         deviceId: selection.deviceId,
         simulatorId: selection.simulatorId,
         simulatorName: selection.simulatorName,
-        platform: derivedPlatform,
       },
+      setupPreferences:
+        selection.platforms.length > 0 ? { platforms: [...selection.platforms] } : null,
     },
     deleteSessionDefaultKeys,
   });

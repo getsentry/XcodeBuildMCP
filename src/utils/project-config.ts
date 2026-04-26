@@ -46,6 +46,10 @@ export type PersistActiveSessionDefaultsProfileOptions = {
   profile?: string | null;
 };
 
+export type SetupPreferences = {
+  platforms?: ('macOS' | 'iOS' | 'tvOS' | 'watchOS' | 'visionOS')[];
+};
+
 export type PersistProjectConfigPatchOptions = {
   fs: FileSystemExecutor;
   cwd: string;
@@ -56,6 +60,7 @@ export type PersistProjectConfigPatchOptions = {
     experimentalWorkflowDiscovery?: boolean;
     disableSessionDefaults?: boolean;
     sessionDefaults?: Partial<SessionDefaults>;
+    setupPreferences?: SetupPreferences | null;
   };
   deleteSessionDefaultKeys?: (keyof SessionDefaults)[];
 };
@@ -422,6 +427,12 @@ export async function persistProjectConfigPatch(
 
   for (const [key, value] of Object.entries(topLevelPatch)) {
     nextConfig[key] = value;
+  }
+
+  if (options.patch.setupPreferences === null) {
+    delete nextConfig.setupPreferences;
+  } else if (options.patch.setupPreferences !== undefined) {
+    nextConfig.setupPreferences = options.patch.setupPreferences;
   }
 
   if (options.patch.sessionDefaults) {

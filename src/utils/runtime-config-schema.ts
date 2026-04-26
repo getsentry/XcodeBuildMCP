@@ -25,6 +25,11 @@ export const runtimeConfigFileSchema = z
     sessionDefaults: sessionDefaultsSchema.optional(),
     sessionDefaultsProfiles: z.record(z.string(), sessionDefaultsSchema).optional(),
     activeSessionDefaultsProfile: z.string().optional(),
+    setupPreferences: z
+      .object({
+        platforms: z.array(z.enum(['macOS', 'iOS', 'tvOS', 'watchOS', 'visionOS'])).optional(),
+      })
+      .optional(),
   })
   .passthrough();
 

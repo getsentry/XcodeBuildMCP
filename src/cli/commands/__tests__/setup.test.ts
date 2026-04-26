@@ -1337,9 +1337,11 @@ sessionDefaults:
 
     const parsed = parseYaml(storedConfig) as {
       sessionDefaults?: Record<string, unknown>;
+      setupPreferences?: { platforms?: string[] };
     };
 
-    expect(parsed.sessionDefaults?.platform).toBe('macOS');
+    expect(parsed.setupPreferences?.platforms).toEqual(['macOS']);
+    expect(parsed.sessionDefaults?.platform).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
   });
@@ -1577,7 +1579,12 @@ sessionDefaults:
       sessionDefaults?: Record<string, unknown>;
     };
 
-    expect(parsed.sessionDefaults?.platform).toBe('macOS');
+    expect(
+      (parsed as { setupPreferences?: { platforms?: string[] } }).setupPreferences?.platforms,
+    ).toEqual(['macOS']);
+    // setup intentionally does not touch sessionDefaults.platform (agent-controlled field);
+    // the pre-existing value from the fixture is preserved.
+    expect(parsed.sessionDefaults?.platform).toBe('iOS Simulator');
     expect(parsed.sessionDefaults?.deviceId).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorId).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorName).toBeUndefined();
@@ -1648,7 +1655,10 @@ sessionDefaults:
       sessionDefaults?: Record<string, unknown>;
     };
 
-    expect(parsed.sessionDefaults?.platform).toBe('tvOS Simulator');
+    expect(
+      (parsed as { setupPreferences?: { platforms?: string[] } }).setupPreferences?.platforms,
+    ).toEqual(['tvOS']);
+    expect(parsed.sessionDefaults?.platform).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorId).toBe('TVOS-1');
     expect(parsed.sessionDefaults?.simulatorName).toBe('Apple TV 4K');
   });
@@ -1723,7 +1733,10 @@ sessionDefaults:
       sessionDefaults?: Record<string, unknown>;
     };
 
-    expect(parsed.sessionDefaults?.platform).toBe('watchOS Simulator');
+    expect(
+      (parsed as { setupPreferences?: { platforms?: string[] } }).setupPreferences?.platforms,
+    ).toEqual(['watchOS']);
+    expect(parsed.sessionDefaults?.platform).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorId).toBe('WATCH-1');
     expect(parsed.sessionDefaults?.simulatorName).toBe('Apple Watch Series 9');
   });
@@ -1793,7 +1806,10 @@ sessionDefaults:
       sessionDefaults?: Record<string, unknown>;
     };
 
-    expect(parsed.sessionDefaults?.platform).toBe('visionOS Simulator');
+    expect(
+      (parsed as { setupPreferences?: { platforms?: string[] } }).setupPreferences?.platforms,
+    ).toEqual(['visionOS']);
+    expect(parsed.sessionDefaults?.platform).toBeUndefined();
     expect(parsed.sessionDefaults?.simulatorId).toBe('XROS-1');
     expect(parsed.sessionDefaults?.simulatorName).toBe('Apple Vision Pro');
   });
