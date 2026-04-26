@@ -1,27 +1,33 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { registryMocks, buildStatusMock, serviceMocks, onToolCatalogInvalidatedRef } = vi.hoisted(
-  () => ({
-    registryMocks: {
-      clear: vi.fn(),
-      getRegisteredCount: vi.fn(() => 0),
-      sync: vi.fn(() => ({ added: 0, updated: 0, removed: 0, total: 0 })),
-    },
-    buildStatusMock: vi.fn(),
-    serviceMocks: {
-      setWorkflowEnabled: vi.fn(),
-      disconnect: vi.fn(),
-      getClientStatus: vi.fn(),
-      getLastError: vi.fn(),
-      listTools: vi.fn(),
-      invokeTool: vi.fn(),
-    },
-    onToolCatalogInvalidatedRef: {
-      current: undefined as (() => void) | undefined,
-    },
-  }),
-);
+const {
+  registryMocks,
+  buildStatusMock,
+  serviceMocks,
+  onToolCatalogInvalidatedRef,
+  getMcpBridgeAvailabilityMock,
+} = vi.hoisted(() => ({
+  registryMocks: {
+    clear: vi.fn(),
+    getRegisteredCount: vi.fn(() => 0),
+    sync: vi.fn(() => ({ added: 0, updated: 0, removed: 0, total: 0 })),
+  },
+  buildStatusMock: vi.fn(),
+  serviceMocks: {
+    setWorkflowEnabled: vi.fn(),
+    disconnect: vi.fn(),
+    getClientStatus: vi.fn(),
+    getLastError: vi.fn(),
+    listTools: vi.fn(),
+    invokeTool: vi.fn(),
+  },
+  onToolCatalogInvalidatedRef: {
+    current: undefined as (() => void) | undefined,
+  },
+  getMcpBridgeAvailabilityMock: vi.fn(),
+}));
 
 vi.mock('../registry.ts', () => ({
   XcodeToolsProxyRegistry: vi.fn().mockImplementation(() => registryMocks),
@@ -30,7 +36,7 @@ vi.mock('../registry.ts', () => ({
 vi.mock('../core.ts', () => ({
   buildXcodeToolsBridgeStatus: buildStatusMock,
   classifyBridgeError: vi.fn(() => 'XCODE_MCP_UNAVAILABLE'),
-  getMcpBridgeAvailability: vi.fn(),
+  getMcpBridgeAvailability: getMcpBridgeAvailabilityMock,
   serializeBridgeTool: vi.fn((tool) => tool),
 }));
 
@@ -83,7 +89,11 @@ describe('XcodeToolsBridgeManager', () => {
     serviceMocks.getLastError.mockReset();
     serviceMocks.getLastError.mockReturnValue(null);
     serviceMocks.listTools.mockReset();
+    serviceMocks.listTools.mockResolvedValue([]);
     serviceMocks.invokeTool.mockReset();
+
+    getMcpBridgeAvailabilityMock.mockReset();
+    getMcpBridgeAvailabilityMock.mockResolvedValue({ available: true, path: '/usr/bin/mcpbridge' });
   });
 
   it('does not resync on listChanged while a manual disconnect is in progress', async () => {
@@ -104,5 +114,28 @@ describe('XcodeToolsBridgeManager', () => {
     expect(syncSpy).not.toHaveBeenCalled();
     expect(registryMocks.clear).toHaveBeenCalledOnce();
     expect(server.sendToolListChanged).toHaveBeenCalledOnce();
+  });
+
+  it('re-enables listChanged-driven syncs after a manual sync follows a disconnect', async () => {
+    const server = {
+      sendToolListChanged: vi.fn(),
+    } as unknown as McpServer;
+
+    const tools: Tool[] = [{ name: 'remote.tool', inputSchema: { type: 'object' } } as Tool];
+    serviceMocks.listTools.mockResolvedValue(tools);
+
+    const manager = new XcodeToolsBridgeManager(server);
+    manager.setWorkflowEnabled(true);
+
+    await manager.disconnectTool();
+    await manager.syncTools({ reason: 'manual' });
+
+    const syncSpy = vi.spyOn(manager, 'syncTools');
+
+    onToolCatalogInvalidatedRef.current?.();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(syncSpy).toHaveBeenCalledWith({ reason: 'listChanged' });
   });
 });
