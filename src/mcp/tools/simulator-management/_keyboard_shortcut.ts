@@ -1,5 +1,6 @@
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
 
 export type KeyboardShortcut = 'software-keyboard' | 'connect-hardware-keyboard';
 
@@ -27,17 +28,12 @@ function resolveDevice(list: SimctlList, simulatorId: string): SimctlDevice | un
 
 function buildFocusScript(deviceName: string): string {
   const safeName = escapeAppleScriptStringLiteral(deviceName);
+  const titlePredicate = `title is "${safeName}" or title starts with "${safeName} –" or title starts with "${safeName} -"`;
   return [
     'tell application "System Events"',
     '  tell process "Simulator"',
     '    set frontmost to true',
-    '    set matchingWindows to (every window whose (title is "' +
-      safeName +
-      '" or title starts with "' +
-      safeName +
-      ' –" or title starts with "' +
-      safeName +
-      ' -"))',
+    `    set matchingWindows to (every window whose (${titlePredicate}))`,
     '    if (count of matchingWindows) is 0 then',
     '      return "NO_WINDOW"',
     '    end if',
@@ -54,7 +50,7 @@ function buildKeystrokeScript(shortcut: KeyboardShortcut): string {
   return [
     'tell application "System Events"',
     '  tell process "Simulator"',
-    '    keystroke "k" using ' + modifiers,
+    `    keystroke "k" using ${modifiers}`,
     '  end tell',
     'end tell',
   ].join('\n');
@@ -85,7 +81,7 @@ export async function sendKeyboardShortcut(
   } catch (e) {
     return {
       success: false,
-      error: `Failed to parse simulator list: ${(e as Error).message}`,
+      error: `Failed to parse simulator list: ${toErrorMessage(e)}`,
     };
   }
 
