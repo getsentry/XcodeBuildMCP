@@ -60,6 +60,7 @@ Use these sections under `## [Unreleased]`:
   - Do NOT just kill the run — first inspect the process tree (`ps -ef | grep -E "vitest|xcodebuild|simctl|devicectl"`) to identify what's stuck.
   - Common hang causes: locked physical device, stale simulator state, `devicectl diagnose` waiting for password, orphaned daemon process.
   - Capture what you find before killing, so the root cause can be fixed rather than papered over.
+- When asked to review changes or test failures, focus on regressions: behavior changes caused by the branch. Do not treat known/acceptable test flakes, environment setup issues, or nondeterministic tool output churn as regressions unless explicitly asked to investigate them.
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the native read tool.
