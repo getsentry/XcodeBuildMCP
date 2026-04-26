@@ -10,6 +10,19 @@ import type { CommandExecutor, CommandResponse, CommandExecOptions } from './Com
 export type { CommandExecutor, CommandResponse, CommandExecOptions } from './CommandExecutor.ts';
 export type { FileSystemExecutor } from './FileSystemExecutor.ts';
 
+/**
+ * Ensure common tool directories (homebrew, MacPorts, user-local) are on PATH
+ * so spawned commands like xcodegen, create-dmg, etc. are found regardless of
+ * how the MCP server process was launched (direct node, supergateway, Docker).
+ */
+const EXTRA_PATH_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin'];
+const enrichedPath: string = (() => {
+  const current = process.env.PATH ?? '';
+  const currentDirs = current.split(':');
+  const missing = EXTRA_PATH_DIRS.filter((d) => existsSync(d) && !currentDirs.includes(d));
+  return missing.length ? `${missing.join(':')}:${current}` : current;
+})();
+
 async function defaultExecutor(
   command: string[],
   logPrefix?: string,
@@ -54,7 +67,7 @@ async function defaultExecutor(
 
     const spawnOpts: Parameters<typeof spawn>[2] = {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: opts?.env ? { ...process.env, ...opts.env } : process.env,
+      env: { ...process.env, PATH: enrichedPath, ...opts?.env },
       cwd: opts?.cwd,
     };
 
