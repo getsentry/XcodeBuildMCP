@@ -70,10 +70,22 @@ for arg in "$@"; do
   FILTERED_ARGS+=("$arg")
 done
 
-exec npx supergateway \
+# Propagate signals to the entire process group so child processes
+# (supergateway -> node mcp) are cleaned up when this script is killed.
+cleanup() {
+  # Send TERM to our process group (negative PID), excluding ourselves
+  trap - TERM INT  # prevent re-entry
+  kill -TERM 0 2>/dev/null
+  wait
+}
+trap cleanup TERM INT
+
+npx supergateway \
   --port "$PORT" \
   --stdio "node ${PROJECT_ROOT}/build/cli.js mcp" \
   --outputTransport streamableHttp \
   --stateful \
   --cors \
-  ${FILTERED_ARGS[@]+"${FILTERED_ARGS[@]}"}
+  ${FILTERED_ARGS[@]+"${FILTERED_ARGS[@]}"} &
+
+wait $!
