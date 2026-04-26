@@ -1,6 +1,7 @@
 id: project-discovery
 title: Project Discovery
 description: Discover and examine Xcode projects, workspaces, and Swift packages. Analyze project structure, schemes, build settings, and bundle information.
+targetPlatforms: [iOS, macOS, tvOS, watchOS, visionOS]
 tools:
   - discover_projs
   - list_schemes

@@ -1,6 +1,7 @@
 id: swift-package
 title: Swift Package Development
 description: Build, test, run and manage Swift Package Manager projects.
+targetPlatforms: [iOS, macOS, tvOS, watchOS, visionOS]
 tools:
   - swift_package_build
   - swift_package_test

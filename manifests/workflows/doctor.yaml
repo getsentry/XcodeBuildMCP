@@ -1,6 +1,7 @@
 id: doctor
 title: MCP Doctor
 description: Diagnostic tool providing comprehensive information about the MCP server environment, dependencies, and configuration.
+targetPlatforms: []
 selection:
   mcp:
     autoInclude: true

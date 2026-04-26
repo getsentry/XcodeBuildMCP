@@ -1,6 +1,7 @@
 id: simulator
 title: iOS Simulator Development
 description: Complete iOS development workflow for both .xcodeproj and .xcworkspace files targeting simulators.
+targetPlatforms: [iOS, tvOS, watchOS, visionOS]
 selection:
   mcp:
     defaultEnabled: true

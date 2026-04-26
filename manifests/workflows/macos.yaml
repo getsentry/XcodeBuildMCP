@@ -1,6 +1,7 @@
 id: macos
 title: macOS Development
 description: Complete macOS development workflow for both .xcodeproj and .xcworkspace files. Build, test, deploy, and manage macOS applications.
+targetPlatforms: [macOS]
 tools:
   - build_macos
   - build_run_macos

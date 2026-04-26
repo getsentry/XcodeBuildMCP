@@ -1,6 +1,7 @@
 id: simulator-management
 title: Simulator Management
 description: Tools for managing simulators from booting, opening simulators, listing simulators, stopping simulators, erasing simulator content and settings, and setting simulator environment options like location, network, statusbar and appearance.
+targetPlatforms: [iOS, tvOS, watchOS, visionOS]
 tools:
   - boot_sim
   - list_sims

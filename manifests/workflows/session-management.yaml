@@ -1,6 +1,7 @@
 id: session-management
 title: Session Management
 description: Manage session defaults for project/workspace paths, scheme, configuration, simulator/device settings.
+targetPlatforms: []
 availability:
   cli: false
 selection:

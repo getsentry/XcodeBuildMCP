@@ -1,6 +1,7 @@
 id: xcode-ide
 title: Xcode IDE Integration
 description: Bridge tools for connecting to Xcode's built-in MCP server (mcpbridge) to access IDE-specific functionality.
+targetPlatforms: [iOS, macOS, tvOS, watchOS, visionOS]
 availability:
   cli: true
 predicates:

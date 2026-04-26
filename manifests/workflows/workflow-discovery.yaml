@@ -1,6 +1,7 @@
 id: workflow-discovery
 title: Workflow Discovery
 description: Manage enabled workflows at runtime.
+targetPlatforms: []
 availability:
   cli: false
 selection:

@@ -1,6 +1,7 @@
 id: device
-title: iOS Device Development
-description: Complete iOS development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro).
+title: Device Development
+description: Complete development workflow for physical devices (iPhone, iPad, Apple Watch, Apple TV, Apple Vision Pro).
+targetPlatforms: [iOS, tvOS, watchOS, visionOS]
 tools:
   - build_device
   - build_run_device

@@ -1,6 +1,7 @@
 id: coverage
 title: Code Coverage
 description: View code coverage data from xcresult bundles produced by test runs.
+targetPlatforms: [iOS, macOS, tvOS, watchOS, visionOS]
 tools:
   - get_coverage_report
   - get_file_coverage

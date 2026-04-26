@@ -62,6 +62,7 @@ function createWorkflow(overrides: Partial<WorkflowManifestEntry> = {}): Workflo
     id: 'test-workflow',
     title: 'Test Workflow',
     description: 'A test workflow',
+    targetPlatforms: [],
     availability: { mcp: true, cli: true },
     predicates: [],
     tools: ['test_tool'],

@@ -17,6 +17,7 @@ describe('schema', () => {
       id: 'simulator',
       title: 'iOS Simulator Development',
       description: 'Build and test iOS apps on simulators',
+      targetPlatforms: ['iOS'],
       tools: ['build_sim'],
     };
 
@@ -36,8 +37,46 @@ describe('schema', () => {
     expect(toolResult.data.predicates).toEqual([]);
     expect(workflowResult.data.availability).toEqual({ mcp: true, cli: true });
     expect(workflowResult.data.predicates).toEqual([]);
+    expect(workflowResult.data.targetPlatforms).toEqual(['iOS']);
     expect(workflowResult.data.tools).toEqual(['build_sim']);
     expect(getEffectiveCliName(toolResult.data)).toBe('build-sim');
+  });
+
+  it('requires workflow target platform metadata', () => {
+    const result = workflowManifestEntrySchema.safeParse({
+      id: 'simulator',
+      title: 'iOS Simulator Development',
+      description: 'Build and test iOS apps on simulators',
+      tools: ['build_sim'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid workflow target platform metadata', () => {
+    const result = workflowManifestEntrySchema.safeParse({
+      id: 'simulator',
+      title: 'iOS Simulator Development',
+      description: 'Build and test iOS apps on simulators',
+      targetPlatforms: ['iPhoneOS'],
+      tools: ['build_sim'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('allows empty workflow target platform metadata', () => {
+    const result = workflowManifestEntrySchema.safeParse({
+      id: 'workflow-discovery',
+      title: 'Workflow Discovery',
+      description: 'Manage enabled workflows at runtime',
+      targetPlatforms: [],
+      tools: ['manage_workflows'],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected empty targetPlatforms to parse');
+    expect(result.data.targetPlatforms).toEqual([]);
   });
 
   it('parses output schema metadata for tool manifests', () => {

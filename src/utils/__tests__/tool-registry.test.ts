@@ -35,6 +35,7 @@ function createManifestFixture(): ResolvedManifest {
           id: 'simulator',
           title: 'Simulator',
           description: 'Built-in simulator workflow',
+          targetPlatforms: ['iOS'],
           availability: { mcp: true, cli: true },
           predicates: [],
           tools: ['build_run_sim'],
@@ -56,6 +57,7 @@ describe('createCustomWorkflowsFromConfig', () => {
     expect(result.workflows).toEqual([
       expect.objectContaining({
         id: 'my-workflow',
+        targetPlatforms: [],
         tools: ['build_run_sim', 'screenshot'],
       }),
     ]);

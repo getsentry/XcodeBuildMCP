@@ -6,6 +6,7 @@ import { discoverProjects } from '../../mcp/tools/project-discovery/discover_pro
 import { listSchemes } from '../../mcp/tools/project-discovery/list_schemes.ts';
 import { listSimulators, type ListedSimulator } from '../../mcp/tools/simulator/list_sims.ts';
 import { loadManifest, type WorkflowManifestEntry } from '../../core/manifest/load-manifest.ts';
+import type { WorkflowTargetPlatform } from '../../core/manifest/schema.ts';
 import { isWorkflowEnabledForRuntime } from '../../visibility/exposure.ts';
 import { getConfig } from '../../utils/config-store.ts';
 import {
@@ -25,7 +26,7 @@ import type { CommandExecutor } from '../../utils/CommandExecutor.ts';
 import { createDoctorDependencies } from '../../mcp/tools/doctor/lib/doctor.deps.ts';
 import { XcodePlatform } from '../../types/common.ts';
 
-type SetupPlatform = 'macOS' | 'iOS' | 'tvOS' | 'watchOS' | 'visionOS';
+type SetupPlatform = WorkflowTargetPlatform;
 
 const SETUP_PLATFORM_TO_SESSION_DEFAULT: Record<SetupPlatform, XcodePlatform> = {
   macOS: XcodePlatform.macOS,
@@ -90,68 +91,6 @@ interface SetupDevice {
   udid: string;
   platform: string;
 }
-
-const PLATFORM_WORKFLOWS: Record<SetupPlatform, string[]> = {
-  macOS: [
-    'coverage',
-    'debugging',
-    'doctor',
-    'logging',
-    'macos',
-    'project-discovery',
-    'project-scaffolding',
-    'swift-package',
-    'ui-automation',
-    'utilities',
-    'xcode-ide',
-  ],
-  iOS: [
-    'coverage',
-    'debugging',
-    'doctor',
-    'logging',
-    'project-discovery',
-    'project-scaffolding',
-    'simulator',
-    'swift-package',
-    'ui-automation',
-    'utilities',
-    'xcode-ide',
-  ],
-  tvOS: [
-    'debugging',
-    'doctor',
-    'logging',
-    'project-discovery',
-    'simulator',
-    'swift-package',
-    'utilities',
-    'xcode-ide',
-  ],
-  watchOS: [
-    'debugging',
-    'doctor',
-    'logging',
-    'project-discovery',
-    'simulator',
-    'swift-package',
-    'utilities',
-    'xcode-ide',
-  ],
-  visionOS: [
-    'coverage',
-    'debugging',
-    'doctor',
-    'logging',
-    'project-discovery',
-    'project-scaffolding',
-    'simulator',
-    'swift-package',
-    'ui-automation',
-    'utilities',
-    'xcode-ide',
-  ],
-};
 
 const PLATFORM_OPTIONS: Array<{ value: SetupPlatform; label: string; description: string }> = [
   { value: 'macOS', label: 'macOS', description: 'Native macOS apps — no simulator needed' },
@@ -310,6 +249,54 @@ function getWorkflowOptions(
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
+function getRecommendedWorkflowIds(
+  workflows: WorkflowManifestEntry[],
+  platforms: SetupPlatform[],
+): string[] {
+  const selectedPlatforms = new Set<SetupPlatform>(platforms);
+  return workflows
+    .filter((workflow) =>
+      workflow.targetPlatforms.some((platform) => selectedPlatforms.has(platform)),
+    )
+    .map((workflow) => workflow.id);
+}
+
+function getDefaultWorkflowIdsForPlatforms(
+  workflows: WorkflowManifestEntry[],
+  platforms: SetupPlatform[],
+): string[] {
+  const availableIds = new Set(workflows.map((workflow) => workflow.id));
+  const defaults: string[] = [];
+
+  if (platforms.includes('macOS') && availableIds.has('macos')) {
+    defaults.push('macos');
+  }
+
+  if (platforms.some((platform) => platform !== 'macOS') && availableIds.has('simulator')) {
+    defaults.push('simulator');
+  }
+
+  return defaults;
+}
+
+function toWorkflowSelectOptions(workflows: WorkflowManifestEntry[]): SelectOption<string>[] {
+  return workflows.map((workflow) => ({
+    value: workflow.id,
+    label: workflow.id,
+    description: workflow.description,
+  }));
+}
+
+function mergeWorkflowSelections(
+  workflowOptions: SelectOption<string>[],
+  selectedIds: Iterable<string>,
+): string[] {
+  const selected = new Set(selectedIds);
+  return workflowOptions
+    .filter((option) => selected.has(option.value))
+    .map((option) => option.value);
+}
+
 function getChangedFields(
   beforeConfig: ProjectConfig | undefined,
   afterConfig: ProjectConfig,
@@ -391,42 +378,71 @@ async function selectWorkflowIds(opts: {
     return [];
   }
 
-  const workflowOptions: SelectOption<string>[] = workflows.map((workflow) => ({
-    value: workflow.id,
-    label: workflow.id,
-    description: workflow.description,
-  }));
+  const recommendedIds = new Set(getRecommendedWorkflowIds(workflows, opts.platforms));
+  const workflowOptions = toWorkflowSelectOptions(workflows);
+  const defaults =
+    opts.existingEnabledWorkflows.length > 0
+      ? opts.existingEnabledWorkflows
+      : getDefaultWorkflowIdsForPlatforms(workflows, opts.platforms);
 
-  let defaults: string[];
-  if (opts.existingEnabledWorkflows.length > 0) {
-    defaults = opts.existingEnabledWorkflows;
-  } else if (opts.platforms.length > 0) {
-    const availableIds = new Set(workflows.map((w) => w.id));
-    const recommended = new Set<string>();
-    for (const platform of opts.platforms) {
-      for (const workflowId of PLATFORM_WORKFLOWS[platform]) {
-        if (availableIds.has(workflowId)) recommended.add(workflowId);
-      }
-    }
-    defaults = Array.from(recommended);
-  } else {
-    defaults = ['simulator'];
+  if (opts.existingEnabledWorkflows.length > 0 || recommendedIds.size === 0) {
+    showPromptHelp(
+      'Select workflows to choose which groups of tools are enabled by default in this project.',
+      opts.quietOutput,
+    );
+    return opts.prompter.selectMany({
+      message: 'Select workflows to enable',
+      options: workflowOptions,
+      initialSelectedKeys: new Set(defaults),
+      getKey: (value) => value,
+      minSelected: 1,
+    });
+  }
+
+  const recommendedOptions = workflowOptions.filter((option) => recommendedIds.has(option.value));
+  const otherOptions = workflowOptions.filter((option) => !recommendedIds.has(option.value));
+
+  showPromptHelp(
+    'Recommended workflows are based on your selected platform(s).\n' +
+      'Only the core default workflow is selected automatically; you can adjust the recommendation list freely.',
+    opts.quietOutput,
+  );
+  const selectedRecommended = await opts.prompter.selectMany({
+    message: 'Select recommended workflows to enable',
+    options: recommendedOptions,
+    initialSelectedKeys: new Set(defaults),
+    getKey: (value) => value,
+    minSelected: otherOptions.length > 0 ? 0 : 1,
+  });
+
+  if (otherOptions.length === 0) {
+    return selectedRecommended;
   }
 
   showPromptHelp(
-    'Select workflows to choose which groups of tools are enabled by default in this project.\n' +
-      'The selection above is recommended for your chosen platforms — you can adjust it freely.',
+    'Additional workflows are not specifically recommended for your selected platform(s),\n' +
+      'but you can still enable them if they fit your project.',
     opts.quietOutput,
   );
-  const selected = await opts.prompter.selectMany({
-    message: 'Select workflows to enable',
-    options: workflowOptions,
-    initialSelectedKeys: new Set(defaults),
+  const showAdditionalWorkflows =
+    selectedRecommended.length === 0 ||
+    (await opts.prompter.confirm({
+      message: 'Show additional workflows?',
+      defaultValue: false,
+    }));
+
+  if (!showAdditionalWorkflows) {
+    return selectedRecommended;
+  }
+
+  const selectedOther = await opts.prompter.selectMany({
+    message: 'Select additional workflows to enable',
+    options: otherOptions,
     getKey: (value) => value,
-    minSelected: 1,
+    minSelected: selectedRecommended.length === 0 ? 1 : 0,
   });
 
-  return selected;
+  return mergeWorkflowSelections(workflowOptions, [...selectedRecommended, ...selectedOther]);
 }
 
 async function selectPlatforms(opts: {

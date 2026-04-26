@@ -1,5 +1,6 @@
 id: utilities
 title: Build Utilities
 description: Utility tools for cleaning build products and managing build artifacts.
+targetPlatforms: [iOS, macOS, tvOS, watchOS, visionOS]
 tools:
   - clean

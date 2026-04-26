@@ -158,6 +158,7 @@ export function createCustomWorkflowsFromConfig(
       id: workflowName,
       title: workflowName,
       description: `Custom workflow '${workflowName}' from config.yaml.`,
+      targetPlatforms: [],
       availability: { mcp: true, cli: false },
       selection: { mcp: { defaultEnabled: false, autoInclude: false } },
       predicates: [],

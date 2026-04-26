@@ -141,6 +141,13 @@ export const workflowSelectionSchema = z.object({
 export type WorkflowSelection = z.infer<typeof workflowSelectionSchema>;
 
 /**
+ * Apple platforms used by setup to recommend workflows.
+ */
+export const workflowTargetPlatformSchema = z.enum(['iOS', 'macOS', 'tvOS', 'watchOS', 'visionOS']);
+
+export type WorkflowTargetPlatform = z.infer<typeof workflowTargetPlatformSchema>;
+
+/**
  * Workflow manifest entry schema.
  * Describes a workflow's metadata and tool composition.
  */
@@ -153,6 +160,9 @@ export const workflowManifestEntrySchema = z.object({
 
   /** Workflow description */
   description: z.string(),
+
+  /** Setup platforms this workflow is recommended for */
+  targetPlatforms: z.array(workflowTargetPlatformSchema),
 
   /** Per-runtime availability flags */
   availability: availabilitySchema.default({ mcp: true, cli: true }),

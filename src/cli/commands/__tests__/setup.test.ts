@@ -273,7 +273,8 @@ describe('setup command', () => {
         offeredWorkflowIds = opts.options.map((option) => String(option.value));
         return opts.options.map((option) => option.value);
       },
-      confirm: async (opts: { defaultValue: boolean }) => opts.defaultValue,
+      confirm: async (opts: { defaultValue: boolean; message: string }) =>
+        opts.message === 'Show additional workflows?' ? true : opts.defaultValue,
     };
 
     await runSetupWizard({
@@ -291,6 +292,223 @@ describe('setup command', () => {
 
     expect(parsed.debug).toBe(true);
     expect(offeredWorkflowIds).toContain('doctor');
+  });
+
+  async function getWorkflowPromptStateForPlatforms(
+    selectedPlatforms: string[],
+    opts?: { showAdditionalWorkflows?: boolean; storedConfig?: string },
+  ): Promise<{
+    additionalWorkflowIds: string[];
+    flatWorkflowIds: string[];
+    recommendedInitialKeys: string[];
+    recommendedWorkflowIds: string[];
+  }> {
+    const { fs } = createSetupFs({ storedConfig: opts?.storedConfig });
+    let additionalWorkflowIds: string[] = [];
+    let flatWorkflowIds: string[] = [];
+    let recommendedInitialKeys: string[] = [];
+    let recommendedWorkflowIds: string[] = [];
+
+    const executor: CommandExecutor = async (command) => {
+      if (command.includes('--json')) {
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'iOS 17.0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-1',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-1) (Shutdown)`,
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    let selectManyCalls = 0;
+    const prompter: Prompter = {
+      selectOne: async <T>(selectOpts: { options: Array<{ value: T }> }) => {
+        const preferredOption = selectOpts.options.find((option) => option.value != null);
+        return (preferredOption ?? selectOpts.options[0]).value;
+      },
+      selectMany: async <T>(selectOpts: {
+        options: Array<{ value: T }>;
+        initialSelectedKeys?: ReadonlySet<string>;
+        getKey: (value: T) => string;
+      }) => {
+        selectManyCalls++;
+        if (selectManyCalls === 1) {
+          return selectOpts.options
+            .filter((option) => selectedPlatforms.includes(String(option.value)))
+            .map((option) => option.value);
+        }
+
+        const workflowIds = selectOpts.options
+          .map((option) => selectOpts.getKey(option.value))
+          .sort();
+
+        if (opts?.storedConfig != null) {
+          flatWorkflowIds = workflowIds;
+          return selectOpts.options
+            .filter((option) =>
+              selectOpts.initialSelectedKeys?.has(selectOpts.getKey(option.value)),
+            )
+            .map((option) => option.value);
+        }
+
+        if (selectManyCalls === 2) {
+          recommendedInitialKeys = [
+            ...(selectOpts.initialSelectedKeys ?? new Set<string>()),
+          ].sort();
+          recommendedWorkflowIds = workflowIds;
+          return selectOpts.options
+            .filter((option) => recommendedInitialKeys.includes(selectOpts.getKey(option.value)))
+            .map((option) => option.value);
+        }
+
+        additionalWorkflowIds = workflowIds;
+        return [];
+      },
+      confirm: async (confirmOpts: { defaultValue: boolean; message: string }) => {
+        if (confirmOpts.message === 'Show additional workflows?') {
+          return opts?.showAdditionalWorkflows ?? false;
+        }
+        return confirmOpts.defaultValue;
+      },
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter,
+      quietOutput: true,
+    });
+
+    return {
+      additionalWorkflowIds,
+      flatWorkflowIds,
+      recommendedInitialKeys,
+      recommendedWorkflowIds,
+    };
+  }
+
+  it('shows iOS workflows as recommended options with only simulator selected by default', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['iOS']);
+
+    expect(state.recommendedInitialKeys).toEqual(['simulator']);
+    expect(state.recommendedWorkflowIds).toEqual([
+      'coverage',
+      'debugging',
+      'device',
+      'project-discovery',
+      'project-scaffolding',
+      'simulator',
+      'simulator-management',
+      'swift-package',
+      'ui-automation',
+      'utilities',
+      'xcode-ide',
+    ]);
+    expect(state.recommendedWorkflowIds).not.toContain('macos');
+    expect(state.recommendedWorkflowIds).not.toContain('doctor');
+    expect(state.recommendedWorkflowIds).not.toContain('session-management');
+    expect(state.recommendedWorkflowIds).not.toContain('workflow-discovery');
+  });
+
+  it('shows macOS workflows as recommended options with only macos selected by default', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['macOS']);
+
+    expect(state.recommendedInitialKeys).toEqual(['macos']);
+    expect(state.recommendedWorkflowIds).toEqual([
+      'coverage',
+      'macos',
+      'project-discovery',
+      'project-scaffolding',
+      'swift-package',
+      'utilities',
+      'xcode-ide',
+    ]);
+    expect(state.recommendedWorkflowIds).not.toContain('debugging');
+    expect(state.recommendedWorkflowIds).not.toContain('device');
+    expect(state.recommendedWorkflowIds).not.toContain('simulator');
+    expect(state.recommendedWorkflowIds).not.toContain('simulator-management');
+    expect(state.recommendedWorkflowIds).not.toContain('ui-automation');
+  });
+
+  it('shows tvOS workflows as recommended options with only simulator selected by default', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['tvOS']);
+
+    expect(state.recommendedInitialKeys).toEqual(['simulator']);
+    expect(state.recommendedWorkflowIds).toEqual([
+      'coverage',
+      'debugging',
+      'device',
+      'project-discovery',
+      'simulator',
+      'simulator-management',
+      'swift-package',
+      'utilities',
+      'xcode-ide',
+    ]);
+    expect(state.recommendedWorkflowIds).not.toContain('macos');
+    expect(state.recommendedWorkflowIds).not.toContain('project-scaffolding');
+    expect(state.recommendedWorkflowIds).not.toContain('ui-automation');
+  });
+
+  it('selects macos and simulator by default for mixed macOS and simulator platforms', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['macOS', 'iOS']);
+
+    expect(state.recommendedInitialKeys).toEqual(['macos', 'simulator']);
+    expect(state.recommendedWorkflowIds).toContain('macos');
+    expect(state.recommendedWorkflowIds).toContain('simulator');
+  });
+
+  it('does not recommend ui-automation for visionOS from manifest target platform metadata', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['visionOS']);
+
+    expect(state.recommendedInitialKeys).toEqual(['simulator']);
+    expect(state.recommendedWorkflowIds).not.toContain('ui-automation');
+  });
+
+  it('shows non-recommended workflows only after the user asks for additional options', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['iOS'], {
+      showAdditionalWorkflows: true,
+    });
+
+    expect(state.recommendedWorkflowIds).toContain('simulator');
+    expect(state.recommendedWorkflowIds).toContain('xcode-ide');
+    expect(state.additionalWorkflowIds).toContain('macos');
+    expect(state.additionalWorkflowIds).not.toContain('simulator');
+    expect(state.additionalWorkflowIds).not.toContain('xcode-ide');
+  });
+
+  it('uses the normal flat workflow list when loading an existing config', async () => {
+    const state = await getWorkflowPromptStateForPlatforms(['iOS'], {
+      storedConfig: 'schemaVersion: 1\nenabledWorkflows:\n  - simulator\n',
+    });
+
+    expect(state.flatWorkflowIds).toContain('simulator');
+    expect(state.flatWorkflowIds).toContain('macos');
+    expect(state.flatWorkflowIds).toContain('xcode-ide');
+    expect(state.recommendedWorkflowIds).toEqual([]);
+    expect(state.additionalWorkflowIds).toEqual([]);
   });
 
   it('fails fast when Xcode command line tools are unavailable', async () => {
