@@ -23,8 +23,31 @@ import {
 import type { FileSystemExecutor } from '../../utils/FileSystemExecutor.ts';
 import type { CommandExecutor } from '../../utils/CommandExecutor.ts';
 import { createDoctorDependencies } from '../../mcp/tools/doctor/lib/doctor.deps.ts';
+import { XcodePlatform } from '../../types/common.ts';
 
 type SetupPlatform = 'macOS' | 'iOS' | 'tvOS' | 'watchOS' | 'visionOS';
+
+const SETUP_PLATFORM_TO_SESSION_DEFAULT: Record<SetupPlatform, XcodePlatform> = {
+  macOS: XcodePlatform.macOS,
+  iOS: XcodePlatform.iOSSimulator,
+  tvOS: XcodePlatform.tvOSSimulator,
+  watchOS: XcodePlatform.watchOSSimulator,
+  visionOS: XcodePlatform.visionOSSimulator,
+};
+
+const SESSION_DEFAULT_TO_SETUP_PLATFORM: Record<string, SetupPlatform> = Object.fromEntries(
+  Object.entries(SETUP_PLATFORM_TO_SESSION_DEFAULT).map(([setup, session]) => [
+    session,
+    setup as SetupPlatform,
+  ]),
+);
+
+const SIMULATOR_RUNTIME_KEYWORDS: Record<Exclude<SetupPlatform, 'macOS'>, string[]> = {
+  iOS: ['iOS'],
+  tvOS: ['tvOS'],
+  watchOS: ['watchOS'],
+  visionOS: ['visionOS', 'xrOS'],
+};
 
 interface SetupSelection {
   debug: boolean;
@@ -221,38 +244,30 @@ function inferPlatformsFromExisting(config?: ProjectConfig): SetupPlatform[] {
   if (!config) return [];
 
   const platform = config.sessionDefaults?.platform;
-  if (platform === 'macOS') return ['macOS'];
-  if (platform === 'iOS Simulator') return ['iOS'];
-  if (platform === 'tvOS Simulator') return ['tvOS'];
-  if (platform === 'watchOS Simulator') return ['watchOS'];
-  if (platform === 'visionOS Simulator') return ['visionOS'];
+  if (platform != null && SESSION_DEFAULT_TO_SETUP_PLATFORM[platform] != null) {
+    return [SESSION_DEFAULT_TO_SETUP_PLATFORM[platform]];
+  }
 
-  // Multi-platform or legacy config: combine workflow heuristic (macOS) with
-  // simulatorPlatform to recover the non-macOS component.
+  // Multi-platform or legacy config: macOS is recovered from the workflow set,
+  // the non-macOS component from the cached simulatorPlatform.
   const results: SetupPlatform[] = [];
   const workflows = new Set(config.enabledWorkflows ?? []);
   if (workflows.has('macos')) results.push('macOS');
 
   const simPlatform = config.sessionDefaults?.simulatorPlatform;
-  if (simPlatform === 'iOS Simulator') results.push('iOS');
-  else if (simPlatform === 'tvOS Simulator') results.push('tvOS');
-  else if (simPlatform === 'watchOS Simulator') results.push('watchOS');
-  else if (simPlatform === 'visionOS Simulator') results.push('visionOS');
-  else if (workflows.has('simulator')) results.push('iOS'); // legacy fallback
+  const fromSim = simPlatform != null ? SESSION_DEFAULT_TO_SETUP_PLATFORM[simPlatform] : undefined;
+  if (fromSim != null && fromSim !== 'macOS') {
+    results.push(fromSim);
+  } else if (workflows.has('simulator')) {
+    results.push('iOS');
+  }
 
   return results;
 }
 
 function derivePlatformSessionDefault(platforms: SetupPlatform[]): string | undefined {
   if (platforms.length !== 1) return undefined;
-  const platformMap: Record<SetupPlatform, string> = {
-    macOS: 'macOS',
-    iOS: 'iOS Simulator',
-    tvOS: 'tvOS Simulator',
-    watchOS: 'watchOS Simulator',
-    visionOS: 'visionOS Simulator',
-  };
-  return platformMap[platforms[0]];
+  return SETUP_PLATFORM_TO_SESSION_DEFAULT[platforms[0]];
 }
 
 function filterSimulatorsByPlatforms(
@@ -265,13 +280,10 @@ function filterSimulatorsByPlatforms(
   >[];
   if (nonMacPlatforms.length !== 1) return simulators;
 
-  const platform = nonMacPlatforms[0];
-  const filtered = simulators.filter((sim) => {
-    if (platform === 'visionOS') {
-      return sim.runtime.includes('xrOS') || sim.runtime.includes('visionOS');
-    }
-    return sim.runtime.includes(platform);
-  });
+  const keywords = SIMULATOR_RUNTIME_KEYWORDS[nonMacPlatforms[0]];
+  const filtered = simulators.filter((sim) =>
+    keywords.some((keyword) => sim.runtime.includes(keyword)),
+  );
   return filtered.length > 0 ? filtered : simulators;
 }
 
