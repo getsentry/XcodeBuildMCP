@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
+import type { WriteStream } from 'node:fs';
 import { activeLogSessions, startLogCapture } from '../log_capture.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 import type { FileSystemExecutor } from '../FileSystemExecutor.ts';
@@ -20,11 +22,11 @@ function createMockExecutorWithCalls(callHistory: CallHistoryEntry[]): CommandEx
     killed: false,
     exitCode: null,
     on: () => mockProcess,
-  };
+  } as unknown as ChildProcess;
 
   return async (command, logPrefix, useShell, opts, detached) => {
     callHistory.push({ command, logPrefix, useShell, opts, detached });
-    return { success: true, output: '', process: mockProcess as any };
+    return { success: true, output: '', process: mockProcess };
   };
 }
 
@@ -60,7 +62,7 @@ function createInMemoryFileSystemExecutor(): FileSystemExecutor {
           callback();
         },
       });
-      return stream as unknown as ReturnType<FileSystemExecutor['createWriteStream']>;
+      return stream as unknown as WriteStream;
     },
     cp: async () => {},
     readdir: async (dir) => {
