@@ -36,13 +36,6 @@ const SETUP_PLATFORM_TO_SESSION_DEFAULT: Record<SetupPlatform, XcodePlatform> = 
   visionOS: XcodePlatform.visionOSSimulator,
 };
 
-const SESSION_DEFAULT_TO_SETUP_PLATFORM: Record<string, SetupPlatform> = Object.fromEntries(
-  Object.entries(SETUP_PLATFORM_TO_SESSION_DEFAULT).map(([setup, session]) => [
-    session,
-    setup as SetupPlatform,
-  ]),
-);
-
 const SIMULATOR_RUNTIME_KEYWORDS: Record<Exclude<SetupPlatform, 'macOS'>, string[]> = {
   iOS: ['iOS'],
   tvOS: ['tvOS'],
