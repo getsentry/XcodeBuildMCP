@@ -45,7 +45,7 @@ function usage() {
 }
 
 async function loadYamlDir(dir) {
-  const entries = (await readdir(dir)).filter((f) => f.endsWith(".yaml"));
+  const entries = (await readdir(dir)).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
   return Promise.all(
     entries.map(async (f) => parseYaml(await readFile(path.join(dir, f), "utf8"))),
   );
