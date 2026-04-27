@@ -2,18 +2,7 @@ import path from 'node:path';
 import type { XcodePlatform } from '../types/common.ts';
 import type { CommandExecutor } from './command.ts';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
-
-function resolvePathFromCwd(pathValue?: string): string | undefined {
-  if (!pathValue) {
-    return undefined;
-  }
-
-  if (path.isAbsolute(pathValue)) {
-    return pathValue;
-  }
-
-  return path.resolve(process.cwd(), pathValue);
-}
+import { resolvePathFromCwd } from './path.ts';
 
 export function getBuildSettingsDestination(platform: XcodePlatform, deviceId?: string): string {
   if (deviceId) {
@@ -57,8 +46,8 @@ export async function resolveAppPathFromBuildSettings(
 ): Promise<string> {
   const command = ['xcodebuild', '-showBuildSettings'];
 
-  const workspacePath = resolvePathFromCwd(params.workspacePath);
-  const projectPath = resolvePathFromCwd(params.projectPath);
+  const workspacePath = params.workspacePath ? resolvePathFromCwd(params.workspacePath) : undefined;
+  const projectPath = params.projectPath ? resolvePathFromCwd(params.projectPath) : undefined;
   const derivedDataPath = resolveEffectiveDerivedDataPath(params.derivedDataPath);
 
   let projectDir: string | undefined;

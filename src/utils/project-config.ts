@@ -7,7 +7,7 @@ import { log } from './logger.ts';
 import { removeUndefined } from './remove-undefined.ts';
 import { runtimeConfigFileSchema, type RuntimeConfigFile } from './runtime-config-schema.ts';
 import { normalizeSessionDefaultsProfileName } from './session-defaults-profile.ts';
-import { expandHomePrefix } from './expand-home.ts';
+import { resolvePathFromCwd } from './path.ts';
 
 const CONFIG_DIR = '.xcodebuildmcp';
 const CONFIG_FILE = 'config.yaml';
@@ -131,13 +131,7 @@ function normalizePathValue(value: string, cwd: string): string {
     return fileUrlPath;
   }
 
-  const expanded = expandHomePrefix(value);
-
-  if (path.isAbsolute(expanded)) {
-    return expanded;
-  }
-
-  return path.resolve(cwd, expanded);
+  return resolvePathFromCwd(value, cwd);
 }
 
 function resolveRelativeSessionPaths(
