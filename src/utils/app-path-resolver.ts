@@ -46,8 +46,8 @@ export async function resolveAppPathFromBuildSettings(
 ): Promise<string> {
   const command = ['xcodebuild', '-showBuildSettings'];
 
-  const workspacePath = params.workspacePath ? resolvePathFromCwd(params.workspacePath) : undefined;
-  const projectPath = params.projectPath ? resolvePathFromCwd(params.projectPath) : undefined;
+  const workspacePath = resolvePathFromCwd(params.workspacePath);
+  const projectPath = resolvePathFromCwd(params.projectPath);
   const derivedDataPath = resolveEffectiveDerivedDataPath(params.derivedDataPath);
 
   let projectDir: string | undefined;

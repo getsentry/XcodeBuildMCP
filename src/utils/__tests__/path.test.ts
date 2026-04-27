@@ -12,10 +12,6 @@ describe('expandHomePrefix', () => {
     expect(expandHomePrefix('~/foo/bar')).toBe(path.join(homedir(), 'foo/bar'));
   });
 
-  it('expands a leading ~\\ on Windows-style separators', () => {
-    expect(expandHomePrefix('~\\foo\\bar')).toBe(path.join(homedir(), 'foo\\bar'));
-  });
-
   it('returns absolute paths unchanged', () => {
     expect(expandHomePrefix('/absolute/path')).toBe('/absolute/path');
   });
@@ -30,6 +26,14 @@ describe('expandHomePrefix', () => {
 
   it('does not expand ~ embedded later in the path', () => {
     expect(expandHomePrefix('foo/~/bar')).toBe('foo/~/bar');
+  });
+
+  it('does not expand a leading ~ followed by whitespace', () => {
+    expect(expandHomePrefix(' ~/foo')).toBe(' ~/foo');
+  });
+
+  it('preserves multi-byte characters in the expanded segment', () => {
+    expect(expandHomePrefix('~/日本語/файл')).toBe(path.join(homedir(), '日本語/файл'));
   });
 
   it('returns an empty string unchanged', () => {
@@ -74,5 +78,9 @@ describe('resolvePathFromCwd', () => {
 
   it('normalizes interior traversal segments in absolute paths', () => {
     expect(resolvePathFromCwd('/a/b/../c')).toBe('/a/c');
+  });
+
+  it('returns undefined when pathValue is undefined', () => {
+    expect(resolvePathFromCwd(undefined)).toBeUndefined();
   });
 });

@@ -1,4 +1,4 @@
-import os from 'node:os';
+import { expandHomePrefix } from '../utils/path.ts';
 
 export interface SnapshotSimulatorEntry {
   name: string;
@@ -7,10 +7,7 @@ export interface SnapshotSimulatorEntry {
 }
 
 export function expandSnapshotPath(pathValue: string): string {
-  if (pathValue.startsWith('~/')) {
-    return `${os.homedir()}${pathValue.slice(1)}`;
-  }
-  return pathValue;
+  return expandHomePrefix(pathValue);
 }
 
 export function extractAppPathFromSnapshotOutput(output: string): string {

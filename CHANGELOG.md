@@ -15,7 +15,7 @@
 
 ### Fixed
 
-- Expanded leading `~` (and `~/` or `~\` on Windows) prefixes in configured `derivedDataPath`, `projectPath`, `workspacePath`, `axePath`, and the iOS/macOS template paths so values like `~/.foo/derivedData` resolve under the user's home directory instead of creating a literal `~` directory under the project root ([#283](https://github.com/getsentry/XcodeBuildMCP/issues/283), supersedes [#301](https://github.com/getsentry/XcodeBuildMCP/pull/301) by [@trmquang93](https://github.com/trmquang93)).
+- Expanded leading `~` and `~/` prefixes in configured `derivedDataPath`, `projectPath`, `workspacePath`, `axePath`, and the iOS/macOS template paths so values like `~/.foo/derivedData` resolve under the user's home directory instead of creating a literal `~` directory under the project root. As part of this change, configured absolute paths are now lexically normalized (e.g. `/a/b/../c` collapses to `/a/c`) before being passed to `xcodebuild` ([#283](https://github.com/getsentry/XcodeBuildMCP/issues/283), supersedes [#301](https://github.com/getsentry/XcodeBuildMCP/pull/301) by [@trmquang93](https://github.com/trmquang93)).
 
 ## [2.3.2]
 
