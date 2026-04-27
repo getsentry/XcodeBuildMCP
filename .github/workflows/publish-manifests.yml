@@ -1,0 +1,97 @@
+name: Publish Manifests
+
+permissions:
+  contents: read
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Override ref/tag to publish (defaults to release tag)"
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      WEBSITE_REPO: getsentry/xcodebuildmcp.com
+      WEBSITE_BRANCH: main
+      TARGET_FILE: app/docs/_data/generated/manifests.json
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.release.tag_name || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Fail if deploy key is missing
+        env:
+          DEPLOY_KEY: ${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "XCODEBUILDMCP_WEBSITE_DEPLOY_KEY is required to publish manifests." >&2
+            exit 1
+          fi
+
+      - name: Configure SSH for website repository
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.XCODEBUILDMCP_WEBSITE_DEPLOY_KEY }}
+
+      - name: Clone website repository
+        run: |
+          set -euo pipefail
+          git clone "git@github.com:${WEBSITE_REPO}.git" website-repo
+          cd website-repo
+          git checkout "$WEBSITE_BRANCH"
+          git pull --ff-only origin "$WEBSITE_BRANCH"
+
+      - name: Resolve ref
+        id: ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          REF="${INPUT_REF:-$RELEASE_TAG}"
+          if [ -z "$REF" ]; then
+            echo "No ref available (workflow_dispatch without input on a non-release event)." >&2
+            exit 1
+          fi
+          echo "value=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifests.json into website repo
+        env:
+          REF: ${{ steps.ref.outputs.value }}
+        run: |
+          set -euo pipefail
+          node scripts/build-website-manifest.mjs \
+            --out="website-repo/${TARGET_FILE}" \
+            --ref="$REF"
+
+      - name: Commit and push website update
+        env:
+          REF: ${{ steps.ref.outputs.value }}
+        run: |
+          set -euo pipefail
+          cd website-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$TARGET_FILE"
+          if git diff --cached --quiet; then
+            echo "Manifest publish target already up to date."
+            exit 0
+          fi
+          git commit -m "Publish manifests from ${GITHUB_REPOSITORY}@${REF}"
+          git push origin "$WEBSITE_BRANCH"

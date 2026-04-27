@@ -25,6 +25,7 @@
     "repro:mcp-lifecycle-leak": "npm run build && npx tsx scripts/repro-mcp-lifecycle-leak.ts",
     "repro:sentry-mcp-teardown": "cd repros/sentry-mcp-teardown && npm run harness",
     "bundle:axe": "scripts/bundle-axe.sh",
+    "build:website-manifest": "node scripts/build-website-manifest.mjs",
     "package:macos": "scripts/package-macos-portable.sh",
     "package:macos:universal": "scripts/package-macos-portable.sh --universal",
     "verify:portable": "scripts/verify-portable-install.sh",
