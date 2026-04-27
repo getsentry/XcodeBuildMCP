@@ -67,4 +67,12 @@ describe('resolvePathFromCwd', () => {
   it('does not expand ~user style prefixes', () => {
     expect(resolvePathFromCwd('~other/foo')).toBe(path.resolve(process.cwd(), '~other/foo'));
   });
+
+  it('normalizes traversal segments in absolute paths', () => {
+    expect(resolvePathFromCwd('/foo/..')).toBe('/');
+  });
+
+  it('normalizes interior traversal segments in absolute paths', () => {
+    expect(resolvePathFromCwd('/a/b/../c')).toBe('/a/c');
+  });
 });

@@ -18,13 +18,10 @@ export function expandHomePrefix(inputPath: string): string {
 }
 
 /**
- * Resolve a user-supplied path: expand ~ then return as-is when absolute,
- * otherwise resolve against `cwd` (defaults to process.cwd()).
+ * Resolve a user-supplied path: expand ~ then resolve against `cwd`
+ * (defaults to process.cwd()). Always returns a normalized absolute path —
+ * traversal segments like `/foo/..` collapse to `/`.
  */
 export function resolvePathFromCwd(pathValue: string, cwd: string = process.cwd()): string {
-  const expanded = expandHomePrefix(pathValue);
-  if (path.isAbsolute(expanded)) {
-    return expanded;
-  }
-  return path.resolve(cwd, expanded);
+  return path.resolve(cwd, expandHomePrefix(pathValue));
 }
