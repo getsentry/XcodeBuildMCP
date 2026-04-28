@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
+import os from 'node:os';
 
 const { scheduleSimulatorDefaultsRefreshMock } = vi.hoisted(() => ({
   scheduleSimulatorDefaultsRefreshMock: vi.fn(),
@@ -181,6 +182,12 @@ describe('bootstrapRuntime', () => {
       const calledWith = chdirSpy?.mock.calls[0]?.[0] as string;
       expect(calledWith.endsWith('/Developer/project')).toBe(true);
       expect(calledWith.startsWith('~')).toBe(false);
+    });
+
+    it('expands a bare ~ to the home directory', async () => {
+      process.env.XCODEBUILDMCP_CWD = '~';
+      await bootstrapRuntime({ runtime: 'cli', fs: createFsWithSessionDefaults() });
+      expect(chdirSpy).toHaveBeenCalledWith(os.homedir());
     });
 
     it('falls back gracefully when chdir throws', async () => {

@@ -1,5 +1,4 @@
 import process from 'node:process';
-import os from 'node:os';
 import {
   initConfigStore,
   getConfig,
@@ -11,6 +10,7 @@ import { getDefaultFileSystemExecutor } from '../utils/command.ts';
 import { log } from '../utils/logger.ts';
 import type { FileSystemExecutor } from '../utils/FileSystemExecutor.ts';
 import { scheduleSimulatorDefaultsRefresh } from '../utils/simulator-defaults-refresh.ts';
+import { expandHomePrefix } from '../utils/path.ts';
 
 export type RuntimeKind = 'cli' | 'daemon' | 'mcp';
 
@@ -100,10 +100,7 @@ function resolveCwdOverride(): string | undefined {
   if (!raw) {
     return undefined;
   }
-  if (raw.startsWith('~/')) {
-    return `${os.homedir()}${raw.slice(1)}`;
-  }
-  return raw;
+  return expandHomePrefix(raw);
 }
 
 export async function bootstrapRuntime(
