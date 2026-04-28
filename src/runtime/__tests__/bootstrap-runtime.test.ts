@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 
 const { scheduleSimulatorDefaultsRefreshMock } = vi.hoisted(() => ({
@@ -142,5 +142,61 @@ describe('bootstrapRuntime', () => {
     expect(sessionStore.getActiveProfile()).toBe('ios');
     expect(sessionStore.getAll().scheme).toBe('IOSScheme');
     expect(sessionStore.getAll().simulatorName).toBe('iPhone 17');
+  });
+
+  describe('XCODEBUILDMCP_CWD env override', () => {
+    let chdirSpy: ReturnType<typeof vi.spyOn> | null = null;
+    let originalEnvValue: string | undefined;
+
+    beforeEach(() => {
+      originalEnvValue = process.env.XCODEBUILDMCP_CWD;
+      chdirSpy = vi.spyOn(process, 'chdir').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      chdirSpy?.mockRestore();
+      chdirSpy = null;
+      if (originalEnvValue === undefined) {
+        delete process.env.XCODEBUILDMCP_CWD;
+      } else {
+        process.env.XCODEBUILDMCP_CWD = originalEnvValue;
+      }
+    });
+
+    it('chdirs to env-var value when opts.cwd is undefined', async () => {
+      process.env.XCODEBUILDMCP_CWD = '/explicit/project/dir';
+      await bootstrapRuntime({ runtime: 'cli', fs: createFsWithSessionDefaults() });
+      expect(chdirSpy).toHaveBeenCalledWith('/explicit/project/dir');
+    });
+
+    it('does not chdir when opts.cwd is provided (caller wins)', async () => {
+      process.env.XCODEBUILDMCP_CWD = '/should/be/ignored';
+      await bootstrapRuntime({ runtime: 'cli', cwd, fs: createFsWithSessionDefaults() });
+      expect(chdirSpy).not.toHaveBeenCalled();
+    });
+
+    it('expands a leading ~/ to the home directory', async () => {
+      process.env.XCODEBUILDMCP_CWD = '~/Developer/project';
+      await bootstrapRuntime({ runtime: 'cli', fs: createFsWithSessionDefaults() });
+      const calledWith = chdirSpy?.mock.calls[0]?.[0] as string;
+      expect(calledWith.endsWith('/Developer/project')).toBe(true);
+      expect(calledWith.startsWith('~')).toBe(false);
+    });
+
+    it('falls back gracefully when chdir throws', async () => {
+      process.env.XCODEBUILDMCP_CWD = '/nonexistent';
+      chdirSpy?.mockImplementation(() => {
+        throw new Error('ENOENT');
+      });
+      await expect(
+        bootstrapRuntime({ runtime: 'cli', fs: createFsWithSessionDefaults() }),
+      ).resolves.toBeDefined();
+    });
+
+    it('is a no-op when env var is unset', async () => {
+      delete process.env.XCODEBUILDMCP_CWD;
+      await bootstrapRuntime({ runtime: 'cli', cwd, fs: createFsWithSessionDefaults() });
+      expect(chdirSpy).not.toHaveBeenCalled();
+    });
   });
 });

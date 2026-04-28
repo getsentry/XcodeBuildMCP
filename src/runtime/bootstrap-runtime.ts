@@ -1,4 +1,5 @@
 import process from 'node:process';
+import os from 'node:os';
 import {
   initConfigStore,
   getConfig,
@@ -94,10 +95,34 @@ function logHydrationResult(hydration: MCPSessionHydrationResult): void {
   );
 }
 
+function resolveCwdOverride(): string | undefined {
+  const raw = process.env.XCODEBUILDMCP_CWD;
+  if (!raw) {
+    return undefined;
+  }
+  if (raw.startsWith('~/')) {
+    return `${os.homedir()}${raw.slice(1)}`;
+  }
+  return raw;
+}
+
 export async function bootstrapRuntime(
   opts: BootstrapRuntimeOptions,
 ): Promise<BootstrapRuntimeResult> {
   process.env.XCODEBUILDMCP_RUNTIME = opts.runtime;
+  const cwdOverride = opts.cwd === undefined ? resolveCwdOverride() : undefined;
+  if (cwdOverride !== undefined) {
+    try {
+      process.chdir(cwdOverride);
+    } catch (error) {
+      log(
+        'warn',
+        `XCODEBUILDMCP_CWD points at "${cwdOverride}" but chdir failed: ${
+          error instanceof Error ? error.message : String(error)
+        }. Falling back to existing cwd.`,
+      );
+    }
+  }
   const cwd = opts.cwd ?? process.cwd();
   const fs = opts.fs ?? getDefaultFileSystemExecutor();
 
