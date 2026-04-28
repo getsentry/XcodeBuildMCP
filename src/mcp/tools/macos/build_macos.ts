@@ -22,6 +22,7 @@ import {
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 function createBuildMacOSRequest(params: BuildMacOSParams): BuildInvocationRequest {
@@ -29,6 +30,7 @@ function createBuildMacOSRequest(params: BuildMacOSParams): BuildInvocationReque
     scheme: params.scheme,
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
+    derivedDataPath: resolveEffectiveDerivedDataPath(params),
     configuration: params.configuration ?? 'Debug',
     platform: 'macOS',
     arch: params.arch,

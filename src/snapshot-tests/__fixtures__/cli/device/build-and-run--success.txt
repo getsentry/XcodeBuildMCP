@@ -6,7 +6,7 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
 
 ℹ️ Resolving app path
 ✅ Resolving app path
@@ -16,7 +16,7 @@
 
 ✅ Build succeeded. (⏱️ <DURATION>)
 ✅ Build & Run complete
-  ├ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app
+  ├ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app
   ├ Bundle ID: io.sentry.calculatorapp
   ├ Process ID: <PID>
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_device_<TIMESTAMP>_pid<PID>.log

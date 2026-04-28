@@ -5,7 +5,7 @@
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
    Configuration: Debug
    Platform: iOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
 
 ✅ Build succeeded. (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_device_<TIMESTAMP>_pid<PID>.log

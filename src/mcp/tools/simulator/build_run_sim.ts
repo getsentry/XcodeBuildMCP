@@ -47,6 +47,7 @@ import {
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
+import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 const baseOptions = {
@@ -157,6 +158,7 @@ async function prepareBuildRunSimExecution(
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
+      derivedDataPath: resolveEffectiveDerivedDataPath(params),
       configuration,
       platform: displayPlatform,
       simulatorName: params.simulatorName,
@@ -505,6 +507,7 @@ export async function build_run_simLogic(
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
+      derivedDataPath: resolveEffectiveDerivedDataPath(params),
       configuration: params.configuration ?? 'Debug',
       platform: 'Simulator',
       simulatorName: params.simulatorName,

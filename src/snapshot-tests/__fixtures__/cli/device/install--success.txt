@@ -2,6 +2,6 @@
 📦 Install App
 
    Device: <DEVICE> (<UUID>)
-   App: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app
+   App: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app
 
 ✅ App installed successfully.

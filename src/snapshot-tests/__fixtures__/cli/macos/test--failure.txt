@@ -2,9 +2,10 @@
 🧪 Test
 
    Scheme: MCPTest
+   Project: example_projects/macOS/MCPTest.xcodeproj
    Configuration: Debug
    Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>
 
 Discovered 4 test(s):
    MCPTestTests/MCPTestTests/appNameIsCorrect
@@ -15,12 +16,12 @@ Discovered 4 test(s):
 MCPTestsXCTests
   ✗ testDeliberateFailure():
       - XCTAssertTrue failed - This test is designed to fail for snapshot testing
-        MCPTestsXCTests.swift:11
+        example_projects/macOS/MCPTestTests/MCPTestsXCTests.swift:11
 
 MCPTestTests
   ✗ deliberateFailure():
       - Expectation failed: 1 == 2: This test is designed to fail for snapshot testing
-        MCPTestTests.swift:11
+        example_projects/macOS/MCPTestTests/MCPTestTests.swift:11
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

@@ -15,7 +15,7 @@
       "target": "device"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app"
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app"
     }
   }
 }

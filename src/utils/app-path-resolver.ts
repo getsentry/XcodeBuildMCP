@@ -48,7 +48,11 @@ export async function resolveAppPathFromBuildSettings(
 
   const workspacePath = resolvePathFromCwd(params.workspacePath);
   const projectPath = resolvePathFromCwd(params.projectPath);
-  const derivedDataPath = resolveEffectiveDerivedDataPath(params.derivedDataPath);
+  const derivedDataPath = resolveEffectiveDerivedDataPath({
+    derivedDataPath: params.derivedDataPath,
+    workspacePath,
+    projectPath,
+  });
 
   let projectDir: string | undefined;
 

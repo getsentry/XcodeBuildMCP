@@ -9,7 +9,7 @@
     },
     "artifacts": {
       "deviceId": "<UUID>",
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphoneos/CalculatorApp.app"
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app"
     },
     "diagnostics": {
       "warnings": [],

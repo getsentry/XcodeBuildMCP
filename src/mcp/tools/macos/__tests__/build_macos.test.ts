@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
@@ -205,7 +205,7 @@ describe('build_macos plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         'build',
       ]);
     });
@@ -303,7 +303,7 @@ describe('build_macos plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         'build',
       ]);
     });
@@ -333,7 +333,7 @@ describe('build_macos plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/Users/dev/My Project/MyProject.xcodeproj'),
         'build',
       ]);
     });
@@ -363,7 +363,7 @@ describe('build_macos plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/workspace.xcworkspace'),
         'build',
       ]);
     });

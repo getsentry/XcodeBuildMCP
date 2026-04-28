@@ -78,7 +78,11 @@ export async function executeXcodeBuildCommand(
       ? resolvePathFromCwd(params.workspacePath)
       : undefined;
     const projectPath = params.projectPath ? resolvePathFromCwd(params.projectPath) : undefined;
-    const derivedDataPath = resolveEffectiveDerivedDataPath(params.derivedDataPath);
+    const derivedDataPath = resolveEffectiveDerivedDataPath({
+      derivedDataPath: params.derivedDataPath,
+      workspacePath,
+      projectPath,
+    });
 
     let projectDir = '';
     if (workspacePath) {

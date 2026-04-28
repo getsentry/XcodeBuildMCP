@@ -66,6 +66,7 @@ const baseGetSimulatorAppPathSchema = z.object({
       "Name of the simulator (e.g., 'iPhone 17'). Provide EITHER this OR simulatorId, not both",
     ),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
+  derivedDataPath: z.string().optional(),
   useLatestOS: z
     .boolean()
     .optional()
@@ -121,6 +122,7 @@ export function createGetSimAppPathExecutor(
           configuration,
           platform: params.platform,
           destination,
+          derivedDataPath: params.derivedDataPath,
         },
         executor,
       );
@@ -181,6 +183,7 @@ const publicSchemaObject = baseGetSimulatorAppPathSchema.omit({
   simulatorId: true,
   simulatorName: true,
   configuration: true,
+  derivedDataPath: true,
   useLatestOS: true,
 } as const);
 

@@ -27,6 +27,7 @@ import {
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 function createBuildDeviceRequest(params: BuildDeviceParams): BuildInvocationRequest {
@@ -34,6 +35,7 @@ function createBuildDeviceRequest(params: BuildDeviceParams): BuildInvocationReq
     scheme: params.scheme,
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
+    derivedDataPath: resolveEffectiveDerivedDataPath(params),
     configuration: params.configuration ?? 'Debug',
     platform: String(mapDevicePlatform(params.platform)),
     target: 'device',
@@ -123,6 +125,9 @@ export async function buildDeviceLogic(
     ctx.nextStepParams = {
       get_device_app_path: {
         scheme: params.scheme,
+        ...(params.derivedDataPath !== undefined
+          ? { derivedDataPath: params.derivedDataPath }
+          : {}),
       },
     };
   }

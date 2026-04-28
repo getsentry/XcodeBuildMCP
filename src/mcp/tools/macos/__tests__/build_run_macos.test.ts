@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-executors.ts';
 import { runToolLogic, type MockToolHandlerResult } from '../../../../test-utils/test-helpers.ts';
@@ -127,7 +127,7 @@ describe('build_run_macos', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         'build',
       ]);
       expect(executorCalls[0].description).toBe('macOS Build');
@@ -195,7 +195,7 @@ describe('build_run_macos', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/workspace.xcworkspace'),
         'build',
       ]);
 
@@ -398,7 +398,7 @@ describe('build_run_macos', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         'build',
       ]);
       expect(executorCalls[0].description).toBe('macOS Build');

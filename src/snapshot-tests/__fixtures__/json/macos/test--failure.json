@@ -6,6 +6,8 @@
   "data": {
     "request": {
       "scheme": "MCPTest",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>",
       "configuration": "Debug",
       "platform": "macOS",
       "onlyTesting": [],

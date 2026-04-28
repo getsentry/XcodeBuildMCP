@@ -37,6 +37,7 @@ import {
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
+import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 const baseSchemaObject = z.object({
@@ -134,6 +135,9 @@ async function prepareTestSimExecution(
       resolutionError: simulatorResolution.error,
       invocationRequest: {
         scheme: params.scheme,
+        workspacePath: params.workspacePath,
+        projectPath: params.projectPath,
+        derivedDataPath: resolveEffectiveDerivedDataPath(params),
         configuration,
         platform: inferred.platform,
         simulatorName: params.simulatorName,
@@ -166,6 +170,9 @@ async function prepareTestSimExecution(
     resolvedSimulatorId: simulatorResolution.simulatorId,
     invocationRequest: {
       scheme: params.scheme,
+      workspacePath: params.workspacePath,
+      projectPath: params.projectPath,
+      derivedDataPath: resolveEffectiveDerivedDataPath(params),
       configuration,
       platform: inferred.platform,
       simulatorName: params.simulatorName,

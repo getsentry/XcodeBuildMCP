@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import * as z from 'zod';
 import {
@@ -370,7 +371,7 @@ describe('build_run_sim tool', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -429,7 +430,7 @@ describe('build_run_sim tool', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -496,7 +497,7 @@ describe('build_run_sim tool', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -512,7 +513,7 @@ describe('build_run_sim tool', () => {
         '-destination',
         'platform=iOS Simulator,name=iPhone 17',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
       ]);
       expect(callHistory[2].logPrefix).toBe('Get App Path');
     });
@@ -545,7 +546,7 @@ describe('build_run_sim tool', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/Users/dev/My Project/MyProject.xcworkspace'),
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
@@ -579,7 +580,7 @@ describe('build_run_sim tool', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('tvOS Simulator Build');

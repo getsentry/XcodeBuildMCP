@@ -23,7 +23,7 @@ const LLDB_SYS_FRAME_FUNC_REGEX =
   /(frame #\d+: )\S+( at (?:\/usr\/lib\/|\/Library\/Developer\/CoreSimulator\/)[^`\n]*`)[^:\n]+(:<OFFSET>)/gm;
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
 const LLDB_BREAKPOINT_LOCATIONS_REGEX = /locations = .+$/gm;
-const DERIVED_DATA_HASH_REGEX = /(DerivedData\/[A-Za-z0-9_]+)-[a-z]{28}\b/g;
+const DERIVED_DATA_HASH_REGEX = /(DerivedData\/[^/\s]+)-(?:[a-z]{28}|[0-9a-f]{12})(?=\/|\b)/g;
 const LOCAL_TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/g;
 const XCTEST_PARENS_DURATION_REGEX = /\(\d+\.\d+\) seconds/g;
 const SWIFT_TESTING_DURATION_REGEX = /after \d+\.\d+ seconds/g;

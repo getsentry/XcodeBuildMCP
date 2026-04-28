@@ -1,7 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
-import { sessionStore } from './session-store.ts';
 
 export interface ToolPreflightParams {
   operation:
@@ -95,7 +94,13 @@ export function formatToolPreflight(params: ToolPreflightParams): string {
   }
 
   lines.push(
-    `   Derived Data: ${displayPath(resolveEffectiveDerivedDataPath(params.derivedDataPath ?? sessionStore.get('derivedDataPath')))}`,
+    `   Derived Data: ${displayPath(
+      resolveEffectiveDerivedDataPath({
+        derivedDataPath: params.derivedDataPath,
+        workspacePath: params.workspacePath,
+        projectPath: params.projectPath,
+      }),
+    )}`,
   );
 
   if (params.arch) {

@@ -44,8 +44,7 @@ describe('session-clear-defaults tool', () => {
       const current = sessionStore.getAll();
       expect(current.scheme).toBeUndefined();
       expect(current.deviceId).toBeUndefined();
-      // derivedDataPath is computed from projectPath when not explicitly set
-      expect(current.derivedDataPath).toContain('proj-');
+      expect(current.derivedDataPath).toBeUndefined();
       expect(current.projectPath).toBe('/path/to/proj.xcodeproj');
       expect(current.simulatorName).toBe('iPhone 17');
       expect(current.useLatestOS).toBe(true);

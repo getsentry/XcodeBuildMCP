@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
@@ -131,7 +131,7 @@ describe('get_mac_app_path plugin', () => {
           '-destination',
           'generic/platform=macOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         ],
         'Get App Path',
         false,
@@ -173,7 +173,7 @@ describe('get_mac_app_path plugin', () => {
           '-destination',
           'generic/platform=macOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcodeproj'),
         ],
         'Get App Path',
         false,
@@ -217,7 +217,7 @@ describe('get_mac_app_path plugin', () => {
           '-destination',
           'platform=macOS,arch=arm64',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         ],
         'Get App Path',
         false,
@@ -261,7 +261,7 @@ describe('get_mac_app_path plugin', () => {
           '-destination',
           'platform=macOS,arch=x86_64',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         ],
         'Get App Path',
         false,
@@ -350,7 +350,7 @@ describe('get_mac_app_path plugin', () => {
           '-destination',
           'platform=macOS,arch=arm64',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         ],
         'Get App Path',
         false,

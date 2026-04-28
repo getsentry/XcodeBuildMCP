@@ -2,9 +2,10 @@
 🧪 Test
 
    Scheme: NONEXISTENT
+   Project: example_projects/macOS/MCPTest.xcodeproj
    Configuration: Debug
    Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>
 
 Errors (1):
 

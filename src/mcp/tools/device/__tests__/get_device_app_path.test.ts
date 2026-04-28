@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import {
   createMockCommandResponse,
@@ -134,7 +134,7 @@ describe('get_device_app_path plugin', () => {
           '-destination',
           'generic/platform=iOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         ],
         logPrefix: 'Get App Path',
         useShell: false,
@@ -193,7 +193,7 @@ describe('get_device_app_path plugin', () => {
           '-destination',
           'generic/platform=watchOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         ],
         logPrefix: 'Get App Path',
         useShell: false,
@@ -251,7 +251,7 @@ describe('get_device_app_path plugin', () => {
           '-destination',
           'generic/platform=iOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/workspace.xcworkspace'),
         ],
         logPrefix: 'Get App Path',
         useShell: false,
@@ -343,6 +343,60 @@ describe('get_device_app_path plugin', () => {
       expect(result.nextStepParams).toBeUndefined();
     });
 
+    it('should use explicit derivedDataPath when resolving build settings', async () => {
+      const calls: Array<{
+        args: string[];
+        logPrefix?: string;
+        useShell?: boolean;
+        opts?: { cwd?: string };
+      }> = [];
+
+      const mockExecutor = (
+        args: string[],
+        logPrefix?: string,
+        useShell?: boolean,
+        opts?: { cwd?: string },
+        _detached?: boolean,
+      ) => {
+        calls.push({ args, logPrefix, useShell, opts });
+        return Promise.resolve(
+          createMockCommandResponse({
+            success: true,
+            output:
+              'Build settings for scheme "MyScheme"\n\nBUILT_PRODUCTS_DIR = /path/to/build/Debug-iphoneos\nFULL_PRODUCT_NAME = MyApp.app\n',
+            error: undefined,
+          }),
+        );
+      };
+
+      await runLogic(() =>
+        get_device_app_pathLogic(
+          {
+            projectPath: '/path/to/project.xcodeproj',
+            scheme: 'MyScheme',
+            derivedDataPath: '/custom/DerivedData',
+          },
+          mockExecutor,
+        ),
+      );
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].args).toEqual([
+        'xcodebuild',
+        '-showBuildSettings',
+        '-project',
+        '/path/to/project.xcodeproj',
+        '-scheme',
+        'MyScheme',
+        '-configuration',
+        'Debug',
+        '-destination',
+        'generic/platform=iOS',
+        '-derivedDataPath',
+        '/custom/DerivedData',
+      ]);
+    });
+
     it('should include optional configuration parameter in command', async () => {
       const calls: Array<{
         args: string[];
@@ -394,7 +448,7 @@ describe('get_device_app_path plugin', () => {
           '-destination',
           'generic/platform=iOS',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         ],
         logPrefix: 'Get App Path',
         useShell: false,

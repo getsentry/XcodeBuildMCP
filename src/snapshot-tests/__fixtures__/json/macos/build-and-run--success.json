@@ -7,6 +7,7 @@
     "request": {
       "scheme": "MCPTest",
       "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>",
       "configuration": "Debug",
       "platform": "macOS",
       "target": "macos"
@@ -17,7 +18,7 @@
       "target": "macos"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app",
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app",
       "bundleId": "io.sentry.MCPTest.macOS",
       "processId": 99999,
       "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_macos_<TIMESTAMP>_pid<PID>.log"

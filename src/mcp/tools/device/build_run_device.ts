@@ -34,6 +34,7 @@ import {
   createDomainStreamingPipeline,
   setXcodebuildStructuredOutput,
 } from '../../../utils/xcodebuild-domain-results.ts';
+import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 
 function createBuildRunDeviceRequest(params: BuildRunDeviceParams): BuildInvocationRequest {
@@ -41,6 +42,7 @@ function createBuildRunDeviceRequest(params: BuildRunDeviceParams): BuildInvocat
     scheme: params.scheme,
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
+    derivedDataPath: resolveEffectiveDerivedDataPath(params),
     configuration: params.configuration ?? 'Debug',
     platform: String(mapDevicePlatform(params.platform)),
     deviceId: params.deviceId,

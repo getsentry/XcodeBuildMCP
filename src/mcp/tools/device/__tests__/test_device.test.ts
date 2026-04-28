@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import {
   createMockExecutor,
   createMockFileSystemExecutor,
@@ -166,7 +166,7 @@ describe('test_device plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
         'test',
       ]);
     });

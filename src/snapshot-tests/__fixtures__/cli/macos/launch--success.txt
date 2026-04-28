@@ -1,7 +1,7 @@
 
 🚀 Launch macOS App
 
-   App: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app
+   App: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app
 
 ✅ App launched successfully
   ├ Bundle ID: io.sentry.MCPTest.macOS

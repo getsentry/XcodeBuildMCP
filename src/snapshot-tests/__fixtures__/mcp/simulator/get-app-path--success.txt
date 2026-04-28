@@ -8,10 +8,10 @@
    Simulator: iPhone 17
 
 ✅ Get app path successful (⏱️ <DURATION>)
-  └ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+  └ App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app
 
 Next steps:
-1. Get bundle ID: get_app_bundle_id({ appPath: "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app" })
+1. Get bundle ID: get_app_bundle_id({ appPath: "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app" })
 2. Boot simulator: boot_sim({ simulatorId: "SIMULATOR_UUID" })
-3. Install app: install_app_sim({ simulatorId: "SIMULATOR_UUID", appPath: "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app" })
+3. Install app: install_app_sim({ simulatorId: "SIMULATOR_UUID", appPath: "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app" })
 4. Launch app: launch_app_sim({ simulatorId: "SIMULATOR_UUID", bundleId: "BUNDLE_ID" })

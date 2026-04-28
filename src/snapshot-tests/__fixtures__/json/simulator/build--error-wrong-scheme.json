@@ -7,6 +7,7 @@
     "request": {
       "scheme": "NONEXISTENT",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS Simulator",
       "simulatorName": "iPhone 17"

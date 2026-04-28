@@ -6,7 +6,7 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
 
 Errors (1):
 

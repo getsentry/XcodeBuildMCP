@@ -8,7 +8,7 @@
       "status": "SUCCEEDED"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app",
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app",
       "bundleId": "io.sentry.MCPTest.macOS",
       "processId": 99999
     },

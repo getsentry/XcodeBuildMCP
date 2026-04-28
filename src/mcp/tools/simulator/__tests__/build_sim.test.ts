@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import {
   createMockExecutor,
@@ -212,7 +212,7 @@ describe('build_sim tool', () => {
           '-collect-test-diagnostics',
           'never',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
           'build',
         ],
         'iOS Simulator Build',
@@ -247,7 +247,7 @@ describe('build_sim tool', () => {
           '-collect-test-diagnostics',
           'never',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcodeproj'),
           'build',
         ],
         'iOS Simulator Build',
@@ -322,7 +322,7 @@ describe('build_sim tool', () => {
           '-collect-test-diagnostics',
           'never',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/Users/dev/My Project/MyProject.xcworkspace'),
           'build',
         ],
         'iOS Simulator Build',
@@ -358,7 +358,7 @@ describe('build_sim tool', () => {
           '-collect-test-diagnostics',
           'never',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
           'build',
         ],
         'iOS Simulator Build',
@@ -393,7 +393,7 @@ describe('build_sim tool', () => {
           '-collect-test-diagnostics',
           'never',
           '-derivedDataPath',
-          DERIVED_DATA_DIR,
+          computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
           'build',
         ],
         'watchOS Simulator Build',
@@ -437,6 +437,9 @@ describe('build_sim tool', () => {
 
       expect(result.isError()).toBeFalsy();
       expectPendingBuildResponse(result, 'get_sim_app_path');
+      expect(result.nextStepParams?.get_sim_app_path).toMatchObject({
+        derivedDataPath: '/path/to/derived',
+      });
     });
 
     it('should handle build failure', async () => {

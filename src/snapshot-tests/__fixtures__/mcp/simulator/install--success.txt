@@ -2,7 +2,7 @@
 📦 Install App
 
    Simulator: <UUID>
-   App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app
+   App Path: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app
 
 ✅ App installed successfully
 

@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { createXcodebuildPipeline } from '../xcodebuild-pipeline.ts';
+import {
+  createXcodebuildPipeline,
+  invocationRequestToHeaderParams,
+} from '../xcodebuild-pipeline.ts';
 import { STAGE_RANK } from '../../types/domain-fragments.ts';
 import type { AnyFragment, DomainFragment } from '../../types/domain-fragments.ts';
 import { renderCliTextTranscript } from '../renderers/cli-text-renderer.ts';
@@ -274,6 +277,28 @@ describe('xcodebuild-pipeline', () => {
     expect(output).toContain('   testF\n');
     expect(output).not.toContain('   testG\n');
     expect(output).toContain('   (...and 2 more)');
+  });
+
+  it('derives header DerivedData from request workspacePath', () => {
+    const params = invocationRequestToHeaderParams({
+      scheme: 'MyApp',
+      workspacePath: '/path/to/MyApp.xcworkspace',
+    });
+
+    expect(params).toContainEqual({ label: 'Workspace', value: '/path/to/MyApp.xcworkspace' });
+    expect(params).toContainEqual({
+      label: 'Derived Data',
+      value: expect.stringMatching(/MyApp-[a-f0-9]{12}$/),
+    });
+  });
+
+  it('does not add DerivedData header rows for package-only requests', () => {
+    const params = invocationRequestToHeaderParams({
+      target: 'swift-package',
+      packagePath: '/path/to/Package',
+    });
+
+    expect(params.some((param) => param.label === 'Derived Data')).toBe(false);
   });
 
   it('produces JSONL output in CLI json mode', () => {

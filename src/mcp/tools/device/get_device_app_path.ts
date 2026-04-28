@@ -32,6 +32,7 @@ import {
 const baseOptions = {
   scheme: z.string().describe('The scheme to use'),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
+  derivedDataPath: z.string().optional(),
   platform: devicePlatformSchema,
 };
 
@@ -53,6 +54,7 @@ const publicSchemaObject = baseSchemaObject.omit({
   workspacePath: true,
   scheme: true,
   configuration: true,
+  derivedDataPath: true,
 } as const);
 
 function createRequest(params: GetDeviceAppPathParams) {
@@ -82,6 +84,7 @@ export function createGetDeviceAppPathExecutor(
           scheme: params.scheme,
           configuration,
           platform,
+          derivedDataPath: params.derivedDataPath,
         },
         executor,
       );

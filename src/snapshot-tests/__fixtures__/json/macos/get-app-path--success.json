@@ -15,7 +15,7 @@
       "target": "macos"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug/MCPTest.app"
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app"
     }
   }
 }

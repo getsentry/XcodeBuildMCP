@@ -21,7 +21,7 @@
 
 ### Changed
 
-- Auto-scope DerivedData per workspace/project path when no explicit `derivedDataPath` is configured. The session store now derives a hashed sub-directory under the global DerivedData root from the active workspace or project path, so concurrent agents and git worktrees no longer share a single explicit DerivedData and corrupt incremental builds. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
+- Auto-scope DerivedData per workspace/project path at xcodebuild invocation time when no explicit `derivedDataPath` is configured. Session defaults remain raw, while build/test/app-path commands derive a stable hashed subdirectory under the global DerivedData root from the resolved workspace or project path. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
 
 ## [2.3.2]
 

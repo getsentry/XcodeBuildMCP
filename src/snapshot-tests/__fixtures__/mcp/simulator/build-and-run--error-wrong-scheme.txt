@@ -6,7 +6,7 @@
    Configuration: Debug
    Platform: iOS Simulator
    Simulator: iPhone 17
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
 
 Errors (1):
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
@@ -172,7 +172,7 @@ describe('build_device plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcworkspace'),
         'build',
       ]);
       expect(spy.commandCalls[0].logPrefix).toBe('iOS Device Build');
@@ -206,7 +206,7 @@ describe('build_device plugin', () => {
         '-collect-test-diagnostics',
         'never',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/MyProject.xcodeproj'),
         'build',
       ]);
       expect(spy.commandCalls[0].logPrefix).toBe('iOS Device Build');
@@ -263,6 +263,30 @@ describe('build_device plugin', () => {
 
       expect(result.isError()).toBeFalsy();
       expectPendingBuildResponse(result, 'get_device_app_path');
+    });
+
+    it('should include explicit derivedDataPath in get_device_app_path next step', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'Build succeeded',
+      });
+
+      const { result } = await runToolLogic(() =>
+        buildDeviceLogic(
+          {
+            projectPath: '/path/to/MyProject.xcodeproj',
+            scheme: 'MyScheme',
+            derivedDataPath: '/tmp/derived-data',
+          },
+          mockExecutor,
+        ),
+      );
+
+      expect(result.isError()).toBeFalsy();
+      expect(result.nextStepParams?.get_device_app_path).toEqual({
+        scheme: 'MyScheme',
+        derivedDataPath: '/tmp/derived-data',
+      });
     });
 
     it('should return exact build failure response', async () => {

@@ -39,4 +39,16 @@ describe('normalizeSnapshotOutput tilde handling', () => {
       'Discovered 2 test(s):\n   ExampleTests/testOne\n› Linking\n› Running tests\n\n✅ 2 tests passed, 0 skipped (⏱️ <DURATION>)\n',
     );
   });
+
+  it('normalizes scoped XcodeBuildMCP DerivedData hashes', () => {
+    const input =
+      'Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-22d700c6d603\n';
+
+    const result = normalizeSnapshotOutput(input);
+
+    expect(result).toContain(
+      '<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>',
+    );
+    expect(result).not.toContain('22d700c6d603');
+  });
 });

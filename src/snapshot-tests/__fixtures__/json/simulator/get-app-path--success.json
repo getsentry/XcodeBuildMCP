@@ -17,7 +17,7 @@
       "durationMs": 1234
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
     }
   }
 }

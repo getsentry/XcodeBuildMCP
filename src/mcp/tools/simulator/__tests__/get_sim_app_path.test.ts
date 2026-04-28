@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
+import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import { ChildProcess } from 'child_process';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
@@ -161,7 +161,7 @@ describe('get_sim_app_path tool', () => {
         '-destination',
         'platform=iOS Simulator,name=iPhone 17,OS=latest',
         '-derivedDataPath',
-        DERIVED_DATA_DIR,
+        computeScopedDerivedDataPath('/path/to/workspace.xcworkspace'),
       ]);
 
       expect(result.isError).toBeFalsy();
@@ -169,6 +169,63 @@ describe('get_sim_app_path tool', () => {
       expect(text).toContain('Get App Path');
       expect(text).toContain('/tmp/DerivedData/Build/MyApp.app');
       expect(result.nextStepParams).toBeDefined();
+    });
+
+    it('should use explicit derivedDataPath when resolving build settings', async () => {
+      const callHistory: Array<{
+        command: string[];
+        logPrefix?: string;
+        useShell?: boolean;
+        opts?: unknown;
+      }> = [];
+
+      const trackingExecutor: CommandExecutor = async (
+        command,
+        logPrefix,
+        useShell,
+        opts,
+      ): Promise<{
+        success: boolean;
+        output: string;
+        process: ChildProcess;
+      }> => {
+        callHistory.push({ command, logPrefix, useShell, opts });
+        return {
+          success: true,
+          output:
+            '    BUILT_PRODUCTS_DIR = /tmp/DerivedData/Build\n    FULL_PRODUCT_NAME = MyApp.app\n',
+          process: { pid: 12345 } as unknown as ChildProcess,
+        };
+      };
+
+      await runLogic(() =>
+        get_sim_app_pathLogic(
+          {
+            workspacePath: '/path/to/workspace.xcworkspace',
+            scheme: 'MyScheme',
+            platform: XcodePlatform.iOSSimulator,
+            simulatorName: 'iPhone 17',
+            derivedDataPath: '/custom/DerivedData',
+          },
+          trackingExecutor,
+        ),
+      );
+
+      expect(callHistory).toHaveLength(1);
+      expect(callHistory[0].command).toEqual([
+        'xcodebuild',
+        '-showBuildSettings',
+        '-workspace',
+        '/path/to/workspace.xcworkspace',
+        '-scheme',
+        'MyScheme',
+        '-configuration',
+        'Debug',
+        '-destination',
+        'platform=iOS Simulator,name=iPhone 17,OS=latest',
+        '-derivedDataPath',
+        '/custom/DerivedData',
+      ]);
     });
 
     it('should surface executor failures when build settings cannot be retrieved', async () => {
