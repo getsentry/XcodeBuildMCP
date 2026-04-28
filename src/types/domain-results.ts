@@ -566,6 +566,7 @@ export type SessionProfileDomainResult = ToolDomainResultBase & {
   kind: 'session-profile';
   previousProfile: string;
   currentProfile: string;
+  persisted?: boolean;
 };
 export type SimulatorActionResultDomainResult = ToolDomainResultBase & {
   kind: 'simulator-action-result';

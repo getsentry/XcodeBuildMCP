@@ -9,7 +9,11 @@ import {
   schema,
   sessionUseDefaultsProfileLogic,
 } from '../session_use_defaults_profile.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  allText,
+  createMockToolHandlerContext,
+  runLogic,
+} from '../../../../test-utils/test-helpers.ts';
 
 describe('session-use-defaults-profile tool', () => {
   beforeEach(() => {
@@ -83,11 +87,11 @@ describe('session-use-defaults-profile tool', () => {
     sessionStore.setActiveProfile('ios');
     sessionStore.setActiveProfile(null);
 
-    const result = await runLogic(() =>
-      sessionUseDefaultsProfileLogic({ profile: 'ios', persist: true }),
-    );
-    expect(result.isError).toBeFalsy();
-    expect(allText(result)).toContain('Persisted active profile selection');
+    const { ctx, result, run } = createMockToolHandlerContext();
+    await run(() => sessionUseDefaultsProfileLogic({ profile: 'ios', persist: true }));
+    expect(result.isError()).toBe(false);
+    expect(result.text()).toContain('Persisted active profile selection');
+    expect(ctx.structuredOutput?.result).toMatchObject({ persisted: true });
     expect(writes).toHaveLength(1);
     const parsed = parseYaml(writes[0].content) as { activeSessionDefaultsProfile?: string };
     expect(parsed.activeSessionDefaultsProfile).toBe('ios');
