@@ -153,6 +153,9 @@ export async function buildMacOSLogic(
     ctx.nextStepParams = {
       get_mac_app_path: {
         scheme: params.scheme,
+        ...(params.derivedDataPath !== undefined
+          ? { derivedDataPath: params.derivedDataPath }
+          : {}),
       },
     };
   }

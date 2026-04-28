@@ -142,6 +142,12 @@ describe('build_macos plugin', () => {
 
       expect(result.isError()).toBeFalsy();
       expectPendingBuildResponse(result, 'get_mac_app_path');
+      expect(result.nextStepParams).toEqual({
+        get_mac_app_path: {
+          scheme: 'MyScheme',
+          derivedDataPath: '/path/to/derived-data',
+        },
+      });
     });
 
     it('should return exact exception handling response', async () => {
