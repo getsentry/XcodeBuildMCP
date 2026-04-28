@@ -1,0 +1,6 @@
+
+⚙️ Toggle Connect Hardware Keyboard
+
+   Simulator: <UUID>
+
+✅ Sent Connect Hardware Keyboard (Cmd+Shift+K)

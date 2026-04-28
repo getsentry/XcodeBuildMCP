@@ -1,0 +1,17 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "1",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "toggle-connect-hardware-keyboard"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

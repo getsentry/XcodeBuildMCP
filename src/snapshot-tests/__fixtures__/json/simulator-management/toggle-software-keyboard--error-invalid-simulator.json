@@ -1,0 +1,25 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Failed to toggle software keyboard.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "toggle-software-keyboard"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Simulator <UUID> not found. Use list_sims to see available simulators."
+        }
+      ]
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

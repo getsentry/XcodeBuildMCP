@@ -135,6 +135,58 @@ export function registerSimulatorManagementSnapshotSuite(runtime: SnapshotRuntim
       });
     });
 
+    describe('toggle-software-keyboard', () => {
+      it('success', async () => {
+        const { text, isError } = await harness.invoke(
+          'simulator-management',
+          'toggle-software-keyboard',
+          {
+            simulatorId: simulatorUdid,
+          },
+        );
+        expect(isError).toBe(false);
+        expectFixture(text, 'toggle-software-keyboard--success');
+      });
+
+      it('error - invalid simulator', async () => {
+        const { text, isError } = await harness.invoke(
+          'simulator-management',
+          'toggle-software-keyboard',
+          {
+            simulatorId: '00000000-0000-0000-0000-000000000000',
+          },
+        );
+        expect(isError).toBe(true);
+        expectFixture(text, 'toggle-software-keyboard--error-invalid-simulator');
+      });
+    });
+
+    describe('toggle-connect-hardware-keyboard', () => {
+      it('success', async () => {
+        const { text, isError } = await harness.invoke(
+          'simulator-management',
+          'toggle-connect-hardware-keyboard',
+          {
+            simulatorId: simulatorUdid,
+          },
+        );
+        expect(isError).toBe(false);
+        expectFixture(text, 'toggle-connect-hardware-keyboard--success');
+      });
+
+      it('error - invalid simulator', async () => {
+        const { text, isError } = await harness.invoke(
+          'simulator-management',
+          'toggle-connect-hardware-keyboard',
+          {
+            simulatorId: '00000000-0000-0000-0000-000000000000',
+          },
+        );
+        expect(isError).toBe(true);
+        expectFixture(text, 'toggle-connect-hardware-keyboard--error-invalid-simulator');
+      });
+    });
+
     describe('statusbar', () => {
       it('success', async () => {
         const { text, isError } = await harness.invoke('simulator-management', 'statusbar', {
