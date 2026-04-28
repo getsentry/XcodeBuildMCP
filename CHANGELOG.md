@@ -15,22 +15,13 @@
 - The `setup` wizard no longer prompts for a simulator or device when macOS is the only selected platform — macOS apps run natively and do not require a simulator or physical device ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
 - When a single platform is selected, `xcodebuildmcp setup` now writes `platform` to `sessionDefaults` in `config.yaml` and includes `XCODEBUILDMCP_PLATFORM` in `--format mcp-json` output. For multi-platform projects the platform key is omitted so the agent can choose per-command ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
 - The `setup` wizard remembers previous choices on re-run: existing `config.yaml` values (including the new `platform`) are pre-loaded as defaults for every prompt ([#281](https://github.com/getsentry/XcodeBuildMCP/pull/281) by [@detailobsessed](https://github.com/detailobsessed)).
+- Auto-scope DerivedData per workspace/project path at xcodebuild invocation time when no explicit `derivedDataPath` is configured. Session defaults remain raw, while build/test/app-path commands derive a stable hashed subdirectory under the global DerivedData root from the resolved workspace or project path. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
 
 ### Fixed
 
 - Expanded leading `~` and `~/` prefixes in configured `derivedDataPath`, `projectPath`, `workspacePath`, `axePath`, and the iOS/macOS template paths so values like `~/.foo/derivedData` resolve under the user's home directory instead of creating a literal `~` directory under the project root. As part of this change, configured absolute paths are now lexically normalized (e.g. `/a/b/../c` collapses to `/a/c`) before being passed to `xcodebuild` ([#283](https://github.com/getsentry/XcodeBuildMCP/issues/283), supersedes [#301](https://github.com/getsentry/XcodeBuildMCP/pull/301) by [@trmquang93](https://github.com/trmquang93)).
 - Added `toggle_connect_hardware_keyboard` tool to toggle the iOS Simulator hardware keyboard connection ([#346](https://github.com/getsentry/XcodeBuildMCP/issues/346)).
-
-### Changed
-
-- Auto-scope DerivedData per workspace/project path at xcodebuild invocation time when no explicit `derivedDataPath` is configured. Session defaults remain raw, while build/test/app-path commands derive a stable hashed subdirectory under the global DerivedData root from the resolved workspace or project path. Explicit `derivedDataPath` still takes precedence ([#340](https://github.com/getsentry/XcodeBuildMCP/issues/340)).
-
-### Fixed
-
 - Fixed `xcode_tools_bridge_disconnect` immediately re-syncing proxied tools after a manual disconnect ([#343](https://github.com/getsentry/XcodeBuildMCP/issues/343)).
-
-### Fixed
-
 - Stopped suggesting an unsupported `--device-id`/`deviceId` argument in the `device list` next-step hint for `device build`/`build_device`; device targeting flows through session defaults ([#350](https://github.com/getsentry/XcodeBuildMCP/pull/350) by [@MukundaKatta](https://github.com/MukundaKatta)).
 
 ## [2.3.2]
