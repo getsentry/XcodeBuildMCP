@@ -58,6 +58,14 @@ async function refreshSimulatorDefaults(
       }
     }
 
+    if (simulatorId && simulatorName) {
+      const resolution = await resolveSimulatorNameToId(executor, simulatorName);
+      if (resolution.success && resolution.simulatorId !== simulatorId) {
+        simulatorId = resolution.simulatorId;
+        patch.simulatorId = resolution.simulatorId;
+      }
+    }
+
     if (!simulatorName && simulatorId) {
       const resolution = await resolveSimulatorIdToName(executor, simulatorId);
       if (resolution.success) {
