@@ -52,6 +52,32 @@
           "location": "MCPTestTests.swift:11"
         }
       ]
-    }
+    },
+    "testCases": [
+      {
+        "suite": "MCPTestsXCTests",
+        "test": "testAppNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "MCPTestsXCTests",
+        "test": "testDeliberateFailure()",
+        "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "suite": "MCPTestTests",
+        "test": "appNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "MCPTestTests",
+        "test": "deliberateFailure()",
+        "status": "failed",
+        "durationMs": 0
+      }
+    ]
   }
 }

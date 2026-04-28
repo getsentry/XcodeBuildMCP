@@ -11,6 +11,7 @@ import {
   formatTransientBuildStageEvent,
   formatStatusLineEvent,
   formatDetailTreeEvent,
+  formatTestCaseResults,
   formatTransientStatusLineEvent,
 } from '../event-formatting.ts';
 
@@ -256,5 +257,44 @@ describe('event formatting', () => {
     expect(rendered).toContain('  ✗ testAdd:');
     expect(rendered).toContain('      - XCTAssertEqual failed');
     expect(rendered).toContain('      - Expected 4, got 5');
+  });
+
+  it('formats per-test-case results with status icons and durations', () => {
+    const rendered = formatTestCaseResults([
+      {
+        type: 'test-case-result',
+        operation: 'TEST',
+        suite: 'Suite',
+        test: 'testA',
+        status: 'passed',
+        durationMs: 5,
+      },
+      {
+        type: 'test-case-result',
+        operation: 'TEST',
+        suite: 'Suite',
+        test: 'testB',
+        status: 'failed',
+        durationMs: 250,
+      },
+      {
+        type: 'test-case-result',
+        operation: 'TEST',
+        test: 'testC',
+        status: 'skipped',
+      },
+    ]);
+
+    expect(rendered).toContain('Test Results:');
+    expect(rendered).toContain('Suite/testA');
+    expect(rendered).toContain('(0.005s)');
+    expect(rendered).toContain('Suite/testB');
+    expect(rendered).toContain('(0.250s)');
+    expect(rendered).toContain('testC');
+    expect(rendered).not.toContain('Suite/testC');
+  });
+
+  it('returns empty string when no test results provided', () => {
+    expect(formatTestCaseResults([])).toBe('');
   });
 });

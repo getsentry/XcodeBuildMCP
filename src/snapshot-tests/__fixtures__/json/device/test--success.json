@@ -44,6 +44,14 @@
       "warnings": [],
       "errors": [],
       "testFailures": []
-    }
+    },
+    "testCases": [
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testAddition",
+        "status": "passed",
+        "durationMs": 0
+      }
+    ]
   }
 }

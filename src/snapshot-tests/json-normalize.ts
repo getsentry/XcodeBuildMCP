@@ -31,7 +31,9 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
 function normalizeNumber(path: string[], key: string | undefined, value: number): number {
   switch (key) {
     case 'durationMs':
-      return path.at(-2) === 'summary' ? 1234 : value;
+      if (path.at(-2) === 'summary') return 1234;
+      if (path.includes('testCases')) return 0;
+      return value;
     case 'processId':
     case 'pid':
       return 99999;
@@ -65,7 +67,15 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item, index) => normalizeValue(item, [...path, String(index)]));
+    const normalized = value.map((item, index) => normalizeValue(item, [...path, String(index)]));
+    if (path.at(-1) === 'testCases') {
+      return [...normalized].sort((a, b) => {
+        const ka = `${(a as { suite?: string }).suite ?? ''}|${(a as { test?: string }).test ?? ''}`;
+        const kb = `${(b as { suite?: string }).suite ?? ''}|${(b as { test?: string }).test ?? ''}`;
+        return ka.localeCompare(kb);
+      });
+    }
+    return normalized;
   }
 
   if (isRecord(value)) {

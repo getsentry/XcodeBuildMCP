@@ -10,6 +10,7 @@ import {
   parseBuildErrorDiagnostic,
   parseDurationMs,
   isBuildErrorDiagnosticLine,
+  type ParsedTestCase,
 } from './xcodebuild-line-parsers.ts';
 import {
   parseXcodebuildSwiftTestingLine,
@@ -223,25 +224,28 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     });
   }
 
-  function recordTestCaseResult(testCase: {
-    status: string;
-    suiteName?: string;
-    testName?: string;
-    durationText?: string;
-    caseCount?: number;
-  }): void {
+  function recordTestCaseResult(testCase: ParsedTestCase): void {
     const increment = testCase.caseCount ?? 1;
     completedCount += increment;
+    const durationMs = parseDurationMs(testCase.durationText);
+
     if (testCase.status === 'failed') {
       failedCount += increment;
-      applyFailureDuration(
-        testCase.suiteName,
-        testCase.testName,
-        parseDurationMs(testCase.durationText),
-      );
-    }
-    if (testCase.status === 'skipped') {
+      applyFailureDuration(testCase.suiteName, testCase.testName, durationMs);
+    } else if (testCase.status === 'skipped') {
       skippedCount += increment;
+    }
+
+    if (operation === 'TEST') {
+      onEvent({
+        kind: 'test-result',
+        fragment: 'test-case-result',
+        operation: 'TEST',
+        ...(testCase.suiteName !== undefined ? { suite: testCase.suiteName } : {}),
+        test: testCase.testName,
+        status: testCase.status,
+        ...(durationMs !== undefined ? { durationMs } : {}),
+      });
     }
     emitTestProgress();
   }

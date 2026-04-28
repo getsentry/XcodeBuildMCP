@@ -27,6 +27,13 @@
       "warnings": [],
       "errors": [],
       "testFailures": []
-    }
+    },
+    "testCases": [
+      {
+        "test": "Basic truth assertions",
+        "status": "passed",
+        "durationMs": 0
+      }
+    ]
   }
 }

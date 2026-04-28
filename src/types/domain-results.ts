@@ -314,6 +314,12 @@ export interface ProjectListSummary extends StatusSummary {
 export interface ScaffoldSummary extends StatusSummary {
   platform: 'iOS' | 'macOS';
 }
+export interface TestCaseResult {
+  suite?: string;
+  test: string;
+  status: 'passed' | 'failed' | 'skipped';
+  durationMs?: number;
+}
 export interface TestSummary extends BuildLikeSummary {
   counts?: Counts;
 }
@@ -591,6 +597,7 @@ export type TestResultDomainResult = ToolDomainResultBase & {
   artifacts: TestResultArtifacts;
   diagnostics: TestDiagnostics;
   tests?: TestSelectionInfo;
+  testCases?: readonly TestCaseResult[];
 };
 export type UiActionResultDomainResult = ToolDomainResultBase & {
   kind: 'ui-action-result';

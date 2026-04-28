@@ -89,6 +89,64 @@ describe('xcodebuild-event-parser', () => {
     expect(progressEvents[2]).toMatchObject({ completed: 3, failed: 1, skipped: 0 });
   });
 
+  it('emits test-case-result events with status, suite, test, and duration', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+      { source: 'stdout', text: "Test Case '-[Suite testB]' failed (0.250 seconds)\n" },
+    ]);
+
+    const cases = events.filter((e) => e.fragment === 'test-case-result');
+    expect(cases).toHaveLength(2);
+    expect(cases[0]).toMatchObject({
+      fragment: 'test-case-result',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      status: 'passed',
+      durationMs: 1,
+    });
+    expect(cases[1]).toMatchObject({
+      fragment: 'test-case-result',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testB',
+      status: 'failed',
+      durationMs: 250,
+    });
+  });
+
+  it('emits test-case-result events for Swift Testing passed/failed lines', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stdout', text: '✔ Test "passingTest()" passed after 0.005 seconds.\n' },
+      {
+        source: 'stdout',
+        text: '✘ Test "failingTest()" failed after 0.010 seconds with 1 issue.\n',
+      },
+    ]);
+
+    const cases = events.filter((e) => e.fragment === 'test-case-result');
+    expect(cases).toHaveLength(2);
+    expect(cases[0]).toMatchObject({
+      status: 'passed',
+      test: 'passingTest()',
+      durationMs: 5,
+    });
+    expect(cases[1]).toMatchObject({
+      status: 'failed',
+      test: 'failingTest()',
+      durationMs: 10,
+    });
+  });
+
+  it('does not emit test-case-result for BUILD operation', () => {
+    const events = collectEvents('BUILD', [
+      { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
+    ]);
+
+    const cases = events.filter((e) => e.fragment === 'test-case-result');
+    expect(cases).toHaveLength(0);
+  });
+
   it('emits test-progress from totals line', () => {
     const events = collectEvents('TEST', [
       {

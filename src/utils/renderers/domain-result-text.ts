@@ -2234,6 +2234,18 @@ export function renderDomainResultTextItems(
     if (result.kind === 'build-run-result') {
       items.push(...createBuildRunSyntheticStepItems(result));
     }
+    if (result.kind === 'test-result' && result.testCases && result.testCases.length > 0) {
+      for (const testCase of result.testCases) {
+        items.push({
+          type: 'test-case-result',
+          operation: 'TEST',
+          ...(testCase.suite !== undefined ? { suite: testCase.suite } : {}),
+          test: testCase.test,
+          status: testCase.status,
+          ...(testCase.durationMs !== undefined ? { durationMs: testCase.durationMs } : {}),
+        });
+      }
+    }
     const summary = createSummaryBlock(result);
     if (summary) {
       items.push(summary);

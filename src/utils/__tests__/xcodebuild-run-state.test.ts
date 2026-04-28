@@ -380,6 +380,39 @@ describe('xcodebuild-run-state', () => {
     expect(state.snapshot().testFailures).toHaveLength(2);
   });
 
+  it('collects test-case-result fragments on the snapshot', () => {
+    const forwarded: DomainFragment[] = [];
+    const state = createXcodebuildRunState({
+      operation: 'TEST',
+      onEvent: (e) => forwarded.push(e),
+    });
+
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-case-result',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      status: 'passed',
+      durationMs: 5,
+    });
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-case-result',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testB',
+      status: 'failed',
+      durationMs: 12,
+    });
+
+    const snap = state.snapshot();
+    expect(snap.testCaseResults).toHaveLength(2);
+    expect(snap.testCaseResults[0]).toMatchObject({ test: 'testA', status: 'passed' });
+    expect(snap.testCaseResults[1]).toMatchObject({ test: 'testB', status: 'failed' });
+    expect(forwarded).toHaveLength(2);
+  });
+
   it('forwards test discovery events without storing additional state', () => {
     const forwarded: DomainFragment[] = [];
     const state = createXcodebuildRunState({

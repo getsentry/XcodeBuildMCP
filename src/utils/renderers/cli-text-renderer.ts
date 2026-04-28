@@ -7,6 +7,7 @@ import type {
   CompilerWarningRenderItem,
   RenderItem,
   StatusRenderItem,
+  TestCaseResultRenderItem,
   TestFailureRenderItem,
 } from '../../rendering/render-items.ts';
 import { deriveBuildLikeTitle, invocationRequestToHeaderParams } from '../xcodebuild-pipeline.ts';
@@ -36,6 +37,7 @@ import {
   formatGroupedTestFailures,
   formatSummaryEvent,
   formatNextStepsEvent,
+  formatTestCaseResults,
   formatTestDiscoveryEvent,
 } from './event-formatting.ts';
 import {
@@ -65,11 +67,13 @@ interface CliTextProcessorOptions {
   interactive: boolean;
   sink: CliTextSink;
   suppressWarnings: boolean;
+  showTestTiming: boolean;
 }
 
 interface CliTextRendererOptions {
   interactive: boolean;
   suppressWarnings?: boolean;
+  showTestTiming?: boolean;
 }
 
 export interface CliTextTranscriptInput {
@@ -78,6 +82,7 @@ export interface CliTextTranscriptInput {
   nextSteps?: readonly NextStep[];
   nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
   suppressWarnings?: boolean;
+  showTestTiming?: boolean;
 }
 
 interface XcodebuildParserState {
@@ -89,10 +94,11 @@ interface XcodebuildParserState {
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
 function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRenderer {
-  const { interactive, sink, suppressWarnings } = options;
+  const { interactive, sink, suppressWarnings, showTestTiming } = options;
   const groupedCompilerErrors: CompilerErrorRenderItem[] = [];
   const groupedWarnings: CompilerWarningRenderItem[] = [];
   const groupedTestFailures: TestFailureRenderItem[] = [];
+  const collectedTestCaseResults: TestCaseResultRenderItem[] = [];
   const parserStates = new Map<XcodebuildOperation, XcodebuildParserState>();
   let pendingTransientRuntimeLine: string | null = null;
   let diagnosticBaseDir: string | null = null;
@@ -267,11 +273,26 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
         break;
       }
 
+      case 'test-case-result': {
+        if (showTestTiming) {
+          collectedTestCaseResults.push(item);
+        }
+        break;
+      }
+
       case 'summary': {
         const renderedDiagnostics = flushGroupedDiagnostics(item.status === 'FAILED');
 
         if (!renderedDiagnostics && item.status === 'FAILED') {
           flushPendingTransientRuntimeLine();
+        }
+
+        if (showTestTiming && collectedTestCaseResults.length > 0) {
+          const block = formatTestCaseResults(collectedTestCaseResults);
+          if (block) {
+            writeSection(block);
+          }
+          collectedTestCaseResults.length = 0;
         }
 
         writeSection(formatSummaryEvent(item));
@@ -414,6 +435,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       nextStepsRuntime = undefined;
       parserStates.clear();
       sawProgressNextSteps = false;
+      collectedTestCaseResults.length = 0;
     },
   };
 }
@@ -424,6 +446,7 @@ export function createCliTextRenderer(options: CliTextRendererOptions): Transcri
   return createCliTextProcessor({
     interactive: options.interactive,
     suppressWarnings: options.suppressWarnings ?? false,
+    showTestTiming: options.showTestTiming ?? false,
     sink: {
       clearTransient(): void {
         reporter.clear();
@@ -446,6 +469,7 @@ export function renderCliTextTranscript(input: CliTextTranscriptInput = {}): str
   const renderer = createCliTextProcessor({
     interactive: false,
     suppressWarnings: input.suppressWarnings ?? false,
+    showTestTiming: input.showTestTiming ?? false,
     sink: {
       clearTransient(): void {},
       updateTransient(): void {},
@@ -547,6 +571,15 @@ function domainFragmentToRenderItem(fragment: AnyFragment): RenderItem | null {
         ...(fragment.test !== undefined ? { test: fragment.test } : {}),
         message: fragment.message,
         ...(fragment.location !== undefined ? { location: fragment.location } : {}),
+        ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
+      };
+    case 'test-case-result':
+      return {
+        type: 'test-case-result',
+        operation: fragment.operation,
+        ...(fragment.suite !== undefined ? { suite: fragment.suite } : {}),
+        test: fragment.test,
+        status: fragment.status,
         ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
       };
     case 'status':

@@ -268,6 +268,7 @@ describe('config-store', () => {
       XCODEBUILDMCP_SCHEME: 'MyApp',
       XCODEBUILDMCP_PLATFORM: 'macOS',
       XCODEBUILDMCP_SUPPRESS_WARNINGS: 'true',
+      XCODEBUILDMCP_SHOW_TEST_TIMING: 'true',
       XCODEBUILDMCP_DERIVED_DATA_PATH: '/tmp/dd',
       XCODEBUILDMCP_USE_LATEST_OS: 'true',
       XCODEBUILDMCP_ARCH: 'arm64',
@@ -282,6 +283,7 @@ describe('config-store', () => {
     expect(config.sessionDefaults?.scheme).toBe('MyApp');
     expect(config.sessionDefaults?.platform).toBe('macOS');
     expect(config.sessionDefaults?.suppressWarnings).toBe(true);
+    expect(config.showTestTiming).toBe(true);
     expect(config.sessionDefaults?.derivedDataPath).toBe('/tmp/dd');
     expect(config.sessionDefaults?.useLatestOS).toBe(true);
     expect(config.sessionDefaults?.arch).toBe('arm64');

@@ -12,6 +12,7 @@ import type {
   SectionRenderItem,
   StatusRenderItem,
   TableRenderItem,
+  TestCaseResultRenderItem,
   TestDiscoveryRenderItem,
   TestFailureRenderItem,
 } from '../../rendering/render-items.ts';
@@ -548,6 +549,28 @@ export function formatTestDiscoveryEvent(event: TestDiscoveryRenderItem): string
 
 export function formatNextStepsEvent(event: NextStepsTextBlock, runtime: 'cli' | 'mcp'): string {
   return renderNextStepsSection(event.steps, runtime);
+}
+
+export function formatTestCaseResults(items: readonly TestCaseResultRenderItem[]): string {
+  if (items.length === 0) {
+    return '';
+  }
+
+  const statusIcon: Record<TestCaseResultRenderItem['status'], string> = {
+    passed: '\u{2705}',
+    failed: '\u{274C}',
+    skipped: '\u{23ED}\u{FE0F}',
+  };
+
+  const lines: string[] = ['Test Results:'];
+  for (const item of items) {
+    const icon = statusIcon[item.status];
+    const duration =
+      item.durationMs !== undefined ? ` (${(item.durationMs / 1000).toFixed(3)}s)` : '';
+    const name = item.suite ? `${item.suite}/${item.test}` : item.test;
+    lines.push(`  ${icon} ${name}${duration}`);
+  }
+  return lines.join('\n');
 }
 
 export function formatGroupedTestFailures(

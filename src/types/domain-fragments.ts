@@ -164,6 +164,16 @@ export interface TestProgressFragment {
   skipped: number;
 }
 
+export interface TestCaseResultFragment {
+  kind: 'test-result';
+  fragment: 'test-case-result';
+  operation: 'TEST';
+  suite?: string;
+  test: string;
+  status: 'passed' | 'failed' | 'skipped';
+  durationMs?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Per-kind unions
 // ---------------------------------------------------------------------------
@@ -180,6 +190,7 @@ export type TestDomainFragment =
   | TestDiscoveryFragment
   | TestFailureFragment
   | TestProgressFragment
+  | TestCaseResultFragment
   | BuildInvocationFragment;
 
 // ---------------------------------------------------------------------------

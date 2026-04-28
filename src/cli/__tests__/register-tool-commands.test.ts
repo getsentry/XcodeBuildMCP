@@ -49,6 +49,7 @@ const baseRuntimeConfig: ResolvedRuntimeConfig = {
   experimentalWorkflowDiscovery: false,
   disableSessionDefaults: true,
   disableXcodeAutoSync: false,
+  showTestTiming: false,
   uiDebuggerGuardMode: 'error',
   incrementalBuildsEnabled: false,
   dapRequestTimeoutMs: 30_000,

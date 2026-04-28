@@ -107,6 +107,15 @@ export interface TestFailureRenderItem {
   durationMs?: number;
 }
 
+export interface TestCaseResultRenderItem {
+  type: 'test-case-result';
+  operation: 'TEST';
+  suite?: string;
+  test: string;
+  status: 'passed' | 'failed' | 'skipped';
+  durationMs?: number;
+}
+
 export interface SummaryRenderItem {
   type: 'summary';
   operation?: XcodebuildOperation;
@@ -134,4 +143,5 @@ export type RenderItem =
   | TestDiscoveryRenderItem
   | TestProgressRenderItem
   | TestFailureRenderItem
+  | TestCaseResultRenderItem
   | SummaryRenderItem;

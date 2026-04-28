@@ -44,6 +44,20 @@
       "warnings": [],
       "errors": [],
       "testFailures": []
-    }
+    },
+    "testCases": [
+      {
+        "suite": "MCPTestsXCTests",
+        "test": "testAppNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "MCPTestTests",
+        "test": "appNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      }
+    ]
   }
 }

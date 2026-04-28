@@ -3,6 +3,7 @@ import type {
   BuildSummaryFragment,
   CompilerDiagnosticFragment,
   DomainFragment,
+  TestCaseResultFragment,
   TestDiscoveryFragment,
   TestFailureFragment,
   TestProgressFragment,
@@ -15,7 +16,8 @@ type XcodebuildRunStateFragment =
   | CompilerDiagnosticFragment
   | TestDiscoveryFragment
   | TestFailureFragment
-  | TestProgressFragment;
+  | TestProgressFragment
+  | TestCaseResultFragment;
 
 export interface XcodebuildRunState {
   operation: XcodebuildOperation;
@@ -24,6 +26,7 @@ export interface XcodebuildRunState {
   warnings: CompilerDiagnosticFragment[];
   errors: CompilerDiagnosticFragment[];
   testFailures: TestFailureFragment[];
+  testCaseResults: TestCaseResultFragment[];
   completedTests: number;
   failedTests: number;
   skippedTests: number;
@@ -124,6 +127,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
     warnings: [],
     errors: [],
     testFailures: [],
+    testCaseResults: [],
     completedTests: 0,
     failedTests: 0,
     skippedTests: 0,
@@ -191,6 +195,12 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
           break;
         }
 
+        case 'test-case-result': {
+          state.testCaseResults.push(fragment);
+          accept(fragment);
+          break;
+        }
+
         case 'test-progress': {
           state.completedTests = fragment.completed;
           state.failedTests = fragment.failed;
@@ -238,6 +248,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         warnings: [...state.warnings],
         errors: [...state.errors],
         testFailures: [...state.testFailures],
+        testCaseResults: [...state.testCaseResults],
       };
     },
 
@@ -248,6 +259,7 @@ export function createXcodebuildRunState(options: RunStateOptions): XcodebuildRu
         warnings: [...state.warnings],
         errors: [...state.errors],
         testFailures: [...state.testFailures],
+        testCaseResults: [...state.testCaseResults],
       };
     },
 

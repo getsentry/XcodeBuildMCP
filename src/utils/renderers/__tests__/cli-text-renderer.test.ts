@@ -582,4 +582,48 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('5 tests passed, 1 skipped');
     expect(output).toContain('Build Logs: /tmp/test.log');
   });
+
+  it('omits per-test results by default and renders them when showTestTiming is true', () => {
+    const fragments = [
+      {
+        kind: 'test-result' as const,
+        fragment: 'test-case-result' as const,
+        operation: 'TEST' as const,
+        suite: 'Suite',
+        test: 'testA',
+        status: 'passed' as const,
+        durationMs: 5,
+      },
+      {
+        kind: 'test-result' as const,
+        fragment: 'test-case-result' as const,
+        operation: 'TEST' as const,
+        suite: 'Suite',
+        test: 'testB',
+        status: 'failed' as const,
+        durationMs: 12,
+      },
+      {
+        kind: 'test-result' as const,
+        fragment: 'build-summary' as const,
+        operation: 'TEST' as const,
+        status: 'FAILED' as const,
+        totalTests: 2,
+        passedTests: 1,
+        failedTests: 1,
+        skippedTests: 0,
+        durationMs: 17,
+      },
+    ];
+
+    const withoutFlag = renderCliTextTranscript({ items: fragments });
+    expect(withoutFlag).not.toContain('Test Results:');
+    expect(withoutFlag).not.toContain('Suite/testA');
+
+    const withFlag = renderCliTextTranscript({ items: fragments, showTestTiming: true });
+    expect(withFlag).toContain('Test Results:');
+    expect(withFlag).toContain('Suite/testA');
+    expect(withFlag).toContain('Suite/testB');
+    expect(withFlag).toContain('(0.005s)');
+  });
 });

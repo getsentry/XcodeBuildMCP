@@ -26,6 +26,7 @@ function createDefaultConfig(
     experimentalWorkflowDiscovery: false,
     disableSessionDefaults: false,
     disableXcodeAutoSync: false,
+    showTestTiming: false,
     uiDebuggerGuardMode: 'error',
     incrementalBuildsEnabled: false,
     dapRequestTimeoutMs: 30000,

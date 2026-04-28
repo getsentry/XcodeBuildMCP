@@ -1,6 +1,7 @@
 import type { AnyFragment } from '../types/domain-fragments.ts';
 import type { NextStep } from '../types/common.ts';
 import { sessionStore } from '../utils/session-store.ts';
+import { getConfig } from '../utils/config-store.ts';
 import {
   createCliTextRenderer,
   renderCliTextTranscript,
@@ -103,18 +104,21 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
 function createTextRenderSession(): RenderSession {
   const suppressWarnings = sessionStore.get('suppressWarnings');
+  const showTestTiming = getConfig().showTestTiming;
 
   return createBaseRenderSession({
     finalize: (input) =>
       renderCliTextTranscript({
         ...input,
         suppressWarnings: suppressWarnings ?? false,
+        showTestTiming,
       }),
   });
 }
 
 function createRawRenderSession(): RenderSession {
   const suppressWarnings = sessionStore.get('suppressWarnings');
+  const showTestTiming = getConfig().showTestTiming;
 
   return createBaseRenderSession({
     onEmit: (fragment) => {
@@ -136,6 +140,7 @@ function createRawRenderSession(): RenderSession {
         nextSteps: input.nextSteps,
         nextStepsRuntime: input.nextStepsRuntime,
         suppressWarnings: suppressWarnings ?? false,
+        showTestTiming,
       });
       if (text) {
         process.stdout.write(text);
@@ -146,7 +151,13 @@ function createRawRenderSession(): RenderSession {
 }
 
 function createCliTextRenderSession(options: { interactive: boolean }): RenderSession {
-  const renderer = createCliTextRenderer(options);
+  const suppressWarnings = sessionStore.get('suppressWarnings');
+  const showTestTiming = getConfig().showTestTiming;
+  const renderer = createCliTextRenderer({
+    ...options,
+    suppressWarnings: suppressWarnings ?? false,
+    showTestTiming,
+  });
 
   return createBaseRenderSession({
     onEmit: (fragment) => renderer.onFragment(fragment),

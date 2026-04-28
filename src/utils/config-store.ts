@@ -19,6 +19,7 @@ export type RuntimeConfigOverrides = Partial<{
   experimentalWorkflowDiscovery: boolean;
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
+  showTestTiming: boolean;
   uiDebuggerGuardMode: UiDebuggerGuardMode;
   incrementalBuildsEnabled: boolean;
   dapRequestTimeoutMs: number;
@@ -43,6 +44,7 @@ export type ResolvedRuntimeConfig = {
   experimentalWorkflowDiscovery: boolean;
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
+  showTestTiming: boolean;
   uiDebuggerGuardMode: UiDebuggerGuardMode;
   incrementalBuildsEnabled: boolean;
   dapRequestTimeoutMs: number;
@@ -77,6 +79,7 @@ const DEFAULT_CONFIG: ResolvedRuntimeConfig = {
   experimentalWorkflowDiscovery: false,
   disableSessionDefaults: false,
   disableXcodeAutoSync: false,
+  showTestTiming: false,
   uiDebuggerGuardMode: 'error',
   incrementalBuildsEnabled: false,
   dapRequestTimeoutMs: 30_000,
@@ -193,6 +196,8 @@ function readEnvConfig(env: NodeJS.ProcessEnv): RuntimeConfigOverrides {
     'disableXcodeAutoSync',
     parseBoolean(env.XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC),
   );
+
+  setIfDefined(config, 'showTestTiming', parseBoolean(env.XCODEBUILDMCP_SHOW_TEST_TIMING));
 
   setIfDefined(
     config,
@@ -480,6 +485,13 @@ function resolveConfig(opts: {
       fileConfig: opts.fileConfig,
       envConfig,
       fallback: DEFAULT_CONFIG.disableXcodeAutoSync,
+    }),
+    showTestTiming: resolveFromLayers({
+      key: 'showTestTiming',
+      overrides: opts.overrides,
+      fileConfig: opts.fileConfig,
+      envConfig,
+      fallback: DEFAULT_CONFIG.showTestTiming,
     }),
     uiDebuggerGuardMode: resolveFromLayers({
       key: 'uiDebuggerGuardMode',

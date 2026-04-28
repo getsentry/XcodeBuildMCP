@@ -58,6 +58,7 @@ function isRunStateFragment(fragment: DomainFragment): fragment is RunStateEvent
     case 'test-discovery':
     case 'test-progress':
     case 'test-failure':
+    case 'test-case-result':
       return true;
     default:
       return false;

@@ -57,6 +57,146 @@
           "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286"
         }
       ]
-    }
+    },
+    "testCases": [
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testAddition",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testAppLaunch",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculationPerformance",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorOperationsEnum",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceBasicOperation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceChainedOperations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceClear",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceCreation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceFailure",
+        "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServicePublicInterface",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServicePublicProperties",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testComplexCalculationWorkflow",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testContentViewInitialization",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testDivisionByZero",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testLargeNumberInputPerformance",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testLargeNumbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testMultipleDecimalPointsHandling",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testPercentageCalculation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testRepeatedEquals",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testSignToggle",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testStateConsistencyAfterOperations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testStateConsistencyWithDecimalNumbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "IntentionalFailureTests",
+        "test": "test",
+        "status": "failed",
+        "durationMs": 0
+      }
+    ]
   }
 }

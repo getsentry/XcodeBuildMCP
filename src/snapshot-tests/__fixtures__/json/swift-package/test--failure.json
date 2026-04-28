@@ -40,6 +40,44 @@
           "location": "SimpleTests.swift:57"
         }
       ]
-    }
+    },
+    "testCases": [
+      {
+        "test": "Array operations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Basic math operations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Basic truth assertions",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Optional handling",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "String operations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "test",
+        "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceFailure",
+        "status": "failed",
+        "durationMs": 0
+      }
+    ]
   }
 }

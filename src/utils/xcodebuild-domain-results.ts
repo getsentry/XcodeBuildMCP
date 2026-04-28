@@ -376,6 +376,12 @@ export function createTestDomainResult(options: {
   const skipped = state.skippedTests;
   const passed = Math.max(0, state.completedTests - failed - skipped);
   const testSelectionInfo = createTestSelectionInfo(options.preflight);
+  const testCases = state.testCaseResults.map((fragment) => ({
+    ...(fragment.suite !== undefined ? { suite: fragment.suite } : {}),
+    test: fragment.test,
+    status: fragment.status,
+    ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
+  }));
   const result: TestResultDomainResult = {
     kind: 'test-result',
     request: options.request,
@@ -398,6 +404,7 @@ export function createTestDomainResult(options: {
     artifacts: options.artifacts,
     ...(testSelectionInfo ? { tests: testSelectionInfo } : {}),
     diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
+    ...(testCases.length > 0 ? { testCases } : {}),
   };
 
   return result;
