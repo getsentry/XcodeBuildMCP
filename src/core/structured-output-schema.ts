@@ -73,7 +73,17 @@ function readJsonObject(filePath: string, label: string): JsonObject {
 }
 
 function schemaPathFor(ref: StructuredOutputSchemaRef): string {
-  return path.join(getStructuredOutputSchemasDir(), ref.schema, `${ref.version}.schema.json`);
+  const schemasDir = getStructuredOutputSchemasDir();
+  const schemaPath = path.join(schemasDir, ref.schema, `${ref.version}.schema.json`);
+  const resolvedPath = path.resolve(schemaPath);
+  const resolvedSchemasDir = path.resolve(schemasDir);
+
+  // Prevent path traversal attacks by ensuring the resolved path is within the schemas directory
+  if (!resolvedPath.startsWith(resolvedSchemasDir + path.sep) && resolvedPath !== resolvedSchemasDir) {
+    throw new Error(`Invalid schema path: attempted path traversal detected for ${ref.schema}@${ref.version}`);
+  }
+
+  return schemaPath;
 }
 
 function collectAndRewriteCommonRefs(value: unknown, pendingDefs: Set<string>): unknown {
@@ -192,8 +202,19 @@ export function getMcpOutputSchema(ref: StructuredOutputSchemaRef): JsonObject {
   }
 
   const rootSchema = readJsonObject(schemaPathFor(ref), `${ref.schema}@${ref.version}`);
+
+  // Validate common schema path to prevent path traversal
+  const schemasDir = getStructuredOutputSchemasDir();
+  const commonSchemaPath = path.join(schemasDir, '_defs', 'common.schema.json');
+  const resolvedCommonPath = path.resolve(commonSchemaPath);
+  const resolvedSchemasDir = path.resolve(schemasDir);
+
+  if (!resolvedCommonPath.startsWith(resolvedSchemasDir + path.sep) && resolvedCommonPath !== resolvedSchemasDir) {
+    throw new Error('Invalid common schema path: attempted path traversal detected');
+  }
+
   const commonSchema = readJsonObject(
-    path.join(getStructuredOutputSchemasDir(), '_defs', 'common.schema.json'),
+    commonSchemaPath,
     'common structured output definitions',
   );
   const bundled = bundleSchema(rootSchema, commonSchema);
