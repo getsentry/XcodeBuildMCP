@@ -66,13 +66,14 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
     vi.useRealTimers();
   });
 
-  async function runRefresh(options: { simulatorId: string; simulatorName: string }) {
+  async function runRefresh(options: { simulatorId?: string; simulatorName?: string }) {
     vi.useFakeTimers();
 
-    sessionStore.setDefaults({
-      simulatorId: options.simulatorId,
-      simulatorName: options.simulatorName,
-    });
+    const defaults = {
+      ...(options.simulatorId != null ? { simulatorId: options.simulatorId } : {}),
+      ...(options.simulatorName != null ? { simulatorName: options.simulatorName } : {}),
+    };
+    sessionStore.setDefaults(defaults);
     const expectedRevision = sessionStore.getRevision();
 
     const scheduled = scheduleSimulatorDefaultsRefresh({
@@ -87,6 +88,25 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
     expect(scheduled).toBe(true);
     await vi.runAllTimersAsync();
   }
+
+  it('resolves simulatorName to simulatorId once when only name is set', async () => {
+    resolveSimulatorNameToIdMock.mockResolvedValue({
+      success: true,
+      simulatorId: 'SIM-1',
+      simulatorName: 'iPhone 17 Pro',
+    });
+
+    await runRefresh({ simulatorName: 'iPhone 17 Pro' });
+
+    expect(resolveSimulatorNameToIdMock).toHaveBeenCalledTimes(1);
+    expect(resolveSimulatorIdToNameMock).not.toHaveBeenCalled();
+    expect(sessionStore.getAll()).toEqual({
+      simulatorId: 'SIM-1',
+      simulatorName: 'iPhone 17 Pro',
+      simulatorPlatform: 'iOS Simulator',
+    });
+    expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
+  });
 
   it('does not patch defaults when both values are set and name resolves to same id', async () => {
     resolveSimulatorNameToIdMock.mockResolvedValue({

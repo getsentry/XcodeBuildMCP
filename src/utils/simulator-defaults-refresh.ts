@@ -50,23 +50,13 @@ async function refreshSimulatorDefaults(
   const executor = options.executor ?? getDefaultCommandExecutor();
 
   try {
-    if (!simulatorId && simulatorName) {
-      const resolution = await resolveSimulatorNameToId(executor, simulatorName);
-      if (resolution.success) {
-        simulatorId = resolution.simulatorId;
-        patch.simulatorId = resolution.simulatorId;
-      }
-    }
-
-    if (simulatorId && simulatorName) {
+    if (simulatorName) {
       const resolution = await resolveSimulatorNameToId(executor, simulatorName);
       if (resolution.success && resolution.simulatorId !== simulatorId) {
         simulatorId = resolution.simulatorId;
         patch.simulatorId = resolution.simulatorId;
       }
-    }
-
-    if (!simulatorName && simulatorId) {
+    } else if (simulatorId) {
       const resolution = await resolveSimulatorIdToName(executor, simulatorId);
       if (resolution.success) {
         simulatorName = resolution.simulatorName;
