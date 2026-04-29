@@ -2,7 +2,8 @@
 # https://github.com/getsentry/warden
 #
 # Warden reviews code using AI-powered skills triggered by GitHub events.
-# Skills live in .agents/skills/ or .claude/skills/
+# Skills live in .agents/skills/ or .claude/skills/, or are pulled from GitHub
+# via the remote field.
 #
 # Add skills with: warden add <skill-name>
 
@@ -171,12 +172,21 @@ paths = [
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
 
-# Remote skills from getsentry/skills
+# Remote security skills from getsentry/warden-skills
 
 [[skills]]
-name = "find-bugs"
-remote = "getsentry/skills"
-paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,ts}"]
+name = "wrdn-pii"
+remote = "getsentry/warden-skills"
+paths = ["**/*"]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "wrdn-authz"
+remote = "getsentry/warden-skills"
+paths = ["src/**/*.ts"]
 ignorePaths = [
   "**/*.test.ts",
   "**/__tests__/**",
@@ -189,8 +199,8 @@ type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
-name = "security-review"
-remote = "getsentry/skills"
+name = "wrdn-code-execution"
+remote = "getsentry/warden-skills"
 paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,sh,ts}"]
 ignorePaths = [
   "**/*.test.ts",
@@ -204,9 +214,48 @@ type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
-name = "gha-security-review"
+name = "wrdn-data-exfil"
+remote = "getsentry/warden-skills"
+paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,sh,ts}"]
+ignorePaths = [
+  "**/*.test.ts",
+  "**/__tests__/**",
+  "**/__fixtures__/**",
+  "**/__snapshots__/**",
+]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "wrdn-gha-workflows"
+remote = "getsentry/warden-skills"
+paths = [
+  ".github/workflows/*.yml",
+  ".github/workflows/*.yaml",
+  ".github/actions/**/*.yml",
+  ".github/actions/**/*.yaml",
+  "action.yml",
+  "action.yaml",
+]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+# Remote code-quality skills from getsentry/skills
+
+[[skills]]
+name = "find-bugs"
 remote = "getsentry/skills"
-paths = [".github/workflows/**", ".github/actions/**"]
+paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,ts}"]
+ignorePaths = [
+  "**/*.test.ts",
+  "**/__tests__/**",
+  "**/__fixtures__/**",
+  "**/__snapshots__/**",
+]
 
 [[skills.triggers]]
 type = "pull_request"
