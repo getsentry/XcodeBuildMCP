@@ -158,7 +158,7 @@ jobs:
           files: |
             xcodebuildmcp-${{ steps.get_version.outputs.VERSION }}.tgz
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
 
       - name: Summary
         env:
@@ -176,7 +176,7 @@ jobs:
           fi
 
   mcp_registry:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !contains(needs.release.outputs.version, '-')
     needs: release
     runs-on: ubuntu-latest
     env:
@@ -391,7 +391,7 @@ jobs:
             --repo "$REPOSITORY"
 
   update_homebrew_tap:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && !contains(needs.release.outputs.version, '-')
     needs: [release, build_and_package_macos, publish_portable_assets]
     runs-on: ubuntu-latest
     env:
