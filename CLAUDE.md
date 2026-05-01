@@ -28,7 +28,9 @@ When reading issues:
 - Technical prose only, be kind but direct (e.g., "Thanks @user" not "Thanks so much @user!")
 
 ## Docs
--
+- Do not commit transient investigation notes, prompt exports, or scratch analysis docs after the work is complete.
+- If an investigation leaves unresolved follow-up work, move it to a GitHub issue instead of preserving the transient doc in the branch.
+
 ### Changelog
 Location: `CHANGELOG.md`
 
