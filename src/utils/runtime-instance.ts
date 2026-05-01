@@ -52,13 +52,3 @@ export function setRuntimeInstanceForTests(instance: RuntimeInstance | null): vo
   runtimeInstance = instance;
   runtimeWorkspaceKey = instance?.workspaceKey ?? null;
 }
-
-export function setRuntimeWorkspaceKeyForTests(workspaceKey: string | null): void {
-  if (workspaceKey === null) {
-    runtimeWorkspaceKey = null;
-    runtimeInstance = null;
-    return;
-  }
-
-  configureRuntimeWorkspaceKey(workspaceKey);
-}
