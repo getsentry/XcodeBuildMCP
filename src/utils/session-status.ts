@@ -1,6 +1,5 @@
 import { getDefaultDebuggerManager } from './debugger/index.ts';
 import { listActiveSimulatorLaunchOsLogSessions } from './log-capture/index.ts';
-import { activeDeviceLogSessions } from './log-capture/device-log-sessions.ts';
 import { getDaemonActivitySnapshot } from '../daemon/activity-registry.ts';
 import { activeProcesses } from '../mcp/tools/swift-package/active-processes.ts';
 import { listActiveVideoCaptureSessionIds } from './video_capture.ts';
@@ -19,7 +18,6 @@ export type SessionRuntimeStatusSnapshot = {
         ownedByCurrentProcess: boolean;
       }>;
     };
-    device: { activeSessionIds: string[] };
   };
   debug: {
     currentSessionId: string | null;
@@ -60,9 +58,6 @@ export async function getSessionRuntimeStatusSnapshot(): Promise<SessionRuntimeS
     logging: {
       simulator: {
         activeLaunchOsLogSessions: await listActiveSimulatorLaunchOsLogSessions(),
-      },
-      device: {
-        activeSessionIds: Array.from(activeDeviceLogSessions.keys()).sort(),
       },
     },
     debug: {

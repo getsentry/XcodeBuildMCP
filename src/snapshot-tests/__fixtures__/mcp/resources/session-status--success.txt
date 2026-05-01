@@ -1,11 +1,7 @@
 {
   "logging": {
     "simulator": {
-      "activeSessionIds": [],
       "activeLaunchOsLogSessions": []
-    },
-    "device": {
-      "activeSessionIds": []
     }
   },
   "debug": {

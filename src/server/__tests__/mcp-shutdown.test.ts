@@ -4,11 +4,6 @@ const mocks = vi.hoisted(() => ({
   stopXcodeStateWatcher: vi.fn(async () => undefined),
   shutdownXcodeToolsBridge: vi.fn(async () => undefined),
   disposeAll: vi.fn(async () => undefined),
-  stopAllDeviceLogCaptures: vi.fn(async () => ({
-    stoppedSessionCount: 0,
-    errorCount: 0,
-    errors: [],
-  })),
   stopOwnedSimulatorLaunchOsLogSessions: vi.fn(async () => ({
     stoppedSessionCount: 0,
     errorCount: 0,
@@ -37,9 +32,6 @@ vi.mock('../../integrations/xcode-tools-bridge/index.ts', () => ({
 }));
 vi.mock('../../utils/debugger/index.ts', () => ({
   getDefaultDebuggerManager: () => ({ disposeAll: mocks.disposeAll }),
-}));
-vi.mock('../../utils/log-capture/device-log-sessions.ts', () => ({
-  stopAllDeviceLogCaptures: mocks.stopAllDeviceLogCaptures,
 }));
 vi.mock('../../utils/log-capture/simulator-launch-oslog-sessions.ts', () => ({
   stopOwnedSimulatorLaunchOsLogSessions: mocks.stopOwnedSimulatorLaunchOsLogSessions,
@@ -88,7 +80,6 @@ describe('runMcpShutdown', () => {
         debuggerSessionCount: 0,
         simulatorLaunchOsLogSessionCount: 0,
         ownedSimulatorLaunchOsLogSessionCount: 0,
-        deviceLogSessionCount: 0,
         videoCaptureSessionCount: 0,
         swiftPackageProcessCount: 0,
         matchingMcpProcessCount: 0,
@@ -105,7 +96,6 @@ describe('runMcpShutdown', () => {
     expect(mocks.stopXcodeStateWatcher).toHaveBeenCalledTimes(1);
     expect(mocks.shutdownXcodeToolsBridge).toHaveBeenCalledTimes(1);
     expect(mocks.disposeAll).toHaveBeenCalledTimes(1);
-    expect(mocks.stopAllDeviceLogCaptures).toHaveBeenCalledTimes(1);
     expect(mocks.stopOwnedSimulatorLaunchOsLogSessions).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllVideoCaptureSessions).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
@@ -135,7 +125,6 @@ describe('runMcpShutdown', () => {
         debuggerSessionCount: 0,
         simulatorLaunchOsLogSessionCount: 1,
         ownedSimulatorLaunchOsLogSessionCount: 1,
-        deviceLogSessionCount: 0,
         videoCaptureSessionCount: 0,
         swiftPackageProcessCount: 0,
         matchingMcpProcessCount: 0,
@@ -175,7 +164,6 @@ describe('runMcpShutdown', () => {
         debuggerSessionCount: 0,
         simulatorLaunchOsLogSessionCount: 2,
         ownedSimulatorLaunchOsLogSessionCount: 2,
-        deviceLogSessionCount: 0,
         videoCaptureSessionCount: 0,
         swiftPackageProcessCount: 0,
         matchingMcpProcessCount: 0,
@@ -214,7 +202,6 @@ describe('runMcpShutdown', () => {
         debuggerSessionCount: 1,
         simulatorLaunchOsLogSessionCount: 0,
         ownedSimulatorLaunchOsLogSessionCount: 0,
-        deviceLogSessionCount: 0,
         videoCaptureSessionCount: 0,
         swiftPackageProcessCount: 0,
         matchingMcpProcessCount: 0,

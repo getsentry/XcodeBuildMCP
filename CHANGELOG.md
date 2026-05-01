@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Removed stale physical-device log session status and shutdown cleanup for deprecated standalone device log capture, and corrected the device build-and-run tool description.
 - Fixed CLI test summaries showing false-positive compiler errors from xcodebuild NSError dump lines, and added compiler-error snapshot coverage for simulator, device, and macOS build-style flows ([#383](https://github.com/getsentry/XcodeBuildMCP/issues/383)).
 - Fixed simulator OSLog helper cleanup so server and daemon startup reconcile same-workspace orphaned log streams without stopping helpers owned by live sessions in other workspaces ([#382](https://github.com/getsentry/XcodeBuildMCP/issues/382)).
 
@@ -34,7 +35,7 @@ xcodebuildmcp simulator build-and-run --scheme MyApp --project-path ./MyApp.xcod
 xcodebuildmcp simulator launch-app --simulator-id <UDID> --bundle-id com.example.MyApp
 ```
 
-For MCP clients, use `build_run_sim`, `launch_app_sim`, or `build_run_device` and read the returned runtime log path.
+For MCP clients, use `build_run_sim` or `launch_app_sim` and read the returned runtime log path.
 
 ### New! Structured outputs
 

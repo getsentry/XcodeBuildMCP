@@ -7,7 +7,6 @@ import type { ChildProcess } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { clearDaemonActivityRegistry } from '../../../daemon/activity-registry.ts';
 import { getDefaultDebuggerManager } from '../../../utils/debugger/index.ts';
-import { activeDeviceLogSessions } from '../../../utils/log-capture/device-log-sessions.ts';
 import {
   clearAllSimulatorLaunchOsLogSessionsForTests,
   registerSimulatorLaunchOsLogSession,
@@ -39,7 +38,6 @@ describe('session-status resource', () => {
       workspaceKey: 'workspace-a',
     });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
-    activeDeviceLogSessions.clear();
     clearAllProcesses();
     await clearAllSimulatorLaunchOsLogSessionsForTests();
     clearDaemonActivityRegistry();
@@ -47,7 +45,6 @@ describe('session-status resource', () => {
   });
 
   afterEach(async () => {
-    activeDeviceLogSessions.clear();
     clearAllProcesses();
     await clearAllSimulatorLaunchOsLogSessionsForTests();
     clearDaemonActivityRegistry();
@@ -66,7 +63,7 @@ describe('session-status resource', () => {
       const parsed = JSON.parse(result.contents[0].text);
 
       expect(parsed.logging.simulator.activeLaunchOsLogSessions).toEqual([]);
-      expect(parsed.logging.device.activeSessionIds).toEqual([]);
+      expect(parsed.logging.device).toBeUndefined();
       expect(parsed.debug.currentSessionId).toBe(null);
       expect(parsed.debug.sessionIds).toEqual([]);
       expect(parsed.watcher).toEqual({ running: false, watchedPath: null });

@@ -1,7 +1,6 @@
 import process from 'node:process';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
-import { activeDeviceLogSessions } from '../utils/log-capture/device-log-sessions.ts';
 import {
   listActiveSimulatorLaunchOsLogSessions,
   terminateLiveSimulatorLaunchOsLogSessionsSync,
@@ -65,7 +64,6 @@ export interface McpLifecycleSnapshot {
   debuggerSessionCount: number;
   simulatorLaunchOsLogSessionCount: number;
   ownedSimulatorLaunchOsLogSessionCount: number;
-  deviceLogSessionCount: number;
   videoCaptureSessionCount: number;
   swiftPackageProcessCount: number;
   matchingMcpProcessCount: number | null;
@@ -306,7 +304,6 @@ export async function buildMcpLifecycleSnapshot(options: {
     ownedSimulatorLaunchOsLogSessionCount: simulatorLaunchOsLogSessions.filter(
       (session) => session.ownedByCurrentProcess,
     ).length,
-    deviceLogSessionCount: activeDeviceLogSessions.size,
     videoCaptureSessionCount: listActiveVideoCaptureSessionIds().length,
     swiftPackageProcessCount: activeProcesses.size,
     matchingMcpProcessCount: peerSample.count,
