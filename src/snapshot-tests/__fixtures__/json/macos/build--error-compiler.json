@@ -25,7 +25,7 @@
       "errors": [
         {
           "message": "cannot convert value of type 'String' to specified type 'Int'",
-          "location": "<ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:19"
+          "location": "<ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:20"
         }
       ]
     }

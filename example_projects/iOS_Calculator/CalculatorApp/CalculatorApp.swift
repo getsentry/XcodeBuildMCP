@@ -28,3 +28,7 @@ struct CalculatorApp: App {
 #Preview {
     ContentView()
 }
+
+#if SNAPSHOT_COMPILER_ERROR
+private let snapshotCompilerError: Int = "not an int"
+#endif

@@ -27,7 +27,7 @@
       "errors": [
         {
           "message": "cannot convert value of type 'String' to specified type 'Int'",
-          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:32"
+          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33"
         }
       ]
     }

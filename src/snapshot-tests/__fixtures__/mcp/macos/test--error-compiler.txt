@@ -17,7 +17,7 @@ Discovered 2 test(s):
 Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    <ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:19
+    <ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:20
 
 ❌ Test failed. (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

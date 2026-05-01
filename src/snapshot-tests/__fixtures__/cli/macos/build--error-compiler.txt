@@ -10,7 +10,7 @@
 Compiler Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    example_projects/macOS/MCPTest/MCPTestApp.swift:19:42
+    example_projects/macOS/MCPTest/MCPTestApp.swift:20:42
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_macos_<TIMESTAMP>_pid<PID>.log

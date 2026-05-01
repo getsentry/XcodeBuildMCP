@@ -6,9 +6,9 @@ import { ensureSimulatorBooted } from '../harness.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
 import {
+  compilerErrorExtraArgs,
   createHarnessForRuntime,
   createWorkflowFixtureMatcher,
-  withCalculatorAppCompilerError,
 } from './helpers.ts';
 
 const TEST_TIMEOUT_MS = 120_000;
@@ -71,13 +71,12 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text, isError } = await withCalculatorAppCompilerError(() =>
-            harness.invoke('simulator', 'build', {
-              workspacePath: WORKSPACE,
-              scheme: SCHEME,
-              simulatorName: SIMULATOR_NAME,
-            }),
-          );
+          const { text, isError } = await harness.invoke('simulator', 'build', {
+            workspacePath: WORKSPACE,
+            scheme: SCHEME,
+            simulatorName: SIMULATOR_NAME,
+            extraArgs: compilerErrorExtraArgs(),
+          });
           expect(isError).toBe(true);
           expectFixture(text, 'build--error-compiler');
         },
@@ -118,13 +117,12 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text, isError } = await withCalculatorAppCompilerError(() =>
-            harness.invoke('simulator', 'build-and-run', {
-              workspacePath: WORKSPACE,
-              scheme: SCHEME,
-              simulatorName: SIMULATOR_NAME,
-            }),
-          );
+          const { text, isError } = await harness.invoke('simulator', 'build-and-run', {
+            workspacePath: WORKSPACE,
+            scheme: SCHEME,
+            simulatorName: SIMULATOR_NAME,
+            extraArgs: compilerErrorExtraArgs(),
+          });
           expect(isError).toBe(true);
           expectFixture(text, 'build-and-run--error-compiler');
         },
@@ -181,14 +179,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text, isError } = await withCalculatorAppCompilerError(() =>
-            harness.invoke('simulator', 'test', {
-              workspacePath: WORKSPACE,
-              scheme: SCHEME,
-              simulatorName: SIMULATOR_NAME,
-              extraArgs: ['-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition'],
-            }),
-          );
+          const { text, isError } = await harness.invoke('simulator', 'test', {
+            workspacePath: WORKSPACE,
+            scheme: SCHEME,
+            simulatorName: SIMULATOR_NAME,
+            extraArgs: compilerErrorExtraArgs([
+              '-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition',
+            ]),
+          });
           expect(isError).toBe(true);
           expectFixture(text, 'test--error-compiler');
         },

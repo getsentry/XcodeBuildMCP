@@ -15,3 +15,7 @@ struct MCPTestApp: App {
         }
     }
 }
+
+#if SNAPSHOT_COMPILER_ERROR
+private let snapshotCompilerError: Int = "not an int"
+#endif

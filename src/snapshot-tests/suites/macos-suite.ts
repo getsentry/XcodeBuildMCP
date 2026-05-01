@@ -5,9 +5,9 @@ import path from 'node:path';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
 import {
+  compilerErrorExtraArgs,
   createHarnessForRuntime,
   createWorkflowFixtureMatcher,
-  withMacosAppCompilerError,
 } from './helpers.ts';
 
 const PROJECT = 'example_projects/macOS/MCPTest.xcodeproj';
@@ -74,12 +74,11 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await withMacosAppCompilerError(() =>
-          harness.invoke('macos', 'build', {
-            projectPath: PROJECT,
-            scheme: 'MCPTest',
-          }),
-        );
+        const { text, isError } = await harness.invoke('macos', 'build', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+          extraArgs: compilerErrorExtraArgs(),
+        });
         expect(isError).toBe(true);
         expectFixture(text, 'build--error-compiler');
       });
@@ -106,12 +105,11 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await withMacosAppCompilerError(() =>
-          harness.invoke('macos', 'build-and-run', {
-            projectPath: PROJECT,
-            scheme: 'MCPTest',
-          }),
-        );
+        const { text, isError } = await harness.invoke('macos', 'build-and-run', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+          extraArgs: compilerErrorExtraArgs(),
+        });
         expect(isError).toBe(true);
         expectFixture(text, 'build-and-run--error-compiler');
       });
@@ -152,16 +150,14 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await withMacosAppCompilerError(() =>
-          harness.invoke('macos', 'test', {
-            projectPath: PROJECT,
-            scheme: 'MCPTest',
-            extraArgs: [
-              '-only-testing:MCPTestTests/MCPTestTests/appNameIsCorrect()',
-              '-only-testing:MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
-            ],
-          }),
-        );
+        const { text, isError } = await harness.invoke('macos', 'test', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+          extraArgs: compilerErrorExtraArgs([
+            '-only-testing:MCPTestTests/MCPTestTests/appNameIsCorrect()',
+            '-only-testing:MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
+          ]),
+        });
         expect(isError).toBe(true);
         expectFixture(text, 'test--error-compiler');
       });

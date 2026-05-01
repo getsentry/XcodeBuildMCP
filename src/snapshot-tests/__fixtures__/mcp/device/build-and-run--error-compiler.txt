@@ -11,7 +11,7 @@
 Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:32
+    <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_device_<TIMESTAMP>_pid<PID>.log
