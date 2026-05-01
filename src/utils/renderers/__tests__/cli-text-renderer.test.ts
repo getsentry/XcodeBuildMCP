@@ -191,6 +191,81 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('\u{274C} Build failed. (\u{23F1}\u{FE0F} 1.2s)');
   });
 
+  it('does not flush buffered compiler errors after a successful final summary', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'test-result',
+          fragment: 'compiler-diagnostic',
+          severity: 'error',
+          operation: 'TEST',
+          message: 'SimCallingSelector=launchApplicationWithID:options:pid:error:,',
+          rawLine: 'SimCallingSelector=launchApplicationWithID:options:pid:error:,',
+        },
+        {
+          kind: 'test-result',
+          fragment: 'build-summary',
+          operation: 'TEST',
+          status: 'SUCCEEDED',
+          totalTests: 1,
+          passedTests: 1,
+          failedTests: 0,
+          skippedTests: 0,
+        },
+      ],
+    });
+
+    expect(output).toContain('✅ 1 test passed, 0 skipped');
+    expect(output).not.toContain('Compiler Errors (1):');
+    expect(output).not.toContain('SimCallingSelector=launchApplicationWithID:options:pid:error:,');
+  });
+
+  it('flushes buffered compiler errors after a failed final summary', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'test-result',
+          fragment: 'compiler-diagnostic',
+          severity: 'error',
+          operation: 'TEST',
+          message: 'unterminated string literal',
+          rawLine: '/tmp/MCPTest/ContentView.swift:16:18: error: unterminated string literal',
+        },
+        {
+          kind: 'test-result',
+          fragment: 'build-summary',
+          operation: 'TEST',
+          status: 'FAILED',
+          totalTests: 1,
+          passedTests: 0,
+          failedTests: 1,
+          skippedTests: 0,
+        },
+      ],
+    });
+
+    expect(output).toContain('Compiler Errors (1):');
+    expect(output).toContain('unterminated string literal');
+  });
+
+  it('flushes buffered compiler errors when final status is unknown', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'build-result',
+          fragment: 'compiler-diagnostic',
+          severity: 'error',
+          operation: 'BUILD',
+          message: 'unknown build failure',
+          rawLine: 'error: unknown build failure',
+        },
+      ],
+    });
+
+    expect(output).toContain('Errors (1):');
+    expect(output).toContain('unknown build failure');
+  });
+
   it('groups compiler diagnostics under a nested failure header before the failed summary', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });

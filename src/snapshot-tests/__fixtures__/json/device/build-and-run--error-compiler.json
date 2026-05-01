@@ -1,0 +1,35 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Build failed",
+  "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>",
+      "configuration": "Debug",
+      "platform": "iOS",
+      "deviceId": "<UUID>",
+      "target": "device"
+    },
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "device"
+    },
+    "artifacts": {
+      "deviceId": "<UUID>",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_device_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "cannot convert value of type 'String' to specified type 'Int'",
+          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:32"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Build failed",
+  "data": {
+    "request": {
+      "scheme": "MCPTest",
+      "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>",
+      "configuration": "Debug",
+      "platform": "macOS",
+      "target": "macos"
+    },
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "macos"
+    },
+    "artifacts": {
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_macos_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "cannot convert value of type 'String' to specified type 'Int'",
+          "location": "<ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:19"
+        }
+      ]
+    }
+  }
+}

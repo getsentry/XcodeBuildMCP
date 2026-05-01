@@ -5,7 +5,11 @@ import path from 'node:path';
 import { ensureSimulatorBooted } from '../harness.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
-import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+import {
+  createHarnessForRuntime,
+  createWorkflowFixtureMatcher,
+  withCalculatorAppCompilerError,
+} from './helpers.ts';
 
 const TEST_TIMEOUT_MS = 120_000;
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
@@ -63,6 +67,22 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         },
         TEST_TIMEOUT_MS,
       );
+
+      it(
+        'error - compiler error',
+        async () => {
+          const { text, isError } = await withCalculatorAppCompilerError(() =>
+            harness.invoke('simulator', 'build', {
+              workspacePath: WORKSPACE,
+              scheme: SCHEME,
+              simulatorName: SIMULATOR_NAME,
+            }),
+          );
+          expect(isError).toBe(true);
+          expectFixture(text, 'build--error-compiler');
+        },
+        TEST_TIMEOUT_MS,
+      );
     });
 
     describe('build-and-run', () => {
@@ -91,6 +111,22 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
           });
           expect(isError).toBe(true);
           expectFixture(text, 'build-and-run--error-wrong-scheme');
+        },
+        TEST_TIMEOUT_MS,
+      );
+
+      it(
+        'error - compiler error',
+        async () => {
+          const { text, isError } = await withCalculatorAppCompilerError(() =>
+            harness.invoke('simulator', 'build-and-run', {
+              workspacePath: WORKSPACE,
+              scheme: SCHEME,
+              simulatorName: SIMULATOR_NAME,
+            }),
+          );
+          expect(isError).toBe(true);
+          expectFixture(text, 'build-and-run--error-compiler');
         },
         TEST_TIMEOUT_MS,
       );
@@ -138,6 +174,23 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
           });
           expect(isError).toBe(true);
           expectFixture(text, 'test--error-wrong-scheme');
+        },
+        TEST_TIMEOUT_MS,
+      );
+
+      it(
+        'error - compiler error',
+        async () => {
+          const { text, isError } = await withCalculatorAppCompilerError(() =>
+            harness.invoke('simulator', 'test', {
+              workspacePath: WORKSPACE,
+              scheme: SCHEME,
+              simulatorName: SIMULATOR_NAME,
+              extraArgs: ['-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition'],
+            }),
+          );
+          expect(isError).toBe(true);
+          expectFixture(text, 'test--error-compiler');
         },
         TEST_TIMEOUT_MS,
       );

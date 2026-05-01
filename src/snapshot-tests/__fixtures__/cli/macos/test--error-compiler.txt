@@ -1,0 +1,23 @@
+
+🧪 Test
+
+   Scheme: MCPTest
+   Project: example_projects/macOS/MCPTest.xcodeproj
+   Configuration: Debug
+   Platform: macOS
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>
+   Selective Testing:
+     MCPTestTests/MCPTestTests/appNameIsCorrect()
+     MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
+
+Discovered 2 test(s):
+   MCPTestTests/MCPTestTests/appNameIsCorrect
+   MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
+
+Compiler Errors (1):
+
+  ✗ cannot convert value of type 'String' to specified type 'Int'
+    example_projects/macOS/MCPTest/MCPTestApp.swift:19:42
+
+❌ Test failed. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/test_macos_<TIMESTAMP>_pid<PID>.log

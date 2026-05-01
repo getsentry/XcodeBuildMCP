@@ -262,6 +262,34 @@ describe('xcodebuild-event-parser', () => {
     });
   });
 
+  it('does not emit compiler errors for NSError selector dump lines', () => {
+    const events = collectEvents('TEST', [
+      { source: 'stderr', text: 'pid:error:,\n' },
+      {
+        source: 'stderr',
+        text: '} (error = Error Domain=FBSOpenApplicationServiceErrorDomain Code=1 "The request was denied" UserInfo={BSErrorCodeDescription=RequestDenied, SimCallingSelector=launchApplicationWithID:options:pid:error:, NSLocalizedDescription=The request was denied})\n',
+      },
+      {
+        source: 'stdout',
+        text: "Test Case '-[WeatherTests.WeatherTests testLoadsForecast]' passed (0.002 seconds)\n",
+      },
+    ]);
+
+    const errors = events.filter(
+      (e) => e.fragment === 'compiler-diagnostic' && e.severity === 'error',
+    );
+    const cases = events.filter((e) => e.fragment === 'test-case-result');
+
+    expect(errors).toHaveLength(0);
+    expect(cases).toHaveLength(1);
+    expect(cases[0]).toMatchObject({
+      fragment: 'test-case-result',
+      status: 'passed',
+      suite: 'WeatherTests',
+      test: 'testLoadsForecast',
+    });
+  });
+
   it('emits swift-testing issue fallbacks as test failures with the full raw line', () => {
     const line =
       '✘ Test "Parameterized failure" recorded an issue with 1 argument value → key:value: opaque failure';

@@ -1,0 +1,51 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "1",
+  "didError": true,
+  "error": "Tests failed",
+  "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>",
+      "configuration": "Debug",
+      "platform": "iOS",
+      "deviceId": "<UUID>",
+      "target": "device",
+      "onlyTesting": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
+      "skipTesting": []
+    },
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "device"
+    },
+    "artifacts": {
+      "deviceId": "<UUID>",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_device_<TIMESTAMP>_pid<PID>.log"
+    },
+    "tests": {
+      "selected": [
+        "CalculatorAppTests/CalculatorAppTests/testAddition"
+      ],
+      "discovered": {
+        "total": 1,
+        "items": [
+          "CalculatorAppTests/CalculatorAppTests/testAddition"
+        ]
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "cannot convert value of type 'String' to specified type 'Int'",
+          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:32"
+        }
+      ],
+      "testFailures": []
+    }
+  }
+}

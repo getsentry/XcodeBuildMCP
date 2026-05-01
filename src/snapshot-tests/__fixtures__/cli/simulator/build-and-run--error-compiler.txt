@@ -1,0 +1,17 @@
+
+🚀 Build & Run
+
+   Scheme: CalculatorApp
+   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+   Configuration: Debug
+   Platform: iOS Simulator
+   Simulator: iPhone 17
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
+
+Compiler Errors (1):
+
+  ✗ cannot convert value of type 'String' to specified type 'Int'
+    example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:32:42
+
+❌ Build failed. (⏱️ <DURATION>)
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_sim_<TIMESTAMP>_pid<PID>.log

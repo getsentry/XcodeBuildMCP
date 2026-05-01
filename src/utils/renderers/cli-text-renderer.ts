@@ -105,6 +105,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let hasDurableRuntimeContent = false;
   let lastVisibleEventType: TextRenderableItem['type'] | null = null;
   let lastStatusLineLevel: StatusRenderItem['level'] | null = null;
+  let lastSummaryStatus: 'SUCCEEDED' | 'FAILED' | null = null;
   let structuredOutput: StructuredToolOutput | undefined;
   let sawIncomingHeaderEvent = false;
   let sawIncomingNonHeaderEvent = false;
@@ -281,6 +282,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'summary': {
+        lastSummaryStatus = item.status;
         const renderedDiagnostics = flushGroupedDiagnostics(item.status === 'FAILED');
 
         if (!renderedDiagnostics && item.status === 'FAILED') {
@@ -417,7 +419,10 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
           }
         }
       }
-      flushGroupedDiagnostics(true);
+      flushGroupedDiagnostics(lastSummaryStatus !== 'SUCCEEDED');
+      groupedCompilerErrors.length = 0;
+      groupedTestFailures.length = 0;
+      groupedWarnings.length = 0;
       const nextStepsBlock = createNextStepsBlock(nextSteps, nextStepsRuntime);
       if (nextStepsBlock && !sawProgressNextSteps) {
         processItem(nextStepsBlock);
@@ -428,6 +433,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       hasDurableRuntimeContent = false;
       lastVisibleEventType = null;
       lastStatusLineLevel = null;
+      lastSummaryStatus = null;
       structuredOutput = undefined;
       sawIncomingHeaderEvent = false;
       sawIncomingNonHeaderEvent = false;

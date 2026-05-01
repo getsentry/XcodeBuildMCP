@@ -5,7 +5,11 @@ import {
   extractAppPathFromSnapshotOutput,
   extractProcessIdFromSnapshotOutput,
 } from '../output-parsers.ts';
-import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+import {
+  createHarnessForRuntime,
+  createWorkflowFixtureMatcher,
+  withCalculatorAppCompilerError,
+} from './helpers.ts';
 
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
 const BUNDLE_ID = 'io.sentry.calculatorapp';
@@ -60,6 +64,17 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(isError).toBe(true);
         expectFixture(text, 'build--error-wrong-scheme');
+      });
+
+      it('error - compiler error', async () => {
+        const { text, isError } = await withCalculatorAppCompilerError(() =>
+          harness.invoke('device', 'build', {
+            workspacePath: WORKSPACE,
+            scheme: 'CalculatorApp',
+          }),
+        );
+        expect(isError).toBe(true);
+        expectFixture(text, 'build--error-compiler');
       });
     });
 
@@ -139,6 +154,18 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         expect(isError).toBe(true);
         expectFixture(text, 'build-and-run--error-wrong-scheme');
       });
+
+      it('error - compiler error', async () => {
+        const { text, isError } = await withCalculatorAppCompilerError(() =>
+          harness.invoke('device', 'build-and-run', {
+            workspacePath: WORKSPACE,
+            scheme: 'CalculatorApp',
+            deviceId: DEVICE_ID,
+          }),
+        );
+        expect(isError).toBe(true);
+        expectFixture(text, 'build-and-run--error-compiler');
+      });
     });
 
     describe.runIf(DEVICE_READY)('install (requires device)', () => {
@@ -215,6 +242,19 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         expect(isError).toBe(true);
         expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'test--failure');
+      }, 300_000);
+
+      it('error - compiler error', async () => {
+        const { text, isError } = await withCalculatorAppCompilerError(() =>
+          harness.invoke('device', 'test', {
+            workspacePath: WORKSPACE,
+            scheme: 'CalculatorApp',
+            deviceId: DEVICE_ID,
+            extraArgs: ['-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition'],
+          }),
+        );
+        expect(isError).toBe(true);
+        expectFixture(text, 'test--error-compiler');
       }, 300_000);
     });
   });

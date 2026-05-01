@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed CLI test summaries showing false-positive compiler errors from xcodebuild NSError dump lines, and added compiler-error snapshot coverage for simulator, device, and macOS build-style flows ([#383](https://github.com/getsentry/XcodeBuildMCP/issues/383)).
 - Fixed simulator OSLog helper cleanup so server and daemon startup reconcile same-workspace orphaned log streams without stopping helpers owned by live sessions in other workspaces ([#382](https://github.com/getsentry/XcodeBuildMCP/issues/382)).
 
 ## [2.5.0-beta.1]

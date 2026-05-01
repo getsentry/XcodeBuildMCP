@@ -49,7 +49,7 @@ export interface ParsedBuildError {
   renderedLine: string;
 }
 
-const BUILD_ERROR_DIAGNOSTIC_PATTERN = /(?:^|[\s:])(?:fatal error|error):\s*\S/iu;
+const BUILD_ERROR_DIAGNOSTIC_PATTERN = /(?:^|\s)(?:fatal error|error):\s+\S/iu;
 
 export function isBuildErrorDiagnosticLine(line: string): boolean {
   return BUILD_ERROR_DIAGNOSTIC_PATTERN.test(line);
