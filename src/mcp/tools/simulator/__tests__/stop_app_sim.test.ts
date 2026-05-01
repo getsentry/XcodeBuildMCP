@@ -67,7 +67,11 @@ describe('stop_app_sim tool', () => {
     trackedChildren.clear();
     registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-stop-app-sim-'));
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
-    setRuntimeInstanceForTests({ instanceId: 'stop-app-sim-test', pid: process.pid });
+    setRuntimeInstanceForTests({
+      instanceId: 'stop-app-sim-test',
+      pid: process.pid,
+      workspaceKey: 'workspace-a',
+    });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async (record) => {
       const child = trackedChildren.get(record.helperPid);
       return child ? child.exitCode == null : true;

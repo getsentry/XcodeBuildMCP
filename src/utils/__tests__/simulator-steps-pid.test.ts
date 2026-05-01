@@ -72,7 +72,11 @@ describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
     logDir = path.join(registryDir, 'logs');
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
     setSimulatorLogDirOverrideForTests(logDir);
-    setRuntimeInstanceForTests({ instanceId: 'launch-test-instance', pid: process.pid });
+    setRuntimeInstanceForTests({
+      instanceId: 'launch-test-instance',
+      pid: process.pid,
+      workspaceKey: 'workspace-a',
+    });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async (record) => {
       const child = trackedChildren.get(record.helperPid);
       return child ? child.exitCode == null : true;

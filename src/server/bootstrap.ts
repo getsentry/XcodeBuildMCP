@@ -7,7 +7,7 @@ import type { RuntimeConfigOverrides } from '../utils/config-store.ts';
 import { getRegisteredWorkflows, registerWorkflowsFromManifest } from '../utils/tool-registry.ts';
 import { bootstrapRuntime } from '../runtime/bootstrap-runtime.ts';
 import { getXcodeToolsBridgeManager } from '../integrations/xcode-tools-bridge/index.ts';
-import { resolveWorkspaceRoot } from '../daemon/socket-path.ts';
+import { resolveWorkspaceRoot, workspaceKeyForRoot } from '../daemon/socket-path.ts';
 import { detectXcodeRuntime } from '../utils/xcode-process.ts';
 import { readXcodeIdeState } from '../utils/xcode-state-reader.ts';
 import { sessionStore } from '../utils/session-store.ts';
@@ -15,6 +15,8 @@ import { startXcodeStateWatcher, lookupBundleId } from '../utils/xcode-state-wat
 import { getDefaultCommandExecutor } from '../utils/command.ts';
 import type { PredicateContext } from '../visibility/predicate-types.ts';
 import { createStartupProfiler, getStartupProfileNowMs } from './startup-profiler.ts';
+import { configureRuntimeWorkspaceKey } from '../utils/runtime-instance.ts';
+import { reconcileSimulatorLaunchOsLogOrphansForWorkspace } from '../utils/log-capture/index.ts';
 
 export interface BootstrapOptions {
   enabledWorkflows?: string[];
@@ -76,6 +78,23 @@ export async function bootstrapServer(
     cwd: result.runtime.cwd,
     projectConfigPath: result.configPath,
   });
+  const workspaceKey = workspaceKeyForRoot(workspaceRoot);
+  configureRuntimeWorkspaceKey(workspaceKey);
+
+  try {
+    const reconciliation = await reconcileSimulatorLaunchOsLogOrphansForWorkspace(workspaceKey);
+    if (reconciliation.stoppedSessionCount > 0 || reconciliation.errorCount > 0) {
+      log(
+        reconciliation.errorCount > 0 ? 'warn' : 'info',
+        `[startup] Simulator OSLog reconciliation: ${JSON.stringify(reconciliation)}`,
+      );
+    }
+  } catch (error) {
+    log(
+      'warn',
+      `[startup] Simulator OSLog reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   log('info', `🚀 Initializing server...`);
 

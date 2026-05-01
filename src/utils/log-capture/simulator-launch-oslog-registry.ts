@@ -6,11 +6,9 @@ import { SIMULATOR_LAUNCH_OSLOG_REGISTRY_DIR } from '../log-paths.ts';
 import type { RuntimeInstance } from '../runtime-instance.ts';
 
 const execFileAsync = promisify(execFile);
-const REGISTRY_VERSION = 1;
 const PROCESS_SAMPLE_CHUNK_SIZE = 100;
 
 export interface SimulatorLaunchOsLogRegistryRecord {
-  version: 1;
   sessionId: string;
   owner: RuntimeInstance;
   simulatorUuid: string;
@@ -45,7 +43,6 @@ function isRecord(value: unknown): value is SimulatorLaunchOsLogRegistryRecord {
 
   const record = value as Partial<SimulatorLaunchOsLogRegistryRecord>;
   return (
-    record.version === REGISTRY_VERSION &&
     typeof record.sessionId === 'string' &&
     typeof record.simulatorUuid === 'string' &&
     typeof record.bundleId === 'string' &&
@@ -59,6 +56,9 @@ function isRecord(value: unknown): value is SimulatorLaunchOsLogRegistryRecord {
     typeof record.owner === 'object' &&
     record.owner !== null &&
     typeof record.owner.instanceId === 'string' &&
+    record.owner.instanceId.length > 0 &&
+    typeof record.owner.workspaceKey === 'string' &&
+    record.owner.workspaceKey.length > 0 &&
     typeof record.owner.pid === 'number' &&
     Number.isInteger(record.owner.pid) &&
     record.owner.pid > 0

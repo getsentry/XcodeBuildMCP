@@ -16,9 +16,8 @@ function createRecord(
   overrides?: Partial<Parameters<typeof writeSimulatorLaunchOsLogRegistryRecord>[0]>,
 ) {
   return {
-    version: 1 as const,
     sessionId: 'session-1',
-    owner: { instanceId: 'instance-1', pid: 1234 },
+    owner: { instanceId: 'instance-1', pid: 1234, workspaceKey: 'workspace-a' },
     simulatorUuid: 'sim-1',
     bundleId: 'io.sentry.app',
     helperPid: process.pid,
@@ -60,6 +59,26 @@ describe.sequential('simulator launch OSLog registry', () => {
     writeFileSync(path.join(registryDir, 'broken.json'), '{not-json');
 
     await expect(listSimulatorLaunchOsLogRegistryRecords()).resolves.toEqual([]);
+  });
+
+  it('prunes records without owner workspace keys', async () => {
+    writeFileSync(
+      path.join(registryDir, 'missing-workspace.json'),
+      `${JSON.stringify({
+        ...createRecord(),
+        owner: { instanceId: 'instance-1', pid: 1234 },
+      })}\n`,
+    );
+
+    await expect(listSimulatorLaunchOsLogRegistryRecords()).resolves.toEqual([]);
+  });
+
+  it('does not require registry version fields', async () => {
+    await writeSimulatorLaunchOsLogRegistryRecord(createRecord());
+
+    await expect(listSimulatorLaunchOsLogRegistryRecords()).resolves.toEqual([
+      expect.objectContaining({ sessionId: 'session-1' }),
+    ]);
   });
 
   it('prunes stale records whose process is gone', async () => {

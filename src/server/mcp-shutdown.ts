@@ -2,7 +2,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
 import { stopXcodeStateWatcher } from '../utils/xcode-state-watcher.ts';
 import { shutdownXcodeToolsBridge } from '../integrations/xcode-tools-bridge/index.ts';
-import { stopAllLogCaptures } from '../utils/log_capture.ts';
 import { stopAllDeviceLogCaptures } from '../utils/log-capture/device-log-sessions.ts';
 import { stopOwnedSimulatorLaunchOsLogSessions } from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
 import { stopAllVideoCaptureSessions } from '../utils/video_capture.ts';
@@ -191,11 +190,6 @@ export async function runMcpShutdown(input: {
       name: 'debugger.dispose-all',
       timeoutMs: debuggerStepTimeoutMs(input.snapshot.debuggerSessionCount),
       operation: () => getDefaultDebuggerManager().disposeAll(),
-    },
-    {
-      name: 'simulator-logs.stop-all',
-      timeoutMs: bulkStepTimeoutMs(input.snapshot.simulatorLogSessionCount),
-      operation: () => stopAllLogCaptures(STEP_TIMEOUT_MS),
     },
     {
       name: 'simulator-launch-oslogs.stop-owned',

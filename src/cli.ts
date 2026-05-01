@@ -8,6 +8,7 @@ import { listCliWorkflowIdsFromManifest } from './runtime/tool-catalog.ts';
 import { flushAndCloseSentry, initSentry, recordBootstrapDurationMetric } from './utils/sentry.ts';
 import { coerceLogLevel, setLogLevel, type LogLevel } from './utils/logger.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
+import { configureRuntimeWorkspaceKey } from './utils/runtime-instance.ts';
 
 function findTopLevelCommand(argv: string[]): string | undefined {
   const flagsWithValue = new Set(['--socket', '--log-level', '--style']);
@@ -133,6 +134,7 @@ async function main(): Promise<void> {
     cwd: result.runtime.cwd,
     projectConfigPath: result.configPath,
   });
+  configureRuntimeWorkspaceKey(workspaceKey);
 
   const cliExposedWorkflowIds = await listCliWorkflowIdsFromManifest({
     excludeWorkflows: ['session-management', 'workflow-discovery'],

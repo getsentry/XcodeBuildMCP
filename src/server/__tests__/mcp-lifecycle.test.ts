@@ -61,7 +61,11 @@ describe('mcp lifecycle coordinator', () => {
   beforeEach(async () => {
     registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-mcp-lifecycle-'));
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
-    setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
+    setRuntimeInstanceForTests({
+      instanceId: 'mcp-lifecycle-test',
+      pid: process.pid,
+      workspaceKey: 'workspace-a',
+    });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
     await clearAllSimulatorLaunchOsLogSessionsForTests();
     vi.restoreAllMocks();
@@ -130,6 +134,29 @@ describe('mcp lifecycle coordinator', () => {
     expect(onShutdown.mock.calls[0]?.[0]?.reason).toBe('unhandled-rejection');
   });
 
+  it('terminates live local OSLog sessions on process exit', async () => {
+    const processRef = new TestProcess();
+    const onShutdown = vi.fn().mockResolvedValue(undefined);
+    const child = createTrackedChild(555);
+    await registerSimulatorLaunchOsLogSession({
+      process: child,
+      simulatorUuid: 'sim-1',
+      bundleId: 'io.sentry.app',
+      logFilePath: '/tmp/app.log',
+    });
+    const coordinator = createMcpLifecycleCoordinator({
+      commandExecutor: createMockExecutor({ output: '' }),
+      processRef,
+      onShutdown,
+    });
+
+    coordinator.attachProcessHandlers();
+    processRef.emit('exit');
+
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(onShutdown).not.toHaveBeenCalled();
+  });
+
   it('maps broken stdout pipes to shutdowns', async () => {
     const suppressSpy = vi
       .spyOn(shutdownState, 'suppressProcessStdioWrites')
@@ -179,7 +206,11 @@ describe('mcp lifecycle snapshot', () => {
   beforeEach(async () => {
     registryDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-mcp-lifecycle-'));
     setSimulatorLaunchOsLogRegistryDirOverrideForTests(registryDir);
-    setRuntimeInstanceForTests({ instanceId: 'mcp-lifecycle-test', pid: process.pid });
+    setRuntimeInstanceForTests({
+      instanceId: 'mcp-lifecycle-test',
+      pid: process.pid,
+      workspaceKey: 'workspace-a',
+    });
     setSimulatorLaunchOsLogRecordActiveOverrideForTests(async () => true);
     await clearAllSimulatorLaunchOsLogSessionsForTests();
   });

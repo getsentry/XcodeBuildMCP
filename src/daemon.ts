@@ -42,6 +42,11 @@ import {
 } from './utils/sentry.ts';
 import { isXcodemakeBinaryAvailable, isXcodemakeEnabled } from './utils/xcodemake/index.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
+import { configureRuntimeWorkspaceKey } from './utils/runtime-instance.ts';
+import {
+  reconcileSimulatorLaunchOsLogOrphansForWorkspace,
+  terminateLiveSimulatorLaunchOsLogSessionsSync,
+} from './utils/log-capture/index.ts';
 
 async function checkExistingDaemon(socketPath: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
@@ -128,6 +133,7 @@ async function main(): Promise<void> {
     cwd: result.runtime.cwd,
     projectConfigPath: result.configPath,
   });
+  configureRuntimeWorkspaceKey(workspaceKey);
 
   const logPath = resolveDaemonLogPath(workspaceKey);
   if (logPath) {
@@ -153,6 +159,20 @@ async function main(): Promise<void> {
 
   log('info', `[Daemon] Workspace: ${workspaceRoot}`);
   log('info', `[Daemon] Socket: ${socketPath}`);
+  try {
+    const reconciliation = await reconcileSimulatorLaunchOsLogOrphansForWorkspace(workspaceKey);
+    if (reconciliation.stoppedSessionCount > 0 || reconciliation.errorCount > 0) {
+      log(
+        reconciliation.errorCount > 0 ? 'warn' : 'info',
+        `[Daemon] Simulator OSLog reconciliation: ${JSON.stringify(reconciliation)}`,
+      );
+    }
+  } catch (error) {
+    log(
+      'warn',
+      `[Daemon] Simulator OSLog reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   if (logPath) {
     log('info', `[Daemon] Logs: ${logPath}`);
   }
@@ -268,7 +288,7 @@ async function main(): Promise<void> {
   };
 
   // Unified shutdown handler
-  const shutdown = (): void => {
+  const shutdown = (exitCode = 0): void => {
     if (isShuttingDown) {
       return;
     }
@@ -292,7 +312,7 @@ async function main(): Promise<void> {
 
       log('info', '[Daemon] Cleanup complete');
       void flushAndCloseSentry(2000).finally(() => {
-        process.exit(0);
+        process.exit(exitCode);
       });
     });
 
@@ -393,8 +413,20 @@ async function main(): Promise<void> {
     });
   });
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  const handleCrash = (reason: unknown): void => {
+    recordDaemonLifecycleMetric('crash');
+    const message = reason instanceof Error ? reason.message : String(reason);
+    log('error', `[Daemon] Crash: ${message}`, { sentry: true });
+    shutdown(1);
+  };
+
+  process.on('exit', () => {
+    terminateLiveSimulatorLaunchOsLogSessionsSync();
+  });
+  process.on('SIGTERM', () => shutdown(0));
+  process.on('SIGINT', () => shutdown(0));
+  process.on('uncaughtException', handleCrash);
+  process.on('unhandledRejection', handleCrash);
 }
 
 main().catch(async (err) => {
