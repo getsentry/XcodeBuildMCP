@@ -145,6 +145,66 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('\u{2705} Resolving app path\n');
   });
 
+  it('replaces interactive build-stage updates with test progress updates', () => {
+    const renderer = createCliTextRenderer({ interactive: true });
+
+    renderer.onFragment({
+      kind: 'test-result',
+      fragment: 'build-stage',
+      operation: 'TEST',
+      stage: 'LINKING',
+      message: 'Linking',
+    });
+
+    renderer.onFragment({
+      kind: 'test-result',
+      fragment: 'test-progress',
+      operation: 'TEST',
+      completed: 4,
+      failed: 0,
+      skipped: 0,
+    });
+
+    expect(reporter.update).toHaveBeenCalledWith('Linking...');
+    expect(reporter.update).toHaveBeenCalledWith(
+      'Running tests (4 completed, 0 failures, 0 skipped)',
+    );
+  });
+
+  it('renders non-interactive test progress durably and deduplicates repeated counts', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'test-result',
+          fragment: 'test-progress',
+          operation: 'TEST',
+          completed: 1,
+          failed: 0,
+          skipped: 0,
+        },
+        {
+          kind: 'test-result',
+          fragment: 'test-progress',
+          operation: 'TEST',
+          completed: 1,
+          failed: 0,
+          skipped: 0,
+        },
+        {
+          kind: 'test-result',
+          fragment: 'test-progress',
+          operation: 'TEST',
+          completed: 2,
+          failed: 0,
+          skipped: 0,
+        },
+      ],
+    });
+
+    expect(output.match(/Running tests \(1 completed, 0 failures, 0 skipped\)/g)).toHaveLength(1);
+    expect(output).toContain('Running tests (2 completed, 0 failures, 0 skipped)');
+  });
+
   it('renders grouped sad-path diagnostics before the failed summary', () => {
     const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const renderer = createCliTextRenderer({ interactive: false });

@@ -15,6 +15,7 @@ import type {
   TestCaseResultRenderItem,
   TestDiscoveryRenderItem,
   TestFailureRenderItem,
+  TestProgressRenderItem,
 } from '../../rendering/render-items.ts';
 import type {
   DetailTreeTextBlock,
@@ -545,6 +546,11 @@ export function formatTestDiscoveryEvent(event: TestDiscoveryRenderItem): string
   }
 
   return lines.join('\n');
+}
+
+export function formatTestProgressEvent(event: TestProgressRenderItem): string {
+  const failWord = event.failed === 1 ? 'failure' : 'failures';
+  return `Running tests (${event.completed} completed, ${event.failed} ${failWord}, ${event.skipped} skipped)`;
 }
 
 export function formatNextStepsEvent(event: NextStepsTextBlock, runtime: 'cli' | 'mcp'): string {

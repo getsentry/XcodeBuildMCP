@@ -4,9 +4,12 @@
 
 ### Fixed
 
+- Fixed simulator test JSONL accuracy by keeping preflight discovery observational, preserving only user-supplied test selectors, discovering multiline parameterized Swift Testing tests, and parsing destination-suffixed xcodebuild test result lines.
 - Removed stale physical-device log session status and shutdown cleanup for deprecated standalone device log capture, and corrected the device build-and-run tool description.
+- Fixed mixed Swift Testing and XCTest summaries so simulator test text output no longer overcounts parameterized Swift Testing results or issue lines.
 - Fixed CLI test summaries showing false-positive compiler errors from xcodebuild NSError dump lines, and added compiler-error snapshot coverage for simulator, device, and macOS build-style flows ([#383](https://github.com/getsentry/XcodeBuildMCP/issues/383)).
 - Fixed simulator OSLog helper cleanup so server and daemon startup reconcile same-workspace orphaned log streams without stopping helpers owned by live sessions in other workspaces ([#382](https://github.com/getsentry/XcodeBuildMCP/issues/382)).
+- Fixed Weather example test discovery and made CLI test progress visible while tests are running instead of leaving the last build phase displayed.
 
 ## [2.5.0-beta.1]
 

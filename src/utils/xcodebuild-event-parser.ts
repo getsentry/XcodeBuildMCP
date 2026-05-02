@@ -33,7 +33,10 @@ function resolveStageFromLine(line: string): XcodebuildStage | null {
   if (
     /^Testing started$/u.test(line) ||
     /^Test [Ss]uite .+ started/u.test(line) ||
-    /^[◇] Test run started/u.test(line)
+    /^Test [Cc]ase .+ started/u.test(line) ||
+    /^[◇] Test run started/u.test(line) ||
+    /^[◇] Test .+ started/u.test(line) ||
+    /^[◇] Test case .+ started/u.test(line)
   ) {
     return 'RUN_TESTS';
   }
@@ -88,6 +91,10 @@ function isIgnoredNoiseLine(line: string): boolean {
   return IGNORED_NOISE_PATTERNS.some((pattern) => pattern.test(line));
 }
 
+function normalizeEventLine(rawLine: string): string {
+  return rawLine.trim().replace(/^(?:\u200B|\u200C|\u200D|\uFEFF)+/u, '');
+}
+
 export interface EventParserOptions {
   operation: XcodebuildOperation;
   kind?: BuildLikeKind;
@@ -112,6 +119,8 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
   let completedCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
+  let swiftTestingCompletedSinceSummary = 0;
+  let swiftTestingFailedSinceSummary = 0;
   let detectedXcresultPath: string | null = null;
 
   let pendingError: {
@@ -224,7 +233,10 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     });
   }
 
-  function recordTestCaseResult(testCase: ParsedTestCase): void {
+  function recordTestCaseResult(
+    testCase: ParsedTestCase,
+    source: 'xcodebuild' | 'swift-testing' = 'xcodebuild',
+  ): void {
     const increment = testCase.caseCount ?? 1;
     completedCount += increment;
     const durationMs = parseDurationMs(testCase.durationText);
@@ -234,6 +246,13 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       applyFailureDuration(testCase.suiteName, testCase.testName, durationMs);
     } else if (testCase.status === 'skipped') {
       skippedCount += increment;
+    }
+
+    if (source === 'swift-testing') {
+      swiftTestingCompletedSinceSummary += increment;
+      if (testCase.status === 'failed') {
+        swiftTestingFailedSinceSummary += increment;
+      }
     }
 
     if (operation === 'TEST') {
@@ -267,7 +286,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
   }
 
   function processLine(rawLine: string): void {
-    const line = rawLine.trim();
+    const line = normalizeEventLine(rawLine);
     if (!line) {
       flushPendingError();
       return;
@@ -324,14 +343,18 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const stResult = parseSwiftTestingResultLine(line);
     if (stResult) {
-      recordTestCaseResult(stResult);
+      recordTestCaseResult(stResult, 'swift-testing');
       return;
     }
 
     const stSummary = parseSwiftTestingRunSummary(line);
     if (stSummary) {
-      completedCount = Math.max(completedCount, stSummary.executed);
-      failedCount = Math.max(failedCount, stSummary.failed);
+      const failedFromSummary =
+        swiftTestingFailedSinceSummary > 0 ? swiftTestingFailedSinceSummary : stSummary.failed;
+      completedCount += stSummary.executed - swiftTestingCompletedSinceSummary;
+      failedCount += failedFromSummary - swiftTestingFailedSinceSummary;
+      swiftTestingCompletedSinceSummary = 0;
+      swiftTestingFailedSinceSummary = 0;
       emitTestProgress();
       return;
     }

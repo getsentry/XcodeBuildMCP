@@ -39,6 +39,7 @@ import {
   formatNextStepsEvent,
   formatTestCaseResults,
   formatTestDiscoveryEvent,
+  formatTestProgressEvent,
 } from './event-formatting.ts';
 import {
   createXcodebuildEventParser,
@@ -112,6 +113,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let nextSteps: readonly NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
+  let lastRenderedTestProgressKey: string | null = null;
 
   function writeDurable(text: string): void {
     sink.clearTransient();
@@ -261,10 +263,16 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'test-progress': {
+        const renderedProgress = formatTestProgressEvent(item);
+        const progressKey = `${item.completed}:${item.failed}:${item.skipped}`;
+        pendingTransientRuntimeLine = null;
         if (interactive) {
-          const failWord = item.failed === 1 ? 'failure' : 'failures';
-          pendingTransientRuntimeLine = null;
-          sink.updateTransient(`Running tests (${item.completed}, ${item.failed} ${failWord})`);
+          sink.updateTransient(renderedProgress);
+        } else if (progressKey !== lastRenderedTestProgressKey) {
+          writeDurable(renderedProgress);
+          lastRenderedTestProgressKey = progressKey;
+          lastVisibleEventType = 'test-progress';
+          lastStatusLineLevel = null;
         }
         break;
       }
@@ -442,6 +450,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       parserStates.clear();
       sawProgressNextSteps = false;
       collectedTestCaseResults.length = 0;
+      lastRenderedTestProgressKey = null;
     },
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createXcodebuildEventParser } from '../xcodebuild-event-parser.ts';
+import { createXcodebuildRunState } from '../xcodebuild-run-state.ts';
 import type { DomainFragment } from '../../types/domain-fragments.ts';
 
 function collectEvents(
@@ -21,6 +22,43 @@ function collectEvents(
   }
 
   parser.flush();
+  return events;
+}
+
+function collectRunStateEvents(
+  lines: { source: 'stdout' | 'stderr'; text: string }[],
+): DomainFragment[] {
+  const events: DomainFragment[] = [];
+  const runState = createXcodebuildRunState({
+    operation: 'TEST',
+    onEvent: (event) => events.push(event),
+  });
+  const parser = createXcodebuildEventParser({
+    operation: 'TEST',
+    onEvent: (event) => {
+      switch (event.fragment) {
+        case 'build-stage':
+        case 'compiler-diagnostic':
+        case 'test-discovery':
+        case 'test-failure':
+        case 'test-progress':
+        case 'test-case-result':
+          runState.push(event);
+          break;
+      }
+    },
+  });
+
+  for (const { source, text } of lines) {
+    if (source === 'stdout') {
+      parser.onStdout(text);
+    } else {
+      parser.onStderr(text);
+    }
+  }
+
+  parser.flush();
+  runState.finalize(false);
   return events;
 }
 
@@ -75,6 +113,31 @@ describe('xcodebuild-event-parser', () => {
     });
   });
 
+  it('emits running-tests status for test suite and case start lines', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: "Test suite 'WeatherUITests' started on 'Clone 1 of iPhone 17 Pro - WeatherUITests-Runner (12147)'\n",
+      },
+      {
+        source: 'stdout',
+        text: "Test case 'WeatherTests/emptySearchReturnsNoResults()' started on 'Clone 2 of iPhone 17 Pro - Weather (12472)'\n",
+      },
+      {
+        source: 'stdout',
+        text: '◇ Test "Calculator initializes with correct default values" started.\n',
+      },
+    ]);
+
+    const stages = events.filter((event) => event.fragment === 'build-stage');
+    expect(stages).toHaveLength(3);
+    expect(stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fragment: 'build-stage', stage: 'RUN_TESTS' }),
+      ]),
+    );
+  });
+
   it('emits test-progress events with cumulative counts', () => {
     const events = collectEvents('TEST', [
       { source: 'stdout', text: "Test Case '-[Suite testA]' passed (0.001 seconds)\n" },
@@ -113,6 +176,50 @@ describe('xcodebuild-event-parser', () => {
       status: 'failed',
       durationMs: 250,
     });
+  });
+
+  it('parses modern xcodebuild Test Case lines with destinations', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: "Test Case '-[WeatherTests testForecast]' passed on 'iPhone 16 Pro' (0.010 seconds)\n",
+      },
+      {
+        source: 'stdout',
+        text: "Test case 'WeatherUITests/testSearch()' failed on 'Clone 1 of iPhone 16 Pro' (0.250 seconds)\n",
+      },
+      {
+        source: 'stdout',
+        text: "Test case 'WeatherUITests/testOfflineMode()' skipped on 'Clone 2 of iPhone 16 Pro' (0.001 seconds)\n",
+      },
+    ]);
+
+    const cases = events.filter((e) => e.fragment === 'test-case-result');
+    expect(cases).toHaveLength(3);
+    expect(cases[0]).toMatchObject({
+      suite: 'WeatherTests',
+      test: 'testForecast',
+      status: 'passed',
+      durationMs: 10,
+    });
+    expect(cases[1]).toMatchObject({
+      suite: 'WeatherUITests',
+      test: 'testSearch()',
+      status: 'failed',
+      durationMs: 250,
+    });
+    expect(cases[2]).toMatchObject({
+      suite: 'WeatherUITests',
+      test: 'testOfflineMode()',
+      status: 'skipped',
+      durationMs: 1,
+    });
+
+    const progressEvents = events.filter((e) => e.fragment === 'test-progress');
+    expect(progressEvents).toHaveLength(3);
+    expect(progressEvents[0]).toMatchObject({ completed: 1, failed: 0, skipped: 0 });
+    expect(progressEvents[1]).toMatchObject({ completed: 2, failed: 1, skipped: 0 });
+    expect(progressEvents[2]).toMatchObject({ completed: 3, failed: 1, skipped: 1 });
   });
 
   it('emits test-case-result events for Swift Testing passed/failed lines', () => {
@@ -395,6 +502,101 @@ describe('xcodebuild-event-parser', () => {
       location: '/tmp/SimpleTests.swift:48',
       message: 'Expectation failed: true == false',
       durationMs: 3,
+    });
+  });
+
+  it('uses Swift Testing and XCTest summaries once for mixed Calculator test output', () => {
+    const xctestPassedLines = Array.from({ length: 21 }, (_, index) => ({
+      source: 'stdout' as const,
+      text: `Test Case '-[CalculatorAppTests.CalculatorAppTests testPassing${index + 1}]' passed (0.001 seconds).\n`,
+    }));
+    const events = collectRunStateEvents([
+      {
+        source: 'stdout',
+        text: '✔ Test "Adding single digit numbers" passed after 0.016 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '\u200B✔ Test "Adding decimal numbers" passed after 0.012 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test "Addition operation" with 4 test cases passed after 0.005 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✘ Test "This test should fail to verify error reporting" recorded an issue at CalculatorServiceTests.swift:37:9: Expectation failed: (calculator.display → "0") == "999"\n',
+      },
+      {
+        source: 'stdout',
+        text: '✘ Test "This test should fail to verify error reporting" failed after 0.029 seconds with 1 issue.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✘ Test run with 34 tests in 9 suites failed after 0.047 seconds with 1 issue.\n',
+      },
+      ...xctestPassedLines,
+      {
+        source: 'stderr',
+        text: '/Volumes/Developer/XcodeBuildMCP/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:52: error: -[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure] : XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999\n',
+      },
+      {
+        source: 'stdout',
+        text: "Test Case '-[CalculatorAppTests.CalculatorAppTests testCalculatorServiceFailure]' failed (0.004 seconds).\n",
+      },
+      {
+        source: 'stderr',
+        text: '/Volumes/Developer/XcodeBuildMCP/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286: error: -[CalculatorAppTests.IntentionalFailureTests test] : XCTAssertTrue failed - This test should fail to verify error reporting\n',
+      },
+      {
+        source: 'stdout',
+        text: "Test Case '-[CalculatorAppTests.IntentionalFailureTests test]' failed (0.003 seconds).\n",
+      },
+      {
+        source: 'stdout',
+        text: '\t Executed 23 tests, with 2 failures (0 unexpected) in 0.654 (0.665) seconds\n',
+      },
+    ]);
+
+    const summary = events.filter((event) => event.fragment === 'build-summary').at(-1);
+    expect(summary).toMatchObject({
+      fragment: 'build-summary',
+      operation: 'TEST',
+      totalTests: 57,
+      passedTests: 54,
+      failedTests: 3,
+      skippedTests: 0,
+    });
+  });
+
+  it('reconciles separate Swift Testing run summaries independently', () => {
+    const events = collectRunStateEvents([
+      {
+        source: 'stdout',
+        text: '✔ Test "First target test" passed after 0.001 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.001 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test "Second target parameterized test" with 4 test cases passed after 0.002 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.002 seconds.\n',
+      },
+    ]);
+
+    const summary = events.filter((event) => event.fragment === 'build-summary').at(-1);
+    expect(summary).toMatchObject({
+      fragment: 'build-summary',
+      operation: 'TEST',
+      totalTests: 2,
+      passedTests: 2,
+      failedTests: 0,
+      skippedTests: 0,
     });
   });
 

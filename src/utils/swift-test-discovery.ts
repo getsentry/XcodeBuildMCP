@@ -94,6 +94,18 @@ function countBraces(line: string): number {
   return delta;
 }
 
+function countParentheses(line: string): number {
+  let delta = 0;
+  for (const character of line) {
+    if (character === '(') {
+      delta += 1;
+    } else if (character === ')') {
+      delta -= 1;
+    }
+  }
+  return delta;
+}
+
 function collectXCTestTypes(lines: string[]): Set<string> {
   const xctestTypes = new Set<string>();
 
@@ -138,6 +150,8 @@ function discoverTestsInFileContent(
   const scopeStack: Array<{ typeName?: string; xctestContext: boolean; depth: number }> = [];
   let braceDepth = 0;
   let pendingAttributes: string[] = [];
+  let pendingMultilineAttributeIndex: number | null = null;
+  let pendingAttributeParenthesisDepth = 0;
 
   sanitizedLines.forEach((sanitizedLine, index) => {
     const lineNumber = index + 1;
@@ -147,8 +161,27 @@ function discoverTestsInFileContent(
       scopeStack.pop();
     }
 
+    let consumedAttributeContinuation = false;
+
     if (line.startsWith('@')) {
       pendingAttributes.push(line);
+      const parenthesisDepth = countParentheses(line);
+      if (parenthesisDepth > 0) {
+        pendingMultilineAttributeIndex = pendingAttributes.length - 1;
+        pendingAttributeParenthesisDepth = parenthesisDepth;
+      } else {
+        pendingMultilineAttributeIndex = null;
+        pendingAttributeParenthesisDepth = 0;
+      }
+    } else if (pendingMultilineAttributeIndex !== null) {
+      pendingAttributes[pendingMultilineAttributeIndex] =
+        `${pendingAttributes[pendingMultilineAttributeIndex]} ${line}`;
+      pendingAttributeParenthesisDepth += countParentheses(line);
+      consumedAttributeContinuation = true;
+      if (pendingAttributeParenthesisDepth <= 0) {
+        pendingMultilineAttributeIndex = null;
+        pendingAttributeParenthesisDepth = 0;
+      }
     }
 
     const typeMatch = line.match(
@@ -203,7 +236,14 @@ function discoverTestsInFileContent(
       }
 
       pendingAttributes = [];
-    } else if (line.length > 0 && !line.startsWith('@')) {
+      pendingMultilineAttributeIndex = null;
+      pendingAttributeParenthesisDepth = 0;
+    } else if (
+      line.length > 0 &&
+      !line.startsWith('@') &&
+      !consumedAttributeContinuation &&
+      pendingMultilineAttributeIndex === null
+    ) {
       pendingAttributes = [];
     }
 

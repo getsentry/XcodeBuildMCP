@@ -1,4 +1,4 @@
-import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.ts';
+import type { TestPreflightResult } from './test-preflight.ts';
 
 function parseTestSelectorArgs(extraArgs: string[] | undefined): {
   remainingArgs: string[];
@@ -55,11 +55,8 @@ export function createSimulatorTwoPhaseExecutionPlan(params: {
   usesExactSelectors: boolean;
 } {
   const parsedArgs = parseTestSelectorArgs(params.extraArgs);
-  const resolvedSelectors = params.preflight ? collectResolvedTestSelectors(params.preflight) : [];
-  const exactSelectorArgs = resolvedSelectors.flatMap((selector) => [`-only-testing:${selector}`]);
-  const usesExactSelectors = exactSelectorArgs.length > 0;
-
-  const selectedTestArgs = usesExactSelectors ? exactSelectorArgs : parsedArgs.selectorArgs;
+  const selectedTestArgs = parsedArgs.selectorArgs;
+  const usesExactSelectors = selectedTestArgs.length > 0;
   const resultBundlePath = params.resultBundlePath ?? parsedArgs.resultBundlePath;
 
   return {

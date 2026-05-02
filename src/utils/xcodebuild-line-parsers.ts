@@ -88,7 +88,9 @@ export function parseRawTestName(rawName: string): { suiteName?: string; testNam
 }
 
 export function parseTestCaseLine(line: string): ParsedTestCase | null {
-  const match = line.match(/^Test Case '(.+)' (passed|failed|skipped) \(([^)]+)\)/u);
+  const match = line.match(
+    /^Test [Cc]ase '(.+)' (passed|failed|skipped)(?: on '.+')? \(([^)]+)\)/u,
+  );
   if (!match) {
     return null;
   }

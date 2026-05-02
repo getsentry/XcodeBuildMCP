@@ -153,6 +153,14 @@ export function createTestExecutor(
           });
         }
 
+        started.pipeline.emitFragment({
+          kind: 'test-result',
+          fragment: 'build-stage',
+          operation: 'TEST',
+          stage: 'RUN_TESTS',
+          message: 'Running tests',
+        });
+
         const testWithoutBuildingResult = await executeXcodeBuildCommand(
           { ...params, extraArgs: executionPlan.testArgs },
           platformOptions,
