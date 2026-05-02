@@ -247,9 +247,11 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       skippedCount += increment;
     }
 
-    testCasesCompletedSinceSwiftTestingSummary += increment;
-    if (testCase.status === 'failed') {
-      testCasesFailedSinceSwiftTestingSummary += increment;
+    if (source === 'swift-testing') {
+      testCasesCompletedSinceSwiftTestingSummary += increment;
+      if (testCase.status === 'failed') {
+        testCasesFailedSinceSwiftTestingSummary += increment;
+      }
     }
 
     if (operation === 'TEST') {
