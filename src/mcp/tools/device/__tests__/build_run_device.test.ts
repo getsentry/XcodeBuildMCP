@@ -109,7 +109,7 @@ describe('build_run_device tool', () => {
           });
         }
 
-        if (command[0] === '/bin/sh') {
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
           return createMockCommandResponse({ success: true, output: 'io.sentry.MyApp' });
         }
 
@@ -143,7 +143,7 @@ describe('build_run_device tool', () => {
           });
         }
 
-        if (command[0] === '/bin/sh') {
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
           return createMockCommandResponse({ success: true, output: 'io.sentry.MyApp' });
         }
 
@@ -177,7 +177,7 @@ describe('build_run_device tool', () => {
           });
         }
 
-        if (command[0] === '/bin/sh') {
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
           return createMockCommandResponse({ success: true, output: 'io.sentry.MyApp' });
         }
 
@@ -218,7 +218,7 @@ describe('build_run_device tool', () => {
           });
         }
 
-        if (command[0] === '/bin/sh') {
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
           return createMockCommandResponse({ success: true, output: 'io.sentry.MyApp' });
         }
 
@@ -258,7 +258,7 @@ describe('build_run_device tool', () => {
           });
         }
 
-        if (command[0] === '/bin/sh') {
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
           return createMockCommandResponse({ success: true, output: 'io.sentry.MyWatchApp' });
         }
 

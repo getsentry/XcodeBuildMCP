@@ -72,7 +72,7 @@ describe('get_mac_bundle_id plugin', () => {
 
     it('should return success with bundle ID using defaults read', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier':
+        'defaults read /Applications/MyApp.app/Contents/Info CFBundleIdentifier':
           'io.sentry.MyMacApp',
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -96,10 +96,10 @@ describe('get_mac_bundle_id plugin', () => {
 
     it('should fallback to PlistBuddy when defaults read fails', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
+        'defaults read /Applications/MyApp.app/Contents/Info CFBundleIdentifier': new Error(
           'defaults read failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /Applications/MyApp.app/Contents/Info.plist':
           'io.sentry.MyMacApp',
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -123,10 +123,10 @@ describe('get_mac_bundle_id plugin', () => {
 
     it('should return error when both extraction methods fail', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
+        'defaults read /Applications/MyApp.app/Contents/Info CFBundleIdentifier': new Error(
           'Command failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /Applications/MyApp.app/Contents/Info.plist':
           new Error('Command failed'),
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -147,10 +147,10 @@ describe('get_mac_bundle_id plugin', () => {
 
     it('keeps extraction errors short and preserves diagnostics', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/Applications/MyApp.app/Contents/Info" CFBundleIdentifier': new Error(
+        'defaults read /Applications/MyApp.app/Contents/Info CFBundleIdentifier': new Error(
           'Command failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/Applications/MyApp.app/Contents/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /Applications/MyApp.app/Contents/Info.plist':
           new Error('Command failed'),
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({

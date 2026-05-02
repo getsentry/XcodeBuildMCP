@@ -91,7 +91,7 @@ describe('get_app_bundle_id plugin', () => {
 
     it('should return success with bundle ID using defaults read', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/path/to/MyApp.app/Info" CFBundleIdentifier': 'io.sentry.MyApp',
+        'defaults read /path/to/MyApp.app/Info CFBundleIdentifier': 'io.sentry.MyApp',
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
         existsSync: () => true,
@@ -116,10 +116,10 @@ describe('get_app_bundle_id plugin', () => {
 
     it('should fallback to PlistBuddy when defaults read fails', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/path/to/MyApp.app/Info" CFBundleIdentifier': new Error(
+        'defaults read /path/to/MyApp.app/Info CFBundleIdentifier': new Error(
           'defaults read failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/path/to/MyApp.app/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /path/to/MyApp.app/Info.plist':
           'io.sentry.MyApp',
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -145,10 +145,10 @@ describe('get_app_bundle_id plugin', () => {
 
     it('should return error when both extraction methods fail', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/path/to/MyApp.app/Info" CFBundleIdentifier': new Error(
+        'defaults read /path/to/MyApp.app/Info CFBundleIdentifier': new Error(
           'defaults read failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/path/to/MyApp.app/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /path/to/MyApp.app/Info.plist':
           new Error('Command failed'),
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -169,10 +169,10 @@ describe('get_app_bundle_id plugin', () => {
 
     it('keeps extraction errors short and preserves diagnostics', async () => {
       const mockExecutor = createMockExecutorForCommands({
-        'defaults read "/path/to/MyApp.app/Info" CFBundleIdentifier': new Error(
+        'defaults read /path/to/MyApp.app/Info CFBundleIdentifier': new Error(
           'defaults read failed',
         ),
-        '/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "/path/to/MyApp.app/Info.plist"':
+        '/usr/libexec/PlistBuddy -c Print :CFBundleIdentifier /path/to/MyApp.app/Info.plist':
           new Error('Command failed'),
       });
       const mockFileSystemExecutor = createMockFileSystemExecutor({

@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed remaining `/bin/sh -c` shell-injection sites in bundle ID extraction and macOS launch flows by invoking `defaults` and `PlistBuddy` directly with argv arrays so user-supplied app paths are no longer interpreted by a shell ([#367](https://github.com/getsentry/XcodeBuildMCP/issues/367)).
 - Fixed simulator test JSONL accuracy by keeping preflight discovery observational, preserving only user-supplied test selectors, discovering multiline parameterized Swift Testing tests, and parsing destination-suffixed xcodebuild test result lines.
 - Removed stale physical-device log session status and shutdown cleanup for deprecated standalone device log capture, and corrected the device build-and-run tool description.
 - Fixed mixed Swift Testing and XCTest summaries so simulator test text output no longer overcounts parameterized Swift Testing results or issue lines.

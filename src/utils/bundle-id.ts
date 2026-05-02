@@ -1,7 +1,11 @@
 import type { CommandExecutor } from './command.ts';
 
-async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
-  const result = await executor(['/bin/sh', '-c', command], 'Bundle ID Extraction');
+async function runSpawn(
+  command: string[],
+  executor: CommandExecutor,
+  logPrefix: string,
+): Promise<string> {
+  const result = await executor(command, logPrefix, false);
   if (!result.success) {
     throw new Error(result.error ?? 'Command failed');
   }
@@ -13,11 +17,16 @@ export async function extractBundleIdFromAppPath(
   executor: CommandExecutor,
 ): Promise<string> {
   try {
-    return await executeSyncCommand(`defaults read "${appPath}/Info" CFBundleIdentifier`, executor);
-  } catch {
-    return await executeSyncCommand(
-      `/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${appPath}/Info.plist"`,
+    return await runSpawn(
+      ['defaults', 'read', `${appPath}/Info`, 'CFBundleIdentifier'],
       executor,
+      'Bundle ID Extraction',
+    );
+  } catch {
+    return await runSpawn(
+      ['/usr/libexec/PlistBuddy', '-c', 'Print :CFBundleIdentifier', `${appPath}/Info.plist`],
+      executor,
+      'Bundle ID Extraction',
     );
   }
 }

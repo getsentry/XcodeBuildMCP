@@ -13,8 +13,8 @@ import {
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
-async function executeSyncCommand(command: string, executor: CommandExecutor): Promise<string> {
-  const result = await executor(['/bin/sh', '-c', command], 'macOS Bundle ID Extraction');
+async function runSpawn(command: string[], executor: CommandExecutor): Promise<string> {
+  const result = await executor(command, 'macOS Bundle ID Extraction', false);
   if (!result.success) {
     throw new Error(result.error ?? 'Command failed');
   }
@@ -49,14 +49,19 @@ export function createGetMacBundleIdExecutor(
       let bundleId: string;
 
       try {
-        bundleId = await executeSyncCommand(
-          `defaults read "${appPath}/Contents/Info" CFBundleIdentifier`,
+        bundleId = await runSpawn(
+          ['defaults', 'read', `${appPath}/Contents/Info`, 'CFBundleIdentifier'],
           executor,
         );
       } catch {
         try {
-          bundleId = await executeSyncCommand(
-            `/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "${appPath}/Contents/Info.plist"`,
+          bundleId = await runSpawn(
+            [
+              '/usr/libexec/PlistBuddy',
+              '-c',
+              'Print :CFBundleIdentifier',
+              `${appPath}/Contents/Info.plist`,
+            ],
             executor,
           );
         } catch (innerError) {

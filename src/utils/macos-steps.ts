@@ -31,7 +31,7 @@ export async function launchMacApp(
   let bundleId: string | undefined;
   try {
     const plistResult = await executor(
-      ['/bin/sh', '-c', `defaults read "${appPath}/Contents/Info" CFBundleIdentifier`],
+      ['defaults', 'read', `${appPath}/Contents/Info`, 'CFBundleIdentifier'],
       'Extract Bundle ID',
       false,
     );

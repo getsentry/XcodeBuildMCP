@@ -9,13 +9,14 @@ import { runLogic } from '../../test-utils/test-helpers.ts';
 type CapturedCall = {
   command: string[];
   logPrefix?: string;
+  useShell?: boolean;
 };
 
 const stubProcess = { pid: 1, on: () => stubProcess } as unknown as ChildProcess;
 
 function createCapturingExecutor(calls: CapturedCall[]): CommandExecutor {
-  return async (command, logPrefix) => {
-    calls.push({ command: [...command], logPrefix });
+  return async (command, logPrefix, useShell) => {
+    calls.push({ command: [...command], logPrefix, useShell });
     return { success: true, output: 'com.example.macapp', process: stubProcess };
   };
 }
@@ -37,7 +38,7 @@ function createMockFileSystem(existingPaths: string[]): FileSystemExecutor {
 }
 
 describe('get_mac_bundle_id.ts — CWE-78 shell injection vectors', () => {
-  it('UNFIXED: double-quote breakout in macOS appPath reaches /bin/sh -c unescaped', async () => {
+  it('does not invoke /bin/sh and passes a metacharacter-laden appPath as an argv element', async () => {
     const calls: CapturedCall[] = [];
     const executor = createCapturingExecutor(calls);
     const maliciousPath = '/Applications/Evil" $(id) ".app';
@@ -46,13 +47,43 @@ describe('get_mac_bundle_id.ts — CWE-78 shell injection vectors', () => {
     await runLogic(() => get_mac_bundle_idLogic({ appPath: maliciousPath }, executor, fs));
 
     expect(calls).toHaveLength(1);
-    const shellCommand = calls[0].command;
-    expect(shellCommand[0]).toBe('/bin/sh');
-    expect(shellCommand[1]).toBe('-c');
+    const call = calls[0];
+    expect(call.command[0]).toBe('defaults');
+    expect(call.useShell).toBe(false);
+    expect(call.command).toEqual([
+      'defaults',
+      'read',
+      `${maliciousPath}/Contents/Info`,
+      'CFBundleIdentifier',
+    ]);
+    expect(call.command).not.toContain('/bin/sh');
+  });
 
-    const cmdString = shellCommand[2];
-    // The $(id) is NOT escaped and would execute in a real shell
-    expect(cmdString).toContain('$(id)');
+  it('falls back to PlistBuddy without invoking a shell when defaults fails', async () => {
+    const calls: CapturedCall[] = [];
+    const failingExecutor: CommandExecutor = async (command, logPrefix, useShell) => {
+      calls.push({ command: [...command], logPrefix, useShell });
+      if (command[0] === 'defaults') {
+        return { success: false, output: '', error: 'defaults read failed', process: stubProcess };
+      }
+      return { success: true, output: 'com.example.macapp', process: stubProcess };
+    };
+
+    const maliciousPath = '/Applications/Evil" $(id) ".app';
+    const fs = createMockFileSystem([maliciousPath]);
+
+    await runLogic(() => get_mac_bundle_idLogic({ appPath: maliciousPath }, failingExecutor, fs));
+
+    expect(calls).toHaveLength(2);
+    const fallback = calls[1];
+    expect(fallback.useShell).toBe(false);
+    expect(fallback.command).toEqual([
+      '/usr/libexec/PlistBuddy',
+      '-c',
+      'Print :CFBundleIdentifier',
+      `${maliciousPath}/Contents/Info.plist`,
+    ]);
+    expect(fallback.command).not.toContain('/bin/sh');
   });
 
   it('safe macOS appPath without metacharacters works normally', async () => {
@@ -64,6 +95,11 @@ describe('get_mac_bundle_id.ts — CWE-78 shell injection vectors', () => {
     await runLogic(() => get_mac_bundle_idLogic({ appPath: safePath }, executor, fs));
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].command[2]).toContain(safePath);
+    expect(calls[0].command).toEqual([
+      'defaults',
+      'read',
+      `${safePath}/Contents/Info`,
+      'CFBundleIdentifier',
+    ]);
   });
 });
