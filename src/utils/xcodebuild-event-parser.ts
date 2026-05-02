@@ -118,8 +118,8 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
   let completedCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
-  let swiftTestingCompletedSinceSummary = 0;
-  let swiftTestingFailedSinceSummary = 0;
+  let testCasesCompletedSinceSwiftTestingSummary = 0;
+  let testCasesFailedSinceSwiftTestingSummary = 0;
   let detectedXcresultPath: string | null = null;
 
   let pendingError: {
@@ -247,11 +247,9 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
       skippedCount += increment;
     }
 
-    if (source === 'swift-testing') {
-      swiftTestingCompletedSinceSummary += increment;
-      if (testCase.status === 'failed') {
-        swiftTestingFailedSinceSummary += increment;
-      }
+    testCasesCompletedSinceSwiftTestingSummary += increment;
+    if (testCase.status === 'failed') {
+      testCasesFailedSinceSwiftTestingSummary += increment;
     }
 
     if (operation === 'TEST') {
@@ -342,12 +340,13 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const stSummary = parseSwiftTestingRunSummary(line);
     if (stSummary) {
-      const failedFromSummary =
-        swiftTestingFailedSinceSummary > 0 ? swiftTestingFailedSinceSummary : stSummary.failed;
-      completedCount += stSummary.executed - swiftTestingCompletedSinceSummary;
-      failedCount += failedFromSummary - swiftTestingFailedSinceSummary;
-      swiftTestingCompletedSinceSummary = 0;
-      swiftTestingFailedSinceSummary = 0;
+      completedCount += Math.max(
+        0,
+        stSummary.executed - testCasesCompletedSinceSwiftTestingSummary,
+      );
+      failedCount += Math.max(0, stSummary.failed - testCasesFailedSinceSwiftTestingSummary);
+      testCasesCompletedSinceSwiftTestingSummary = 0;
+      testCasesFailedSinceSwiftTestingSummary = 0;
       emitTestProgress();
       return;
     }

@@ -593,11 +593,73 @@ describe('xcodebuild-event-parser', () => {
     expect(summary).toMatchObject({
       fragment: 'build-summary',
       operation: 'TEST',
-      totalTests: 2,
-      passedTests: 2,
+      totalTests: 5,
+      passedTests: 5,
       failedTests: 0,
       skippedTests: 0,
     });
+  });
+
+  it('keeps Swift Testing summary progress monotonic when per-test lines exceed the summary', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: '✔ Test "First observed case" passed after 0.001 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test "Second observed case" passed after 0.001 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const progress = events.filter((event) => event.fragment === 'test-progress');
+    expect(progress).toEqual([
+      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 2, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 2, failed: 0, skipped: 0 }),
+    ]);
+  });
+
+  it('does not double-count xcodebuild-formatted test lines when a Swift Testing summary follows', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: "Test case 'WeatherTests/emptySearchReturnsNoResults()' passed on 'Clone 1' (0.001 seconds)\n",
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const progress = events.filter((event) => event.fragment === 'test-progress');
+    expect(progress).toEqual([
+      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
+    ]);
+  });
+
+  it('counts additional failures reported only by a Swift Testing summary', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: '✘ Test "Individually reported failure" failed after 0.001 seconds with 1 issue.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✘ Test run with 2 tests in 1 suite failed after 0.001 seconds with 2 issues.\n',
+      },
+    ]);
+
+    const progress = events.filter((event) => event.fragment === 'test-progress');
+    expect(progress).toEqual([
+      expect.objectContaining({ completed: 1, failed: 1, skipped: 0 }),
+      expect.objectContaining({ completed: 2, failed: 2, skipped: 0 }),
+    ]);
   });
 
   it('processes full test lifecycle', () => {
