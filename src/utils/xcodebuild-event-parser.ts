@@ -310,7 +310,11 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const testCase = parseTestCaseLine(line);
     if (testCase) {
-      recordTestCaseResult(testCase);
+      const source =
+        /^Test case /u.test(line) && /\/.+\(\)$/u.test(testCase.rawName)
+          ? 'swift-testing'
+          : 'xcodebuild';
+      recordTestCaseResult(testCase, source);
       return;
     }
 

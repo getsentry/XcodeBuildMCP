@@ -624,7 +624,26 @@ describe('xcodebuild-event-parser', () => {
     ]);
   });
 
-  it('keeps xcodebuild-formatted test lines independent from Swift Testing summaries', () => {
+  it('keeps XCTest-style test case lines independent from Swift Testing summaries', () => {
+    const events = collectEvents('TEST', [
+      {
+        source: 'stdout',
+        text: "Test case 'WeatherUITests.testSearch()' passed on 'Clone 1' (0.001 seconds)\n",
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const progress = events.filter((event) => event.fragment === 'test-progress');
+    expect(progress).toEqual([
+      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 2, failed: 0, skipped: 0 }),
+    ]);
+  });
+
+  it('does not double-count xcodebuild-formatted Swift Testing lines before a summary', () => {
     const events = collectEvents('TEST', [
       {
         source: 'stdout',
@@ -639,7 +658,7 @@ describe('xcodebuild-event-parser', () => {
     const progress = events.filter((event) => event.fragment === 'test-progress');
     expect(progress).toEqual([
       expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
-      expect.objectContaining({ completed: 2, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
     ]);
   });
 
