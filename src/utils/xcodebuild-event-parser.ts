@@ -236,7 +236,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     testCase: ParsedTestCase,
     source: 'xcodebuild' | 'swift-testing' = 'xcodebuild',
   ): void {
-    const increment = testCase.caseCount ?? 1;
+    const increment = 1;
     completedCount += increment;
     const durationMs = parseDurationMs(testCase.durationText);
 

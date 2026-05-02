@@ -593,8 +593,8 @@ describe('xcodebuild-event-parser', () => {
     expect(summary).toMatchObject({
       fragment: 'build-summary',
       operation: 'TEST',
-      totalTests: 5,
-      passedTests: 5,
+      totalTests: 2,
+      passedTests: 2,
       failedTests: 0,
       skippedTests: 0,
     });
@@ -624,7 +624,7 @@ describe('xcodebuild-event-parser', () => {
     ]);
   });
 
-  it('does not double-count xcodebuild-formatted test lines when a Swift Testing summary follows', () => {
+  it('keeps xcodebuild-formatted test lines independent from Swift Testing summaries', () => {
     const events = collectEvents('TEST', [
       {
         source: 'stdout',
@@ -639,7 +639,7 @@ describe('xcodebuild-event-parser', () => {
     const progress = events.filter((event) => event.fragment === 'test-progress');
     expect(progress).toEqual([
       expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
-      expect.objectContaining({ completed: 1, failed: 0, skipped: 0 }),
+      expect.objectContaining({ completed: 2, failed: 0, skipped: 0 }),
     ]);
   });
 
@@ -660,6 +660,29 @@ describe('xcodebuild-event-parser', () => {
       expect.objectContaining({ completed: 1, failed: 1, skipped: 0 }),
       expect.objectContaining({ completed: 2, failed: 2, skipped: 0 }),
     ]);
+  });
+
+  it('keeps parameterized Swift Testing result counts aligned with the run summary', () => {
+    const events = collectRunStateEvents([
+      {
+        source: 'stdout',
+        text: '✔ Test "Parameterized test" with 4 test cases passed after 0.001 seconds.\n',
+      },
+      {
+        source: 'stdout',
+        text: '✔ Test run with 1 test in 1 suite passed after 0.001 seconds.\n',
+      },
+    ]);
+
+    const summary = events.filter((event) => event.fragment === 'build-summary').at(-1);
+    expect(summary).toMatchObject({
+      fragment: 'build-summary',
+      operation: 'TEST',
+      totalTests: 1,
+      passedTests: 1,
+      failedTests: 0,
+      skippedTests: 0,
+    });
   });
 
   it('processes full test lifecycle', () => {
@@ -684,7 +707,7 @@ describe('xcodebuild-event-parser', () => {
     expect(fragments).toContain('test-failure');
   });
 
-  it('increments counts by caseCount for parameterized Swift Testing results', () => {
+  it('counts parameterized Swift Testing result lines once for progress', () => {
     const events = collectEvents('TEST', [
       {
         source: 'stdout',
@@ -695,7 +718,7 @@ describe('xcodebuild-event-parser', () => {
     const progress = events.filter((e) => e.fragment === 'test-progress');
     expect(progress).toHaveLength(1);
     if (progress[0].fragment === 'test-progress') {
-      expect(progress[0].completed).toBe(3);
+      expect(progress[0].completed).toBe(1);
     }
   });
 
