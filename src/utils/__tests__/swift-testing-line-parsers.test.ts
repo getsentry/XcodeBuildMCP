@@ -4,7 +4,6 @@ import {
   parseSwiftTestingIssueLine,
   parseSwiftTestingRunSummary,
   parseSwiftTestingContinuationLine,
-  parseXcodebuildSwiftTestingLine,
 } from '../swift-testing-line-parsers.ts';
 
 describe('Swift Testing line parsers', () => {
@@ -257,44 +256,6 @@ describe('Swift Testing line parsers', () => {
 
     it('should return null for non-continuation lines', () => {
       expect(parseSwiftTestingContinuationLine('regular line')).toBeNull();
-    });
-  });
-
-  describe('parseXcodebuildSwiftTestingLine', () => {
-    it('should parse a passed test case', () => {
-      const result = parseXcodebuildSwiftTestingLine(
-        "Test case 'MCPTestTests/appNameIsCorrect()' passed on 'My Mac - MCPTest (78757)' (0.000 seconds)",
-      );
-      expect(result).toEqual({
-        status: 'passed',
-        rawName: 'MCPTestTests/appNameIsCorrect()',
-        suiteName: 'MCPTestTests',
-        testName: 'appNameIsCorrect()',
-        durationText: '0.000s',
-      });
-    });
-
-    it('should parse a failed test case', () => {
-      const result = parseXcodebuildSwiftTestingLine(
-        "Test case 'MCPTestTests/deliberateFailure()' failed on 'My Mac - MCPTest (78757)' (0.000 seconds)",
-      );
-      expect(result).toEqual({
-        status: 'failed',
-        rawName: 'MCPTestTests/deliberateFailure()',
-        suiteName: 'MCPTestTests',
-        testName: 'deliberateFailure()',
-        durationText: '0.000s',
-      });
-    });
-
-    it('should return null for XCTest format lines', () => {
-      expect(
-        parseXcodebuildSwiftTestingLine("Test Case '-[Suite test]' passed (0.001 seconds)."),
-      ).toBeNull();
-    });
-
-    it('should return null for non-matching lines', () => {
-      expect(parseXcodebuildSwiftTestingLine('random text')).toBeNull();
     });
   });
 });

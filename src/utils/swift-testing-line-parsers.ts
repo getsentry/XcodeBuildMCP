@@ -176,29 +176,3 @@ export function parseSwiftTestingContinuationLine(line: string): string | null {
   const match = line.match(/^↳ (.+)$/u);
   return match ? match[1] : null;
 }
-
-/**
- * Parse xcodebuild's Swift Testing format.
- *
- * Matches:
- *   Test case 'Suite/testName()' passed on 'My Mac - App (12345)' (0.001 seconds)
- *   Test case 'Suite/testName()' failed on 'My Mac - App (12345)' (0.001 seconds)
- */
-export function parseXcodebuildSwiftTestingLine(line: string): ParsedTestCase | null {
-  const match = line.match(
-    /^Test case '(.+)' (passed|failed|skipped) on '.+' \(([^)]+) seconds?\)$/u,
-  );
-  if (!match) {
-    return null;
-  }
-  const [, rawName, status, duration] = match;
-  const { suiteName, testName } = parseRawTestName(rawName);
-
-  return {
-    status: status as 'passed' | 'failed' | 'skipped',
-    rawName,
-    suiteName,
-    testName,
-    durationText: `${duration}s`,
-  };
-}

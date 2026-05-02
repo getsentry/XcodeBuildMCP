@@ -13,7 +13,6 @@ import {
   type ParsedTestCase,
 } from './xcodebuild-line-parsers.ts';
 import {
-  parseXcodebuildSwiftTestingLine,
   parseSwiftTestingIssueLine,
   parseSwiftTestingResultLine,
   parseSwiftTestingRunSummary,
@@ -326,12 +325,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
     const failureDiag = parseFailureDiagnostic(line);
     if (failureDiag) {
       queueFailureDiagnostic(failureDiag);
-      return;
-    }
-
-    const xcodebuildST = parseXcodebuildSwiftTestingLine(line);
-    if (xcodebuildST) {
-      recordTestCaseResult(xcodebuildST);
       return;
     }
 
