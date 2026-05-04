@@ -318,7 +318,7 @@ export function cleanupWorkspaceDaemonFiles(
   workspaceKey: string,
   options?: DaemonFileCleanupOptions,
 ): void {
-  withDaemonRegistryMutationLock(workspaceKey, () => {
+  const result = withDaemonRegistryMutationLock(workspaceKey, () => {
     const registryPath = registryPathForWorkspaceKey(workspaceKey);
     const removed = removeRegistryAtPathIfOwned(registryPath, workspaceKey, options);
     if (!removed) {
@@ -331,4 +331,7 @@ export function cleanupWorkspaceDaemonFiles(
       // ignore
     }
   });
+  if (result === null) {
+    throw new Error(`Unable to acquire daemon registry lock for ${workspaceKey}`);
+  }
 }

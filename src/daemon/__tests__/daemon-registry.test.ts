@@ -145,7 +145,7 @@ describe('daemon registry', () => {
     expect(existsSync(entry.socketPath)).toBe(false);
   });
 
-  it('does not clean up while another daemon registry mutation holds the workspace lock', () => {
+  it('throws and preserves files while another daemon registry mutation holds the workspace lock', () => {
     const entry = createEntry();
     writeDaemonRegistryEntry(entry);
     mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
@@ -154,9 +154,11 @@ describe('daemon registry', () => {
     expect(lock).not.toBeNull();
 
     try {
-      cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
-        socketPath: entry.socketPath,
-      });
+      expect(() =>
+        cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+          socketPath: entry.socketPath,
+        }),
+      ).toThrow(`Unable to acquire daemon registry lock for ${entry.workspaceKey}`);
 
       expect(readDaemonRegistryEntry(entry.workspaceKey)).toEqual(entry);
       expect(existsSync(entry.socketPath)).toBe(true);
