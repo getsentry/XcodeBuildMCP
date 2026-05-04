@@ -199,7 +199,7 @@ export async function runMcpShutdown(input: {
       timeoutMs: workspaceFilesystemCleanupTimeoutMs,
       operation: () =>
         cleanupOwnedWorkspaceFilesystemArtifacts({
-          timeoutMs: workspaceFilesystemCleanupTimeoutMs,
+          timeoutMs: STEP_TIMEOUT_MS,
         }),
     },
     {

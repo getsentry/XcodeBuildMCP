@@ -204,7 +204,7 @@ describe('runMcpShutdown', () => {
     );
     expect(filesystemStep?.status).toBe('completed');
     expect(mocks.cleanupOwnedWorkspaceFilesystemArtifacts).toHaveBeenCalledWith({
-      timeoutMs: 2100,
+      timeoutMs: 1000,
     });
   });
 
