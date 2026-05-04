@@ -51,11 +51,20 @@ export async function forceStopDaemon(socketPath: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   if (entry) {
-    cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
-      pid: entry.pid,
-      socketPath,
-      allowLiveOwner: true,
-    });
+    try {
+      cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+        pid: entry.pid,
+        socketPath,
+        allowLiveOwner: true,
+      });
+    } catch {
+      // Lock contention: fall back to direct socket removal.
+      try {
+        unlinkSync(socketPath);
+      } catch {
+        // Socket may already be gone.
+      }
+    }
   } else {
     // Registry entry missing; cannot derive workspace key from socket path alone.
     // Clean up the socket file directly.
