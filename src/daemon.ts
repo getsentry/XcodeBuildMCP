@@ -333,29 +333,34 @@ async function main(): Promise<void> {
           },
         });
 
-      let forcedShutdownTimer: NodeJS.Timeout | null = setTimeout(() => {
-        forcedShutdownTimer = null;
-        log('warn', '[Daemon] Forced shutdown after timeout');
-        void cleanupArtifacts().finally(() => {
-          void flushAndCloseSentry(1000).finally(() => {
-            process.exit(1);
-          });
-        });
-      }, 5000);
-      forcedShutdownTimer.unref?.();
-
-      server.close(() => {
+      let cleanupStarted = false;
+      let forcedShutdownTimer: NodeJS.Timeout | null = null;
+      const finishShutdown = (finalExitCode: number, flushTimeoutMs: number): void => {
+        if (cleanupStarted) {
+          return;
+        }
+        cleanupStarted = true;
         if (forcedShutdownTimer) {
           clearTimeout(forcedShutdownTimer);
           forcedShutdownTimer = null;
         }
-        log('info', '[Daemon] Server closed');
         void cleanupArtifacts().finally(() => {
           log('info', '[Daemon] Cleanup complete');
-          void flushAndCloseSentry(2000).finally(() => {
-            process.exit(exitCode);
+          void flushAndCloseSentry(flushTimeoutMs).finally(() => {
+            process.exit(finalExitCode);
           });
         });
+      };
+
+      forcedShutdownTimer = setTimeout(() => {
+        log('warn', '[Daemon] Forced shutdown after timeout');
+        finishShutdown(1, 1000);
+      }, 5000);
+      forcedShutdownTimer.unref?.();
+
+      server.close(() => {
+        log('info', '[Daemon] Server closed');
+        finishShutdown(exitCode, 2000);
       });
     };
 
@@ -417,9 +422,19 @@ async function main(): Promise<void> {
       idleCheckTimer.unref?.();
     }
 
-    server.on('error', releaseStartupRegistryLock);
+    const handleStartupServerError = (error: Error): void => {
+      releaseStartupRegistryLock();
+      const message = error.message;
+      log('error', `[Daemon] Server startup error: ${message}`, { sentry: true });
+      console.error('Daemon error:', message);
+      void flushAndCloseSentry(2000).finally(() => {
+        process.exit(1);
+      });
+    };
+    server.once('error', handleStartupServerError);
 
     server.listen(socketPath, () => {
+      server.off('error', handleStartupServerError);
       log('info', `[Daemon] Listening on ${socketPath}`);
 
       // Write registry entry after successful listen
