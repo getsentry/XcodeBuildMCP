@@ -1,7 +1,8 @@
-import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import { DERIVED_DATA_DIR } from './log-paths.ts';
+import { getWorkspaceFilesystemLayout } from './log-paths.ts';
 import { resolvePathFromCwd } from './path.ts';
+import { getRuntimeInstanceIfConfigured } from './runtime-instance.ts';
+import { shortWorkspaceHash, workspaceKeyForRoot } from './workspace-identity.ts';
 
 export type DerivedDataPathInput = {
   derivedDataPath?: string | null;
@@ -14,11 +15,19 @@ function getNonEmptyPath(pathValue?: string | null): string | undefined {
   return pathValue && pathValue.trim().length > 0 ? pathValue : undefined;
 }
 
+function resolveWorkspaceDerivedDataRoot(cwd: string): string {
+  const workspaceKey = getRuntimeInstanceIfConfigured()?.workspaceKey ?? workspaceKeyForRoot(cwd);
+  return getWorkspaceFilesystemLayout(workspaceKey).derivedData;
+}
+
 export function computeScopedDerivedDataPath(anchorPath: string, cwd?: string): string {
-  const resolved = resolvePathFromCwd(anchorPath, cwd);
-  const hash = crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12);
+  const resolvedCwd = cwd ?? process.cwd();
+  const resolved = resolvePathFromCwd(anchorPath, resolvedCwd);
   const name = path.basename(resolved, path.extname(resolved));
-  return path.join(DERIVED_DATA_DIR, `${name}-${hash}`);
+  return path.join(
+    resolveWorkspaceDerivedDataRoot(resolvedCwd),
+    `${name}-${shortWorkspaceHash(resolved)}`,
+  );
 }
 
 export function resolveEffectiveDerivedDataPath(input: DerivedDataPathInput = {}): string {
@@ -38,5 +47,5 @@ export function resolveEffectiveDerivedDataPath(input: DerivedDataPathInput = {}
     return computeScopedDerivedDataPath(projectPath, cwd);
   }
 
-  return DERIVED_DATA_DIR;
+  return resolveWorkspaceDerivedDataRoot(cwd);
 }

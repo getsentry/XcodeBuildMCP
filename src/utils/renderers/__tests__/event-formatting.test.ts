@@ -35,7 +35,10 @@ describe('event formatting', () => {
           { label: 'Scheme', value: 'MyApp' },
           { label: '-only-testing', value: 'MyAppTests/MyAppTests/testLaunch' },
           { label: '-skip-testing', value: 'MyAppTests/MyAppTests/testFlaky' },
-          { label: 'Derived Data', value: '~/Library/Developer/XcodeBuildMCP/DerivedData' },
+          {
+            label: 'Derived Data',
+            value: '~/Library/Developer/XcodeBuildMCP/workspaces/abc123/DerivedData',
+          },
         ],
       }),
     ).toBe(
@@ -43,7 +46,7 @@ describe('event formatting', () => {
         '\u{1F9EA} Test',
         '',
         '   Scheme: MyApp',
-        '   Derived Data: ~/Library/Developer/XcodeBuildMCP/DerivedData',
+        '   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/abc123/DerivedData',
         '   Selective Testing:',
         '     MyAppTests/MyAppTests/testLaunch',
         '     Skip Testing: MyAppTests/MyAppTests/testFlaky',

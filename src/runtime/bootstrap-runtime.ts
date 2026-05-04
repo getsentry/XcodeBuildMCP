@@ -11,6 +11,8 @@ import { log } from '../utils/logger.ts';
 import type { FileSystemExecutor } from '../utils/FileSystemExecutor.ts';
 import { scheduleSimulatorDefaultsRefresh } from '../utils/simulator-defaults-refresh.ts';
 import { expandHomePrefix } from '../utils/path.ts';
+import { resolveWorkspaceIdentity } from '../utils/workspace-identity.ts';
+import { configureRuntimeWorkspaceKey } from '../utils/runtime-instance.ts';
 
 export type RuntimeKind = 'cli' | 'daemon' | 'mcp';
 
@@ -29,6 +31,8 @@ export interface BootstrappedRuntime {
 
 export interface BootstrapRuntimeResult {
   runtime: BootstrappedRuntime;
+  workspaceRoot: string;
+  workspaceKey: string;
   configFound: boolean;
   configPath?: string;
   notices: string[];
@@ -136,6 +140,11 @@ export async function bootstrapRuntime(
   }
 
   const config = getConfig();
+  const workspaceIdentity = resolveWorkspaceIdentity({
+    cwd,
+    projectConfigPath: configResult.path,
+  });
+  configureRuntimeWorkspaceKey(workspaceIdentity.workspaceKey);
 
   if (opts.runtime === 'mcp') {
     const hydration = hydrateSessionDefaultsForMcp(
@@ -152,6 +161,8 @@ export async function bootstrapRuntime(
       cwd,
       config,
     },
+    workspaceRoot: workspaceIdentity.workspaceRoot,
+    workspaceKey: workspaceIdentity.workspaceKey,
     configFound: configResult.found,
     configPath: configResult.path,
     notices: configResult.notices,

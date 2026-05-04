@@ -7,7 +7,7 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS Simulator",
       "simulatorName": "iPhone 17"
@@ -18,7 +18,7 @@
       "target": "simulator"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
+      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
       "bundleId": "io.sentry.calculatorapp",
       "processId": 99999,
       "simulatorId": "<UUID>",

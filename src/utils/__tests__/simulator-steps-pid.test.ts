@@ -9,6 +9,7 @@ import {
   launchSimulatorAppWithLogging,
   setSimulatorLogDirOverrideForTests,
 } from '../simulator-steps.ts';
+import { getWorkspaceFilesystemLayout } from '../log-paths.ts';
 import type { CommandExecutor } from '../CommandExecutor.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
@@ -108,6 +109,26 @@ describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
 
     expect(result.success).toBe(true);
     expect(result.processId).toBe(42567);
+  });
+
+  it('writes logs under the current workspace log directory when no test override is set', async () => {
+    setSimulatorLogDirOverrideForTests(null);
+    const spawner = createMockSpawner();
+    const executor = createMockExecutor(42567);
+
+    const result = await launchSimulatorAppWithLogging(
+      'test-sim-uuid',
+      'com.example.app',
+      executor,
+      undefined,
+      { spawner },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.logFilePath).toContain(getWorkspaceFilesystemLayout('workspace-a').logs);
+    expect(result.logFilePath).toContain('_helperpid90000_ownerpid');
+    expect(result.osLogPath).toContain(getWorkspaceFilesystemLayout('workspace-a').logs);
+    expect(result.osLogPath).toContain('_helperpid90001_ownerpid');
   });
 
   it('returns undefined processId when executor returns no PID', async () => {

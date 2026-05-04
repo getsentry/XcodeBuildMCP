@@ -9,6 +9,10 @@
  */
 
 import { beforeEach, afterEach } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
 import {
   __setTestCommandExecutorOverride,
   __setTestFileSystemExecutorOverride,
@@ -21,14 +25,35 @@ import {
   createNoopFileSystemExecutor,
   createNoopInteractiveSpawner,
 } from './mock-executors.ts';
+import { setXcodebuildLogDirOverrideForTests } from '../utils/xcodebuild-log-capture.ts';
+import { resetWorkspaceFilesystemLifecycleStateForTests } from '../utils/workspace-filesystem-lifecycle.ts';
+import { setXcodeBuildMCPAppDirOverrideForTests } from '../utils/log-paths.ts';
+
+let xcodebuildLogDir: string | null = null;
+let appDir: string | null = null;
 
 beforeEach(() => {
   __setTestCommandExecutorOverride(createNoopExecutor());
   __setTestFileSystemExecutorOverride(createNoopFileSystemExecutor());
   __setTestInteractiveSpawnerOverride(createNoopInteractiveSpawner());
+  appDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-test-app-dir-'));
+  setXcodeBuildMCPAppDirOverrideForTests(appDir);
+  xcodebuildLogDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-test-logs-'));
+  setXcodebuildLogDirOverrideForTests(xcodebuildLogDir);
 });
 
-afterEach(() => {
+afterEach(async () => {
   __clearTestExecutorOverrides();
   __clearTestInteractiveSpawnerOverride();
+  setXcodebuildLogDirOverrideForTests(null);
+  setXcodeBuildMCPAppDirOverrideForTests(null);
+  resetWorkspaceFilesystemLifecycleStateForTests();
+  if (xcodebuildLogDir) {
+    await rm(xcodebuildLogDir, { recursive: true, force: true });
+    xcodebuildLogDir = null;
+  }
+  if (appDir) {
+    await rm(appDir, { recursive: true, force: true });
+    appDir = null;
+  }
 });

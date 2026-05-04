@@ -3,9 +3,12 @@ import { normalizeSnapshotOutput } from '../../snapshot-tests/normalize.ts';
 
 describe('normalizeSnapshotOutput tilde handling', () => {
   it('normalizes ~/ paths to <HOME>/', () => {
-    const input = 'Derived Data: ~/Library/Developer/XcodeBuildMCP/DerivedData\n';
+    const input =
+      'Workspace Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs\n';
     const result = normalizeSnapshotOutput(input);
-    expect(result).toContain('<HOME>/Library/Developer/XcodeBuildMCP/DerivedData');
+    expect(result).toContain(
+      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs',
+    );
     expect(result).not.toContain('~/');
   });
 
@@ -40,15 +43,45 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     );
   });
 
-  it('normalizes scoped XcodeBuildMCP DerivedData hashes', () => {
-    const input =
-      'Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-22d700c6d603\n';
+  it('normalizes workspace-scoped log paths to the stable log fixture path', () => {
+    const input = [
+      'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs/build_sim_2026-05-02T12-00-00-000Z_pid1234_abcd1234.log',
+      'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs/io.app_2026-05-02T12-00-00-000Z_helperpid1234_ownerpid5678_abcd1234.log',
+      '',
+    ].join('\n');
 
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>',
+      'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
     );
+    expect(result).toContain(
+      'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/io.app_<TIMESTAMP>_pid<PID>.log',
+    );
+  });
+
+  it('normalizes workspace-scoped XcodeBuildMCP DerivedData hashes', () => {
+    const input =
+      'Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/DerivedData/CalculatorApp-22d700c6d603\n';
+
+    const result = normalizeSnapshotOutput(input);
+
+    expect(result).toContain(
+      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/DerivedData/CalculatorApp-<HASH>',
+    );
+    expect(result).not.toContain('Weather-abc123def456');
     expect(result).not.toContain('22d700c6d603');
+  });
+
+  it('normalizes workspace-scoped DerivedData root with no trailing path', () => {
+    const input =
+      'Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-c5da0cbe19a7/DerivedData\n';
+
+    const result = normalizeSnapshotOutput(input);
+
+    expect(result).toContain(
+      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData\n',
+    );
+    expect(result).not.toContain('c5da0cbe19a7');
   });
 });

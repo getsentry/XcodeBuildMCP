@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { displayPath, formatToolPreflight } from '../build-preflight.ts';
 import { computeScopedDerivedDataPath } from '../derived-data-path.ts';
-import { DERIVED_DATA_DIR } from '../log-paths.ts';
+import { getWorkspaceFilesystemLayout } from '../log-paths.ts';
+import { workspaceKeyForRoot } from '../workspace-identity.ts';
 
-const DISPLAY_DERIVED_DATA = displayPath(DERIVED_DATA_DIR);
+const displayDefaultDerivedData = (): string =>
+  displayPath(getWorkspaceFilesystemLayout(workspaceKeyForRoot(process.cwd())).derivedData);
 const displayScopedDerivedData = (anchorPath: string): string =>
   displayPath(computeScopedDerivedDataPath(anchorPath));
 
@@ -195,7 +197,7 @@ describe('formatToolPreflight', () => {
         '   Scheme: MyApp',
         '   Configuration: Debug',
         '   Platform: macOS',
-        `   Derived Data: ${DISPLAY_DERIVED_DATA}`,
+        `   Derived Data: ${displayDefaultDerivedData()}`,
         '',
       ].join('\n'),
     );

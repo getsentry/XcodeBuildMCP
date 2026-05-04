@@ -80,6 +80,15 @@ When reading issues:
 - When working on skill sources in `skills/`, use the `skill-creator` skill workflow.
 - After modifying any skill source, run `npx skill-check <skill-directory>` and address all errors/warnings before handoff.
 -
+## Multi-process filesystem state
+- XcodeBuildMCP explicitly supports multiple concurrent MCP server, daemon, CLI, test, and helper processes for the same or different workspaces.
+- Shared filesystem state under `~/Library/Developer/XcodeBuildMCP` must be multi-process safe.
+- Use workspace-key scoped directories for workspace-owned state.
+- Do not store runtime state under `~/.xcodebuildmcp`; `.xcodebuildmcp/config.yaml` is only project configuration.
+- Use shared lock and atomic-write helpers for mutable shared files.
+- Prefer one-record-per-file registries over shared aggregate files.
+- Cleanup must verify ownership before deleting shared artifacts.
+
 ## Style
 - Keep answers short and concise
 - No emojis in commits, issues, PR comments, or code

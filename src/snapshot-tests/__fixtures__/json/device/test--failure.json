@@ -6,6 +6,8 @@
   "data": {
     "request": {
       "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS",
       "deviceId": "<UUID>",
@@ -29,7 +31,7 @@
     },
     "tests": {
       "discovered": {
-        "total": 52,
+        "total": 57,
         "items": [
           "CalculatorAppFeatureTests/CalculatorBasicTests/testClear",
           "CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState",

@@ -9,15 +9,13 @@ import {
   ensureSocketDir,
   removeStaleSocket,
   getSocketPath,
-  getWorkspaceKey,
-  resolveWorkspaceRoot,
   logPathForWorkspaceKey,
 } from './daemon/socket-path.ts';
 import { startDaemonServer } from './daemon/daemon-server.ts';
 import {
+  acquireDaemonRegistryMutationLock,
   writeDaemonRegistryEntry,
-  removeDaemonRegistryEntry,
-  cleanupWorkspaceDaemonFiles,
+  type DaemonRegistryMutationLock,
 } from './daemon/daemon-registry.ts';
 import { log, normalizeLogLevel, setLogFile, setLogLevel } from './utils/logger.ts';
 import { version } from './version.ts';
@@ -42,11 +40,11 @@ import {
 } from './utils/sentry.ts';
 import { isXcodemakeBinaryAvailable, isXcodemakeEnabled } from './utils/xcodemake/index.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
-import { configureRuntimeWorkspaceKey } from './utils/runtime-instance.ts';
 import {
-  reconcileSimulatorLaunchOsLogOrphansForWorkspace,
-  terminateLiveSimulatorLaunchOsLogSessionsSync,
-} from './utils/log-capture/index.ts';
+  cleanupOwnedWorkspaceFilesystemArtifacts,
+  runWorkspaceFilesystemLifecycleSweep,
+  terminateOwnedWorkspaceFilesystemArtifactsSync,
+} from './utils/workspace-filesystem-lifecycle.ts';
 
 async function checkExistingDaemon(socketPath: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
@@ -124,16 +122,7 @@ async function main(): Promise<void> {
     },
   });
 
-  const workspaceRoot = resolveWorkspaceRoot({
-    cwd: result.runtime.cwd,
-    projectConfigPath: result.configPath,
-  });
-
-  const workspaceKey = getWorkspaceKey({
-    cwd: result.runtime.cwd,
-    projectConfigPath: result.configPath,
-  });
-  configureRuntimeWorkspaceKey(workspaceKey);
+  const { workspaceRoot, workspaceKey } = result;
 
   const logPath = resolveDaemonLogPath(workspaceKey);
   if (logPath) {
@@ -159,20 +148,27 @@ async function main(): Promise<void> {
 
   log('info', `[Daemon] Workspace: ${workspaceRoot}`);
   log('info', `[Daemon] Socket: ${socketPath}`);
-  try {
-    const reconciliation = await reconcileSimulatorLaunchOsLogOrphansForWorkspace(workspaceKey);
-    if (reconciliation.stoppedSessionCount > 0 || reconciliation.errorCount > 0) {
+
+  const runStartupLifecycleSweep = async (): Promise<void> => {
+    try {
+      const lifecycle = await runWorkspaceFilesystemLifecycleSweep({
+        workspaceKey,
+        trigger: 'startup',
+      });
+      if (lifecycle.stopped > 0 || lifecycle.deleted > 0 || lifecycle.errors.length > 0) {
+        log(
+          lifecycle.errors.length > 0 ? 'warn' : 'info',
+          `[Daemon] Filesystem lifecycle: ${JSON.stringify(lifecycle)}`,
+        );
+      }
+    } catch (error) {
       log(
-        reconciliation.errorCount > 0 ? 'warn' : 'info',
-        `[Daemon] Simulator OSLog reconciliation: ${JSON.stringify(reconciliation)}`,
+        'warn',
+        `[Daemon] Filesystem lifecycle failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-  } catch (error) {
-    log(
-      'warn',
-      `[Daemon] Simulator OSLog reconciliation failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  };
+
   if (logPath) {
     log('info', `[Daemon] Logs: ${logPath}`);
   }
@@ -181,6 +177,28 @@ async function main(): Promise<void> {
 
   const isRunning = await checkExistingDaemon(socketPath);
   if (isRunning) {
+    log('error', '[Daemon] Another daemon is already running for this workspace');
+    console.error('Error: Daemon is already running for this workspace');
+    await flushAndCloseSentry(1000);
+    process.exit(1);
+  }
+
+  const startupRegistryLock = acquireDaemonRegistryMutationLock(workspaceKey);
+  if (!startupRegistryLock) {
+    log('error', '[Daemon] Unable to acquire daemon registry lock');
+    console.error('Error: Unable to acquire daemon registry lock');
+    await flushAndCloseSentry(1000);
+    process.exit(1);
+  }
+  let pendingStartupRegistryLock: DaemonRegistryMutationLock | null = startupRegistryLock;
+  const releaseStartupRegistryLock = (): void => {
+    pendingStartupRegistryLock?.release();
+    pendingStartupRegistryLock = null;
+  };
+
+  const isRunningAfterLock = await checkExistingDaemon(socketPath);
+  if (isRunningAfterLock) {
+    releaseStartupRegistryLock();
     log('error', '[Daemon] Another daemon is already running for this workspace');
     console.error('Error: Daemon is already running for this workspace');
     await flushAndCloseSentry(1000);
@@ -302,26 +320,33 @@ async function main(): Promise<void> {
     recordDaemonLifecycleMetric('shutdown');
     log('info', '[Daemon] Shutting down...');
 
-    // Close the server
+    const cleanupArtifacts = (): Promise<unknown> =>
+      cleanupOwnedWorkspaceFilesystemArtifacts({
+        workspaceKey,
+        trigger: 'shutdown',
+        daemonCleanup: {
+          pid: process.pid,
+          socketPath,
+          allowLiveOwner: true,
+        },
+      });
+
     server.close(() => {
       log('info', '[Daemon] Server closed');
-
-      // Remove registry entry and socket
-      removeDaemonRegistryEntry(workspaceKey);
-      removeStaleSocket(socketPath);
-
-      log('info', '[Daemon] Cleanup complete');
-      void flushAndCloseSentry(2000).finally(() => {
-        process.exit(exitCode);
+      void cleanupArtifacts().finally(() => {
+        log('info', '[Daemon] Cleanup complete');
+        void flushAndCloseSentry(2000).finally(() => {
+          process.exit(exitCode);
+        });
       });
     });
 
-    // Force exit if server doesn't close in time
     setTimeout(() => {
       log('warn', '[Daemon] Forced shutdown after timeout');
-      cleanupWorkspaceDaemonFiles(workspaceKey);
-      void flushAndCloseSentry(1000).finally(() => {
-        process.exit(1);
+      void cleanupArtifacts().finally(() => {
+        void flushAndCloseSentry(1000).finally(() => {
+          process.exit(1);
+        });
       });
     }, 5000);
   };
@@ -384,20 +409,29 @@ async function main(): Promise<void> {
     idleCheckTimer.unref?.();
   }
 
+  server.on('error', releaseStartupRegistryLock);
+
   server.listen(socketPath, () => {
     log('info', `[Daemon] Listening on ${socketPath}`);
 
     // Write registry entry after successful listen
-    writeDaemonRegistryEntry({
-      workspaceKey,
-      workspaceRoot,
-      socketPath,
-      logPath: logPath ?? undefined,
-      pid: process.pid,
-      startedAt,
-      enabledWorkflows: daemonWorkflows,
-      version: String(version),
-    });
+    try {
+      writeDaemonRegistryEntry(
+        {
+          workspaceKey,
+          workspaceRoot,
+          socketPath,
+          logPath: logPath ?? undefined,
+          pid: process.pid,
+          startedAt,
+          enabledWorkflows: daemonWorkflows,
+          version: String(version),
+        },
+        { lock: startupRegistryLock },
+      );
+    } finally {
+      releaseStartupRegistryLock();
+    }
 
     writeLine(`Daemon started (PID: ${process.pid})`);
     writeLine(`Workspace: ${workspaceRoot}`);
@@ -405,11 +439,15 @@ async function main(): Promise<void> {
     writeLine(`Tools: ${catalog.tools.length}`);
     recordBootstrapDurationMetric('cli-daemon', Date.now() - daemonBootstrapStart);
 
+    // Filesystem orphan reconciliation and log retention run fire-and-forget after listen so
+    // a slow sweep cannot delay request serving. Request handlers must not assume orphans
+    // have been cleaned at startup.
     setImmediate(() => {
       void enrichSentryMetadata().catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         log('warn', `[Daemon] Failed to enrich Sentry metadata: ${message}`);
       });
+      void runStartupLifecycleSweep();
     });
   });
 
@@ -421,7 +459,7 @@ async function main(): Promise<void> {
   };
 
   process.on('exit', () => {
-    terminateLiveSimulatorLaunchOsLogSessionsSync();
+    terminateOwnedWorkspaceFilesystemArtifactsSync();
   });
   process.on('SIGTERM', () => shutdown(0));
   process.on('SIGINT', () => shutdown(0));

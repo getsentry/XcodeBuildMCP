@@ -5,7 +5,10 @@ import { log } from './logging/index.ts';
 import { toErrorMessage } from './errors.ts';
 import type { CommandExecutor } from './CommandExecutor.ts';
 import { normalizeSimctlChildEnv } from './environment.ts';
-import { LOG_DIR } from './log-paths.ts';
+import { getWorkspaceFilesystemLayout } from './log-paths.ts';
+import { getRuntimeInstance } from './runtime-instance.ts';
+import { scheduleArtifactCreatedSweep } from './workspace-filesystem-lifecycle.ts';
+import { formatLogTimestamp, shortRandomSuffix } from './log-naming.ts';
 import {
   registerSimulatorLaunchOsLogSession,
   stopSimulatorLaunchOsLogSessionsForApp,
@@ -13,8 +16,18 @@ import {
 
 let logDirOverrideForTests: string | null = null;
 
-function formatLogTimestamp(): string {
-  return new Date().toISOString().replace(/:/g, '-').replace('.', '-');
+interface ResolvedSimulatorLogDir {
+  path: string;
+  isOverride: boolean;
+}
+
+function resolveSimulatorLogDir(): ResolvedSimulatorLogDir {
+  return {
+    path:
+      logDirOverrideForTests ??
+      getWorkspaceFilesystemLayout(getRuntimeInstance().workspaceKey).logs,
+    isOverride: logDirOverrideForTests !== null,
+  };
 }
 
 export interface StepResult {
@@ -165,15 +178,19 @@ export async function launchSimulatorAppWithLogging(
 ): Promise<LaunchWithLoggingResult> {
   const spawner = deps?.spawner ?? spawn;
 
-  const logsDir = logDirOverrideForTests ?? LOG_DIR;
+  const logsDir = resolveSimulatorLogDir();
   const ts = formatLogTimestamp();
-  const logFileName = `${bundleId}_${ts}_pid${process.pid}.log`;
-  const logFilePath = path.join(logsDir, logFileName);
+  const suffix = shortRandomSuffix();
+  let logFilePath = path.join(
+    logsDir.path,
+    `${bundleId}_${ts}_ownerpid${process.pid}_${suffix}.log`,
+  );
 
   let fd: number | undefined;
   try {
-    fs.mkdirSync(logsDir, { recursive: true });
-    fd = fs.openSync(logFilePath, 'w');
+    fs.mkdirSync(logsDir.path, { recursive: true });
+    scheduleArtifactCreatedSweep(logsDir);
+    fd = fs.openSync(logFilePath, 'wx');
 
     const args = [
       'simctl',
@@ -196,6 +213,13 @@ export async function launchSimulatorAppWithLogging(
     }
 
     const child = spawner('xcrun', args, spawnOpts);
+    if (child.pid && Number.isInteger(child.pid)) {
+      const helperLogFilePath = path.join(
+        logsDir.path,
+        `${bundleId}_${ts}_helperpid${child.pid}_ownerpid${process.pid}_${suffix}.log`,
+      );
+      logFilePath = renameHelperLogPathOrThrow(logFilePath, helperLogFilePath, child);
+    }
     child.unref();
     fs.closeSync(fd);
     fd = undefined;
@@ -261,6 +285,25 @@ async function resolveAppPidViaLaunch(
   return pidMatch ? parseInt(pidMatch[1], 10) : undefined;
 }
 
+function renameHelperLogPathOrThrow(
+  currentPath: string,
+  helperPath: string,
+  child: ChildProcess,
+): string {
+  try {
+    fs.renameSync(currentPath, helperPath);
+    return helperPath;
+  } catch (error) {
+    try {
+      child.kill?.('SIGTERM');
+    } catch {
+      // Best-effort cleanup after failing to secure helper-pid log protection.
+    }
+    const message = toErrorMessage(error);
+    throw new Error(`Failed to move log file to helper-pid protected path: ${message}`);
+  }
+}
+
 function readLogFileSafe(filePath: string): string {
   try {
     return fs.readFileSync(filePath, 'utf-8');
@@ -272,11 +315,15 @@ function readLogFileSafe(filePath: string): string {
 async function startTrackedOsLogStream(
   simulatorUuid: string,
   bundleId: string,
-  logsDir: string,
+  logsDir: ResolvedSimulatorLogDir,
   spawner: ProcessSpawner,
 ): Promise<string | undefined> {
   const ts = formatLogTimestamp();
-  const osLogFilePath = path.join(logsDir, `${bundleId}_oslog_${ts}_pid${process.pid}.log`);
+  const suffix = shortRandomSuffix();
+  let osLogFilePath = path.join(
+    logsDir.path,
+    `${bundleId}_oslog_${ts}_ownerpid${process.pid}_${suffix}.log`,
+  );
 
   let fd: number | undefined;
   try {
@@ -293,7 +340,8 @@ async function startTrackedOsLogStream(
       return undefined;
     }
 
-    fd = fs.openSync(osLogFilePath, 'w');
+    scheduleArtifactCreatedSweep(logsDir);
+    fd = fs.openSync(osLogFilePath, 'wx');
 
     const child = spawner(
       'xcrun',
@@ -312,6 +360,13 @@ async function startTrackedOsLogStream(
         detached: true,
       },
     );
+    if (child.pid && Number.isInteger(child.pid)) {
+      const helperOsLogFilePath = path.join(
+        logsDir.path,
+        `${bundleId}_oslog_${ts}_helperpid${child.pid}_ownerpid${process.pid}_${suffix}.log`,
+      );
+      osLogFilePath = renameHelperLogPathOrThrow(osLogFilePath, helperOsLogFilePath, child);
+    }
 
     try {
       await registerSimulatorLaunchOsLogSession({

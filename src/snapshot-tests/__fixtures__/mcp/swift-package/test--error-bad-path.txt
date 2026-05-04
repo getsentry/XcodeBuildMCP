@@ -4,7 +4,7 @@
    Scheme: NONEXISTENT
    Configuration: debug
    Platform: Swift Package
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData
 
 Errors (1):
 

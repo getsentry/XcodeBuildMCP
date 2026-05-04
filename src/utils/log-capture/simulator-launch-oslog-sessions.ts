@@ -2,6 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { acquireDaemonActivity } from '../../daemon/activity-registry.ts';
 import { getRuntimeInstance, getRuntimeInstanceIfConfigured } from '../runtime-instance.ts';
+import { isPidAlive } from '../process-liveness.ts';
 import {
   clearSimulatorLaunchOsLogRegistryForTests,
   compareOsLogSortKeys,
@@ -21,6 +22,7 @@ export interface SimulatorLaunchOsLogSession {
   simulatorUuid: string;
   bundleId: string;
   logFilePath: string;
+  workspaceKey: string;
   startedAt: Date;
   hasEnded: boolean;
   releaseActivity?: () => void;
@@ -49,6 +51,10 @@ export interface SimulatorLaunchOsLogReconciliationResult {
 const activeSimulatorLaunchOsLogSessions = new Map<string, SimulatorLaunchOsLogSession>();
 let ownerPidAliveOverrideForTests: ((pid: number) => boolean) | null = null;
 
+function zeroStopResult(): { stoppedSessionCount: number; errorCount: number; errors: string[] } {
+  return { stoppedSessionCount: 0, errorCount: 0, errors: [] };
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -76,14 +82,7 @@ function isOwnerPidAlive(pid: number): boolean {
   if (ownerPidAliveOverrideForTests) {
     return ownerPidAliveOverrideForTests(pid);
   }
-
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    return code !== 'ESRCH';
-  }
+  return isPidAlive(pid);
 }
 
 function finalizeLiveSession(sessionId: string, session: SimulatorLaunchOsLogSession): void {
@@ -101,7 +100,10 @@ function finalizeLiveSession(sessionId: string, session: SimulatorLaunchOsLogSes
 
 function handleLocalProcessExit(sessionId: string, session: SimulatorLaunchOsLogSession): void {
   finalizeLiveSession(sessionId, session);
-  void removeSimulatorLaunchOsLogRegistryRecord(sessionId).catch(() => {
+  void removeSimulatorLaunchOsLogRegistryRecord({
+    sessionId,
+    workspaceKey: session.workspaceKey,
+  }).catch(() => {
     // Best-effort cleanup; future reads prune stale records.
   });
 }
@@ -125,7 +127,10 @@ async function confirmRecordStopped(
   record: SimulatorLaunchOsLogRegistryRecord,
   liveSession: SimulatorLaunchOsLogSession | undefined,
 ): Promise<void> {
-  await removeSimulatorLaunchOsLogRegistryRecord(record.sessionId);
+  await removeSimulatorLaunchOsLogRegistryRecord({
+    sessionId: record.sessionId,
+    workspaceKey: record.owner.workspaceKey,
+  });
   if (liveSession) {
     finalizeLiveSession(record.sessionId, liveSession);
   }
@@ -206,6 +211,7 @@ export async function registerSimulatorLaunchOsLogSession(params: {
     throw new Error('Simulator launch OSLog process did not provide a valid pid');
   }
 
+  const owner = getRuntimeInstance();
   const sessionId = randomUUID();
   const session: SimulatorLaunchOsLogSession = {
     sessionId,
@@ -213,6 +219,7 @@ export async function registerSimulatorLaunchOsLogSession(params: {
     simulatorUuid: params.simulatorUuid,
     bundleId: params.bundleId,
     logFilePath: params.logFilePath,
+    workspaceKey: owner.workspaceKey,
     startedAt: new Date(),
     hasEnded: false,
     releaseActivity: acquireDaemonActivity('logging.simulator.launch-oslog'),
@@ -233,7 +240,7 @@ export async function registerSimulatorLaunchOsLogSession(params: {
   try {
     await writeSimulatorLaunchOsLogRegistryRecord({
       sessionId,
-      owner: getRuntimeInstance(),
+      owner,
       simulatorUuid: params.simulatorUuid,
       bundleId: params.bundleId,
       helperPid,
@@ -255,8 +262,9 @@ export async function listActiveSimulatorLaunchOsLogSessions(): Promise<
   if (!currentInstance) {
     return [];
   }
-  return (await listSimulatorLaunchOsLogRegistryRecords())
-    .filter((record) => record.owner.workspaceKey === currentInstance.workspaceKey)
+  return (
+    await listSimulatorLaunchOsLogRegistryRecords({ workspaceKey: currentInstance.workspaceKey })
+  )
     .map((record) => toSummary(record, currentInstance.instanceId))
     .sort(compareOsLogSortKeys);
 }
@@ -266,16 +274,19 @@ export async function getActiveSimulatorLaunchOsLogSessionCount(): Promise<numbe
   if (!currentInstance) {
     return 0;
   }
-  return (await listSimulatorLaunchOsLogRegistryRecords()).filter(
-    (record) => record.owner.workspaceKey === currentInstance.workspaceKey,
+  return (
+    await listSimulatorLaunchOsLogRegistryRecords({
+      workspaceKey: currentInstance.workspaceKey,
+    })
   ).length;
 }
 
 async function stopMatchingRecords(
   predicate: (record: SimulatorLaunchOsLogRegistryRecord) => boolean,
   timeoutMs: number,
+  listOptions?: Parameters<typeof listSimulatorLaunchOsLogRegistryRecords>[0],
 ): Promise<{ stoppedSessionCount: number; errorCount: number; errors: string[] }> {
-  const records = (await listSimulatorLaunchOsLogRegistryRecords()).filter(predicate);
+  const records = (await listSimulatorLaunchOsLogRegistryRecords(listOptions)).filter(predicate);
   const errors: string[] = [];
 
   for (const record of records) {
@@ -301,7 +312,7 @@ export async function stopSimulatorLaunchOsLogSessionsForApp(
 ): Promise<{ stoppedSessionCount: number; errorCount: number; errors: string[] }> {
   const currentInstance = getRuntimeInstanceIfConfigured();
   if (!currentInstance) {
-    return { stoppedSessionCount: 0, errorCount: 0, errors: [] };
+    return zeroStopResult();
   }
   return stopMatchingRecords(
     (record) =>
@@ -313,6 +324,7 @@ export async function stopSimulatorLaunchOsLogSessionsForApp(
         currentInstance.instanceId,
       ),
     timeoutMs,
+    { workspaceKey: currentInstance.workspaceKey },
   );
 }
 
@@ -321,25 +333,26 @@ export async function stopOwnedSimulatorLaunchOsLogSessions(
 ): Promise<{ stoppedSessionCount: number; errorCount: number; errors: string[] }> {
   const currentInstance = getRuntimeInstanceIfConfigured();
   if (!currentInstance) {
-    return { stoppedSessionCount: 0, errorCount: 0, errors: [] };
+    return zeroStopResult();
   }
   return stopMatchingRecords(
     (record) => record.owner.instanceId === currentInstance.instanceId,
     timeoutMs,
+    { workspaceKey: currentInstance.workspaceKey },
   );
 }
 
 export async function stopAllSimulatorLaunchOsLogSessions(
   timeoutMs = 1000,
 ): Promise<{ stoppedSessionCount: number; errorCount: number; errors: string[] }> {
-  return stopMatchingRecords(() => true, timeoutMs);
+  return stopMatchingRecords(() => true, timeoutMs, { includeAllWorkspaces: true });
 }
 
 export async function reconcileSimulatorLaunchOsLogOrphansForWorkspace(
   workspaceKey: string,
   timeoutMs = 1000,
 ): Promise<SimulatorLaunchOsLogReconciliationResult> {
-  const records = await listSimulatorLaunchOsLogRegistryRecords();
+  const records = await listSimulatorLaunchOsLogRegistryRecords({ workspaceKey });
   const errors: string[] = [];
   let eligibleOrphanCount = 0;
   let stoppedSessionCount = 0;

@@ -1,0 +1,522 @@
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { cleanupWorkspaceDaemonFiles, readDaemonRegistryEntry } from '../daemon/daemon-registry.ts';
+import { getWorkspaceFilesystemLayout } from './log-paths.ts';
+import { listSimulatorLaunchOsLogProtectedPaths } from './log-capture/simulator-launch-oslog-registry.ts';
+import {
+  reconcileSimulatorLaunchOsLogOrphansForWorkspace,
+  stopOwnedSimulatorLaunchOsLogSessions,
+  terminateLiveSimulatorLaunchOsLogSessionsSync,
+} from './log-capture/simulator-launch-oslog-sessions.ts';
+import { log } from './logging/index.ts';
+import { getRuntimeInstance, getRuntimeInstanceIfConfigured } from './runtime-instance.ts';
+import { tryAcquireFsLock } from './fs-lock.ts';
+import { isPidAlive } from './process-liveness.ts';
+
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES = 10_000;
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_COOLDOWN_MS = 60 * 60 * 1000;
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_SCHEDULE_DELAY_MS = 250;
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_MIN_VISIBLE_MS = 60 * 60 * 1000;
+export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOCK_LEASE_MS = 10 * 60 * 1000;
+
+const FALLBACK_MARKER_FILE = '.last-cleanup';
+const FALLBACK_LOCK_DIR_NAME = '.filesystem-lifecycle.lock';
+const runningScheduledSweeps = new Set<string>();
+const lastScheduledAtByScope = new Map<string, number>();
+const lastScheduledAtByPreKey = new Map<string, number>();
+
+const HELPER_PID_PATTERN = /(?:^|_)helperpid(\d+)(?:_|\.|$)/g;
+const ISO_TIMESTAMP_PATTERN = '\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z';
+const SUFFIX_PATTERN = '[a-f0-9]{8}';
+const XCODEBUILD_LOG_NAME_PATTERN = new RegExp(
+  `^[A-Za-z0-9][A-Za-z0-9_-]*_${ISO_TIMESTAMP_PATTERN}_pid\\d+_${SUFFIX_PATTERN}\\.log$`,
+);
+const SIMULATOR_LOG_NAME_PATTERN = new RegExp(
+  `^.+_${ISO_TIMESTAMP_PATTERN}_(?:helperpid\\d+_)?ownerpid\\d+_${SUFFIX_PATTERN}\\.log$`,
+);
+
+export type WorkspaceFilesystemLifecycleTrigger =
+  | 'startup'
+  | 'artifact-created'
+  | 'shutdown'
+  | 'force-stop'
+  | 'manual';
+
+export interface WorkspaceFilesystemLifecycleOptions {
+  workspaceKey?: string;
+  trigger: WorkspaceFilesystemLifecycleTrigger;
+  logDir?: string;
+  markerPath?: string;
+  lockDir?: string;
+  now?: number;
+  maxAgeMs?: number;
+  maxFiles?: number;
+  cooldownMs?: number;
+  force?: boolean;
+  minVisibleMs?: number;
+  protectedLogPaths?: string[];
+  timeoutMs?: number;
+  lockPurpose?: string;
+  daemonCleanup?: {
+    socketPath?: string;
+    pid?: number;
+    allowLiveOwner?: boolean;
+  };
+}
+
+export interface WorkspaceFilesystemLifecycleResult {
+  workspaceKey: string;
+  trigger: WorkspaceFilesystemLifecycleTrigger;
+  logDir: string;
+  scanned: number;
+  deleted: number;
+  stopped: number;
+  skippedByCooldown: boolean;
+  skippedByLock: boolean;
+  errors: string[];
+}
+
+interface ResolvedWorkspaceFilesystemLifecycleOptions {
+  workspaceKey: string;
+  trigger: WorkspaceFilesystemLifecycleTrigger;
+  logDir: string;
+  markerPath: string;
+  lockDir: string;
+  now: number;
+  maxAgeMs: number;
+  maxFiles: number;
+  cooldownMs: number;
+  force: boolean;
+  minVisibleMs: number;
+  protectedLogPaths: string[];
+  timeoutMs: number;
+  lockPurpose: string;
+  daemonCleanup?: WorkspaceFilesystemLifecycleOptions['daemonCleanup'];
+}
+
+interface RetainedLogFile {
+  path: string;
+  name: string;
+  mtimeMs: number;
+}
+
+function resolveWorkspaceKey(options: WorkspaceFilesystemLifecycleOptions): string {
+  if (options.workspaceKey) {
+    return options.workspaceKey;
+  }
+  const runtimeInstance = getRuntimeInstanceIfConfigured();
+  if (runtimeInstance) {
+    return runtimeInstance.workspaceKey;
+  }
+  if (options.logDir) {
+    return 'custom-log-dir';
+  }
+  return getRuntimeInstance().workspaceKey;
+}
+
+function resolveOptions(
+  options: WorkspaceFilesystemLifecycleOptions,
+): ResolvedWorkspaceFilesystemLifecycleOptions {
+  const workspaceKey = resolveWorkspaceKey(options);
+  const layout = options.logDir ? null : getWorkspaceFilesystemLayout(workspaceKey);
+  const logDir = options.logDir ?? layout?.logs;
+  if (!logDir) {
+    throw new Error('Workspace filesystem lifecycle requires a log directory');
+  }
+
+  return {
+    workspaceKey,
+    trigger: options.trigger,
+    logDir,
+    markerPath:
+      options.markerPath ??
+      layout?.filesystemLifecycle.markerPath ??
+      path.join(logDir, FALLBACK_MARKER_FILE),
+    lockDir:
+      options.lockDir ??
+      layout?.filesystemLifecycle.lockDir ??
+      path.join(logDir, FALLBACK_LOCK_DIR_NAME),
+    now: options.now ?? Date.now(),
+    maxAgeMs: options.maxAgeMs ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS,
+    maxFiles: options.maxFiles ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES,
+    cooldownMs: options.cooldownMs ?? WORKSPACE_FILESYSTEM_LIFECYCLE_COOLDOWN_MS,
+    force: options.force ?? false,
+    minVisibleMs: options.minVisibleMs ?? WORKSPACE_FILESYSTEM_LIFECYCLE_MIN_VISIBLE_MS,
+    protectedLogPaths: options.protectedLogPaths ?? [],
+    timeoutMs: options.timeoutMs ?? 1000,
+    lockPurpose: options.lockPurpose ?? 'filesystem-lifecycle',
+    daemonCleanup: options.daemonCleanup,
+  };
+}
+
+async function shouldSkipForCooldown(
+  markerPath: string,
+  now: number,
+  cooldownMs: number,
+): Promise<boolean> {
+  try {
+    const markerStat = await fs.stat(markerPath);
+    return now - markerStat.mtimeMs < cooldownMs;
+  } catch {
+    return false;
+  }
+}
+
+async function touchCleanupMarker(markerPath: string, now: number): Promise<void> {
+  await fs.mkdir(path.dirname(markerPath), { recursive: true, mode: 0o700 });
+  await fs.writeFile(markerPath, String(now));
+  const markerDate = new Date(now);
+  await fs.utimes(markerPath, markerDate, markerDate);
+}
+
+function hasLiveHelperPidInName(fileName: string): boolean {
+  for (const match of fileName.matchAll(HELPER_PID_PATTERN)) {
+    const pid = Number(match[1]);
+    if (Number.isInteger(pid) && pid > 0 && isPidAlive(pid)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isXcodeBuildMCPManagedLogName(fileName: string): boolean {
+  if (fileName === 'daemon.log') {
+    return true;
+  }
+  return XCODEBUILD_LOG_NAME_PATTERN.test(fileName) || SIMULATOR_LOG_NAME_PATTERN.test(fileName);
+}
+
+async function deleteFile(filePath: string): Promise<boolean> {
+  try {
+    await fs.unlink(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isProtectedLogFile(
+  file: RetainedLogFile,
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+  protectedPaths: Set<string>,
+): boolean {
+  if (protectedPaths.has(file.path)) {
+    return true;
+  }
+  if (options.now - file.mtimeMs < options.minVisibleMs) {
+    return true;
+  }
+  return hasLiveHelperPidInName(file.name);
+}
+
+async function collectProtectedLogPaths(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+): Promise<Set<string>> {
+  const protectedPaths = new Set(options.protectedLogPaths);
+
+  try {
+    for (const osLogPath of await listSimulatorLaunchOsLogProtectedPaths({
+      workspaceKey: options.workspaceKey,
+    })) {
+      protectedPaths.add(osLogPath);
+    }
+  } catch {
+    // ignore
+  }
+
+  const daemonEntry = readDaemonRegistryEntry(options.workspaceKey);
+  if (daemonEntry?.logPath && isPidAlive(daemonEntry.pid)) {
+    protectedPaths.add(daemonEntry.logPath);
+  }
+
+  return protectedPaths;
+}
+
+async function pruneKnownLogDirectory(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+  protectedPaths: Set<string>,
+): Promise<{ scanned: number; deleted: number }> {
+  await fs.mkdir(options.logDir, { recursive: true, mode: 0o700 });
+  const entries = await fs.readdir(options.logDir, { withFileTypes: true });
+  const candidates = entries
+    .filter((entry) => entry.isFile() && isXcodeBuildMCPManagedLogName(entry.name))
+    .map((entry) => ({ name: entry.name, path: path.join(options.logDir, entry.name) }));
+
+  const stats = await Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        const stat = await fs.stat(candidate.path);
+        return { ...candidate, mtimeMs: stat.mtimeMs } satisfies RetainedLogFile;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const retainedDeletable: RetainedLogFile[] = [];
+  const expired: RetainedLogFile[] = [];
+  let scanned = 0;
+
+  for (const file of stats) {
+    if (!file) continue;
+    scanned += 1;
+    if (isProtectedLogFile(file, options, protectedPaths)) {
+      continue;
+    }
+    if (options.now - file.mtimeMs > options.maxAgeMs) {
+      expired.push(file);
+      continue;
+    }
+    retainedDeletable.push(file);
+  }
+
+  const excessFileCount = retainedDeletable.length - options.maxFiles;
+  const overflow =
+    excessFileCount > 0
+      ? retainedDeletable
+          .slice()
+          .sort((left, right) => left.mtimeMs - right.mtimeMs)
+          .slice(0, excessFileCount)
+      : [];
+
+  const deletions = await Promise.all(
+    [...expired, ...overflow].map((file) => deleteFile(file.path)),
+  );
+  const deleted = deletions.reduce((count, success) => count + (success ? 1 : 0), 0);
+
+  return { scanned, deleted };
+}
+
+function zeroResult(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+  skippedByCooldown: boolean,
+  skippedByLock: boolean,
+  stopped = 0,
+  errors: string[] = [],
+): WorkspaceFilesystemLifecycleResult {
+  return {
+    workspaceKey: options.workspaceKey,
+    trigger: options.trigger,
+    logDir: options.logDir,
+    scanned: 0,
+    deleted: 0,
+    stopped,
+    skippedByCooldown,
+    skippedByLock,
+    errors,
+  };
+}
+
+async function runStartupReconciliation(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+  errors: string[],
+): Promise<number> {
+  if (options.trigger !== 'startup') {
+    return 0;
+  }
+  try {
+    const reconciliation = await reconcileSimulatorLaunchOsLogOrphansForWorkspace(
+      options.workspaceKey,
+      options.timeoutMs,
+    );
+    errors.push(...reconciliation.errors);
+    return reconciliation.stoppedSessionCount;
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return 0;
+  }
+}
+
+function runDaemonCleanup(options: ResolvedWorkspaceFilesystemLifecycleOptions): void {
+  if (!options.daemonCleanup) {
+    return;
+  }
+  cleanupWorkspaceDaemonFiles(options.workspaceKey, options.daemonCleanup);
+}
+
+export async function runWorkspaceFilesystemLifecycleSweep(
+  options: WorkspaceFilesystemLifecycleOptions,
+): Promise<WorkspaceFilesystemLifecycleResult> {
+  const resolved = resolveOptions(options);
+  const errors: string[] = [];
+  const stopped = await runStartupReconciliation(resolved, errors);
+
+  if (
+    !resolved.force &&
+    (await shouldSkipForCooldown(resolved.markerPath, resolved.now, resolved.cooldownMs))
+  ) {
+    return zeroResult(resolved, true, false, stopped, errors);
+  }
+
+  const lock = await tryAcquireFsLock({
+    lockDir: resolved.lockDir,
+    purpose: resolved.lockPurpose,
+    leaseMs: WORKSPACE_FILESYSTEM_LIFECYCLE_LOCK_LEASE_MS,
+    now: resolved.now,
+  });
+  if (!lock) {
+    return zeroResult(resolved, false, true, stopped, errors);
+  }
+
+  try {
+    if (
+      !resolved.force &&
+      (await shouldSkipForCooldown(resolved.markerPath, resolved.now, resolved.cooldownMs))
+    ) {
+      return zeroResult(resolved, true, false, stopped, errors);
+    }
+
+    runDaemonCleanup(resolved);
+    const protectedPaths = await collectProtectedLogPaths(resolved);
+    const { scanned, deleted } = await pruneKnownLogDirectory(resolved, protectedPaths);
+    await touchCleanupMarker(resolved.markerPath, resolved.now);
+
+    return {
+      workspaceKey: resolved.workspaceKey,
+      trigger: resolved.trigger,
+      logDir: resolved.logDir,
+      scanned,
+      deleted,
+      stopped,
+      skippedByCooldown: false,
+      skippedByLock: false,
+      errors,
+    };
+  } finally {
+    await lock.release();
+  }
+}
+
+function buildSchedulePreKey(options: WorkspaceFilesystemLifecycleOptions): string | null {
+  if (options.workspaceKey) {
+    return `workspace:${options.workspaceKey}`;
+  }
+  if (options.logDir) {
+    return `logDir:${options.logDir}`;
+  }
+  return null;
+}
+
+export function scheduleWorkspaceFilesystemLifecycleSweep(
+  options: WorkspaceFilesystemLifecycleOptions,
+): void {
+  const preKey = buildSchedulePreKey(options);
+  if (preKey !== null && !options.force) {
+    const lastAt = lastScheduledAtByPreKey.get(preKey);
+    if (
+      lastAt !== undefined &&
+      (options.now ?? Date.now()) - lastAt < WORKSPACE_FILESYSTEM_LIFECYCLE_COOLDOWN_MS
+    ) {
+      return;
+    }
+  }
+
+  const resolved = resolveOptions(options);
+  const scheduleKey = `${resolved.workspaceKey}:${resolved.logDir}`;
+  const lastScheduledAt = lastScheduledAtByScope.get(scheduleKey);
+
+  if (
+    !resolved.force &&
+    lastScheduledAt !== undefined &&
+    resolved.now - lastScheduledAt < resolved.cooldownMs
+  ) {
+    return;
+  }
+  if (runningScheduledSweeps.has(scheduleKey)) {
+    return;
+  }
+
+  lastScheduledAtByScope.set(scheduleKey, resolved.now);
+  if (preKey !== null) {
+    lastScheduledAtByPreKey.set(preKey, resolved.now);
+  }
+  runningScheduledSweeps.add(scheduleKey);
+
+  const timer = setTimeout(() => {
+    void runWorkspaceFilesystemLifecycleSweep(resolved)
+      .then((result) => {
+        if (!result.skippedByCooldown && !result.skippedByLock && result.deleted > 0) {
+          log(
+            'info',
+            `[FilesystemLifecycle] Deleted ${result.deleted} old log files from ${result.logDir}`,
+          );
+        }
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        log('warn', `[FilesystemLifecycle] Cleanup failed: ${message}`);
+      })
+      .finally(() => {
+        runningScheduledSweeps.delete(scheduleKey);
+      });
+  }, WORKSPACE_FILESYSTEM_LIFECYCLE_SCHEDULE_DELAY_MS);
+  timer.unref?.();
+}
+
+export async function cleanupOwnedWorkspaceFilesystemArtifacts(
+  options: Omit<WorkspaceFilesystemLifecycleOptions, 'trigger'> & {
+    trigger?: 'shutdown' | 'force-stop';
+  } = {},
+): Promise<WorkspaceFilesystemLifecycleResult> {
+  const runtimeInstance = getRuntimeInstanceIfConfigured();
+  const workspaceKey = options.workspaceKey ?? runtimeInstance?.workspaceKey;
+  if (!workspaceKey) {
+    return {
+      workspaceKey: 'unconfigured',
+      trigger: options.trigger ?? 'shutdown',
+      logDir: '',
+      scanned: 0,
+      deleted: 0,
+      stopped: 0,
+      skippedByCooldown: false,
+      skippedByLock: false,
+      errors: [],
+    };
+  }
+
+  const stopResult = await stopOwnedSimulatorLaunchOsLogSessions(options.timeoutMs ?? 1000);
+  if (options.daemonCleanup) {
+    cleanupWorkspaceDaemonFiles(workspaceKey, options.daemonCleanup);
+  }
+
+  return {
+    workspaceKey,
+    trigger: options.trigger ?? 'shutdown',
+    logDir: getWorkspaceFilesystemLayout(workspaceKey).logs,
+    scanned: 0,
+    deleted: 0,
+    stopped: stopResult.stoppedSessionCount,
+    skippedByCooldown: false,
+    skippedByLock: false,
+    errors: stopResult.errors,
+  };
+}
+
+export function terminateOwnedWorkspaceFilesystemArtifactsSync(): {
+  attemptedCount: number;
+  errorCount: number;
+  errors: string[];
+} {
+  return terminateLiveSimulatorLaunchOsLogSessionsSync();
+}
+
+export function resetWorkspaceFilesystemLifecycleStateForTests(): void {
+  runningScheduledSweeps.clear();
+  lastScheduledAtByScope.clear();
+  lastScheduledAtByPreKey.clear();
+}
+
+export function scheduleArtifactCreatedSweep(logDir: { path: string; isOverride: boolean }): void {
+  if (logDir.isOverride) {
+    scheduleWorkspaceFilesystemLifecycleSweep({
+      trigger: 'artifact-created',
+      logDir: logDir.path,
+    });
+    return;
+  }
+  scheduleWorkspaceFilesystemLifecycleSweep({
+    trigger: 'artifact-created',
+    workspaceKey: getRuntimeInstance().workspaceKey,
+  });
+}

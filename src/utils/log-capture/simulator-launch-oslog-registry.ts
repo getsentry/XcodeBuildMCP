@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { SIMULATOR_LAUNCH_OSLOG_REGISTRY_DIR } from '../log-paths.ts';
+import { getWorkspaceFilesystemLayout, getWorkspacesDir } from '../log-paths.ts';
 import type { RuntimeInstance } from '../runtime-instance.ts';
+import { getRuntimeInstanceIfConfigured } from '../runtime-instance.ts';
 
 const execFileAsync = promisify(execFile);
 const PROCESS_SAMPLE_CHUNK_SIZE = 100;
@@ -19,21 +21,43 @@ export interface SimulatorLaunchOsLogRegistryRecord {
   expectedCommandParts: string[];
 }
 
+interface RegistryEntry {
+  filePath: string;
+  record: SimulatorLaunchOsLogRegistryRecord;
+}
+
+interface InvalidRegistryEntry {
+  filePath: string;
+}
+
+interface RegistryDirectoryReadResult {
+  entries: RegistryEntry[];
+  invalidEntries: InvalidRegistryEntry[];
+}
+
+interface ListRegistryRecordsOptions {
+  workspaceKey?: string;
+  includeAllWorkspaces?: boolean;
+}
+
 let registryDirOverride: string | null = null;
 let recordActiveOverrideForTests:
   | ((record: SimulatorLaunchOsLogRegistryRecord) => Promise<boolean>)
   | null = null;
 
-function getRegistryDir(): string {
-  return registryDirOverride ?? SIMULATOR_LAUNCH_OSLOG_REGISTRY_DIR;
+function getWorkspaceRegistryDir(workspaceKey: string): string {
+  return (
+    registryDirOverride ??
+    getWorkspaceFilesystemLayout(workspaceKey).simulatorLaunchOsLogRegistryDir
+  );
 }
 
-function getRegistryPath(sessionId: string): string {
-  return path.join(getRegistryDir(), `${sessionId}.json`);
+function getWorkspaceRegistryPath(sessionId: string, workspaceKey: string): string {
+  return path.join(getWorkspaceRegistryDir(workspaceKey), `${sessionId}.json`);
 }
 
-async function ensureRegistryDir(): Promise<void> {
-  await fs.mkdir(getRegistryDir(), { recursive: true, mode: 0o700 });
+async function ensureRegistryDir(dir: string): Promise<void> {
+  await fs.mkdir(dir, { recursive: true, mode: 0o700 });
 }
 
 function isRecord(value: unknown): value is SimulatorLaunchOsLogRegistryRecord {
@@ -78,6 +102,102 @@ async function removeRegistryPaths(paths: string[]): Promise<void> {
       }
     }),
   );
+}
+
+async function readRegistryRecordFile(
+  filePath: string,
+): Promise<SimulatorLaunchOsLogRegistryRecord | null> {
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(content) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readRegistryDirectory(dir: string): Promise<RegistryDirectoryReadResult> {
+  let candidatePaths: string[];
+  try {
+    const dirEntries = await fs.readdir(dir, { withFileTypes: true });
+    candidatePaths = dirEntries
+      .filter((dirEntry) => dirEntry.isFile() && dirEntry.name.endsWith('.json'))
+      .map((dirEntry) => path.join(dir, dirEntry.name));
+  } catch {
+    return { entries: [], invalidEntries: [] };
+  }
+
+  const records = await Promise.all(candidatePaths.map(readRegistryRecordFile));
+
+  const entries: RegistryEntry[] = [];
+  const invalidEntries: InvalidRegistryEntry[] = [];
+  for (const [index, record] of records.entries()) {
+    const filePath = candidatePaths[index];
+    if (record) {
+      entries.push({ filePath, record });
+    } else {
+      invalidEntries.push({ filePath });
+    }
+  }
+
+  return { entries, invalidEntries };
+}
+
+async function listWorkspaceRegistryDirs(): Promise<string[]> {
+  if (registryDirOverride) {
+    return [registryDirOverride];
+  }
+
+  const workspacesRoot = getWorkspacesDir();
+  try {
+    const workspaceEntries = await fs.readdir(workspacesRoot, { withFileTypes: true });
+    return workspaceEntries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => getWorkspaceRegistryDir(entry.name));
+  } catch {
+    return [];
+  }
+}
+
+async function resolveRegistryDirsForRead(options: ListRegistryRecordsOptions): Promise<string[]> {
+  if (registryDirOverride) {
+    return [registryDirOverride];
+  }
+
+  const dirs: string[] = [];
+
+  if (options.includeAllWorkspaces) {
+    dirs.push(...(await listWorkspaceRegistryDirs()));
+  } else {
+    const workspaceKey = options.workspaceKey ?? getRuntimeInstanceIfConfigured()?.workspaceKey;
+    if (workspaceKey) {
+      dirs.push(getWorkspaceRegistryDir(workspaceKey));
+    }
+  }
+
+  const seen = new Set<string>();
+  return dirs.filter((dir) => {
+    if (seen.has(dir)) {
+      return false;
+    }
+    seen.add(dir);
+    return true;
+  });
+}
+
+async function readSimulatorLaunchOsLogRegistryEntries(
+  options: ListRegistryRecordsOptions = {},
+): Promise<RegistryDirectoryReadResult> {
+  const entries: RegistryEntry[] = [];
+  const invalidEntries: InvalidRegistryEntry[] = [];
+
+  for (const dir of await resolveRegistryDirsForRead(options)) {
+    const result = await readRegistryDirectory(dir);
+    entries.push(...result.entries);
+    invalidEntries.push(...result.invalidEntries);
+  }
+
+  return { entries, invalidEntries };
 }
 
 async function sampleProcessCommands(pids: number[]): Promise<Map<number, string> | null> {
@@ -141,18 +261,28 @@ function commandMatchesRecord(
 export async function writeSimulatorLaunchOsLogRegistryRecord(
   record: SimulatorLaunchOsLogRegistryRecord,
 ): Promise<void> {
-  await ensureRegistryDir();
-  const destinationPath = getRegistryPath(record.sessionId);
-  const tempPath = `${destinationPath}.${process.pid}.${Date.now()}.tmp`;
-  await fs.writeFile(tempPath, `${JSON.stringify(record, null, 2)}\n`, {
-    encoding: 'utf8',
-    mode: 0o600,
-  });
-  await fs.rename(tempPath, destinationPath);
+  const registryDir = getWorkspaceRegistryDir(record.owner.workspaceKey);
+  await ensureRegistryDir(registryDir);
+  const destinationPath = getWorkspaceRegistryPath(record.sessionId, record.owner.workspaceKey);
+  const tempPath = `${destinationPath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(tempPath, `${JSON.stringify(record, null, 2)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'wx',
+    });
+    await fs.rename(tempPath, destinationPath);
+  } catch (error) {
+    await fs.unlink(tempPath).catch(() => undefined);
+    throw error;
+  }
 }
 
-export async function removeSimulatorLaunchOsLogRegistryRecord(sessionId: string): Promise<void> {
-  await removeRegistryPaths([getRegistryPath(sessionId)]);
+export async function removeSimulatorLaunchOsLogRegistryRecord(params: {
+  sessionId: string;
+  workspaceKey: string;
+}): Promise<void> {
+  await removeRegistryPaths([getWorkspaceRegistryPath(params.sessionId, params.workspaceKey)]);
 }
 
 async function isRecordActive(record: SimulatorLaunchOsLogRegistryRecord): Promise<boolean> {
@@ -168,13 +298,13 @@ async function isRecordActive(record: SimulatorLaunchOsLogRegistryRecord): Promi
 }
 
 function partitionRecordsByCommandMatch(
-  entries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }>,
+  entries: RegistryEntry[],
   commandsByPid: Map<number, string>,
 ): {
-  activeEntries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }>;
+  activeEntries: RegistryEntry[];
   stalePaths: string[];
 } {
-  const activeEntries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
+  const activeEntries: RegistryEntry[] = [];
   const stalePaths: string[] = [];
 
   for (const entry of entries) {
@@ -188,48 +318,13 @@ function partitionRecordsByCommandMatch(
   return { activeEntries, stalePaths };
 }
 
-export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
-  SimulatorLaunchOsLogRegistryRecord[]
-> {
-  try {
-    await ensureRegistryDir();
-  } catch {
-    return [];
-  }
-
-  const entries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
-  const invalidPaths: string[] = [];
-
-  try {
-    const dirEntries = await fs.readdir(getRegistryDir(), { withFileTypes: true });
-    for (const dirEntry of dirEntries) {
-      if (!dirEntry.isFile() || !dirEntry.name.endsWith('.json')) {
-        continue;
-      }
-
-      const filePath = path.join(getRegistryDir(), dirEntry.name);
-      try {
-        const content = await fs.readFile(filePath, 'utf8');
-        const parsed = JSON.parse(content) as unknown;
-        if (!isRecord(parsed)) {
-          invalidPaths.push(filePath);
-          continue;
-        }
-        entries.push({ filePath, record: parsed });
-      } catch {
-        invalidPaths.push(filePath);
-      }
-    }
-  } catch {
-    return [];
-  }
-
-  if (invalidPaths.length > 0) {
-    await removeRegistryPaths(invalidPaths);
-  }
-
+export async function listSimulatorLaunchOsLogProtectedPaths(
+  options: ListRegistryRecordsOptions = {},
+): Promise<Set<string>> {
+  const { entries } = await readSimulatorLaunchOsLogRegistryEntries(options);
+  const protectedPaths = new Set<string>();
   if (entries.length === 0) {
-    return [];
+    return protectedPaths;
   }
 
   if (!recordActiveOverrideForTests) {
@@ -237,7 +332,51 @@ export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
       entries.map((entry) => entry.record.helperPid),
     );
     if (commandsByPid !== null) {
-      const { activeEntries, stalePaths } = partitionRecordsByCommandMatch(entries, commandsByPid);
+      for (const entry of entries) {
+        if (commandMatchesRecord(commandsByPid.get(entry.record.helperPid), entry.record)) {
+          protectedPaths.add(entry.record.logFilePath);
+        }
+      }
+      return protectedPaths;
+    }
+  }
+
+  for (const entry of entries) {
+    if (await isRecordActive(entry.record)) {
+      protectedPaths.add(entry.record.logFilePath);
+    }
+  }
+
+  return protectedPaths;
+}
+
+export async function listSimulatorLaunchOsLogRegistryRecords(
+  options: ListRegistryRecordsOptions = {},
+): Promise<SimulatorLaunchOsLogRegistryRecord[]> {
+  const { entries, invalidEntries } = await readSimulatorLaunchOsLogRegistryEntries(options);
+  const scopedEntries =
+    options.workspaceKey && !options.includeAllWorkspaces
+      ? entries.filter((entry) => entry.record.owner.workspaceKey === options.workspaceKey)
+      : entries;
+
+  const invalidPathsToRemove = invalidEntries.map((entry) => entry.filePath);
+  if (invalidPathsToRemove.length > 0) {
+    await removeRegistryPaths(invalidPathsToRemove);
+  }
+
+  if (scopedEntries.length === 0) {
+    return [];
+  }
+
+  if (!recordActiveOverrideForTests) {
+    const commandsByPid = await sampleProcessCommands(
+      scopedEntries.map((entry) => entry.record.helperPid),
+    );
+    if (commandsByPid !== null) {
+      const { activeEntries, stalePaths } = partitionRecordsByCommandMatch(
+        scopedEntries,
+        commandsByPid,
+      );
       if (stalePaths.length > 0) {
         await removeRegistryPaths(stalePaths);
       }
@@ -246,8 +385,8 @@ export async function listSimulatorLaunchOsLogRegistryRecords(): Promise<
   }
 
   const stalePaths: string[] = [];
-  const activeEntries: Array<{ filePath: string; record: SimulatorLaunchOsLogRegistryRecord }> = [];
-  for (const entry of entries) {
+  const activeEntries: RegistryEntry[] = [];
+  for (const entry of scopedEntries) {
     if (await isRecordActive(entry.record)) {
       activeEntries.push(entry);
       continue;
@@ -286,7 +425,14 @@ export function compareOsLogSortKeys(left: OsLogSortKey, right: OsLogSortKey): n
 
 export async function clearSimulatorLaunchOsLogRegistryForTests(): Promise<void> {
   try {
-    await fs.rm(getRegistryDir(), { recursive: true, force: true });
+    if (registryDirOverride) {
+      await fs.rm(registryDirOverride, { recursive: true, force: true });
+      return;
+    }
+
+    for (const dir of await listWorkspaceRegistryDirs()) {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   } catch {
     // Ignore cleanup failures in tests.
   }

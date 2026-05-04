@@ -6,16 +6,16 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
 
-Discovered 52 test(s):
+Discovered 57 test(s):
    CalculatorAppFeatureTests/CalculatorBasicTests/testClear
    CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState
    CalculatorAppFeatureTests/CalculatorBasicTests/testIntentionalFailure
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testChainCalculations
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay
-   (...and 46 more)
+   (...and 51 more)
 
 Test Failures (2):
 

@@ -2,13 +2,12 @@
 import { bootstrapRuntime } from './runtime/bootstrap-runtime.ts';
 import { buildCliToolCatalog } from './cli/cli-tool-catalog.ts';
 import { buildYargsApp } from './cli/yargs-app.ts';
-import { getSocketPath, getWorkspaceKey, resolveWorkspaceRoot } from './daemon/socket-path.ts';
+import { getSocketPath } from './daemon/socket-path.ts';
 import { startMcpServer } from './server/start-mcp-server.ts';
 import { listCliWorkflowIdsFromManifest } from './runtime/tool-catalog.ts';
 import { flushAndCloseSentry, initSentry, recordBootstrapDurationMetric } from './utils/sentry.ts';
 import { coerceLogLevel, setLogLevel, type LogLevel } from './utils/logger.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
-import { configureRuntimeWorkspaceKey } from './utils/runtime-instance.ts';
 
 function findTopLevelCommand(argv: string[]): string | undefined {
   const flagsWithValue = new Set(['--socket', '--log-level', '--style']);
@@ -119,22 +118,12 @@ async function main(): Promise<void> {
     },
   });
 
-  // Compute workspace context for daemon routing
-  const workspaceRoot = resolveWorkspaceRoot({
-    cwd: result.runtime.cwd,
-    projectConfigPath: result.configPath,
-  });
+  const { workspaceRoot, workspaceKey } = result;
 
   const defaultSocketPath = getSocketPath({
     cwd: result.runtime.cwd,
     projectConfigPath: result.configPath,
   });
-
-  const workspaceKey = getWorkspaceKey({
-    cwd: result.runtime.cwd,
-    projectConfigPath: result.configPath,
-  });
-  configureRuntimeWorkspaceKey(workspaceKey);
 
   const cliExposedWorkflowIds = await listCliWorkflowIdsFromManifest({
     excludeWorkflows: ['session-management', 'workflow-discovery'],

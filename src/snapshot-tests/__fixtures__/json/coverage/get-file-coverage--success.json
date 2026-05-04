@@ -6,8 +6,8 @@
   "data": {
     "summary": {
       "status": "SUCCEEDED",
-      "coveragePct": 77.8,
-      "coveredLines": 147,
+      "coveragePct": 83.1,
+      "coveredLines": 157,
       "executableLines": 189
     },
     "coverageScope": "file",
@@ -23,12 +23,6 @@
           "name": "CalculatorService.deleteLastDigit()",
           "coveredLines": 0,
           "executableLines": 16
-        },
-        {
-          "line": 178,
-          "name": "CalculatorService.setError(_:)",
-          "coveredLines": 0,
-          "executableLines": 5
         },
         {
           "line": 58,
@@ -69,13 +63,6 @@
       ],
       "partialCoverage": [
         {
-          "line": 63,
-          "name": "CalculatorService.inputDecimal()",
-          "coveragePct": 71.4,
-          "coveredLines": 10,
-          "executableLines": 14
-        },
-        {
           "line": 184,
           "name": "CalculatorService.updateExpressionDisplay()",
           "coveragePct": 80,
@@ -83,23 +70,30 @@
           "executableLines": 10
         },
         {
-          "line": 93,
-          "name": "CalculatorService.calculate()",
-          "coveragePct": 84.2,
-          "coveredLines": 32,
-          "executableLines": 38
-        },
-        {
           "line": 195,
           "name": "CalculatorService.formatNumber(_:)",
           "coveragePct": 85.7,
           "coveredLines": 18,
           "executableLines": 21
+        },
+        {
+          "line": 93,
+          "name": "CalculatorService.calculate()",
+          "coveragePct": 89.5,
+          "coveredLines": 34,
+          "executableLines": 38
+        },
+        {
+          "line": 63,
+          "name": "CalculatorService.inputDecimal()",
+          "coveragePct": 92.9,
+          "coveredLines": 13,
+          "executableLines": 14
         }
       ],
-      "fullCoverageCount": 27,
-      "notCoveredFunctionCount": 8,
-      "notCoveredLineCount": 27,
+      "fullCoverageCount": 28,
+      "notCoveredFunctionCount": 7,
+      "notCoveredLineCount": 22,
       "partialCoverageFunctionCount": 4
     }
   }

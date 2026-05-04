@@ -394,7 +394,7 @@ describe('simulator launch OSLog sessions', () => {
     await expect(listActiveSimulatorLaunchOsLogSessions()).resolves.toEqual([]);
   });
 
-  it('does not reconcile sessions from a different workspace', async () => {
+  it('does not scan or reconcile sessions from a different workspace', async () => {
     const otherWorkspaceChild = createMockChild({ pid: 1001 });
     setRuntimeInstanceForTests({
       instanceId: 'dead-instance',
@@ -417,11 +417,11 @@ describe('simulator launch OSLog sessions', () => {
     const result = await reconcileSimulatorLaunchOsLogOrphansForWorkspace('workspace-a', 1);
 
     expect(result).toEqual({
-      scannedSessionCount: 1,
+      scannedSessionCount: 0,
       eligibleOrphanCount: 0,
       stoppedSessionCount: 0,
       skippedLiveOwnerCount: 0,
-      skippedDifferentWorkspaceCount: 1,
+      skippedDifferentWorkspaceCount: 0,
       errorCount: 0,
       errors: [],
     });

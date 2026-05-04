@@ -4,7 +4,14 @@
    Scheme: spm
    Configuration: debug
    Platform: Swift Package
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData
+Running tests (1 completed, 1 failure, 0 skipped)
+Running tests (2 completed, 1 failure, 0 skipped)
+Running tests (3 completed, 1 failure, 0 skipped)
+Running tests (4 completed, 1 failure, 0 skipped)
+Running tests (5 completed, 1 failure, 0 skipped)
+Running tests (6 completed, 1 failure, 0 skipped)
+Running tests (7 completed, 2 failures, 0 skipped)
 
 CalculatorAppTests
   ✗ testCalculatorServiceFailure:

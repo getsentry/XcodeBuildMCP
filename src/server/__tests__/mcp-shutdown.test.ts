@@ -4,9 +4,15 @@ const mocks = vi.hoisted(() => ({
   stopXcodeStateWatcher: vi.fn(async () => undefined),
   shutdownXcodeToolsBridge: vi.fn(async () => undefined),
   disposeAll: vi.fn(async () => undefined),
-  stopOwnedSimulatorLaunchOsLogSessions: vi.fn(async () => ({
-    stoppedSessionCount: 0,
-    errorCount: 0,
+  cleanupOwnedWorkspaceFilesystemArtifacts: vi.fn(async () => ({
+    workspaceKey: 'workspace-a',
+    trigger: 'shutdown',
+    logDir: '/tmp/logs',
+    scanned: 0,
+    deleted: 0,
+    stopped: 0,
+    skippedByCooldown: false,
+    skippedByLock: false,
     errors: [],
   })),
   stopAllVideoCaptureSessions: vi.fn(async () => ({
@@ -33,8 +39,8 @@ vi.mock('../../integrations/xcode-tools-bridge/index.ts', () => ({
 vi.mock('../../utils/debugger/index.ts', () => ({
   getDefaultDebuggerManager: () => ({ disposeAll: mocks.disposeAll }),
 }));
-vi.mock('../../utils/log-capture/simulator-launch-oslog-sessions.ts', () => ({
-  stopOwnedSimulatorLaunchOsLogSessions: mocks.stopOwnedSimulatorLaunchOsLogSessions,
+vi.mock('../../utils/workspace-filesystem-lifecycle.ts', () => ({
+  cleanupOwnedWorkspaceFilesystemArtifacts: mocks.cleanupOwnedWorkspaceFilesystemArtifacts,
 }));
 vi.mock('../../utils/video_capture.ts', () => ({
   stopAllVideoCaptureSessions: mocks.stopAllVideoCaptureSessions,
@@ -96,15 +102,25 @@ describe('runMcpShutdown', () => {
     expect(mocks.stopXcodeStateWatcher).toHaveBeenCalledTimes(1);
     expect(mocks.shutdownXcodeToolsBridge).toHaveBeenCalledTimes(1);
     expect(mocks.disposeAll).toHaveBeenCalledTimes(1);
-    expect(mocks.stopOwnedSimulatorLaunchOsLogSessions).toHaveBeenCalledTimes(1);
+    expect(mocks.cleanupOwnedWorkspaceFilesystemArtifacts).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllVideoCaptureSessions).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
   });
 
   it('adds outer timeout headroom for one-item bulk cleanup', async () => {
-    mocks.stopOwnedSimulatorLaunchOsLogSessions.mockImplementationOnce(async () => {
+    mocks.cleanupOwnedWorkspaceFilesystemArtifacts.mockImplementationOnce(async () => {
       await wait(1050);
-      return { stoppedSessionCount: 1, errorCount: 0, errors: [] };
+      return {
+        workspaceKey: 'workspace-a',
+        trigger: 'shutdown',
+        logDir: '/tmp/logs',
+        scanned: 0,
+        deleted: 0,
+        stopped: 1,
+        skippedByCooldown: false,
+        skippedByLock: false,
+        errors: [],
+      };
     });
 
     const result = await runMcpShutdown({
@@ -134,16 +150,26 @@ describe('runMcpShutdown', () => {
       server: { close: async () => undefined },
     });
 
-    const simulatorLogsStep = result.steps.find(
-      (step) => step.name === 'simulator-launch-oslogs.stop-owned',
+    const filesystemStep = result.steps.find(
+      (step) => step.name === 'workspace-filesystem.cleanup-owned',
     );
-    expect(simulatorLogsStep?.status).toBe('completed');
+    expect(filesystemStep?.status).toBe('completed');
   });
 
   it('uses an expanded timeout budget for sequential multi-item bulk cleanup steps', async () => {
-    mocks.stopOwnedSimulatorLaunchOsLogSessions.mockImplementationOnce(async () => {
+    mocks.cleanupOwnedWorkspaceFilesystemArtifacts.mockImplementationOnce(async () => {
       await wait(1100);
-      return { stoppedSessionCount: 2, errorCount: 0, errors: [] };
+      return {
+        workspaceKey: 'workspace-a',
+        trigger: 'shutdown',
+        logDir: '/tmp/logs',
+        scanned: 0,
+        deleted: 0,
+        stopped: 2,
+        skippedByCooldown: false,
+        skippedByLock: false,
+        errors: [],
+      };
     });
 
     const result = await runMcpShutdown({
@@ -173,10 +199,10 @@ describe('runMcpShutdown', () => {
       server: { close: async () => undefined },
     });
 
-    const simulatorLogsStep = result.steps.find(
-      (step) => step.name === 'simulator-launch-oslogs.stop-owned',
+    const filesystemStep = result.steps.find(
+      (step) => step.name === 'workspace-filesystem.cleanup-owned',
     );
-    expect(simulatorLogsStep?.status).toBe('completed');
+    expect(filesystemStep?.status).toBe('completed');
   });
 
   it('uses a larger timeout budget for debugger dispose-all', async () => {

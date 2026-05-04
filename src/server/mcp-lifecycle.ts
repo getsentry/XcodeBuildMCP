@@ -1,10 +1,8 @@
 import process from 'node:process';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
-import {
-  listActiveSimulatorLaunchOsLogSessions,
-  terminateLiveSimulatorLaunchOsLogSessionsSync,
-} from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
+import { listActiveSimulatorLaunchOsLogSessions } from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
+import { terminateOwnedWorkspaceFilesystemArtifactsSync } from '../utils/workspace-filesystem-lifecycle.ts';
 import { activeProcesses } from '../mcp/tools/swift-package/active-processes.ts';
 import { getDaemonActivitySnapshot } from '../daemon/activity-registry.ts';
 import { listActiveVideoCaptureSessionIds } from '../utils/video_capture.ts';
@@ -364,7 +362,7 @@ export function createMcpLifecycleCoordinator(
     void coordinator.shutdown('unhandled-rejection', reason);
   };
   const handleExit = (): void => {
-    terminateLiveSimulatorLaunchOsLogSessionsSync();
+    terminateOwnedWorkspaceFilesystemArtifactsSync();
   };
 
   let handlersAttached = false;

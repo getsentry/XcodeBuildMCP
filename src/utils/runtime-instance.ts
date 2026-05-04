@@ -1,39 +1,37 @@
 import { randomUUID } from 'node:crypto';
 
+const DEFAULT_WORKSPACE_KEY = 'default';
+
 export interface RuntimeInstance {
   instanceId: string;
   pid: number;
   workspaceKey: string;
 }
 
+let configuredWorkspaceKey: string | null = null;
 let runtimeInstance: RuntimeInstance | null = null;
-let runtimeWorkspaceKey: string | null = null;
 
 export function configureRuntimeWorkspaceKey(workspaceKey: string): void {
-  const normalizedWorkspaceKey = workspaceKey.trim();
-  if (normalizedWorkspaceKey.length === 0) {
-    throw new Error('Runtime workspace key cannot be empty');
+  const normalized = workspaceKey.trim();
+  if (!normalized) {
+    throw new Error('Workspace key cannot be empty');
   }
-
-  runtimeWorkspaceKey = normalizedWorkspaceKey;
+  configuredWorkspaceKey = normalized;
   if (runtimeInstance) {
-    runtimeInstance = { ...runtimeInstance, workspaceKey: normalizedWorkspaceKey };
+    runtimeInstance = { ...runtimeInstance, workspaceKey: normalized };
   }
 }
 
 export function getRuntimeInstance(): RuntimeInstance {
-  if (runtimeInstance) {
-    return runtimeInstance;
-  }
-
-  if (!runtimeWorkspaceKey) {
+  const workspaceKey = configuredWorkspaceKey;
+  if (!workspaceKey) {
     throw new Error('Runtime workspace key has not been configured');
   }
 
-  runtimeInstance = {
+  runtimeInstance ??= {
     instanceId: randomUUID(),
     pid: process.pid,
-    workspaceKey: runtimeWorkspaceKey,
+    workspaceKey,
   };
   return runtimeInstance;
 }
@@ -42,13 +40,23 @@ export function getRuntimeInstanceIfConfigured(): RuntimeInstance | null {
   if (runtimeInstance) {
     return runtimeInstance;
   }
-  if (!runtimeWorkspaceKey) {
+  if (!configuredWorkspaceKey) {
     return null;
   }
   return getRuntimeInstance();
 }
 
-export function setRuntimeInstanceForTests(instance: RuntimeInstance | null): void {
-  runtimeInstance = instance;
-  runtimeWorkspaceKey = instance?.workspaceKey ?? null;
+export function setRuntimeInstanceForTests(
+  instance:
+    | (Omit<RuntimeInstance, 'workspaceKey'> & Partial<Pick<RuntimeInstance, 'workspaceKey'>>)
+    | null,
+): void {
+  runtimeInstance = instance
+    ? {
+        instanceId: instance.instanceId,
+        pid: instance.pid,
+        workspaceKey: instance.workspaceKey ?? configuredWorkspaceKey ?? DEFAULT_WORKSPACE_KEY,
+      }
+    : null;
+  configuredWorkspaceKey = runtimeInstance?.workspaceKey ?? null;
 }

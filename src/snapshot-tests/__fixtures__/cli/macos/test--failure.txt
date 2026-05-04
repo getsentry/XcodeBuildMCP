@@ -5,13 +5,17 @@
    Project: example_projects/macOS/MCPTest.xcodeproj
    Configuration: Debug
    Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/MCPTest-<HASH>
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
 
 Discovered 4 test(s):
    MCPTestTests/MCPTestTests/appNameIsCorrect
    MCPTestTests/MCPTestTests/deliberateFailure
    MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
    MCPTestTests/MCPTestsXCTests/testDeliberateFailure
+Running tests (1 completed, 0 failures, 0 skipped)
+Running tests (2 completed, 1 failure, 0 skipped)
+Running tests (3 completed, 1 failure, 0 skipped)
+Running tests (4 completed, 2 failures, 0 skipped)
 
 MCPTestsXCTests
   ✗ testDeliberateFailure():

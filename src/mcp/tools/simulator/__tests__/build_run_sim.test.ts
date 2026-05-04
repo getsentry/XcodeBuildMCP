@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
-import { DERIVED_DATA_DIR } from '../../../../utils/log-paths.ts';
 import * as z from 'zod';
 import {
   createMockExecutor,
@@ -197,7 +196,7 @@ describe('build_run_sim tool', () => {
                     isAvailable: true,
                   },
                   '-derivedDataPath',
-                  DERIVED_DATA_DIR,
+                  computeScopedDerivedDataPath('/path/to/workspace'),
                 ],
               },
             }),
@@ -266,7 +265,7 @@ describe('build_run_sim tool', () => {
                     isAvailable: true,
                   },
                   '-derivedDataPath',
-                  DERIVED_DATA_DIR,
+                  computeScopedDerivedDataPath('/path/to/workspace'),
                 ],
               },
             }),

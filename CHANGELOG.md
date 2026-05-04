@@ -11,6 +11,10 @@
 - Fixed simulator OSLog helper cleanup so server and daemon startup reconcile same-workspace orphaned log streams without stopping helpers owned by live sessions in other workspaces ([#382](https://github.com/getsentry/XcodeBuildMCP/issues/382)).
 - Fixed Weather example test discovery and made CLI test progress visible while tests are running instead of leaving the last build phase displayed.
 
+### Changed
+
+- Centralized workspace log retention and startup/shutdown filesystem cleanup so XcodeBuildMCP-owned logs are pruned consistently while preserving active daemon and simulator OSLog outputs.
+
 ## [2.5.0-beta.1]
 
 ### Breaking

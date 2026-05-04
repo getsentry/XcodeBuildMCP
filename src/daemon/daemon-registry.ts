@@ -1,17 +1,63 @@
+import { randomUUID } from 'node:crypto';
 import {
-  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join, dirname } from 'node:path';
-import {
-  daemonsDir,
-  daemonDirForWorkspaceKey,
-  registryPathForWorkspaceKey,
-} from './socket-path.ts';
+import { dirname, join } from 'node:path';
+import { daemonDirForWorkspaceKey, registryPathForWorkspaceKey } from './socket-path.ts';
+import { getWorkspacesDir, getWorkspaceFilesystemLayout } from '../utils/log-paths.ts';
+import { tryAcquireFsLockSync } from '../utils/fs-lock-sync.ts';
+import { isPidAlive } from '../utils/process-liveness.ts';
+
+export interface DaemonRegistryMutationLock {
+  readonly workspaceKey: string;
+  release(): void;
+}
+
+const DAEMON_REGISTRY_LOCK_LEASE_MS = 30_000;
+const DAEMON_REGISTRY_LOCK_WAIT_MS = 1_000;
+const DAEMON_REGISTRY_LOCK_POLL_MS = 10;
+const DAEMON_REGISTRY_LOCK_PURPOSE = 'daemon-registry';
+
+const SLEEP_SYNC_WAIT_TARGET = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepSync(ms: number): void {
+  Atomics.wait(SLEEP_SYNC_WAIT_TARGET, 0, 0, ms);
+}
+
+/**
+ * Synchronous lock acquisition with bounded busy-wait. Blocks the event loop for up to
+ * DAEMON_REGISTRY_LOCK_WAIT_MS on contention. Only safe to call from startup or shutdown
+ * paths (writeDaemonRegistryEntry, removeDaemonRegistryEntry, cleanupWorkspaceDaemonFiles)
+ * — never from request handlers.
+ */
+export function acquireDaemonRegistryMutationLock(
+  workspaceKey: string,
+): DaemonRegistryMutationLock | null {
+  const lockDir = join(getWorkspaceFilesystemLayout(workspaceKey).locks, 'daemon-registry.lock');
+  const deadline = Date.now() + DAEMON_REGISTRY_LOCK_WAIT_MS;
+  do {
+    const lock = tryAcquireFsLockSync({
+      lockDir,
+      purpose: DAEMON_REGISTRY_LOCK_PURPOSE,
+      leaseMs: DAEMON_REGISTRY_LOCK_LEASE_MS,
+    });
+    if (lock) {
+      return {
+        workspaceKey,
+        release: () => lock.release(),
+      };
+    }
+    sleepSync(DAEMON_REGISTRY_LOCK_POLL_MS);
+  } while (Date.now() < deadline);
+
+  return null;
+}
 
 /**
  * Metadata stored for each running daemon.
@@ -27,32 +73,219 @@ export interface DaemonRegistryEntry {
   version: string;
 }
 
-/**
- * Write a daemon registry entry.
- * Creates the daemon directory if it doesn't exist.
- */
-export function writeDaemonRegistryEntry(entry: DaemonRegistryEntry): void {
-  const registryPath = registryPathForWorkspaceKey(entry.workspaceKey);
-  const dir = dirname(registryPath);
+export interface DaemonFileCleanupOptions {
+  socketPath?: string;
+  pid?: number;
+  allowLiveOwner?: boolean;
+}
 
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
+interface WriteDaemonRegistryEntryOptions {
+  lock?: DaemonRegistryMutationLock;
+}
+
+function isDaemonRegistryEntry(value: unknown): value is DaemonRegistryEntry {
+  if (typeof value !== 'object' || value === null) {
+    return false;
   }
 
-  writeFileSync(registryPath, JSON.stringify(entry, null, 2), {
-    mode: 0o600,
-  });
+  const entry = value as Partial<DaemonRegistryEntry>;
+  return (
+    typeof entry.workspaceKey === 'string' &&
+    entry.workspaceKey.length > 0 &&
+    typeof entry.workspaceRoot === 'string' &&
+    typeof entry.socketPath === 'string' &&
+    (entry.logPath === undefined || typeof entry.logPath === 'string') &&
+    typeof entry.pid === 'number' &&
+    Number.isInteger(entry.pid) &&
+    entry.pid > 0 &&
+    typeof entry.startedAt === 'string' &&
+    Array.isArray(entry.enabledWorkflows) &&
+    entry.enabledWorkflows.every((workflow) => typeof workflow === 'string') &&
+    typeof entry.version === 'string'
+  );
+}
+
+type RegistryReadResult =
+  | { status: 'missing' }
+  | { status: 'invalid' }
+  | { status: 'valid'; entry: DaemonRegistryEntry };
+
+function readRegistryEntryAtPath(
+  registryPath: string,
+  expectedWorkspaceKey?: string,
+): RegistryReadResult {
+  let content: string;
+  try {
+    content = readFileSync(registryPath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: 'missing' };
+    }
+    return { status: 'invalid' };
+  }
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (!isDaemonRegistryEntry(parsed)) {
+      return { status: 'invalid' };
+    }
+    if (expectedWorkspaceKey !== undefined && parsed.workspaceKey !== expectedWorkspaceKey) {
+      return { status: 'invalid' };
+    }
+    return { status: 'valid', entry: parsed };
+  } catch {
+    return { status: 'invalid' };
+  }
+}
+
+function readValidRegistryEntryAtPath(
+  registryPath: string,
+  expectedWorkspaceKey?: string,
+): DaemonRegistryEntry | null {
+  const result = readRegistryEntryAtPath(registryPath, expectedWorkspaceKey);
+  return result.status === 'valid' ? result.entry : null;
+}
+
+function writeFileAtomicSync(filePath: string, content: string): void {
+  const dir = dirname(filePath);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+
+  const tempPath = join(dir, `.daemon.json.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    writeFileSync(tempPath, content, { encoding: 'utf8', mode: 0o600 });
+    renameSync(tempPath, filePath);
+  } catch (error) {
+    rmSync(tempPath, { force: true });
+    throw error;
+  }
+}
+
+function withDaemonRegistryMutationLock<T>(
+  workspaceKey: string,
+  callback: () => T,
+  existingLock?: DaemonRegistryMutationLock,
+): T | null {
+  if (existingLock) {
+    if (existingLock.workspaceKey !== workspaceKey) {
+      throw new Error(
+        `Daemon registry lock for ${existingLock.workspaceKey} cannot guard ${workspaceKey}`,
+      );
+    }
+    return callback();
+  }
+
+  const lock = acquireDaemonRegistryMutationLock(workspaceKey);
+  if (!lock) {
+    return null;
+  }
+
+  try {
+    return callback();
+  } finally {
+    lock.release();
+  }
+}
+
+function entryMatchesCleanupTarget(
+  entry: DaemonRegistryEntry,
+  workspaceKey: string,
+  options?: DaemonFileCleanupOptions,
+): boolean {
+  if (entry.workspaceKey !== workspaceKey) {
+    return false;
+  }
+  if (options?.socketPath && entry.socketPath !== options.socketPath) {
+    return false;
+  }
+  return true;
+}
+
+function canRemoveRegistryEntry(
+  entry: DaemonRegistryEntry,
+  workspaceKey: string,
+  options?: DaemonFileCleanupOptions,
+): boolean {
+  if (!entryMatchesCleanupTarget(entry, workspaceKey, options)) {
+    return false;
+  }
+
+  const pidMatches = options?.pid === undefined || entry.pid === options.pid;
+  if (pidMatches && options?.allowLiveOwner === true) {
+    return true;
+  }
+
+  return !isPidAlive(entry.pid);
+}
+
+function removeRegistryAtPathIfOwned(
+  registryPath: string,
+  workspaceKey: string,
+  options?: DaemonFileCleanupOptions,
+): DaemonRegistryEntry | null {
+  const entry = readValidRegistryEntryAtPath(registryPath, workspaceKey);
+  if (!entry || !canRemoveRegistryEntry(entry, workspaceKey, options)) {
+    return null;
+  }
+
+  try {
+    unlinkSync(registryPath);
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function listWorkspaceRegistryEntries(): DaemonRegistryEntry[] {
+  const entries: DaemonRegistryEntry[] = [];
+  try {
+    const workspaceDirs = readdirSync(getWorkspacesDir(), { withFileTypes: true });
+    for (const workspaceDir of workspaceDirs) {
+      if (!workspaceDir.isDirectory()) {
+        continue;
+      }
+      const registryPath = registryPathForWorkspaceKey(workspaceDir.name);
+      const result = readRegistryEntryAtPath(registryPath, workspaceDir.name);
+      if (result.status === 'valid') {
+        entries.push(result.entry);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return entries;
 }
 
 /**
- * Remove a daemon registry entry.
+ * Write a daemon registry entry.
+ * Creates the daemon metadata directory if it doesn't exist.
  */
-export function removeDaemonRegistryEntry(workspaceKey: string): void {
-  const registryPath = registryPathForWorkspaceKey(workspaceKey);
-
-  if (existsSync(registryPath)) {
-    unlinkSync(registryPath);
+export function writeDaemonRegistryEntry(
+  entry: DaemonRegistryEntry,
+  options: WriteDaemonRegistryEntryOptions = {},
+): void {
+  const result = withDaemonRegistryMutationLock(
+    entry.workspaceKey,
+    () => {
+      const registryPath = registryPathForWorkspaceKey(entry.workspaceKey);
+      writeFileAtomicSync(registryPath, `${JSON.stringify(entry, null, 2)}\n`);
+    },
+    options.lock,
+  );
+  if (result === null) {
+    throw new Error(`Unable to acquire daemon registry lock for ${entry.workspaceKey}`);
   }
+}
+
+/**
+ * Remove a daemon registry entry when it is owned by the caller or provably stale.
+ */
+export function removeDaemonRegistryEntry(
+  workspaceKey: string,
+  options?: DaemonFileCleanupOptions,
+): void {
+  withDaemonRegistryMutationLock(workspaceKey, () => {
+    removeRegistryAtPathIfOwned(registryPathForWorkspaceKey(workspaceKey), workspaceKey, options);
+  });
 }
 
 /**
@@ -60,78 +293,54 @@ export function removeDaemonRegistryEntry(workspaceKey: string): void {
  * Returns null if the entry doesn't exist.
  */
 export function readDaemonRegistryEntry(workspaceKey: string): DaemonRegistryEntry | null {
-  const registryPath = registryPathForWorkspaceKey(workspaceKey);
-
-  if (!existsSync(registryPath)) {
-    return null;
+  const workspaceResult = readRegistryEntryAtPath(
+    registryPathForWorkspaceKey(workspaceKey),
+    workspaceKey,
+  );
+  if (workspaceResult.status === 'valid') {
+    return workspaceResult.entry;
   }
-
-  try {
-    const content = readFileSync(registryPath, 'utf8');
-    return JSON.parse(content) as DaemonRegistryEntry;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
  * List all daemon registry entries.
- * Enumerates the daemons directory and reads each daemon.json file.
  */
 export function listDaemonRegistryEntries(): DaemonRegistryEntry[] {
-  const dir = daemonsDir();
-
-  if (!existsSync(dir)) {
-    return [];
+  const entriesByWorkspaceKey = new Map<string, DaemonRegistryEntry>();
+  for (const entry of listWorkspaceRegistryEntries()) {
+    entriesByWorkspaceKey.set(entry.workspaceKey, entry);
   }
 
-  const entries: DaemonRegistryEntry[] = [];
+  return Array.from(entriesByWorkspaceKey.values());
+}
 
-  try {
-    const subdirs = readdirSync(dir, { withFileTypes: true });
-
-    for (const subdir of subdirs) {
-      if (!subdir.isDirectory()) continue;
-
-      const workspaceKey = subdir.name;
-      const registryPath = join(daemonDirForWorkspaceKey(workspaceKey), 'daemon.json');
-
-      if (!existsSync(registryPath)) continue;
-
-      try {
-        const content = readFileSync(registryPath, 'utf8');
-        const entry = JSON.parse(content) as DaemonRegistryEntry;
-        entries.push(entry);
-      } catch {
-        // Skip malformed entries
-      }
-    }
-  } catch {
-    // Directory read error, return empty
-  }
-
-  return entries;
+export function findDaemonRegistryEntryBySocketPath(
+  socketPath: string,
+): DaemonRegistryEntry | null {
+  return listDaemonRegistryEntries().find((entry) => entry.socketPath === socketPath) ?? null;
 }
 
 /**
- * Remove all registry files for a workspace key (socket + registry).
+ * Remove daemon metadata and socket for a workspace when owned or provably stale.
  */
-export function cleanupWorkspaceDaemonFiles(workspaceKey: string): void {
-  const daemonDir = daemonDirForWorkspaceKey(workspaceKey);
+export function cleanupWorkspaceDaemonFiles(
+  workspaceKey: string,
+  options?: DaemonFileCleanupOptions,
+): void {
+  withDaemonRegistryMutationLock(workspaceKey, () => {
+    const socketPath =
+      options?.socketPath ?? join(daemonDirForWorkspaceKey(workspaceKey), 'd.sock');
+    const registryPath = registryPathForWorkspaceKey(workspaceKey);
+    const removed = removeRegistryAtPathIfOwned(registryPath, workspaceKey, options);
+    if (!removed || removed.socketPath !== socketPath) {
+      return;
+    }
 
-  if (!existsSync(daemonDir)) {
-    return;
-  }
-
-  // Remove daemon.json
-  const registryPath = join(daemonDir, 'daemon.json');
-  if (existsSync(registryPath)) {
-    unlinkSync(registryPath);
-  }
-
-  // Remove daemon.sock
-  const socketPath = join(daemonDir, 'daemon.sock');
-  if (existsSync(socketPath)) {
-    unlinkSync(socketPath);
-  }
+    try {
+      unlinkSync(socketPath);
+    } catch {
+      // ignore
+    }
+  });
 }

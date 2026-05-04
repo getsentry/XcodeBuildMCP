@@ -14,6 +14,8 @@ import { bootstrapRuntime, type RuntimeKind } from '../bootstrap-runtime.ts';
 import { __resetConfigStoreForTests } from '../../utils/config-store.ts';
 import { sessionStore } from '../../utils/session-store.ts';
 import { createMockFileSystemExecutor } from '../../test-utils/mock-executors.ts';
+import { getRuntimeInstance, setRuntimeInstanceForTests } from '../../utils/runtime-instance.ts';
+import { workspaceKeyForRoot } from '../../utils/workspace-identity.ts';
 
 const cwd = '/repo';
 const configPath = path.join(cwd, '.xcodebuildmcp', 'config.yaml');
@@ -83,6 +85,7 @@ describe('bootstrapRuntime', () => {
     sessionStore.clear();
     scheduleSimulatorDefaultsRefreshMock.mockReset();
     scheduleSimulatorDefaultsRefreshMock.mockReturnValue(false);
+    setRuntimeInstanceForTests(null);
   });
 
   it('hydrates session defaults for mcp runtime', async () => {
@@ -98,6 +101,9 @@ describe('bootstrapRuntime', () => {
       simulatorId: 'SIM-UUID',
       simulatorName: 'iPhone 17',
     });
+    expect(result.workspaceRoot).toBe(cwd);
+    expect(result.workspaceKey).toBe(workspaceKeyForRoot(cwd));
+    expect(getRuntimeInstance().workspaceKey).toBe(result.workspaceKey);
     expect(scheduleSimulatorDefaultsRefreshMock).toHaveBeenCalledWith(
       expect.objectContaining({
         reason: 'startup-hydration',

@@ -5,18 +5,23 @@ import {
   computeScopedDerivedDataPath,
   resolveEffectiveDerivedDataPath,
 } from '../derived-data-path.ts';
-import { DERIVED_DATA_DIR } from '../log-paths.ts';
+import { getWorkspaceFilesystemLayout } from '../log-paths.ts';
+import { workspaceKeyForRoot } from '../workspace-identity.ts';
 
 describe('resolveEffectiveDerivedDataPath', () => {
-  it('returns the global DerivedData root when no explicit path or anchor is present', () => {
-    expect(resolveEffectiveDerivedDataPath()).toBe(DERIVED_DATA_DIR);
+  it('returns the workspace DerivedData root when no explicit path or anchor is present', () => {
+    const cwd = '/Users/dev/repo';
+    const expectedRoot = getWorkspaceFilesystemLayout(workspaceKeyForRoot(cwd)).derivedData;
+
+    expect(resolveEffectiveDerivedDataPath({ cwd })).toBe(expectedRoot);
     expect(
       resolveEffectiveDerivedDataPath({
         derivedDataPath: ' ',
         workspacePath: '\t',
         projectPath: '',
+        cwd,
       }),
-    ).toBe(DERIVED_DATA_DIR);
+    ).toBe(expectedRoot);
   });
 
   it('uses an explicit absolute derivedDataPath', () => {

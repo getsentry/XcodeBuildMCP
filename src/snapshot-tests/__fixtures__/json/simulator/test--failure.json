@@ -7,7 +7,7 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS Simulator",
       "simulatorName": "iPhone 17",
@@ -18,8 +18,8 @@
       "status": "FAILED",
       "durationMs": 1234,
       "counts": {
-        "passed": 21,
-        "failed": 2,
+        "passed": 53,
+        "failed": 4,
         "skipped": 0
       },
       "target": "simulator"
@@ -29,7 +29,7 @@
     },
     "tests": {
       "discovered": {
-        "total": 52,
+        "total": 57,
         "items": [
           "CalculatorAppFeatureTests/CalculatorBasicTests/testClear",
           "CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState",
@@ -45,6 +45,12 @@
       "errors": [],
       "testFailures": [
         {
+          "suite": "(Unknown Suite)",
+          "test": "This test should fail to verify error reporting",
+          "message": "Expectation failed: (calculator.display → \"0\") == \"999\"\n// This test is designed to fail to test error reporting\nThis should fail - display should be 0, not 999",
+          "location": "CalculatorServiceTests.swift:37"
+        },
+        {
           "suite": "CalculatorAppTests",
           "test": "testCalculatorServiceFailure",
           "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
@@ -55,10 +61,180 @@
           "test": "test",
           "message": "XCTAssertTrue failed - This test should fail to verify error reporting",
           "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286"
+        },
+        {
+          "suite": "Calculator Basic Functionality",
+          "test": "This test should fail to verify error reporting",
+          "message": "CalculatorServiceTests.swift:37: Expectation failed: (calculator.display → \"0\") == \"999\": // This test is designed to fail to test error reporting\nThis should fail - display should be 0, not 999"
         }
       ]
     },
     "testCases": [
+      {
+        "test": "Adding decimal numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Adding multiple digit numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Adding single digit numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Addition operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculate without setting operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator handles invalid input gracefully",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator initializes with correct default values",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator state after multiple clears",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Chain calculations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Clear function resets calculator to initial state",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Clear input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Complex calculation sequence",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal operations precision",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Division by zero returns zero",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Division operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Expression display updates correctly",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Large number error handling",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiple decimal points should be ignored",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiple equals presses",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiplication operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Number input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Operation input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Percentage calculation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Repetitive equals press repeats last operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Setting operation without previous number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Simple addition calculation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Subtraction operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "This test should fail to verify error reporting",
+        "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on negative number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on positive number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on zero has no effect",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Very small decimal numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
       {
         "suite": "CalculatorAppTests",
         "test": "testAddition",
@@ -188,6 +364,12 @@
       {
         "suite": "CalculatorAppTests",
         "test": "testStateConsistencyWithDecimalNumbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "Decimal point at start creates 0",
+        "test": "",
         "status": "passed",
         "durationMs": 0
       },

@@ -9,7 +9,9 @@ const APPLE_DEVICE_UDID_REGEX = /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}/g;
 const UUID_REGEX = /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/g;
 const DURATION_REGEX = /\d+\.\d+s\b/g;
 const PID_NUMBER_REGEX = /(pid:\s*)\d+/gi;
-const PID_FILENAME_SUFFIX_REGEX = /_pid\d+\.log/g;
+const PID_FILENAME_SUFFIX_REGEX = /_pid\d+(?:_[0-9a-f]{8})?\.log/g;
+const HELPER_PID_FILENAME_SUFFIX_REGEX =
+  /_(?:helperpid\d+_ownerpid\d+|ownerpid\d+)_[0-9a-f]{8}\.log/g;
 const PID_JSON_REGEX = /"pid"\s*:\s*\d+/g;
 const PROCESS_ID_REGEX = /Process ID: \d+/g;
 const PROCESS_INLINE_PID_REGEX = /process \d+/g;
@@ -76,6 +78,14 @@ export function normalizeSnapshotOutput(text: string): string {
     '<TMPDIR>',
   );
   normalized = normalized.replace(
+    /<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+\/logs\//g,
+    '<HOME>/Library/Developer/XcodeBuildMCP/logs/',
+  );
+  normalized = normalized.replace(
+    /(<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+)-[0-9a-f]{12}\/DerivedData(?=$|[^A-Za-z0-9])/g,
+    '$1-<HASH>/DerivedData',
+  );
+  normalized = normalized.replace(
     /(Build Logs: )(?:<TMPDIR>|<HOME>\/Library\/Developer\/XcodeBuildMCP)\/logs\//g,
     '$1<HOME>/Library/Developer/XcodeBuildMCP/logs/',
   );
@@ -89,6 +99,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(DEVICE_TRANSPORT_TYPE_REGEX, '<CONNECTION>');
   normalized = normalized.replace(DURATION_REGEX, '<DURATION>');
   normalized = normalized.replace(PID_NUMBER_REGEX, '$1<PID>');
+  normalized = normalized.replace(HELPER_PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(PID_JSON_REGEX, '"pid" : <PID>');
   normalized = normalized.replace(PROCESS_ID_REGEX, 'Process ID: <PID>');

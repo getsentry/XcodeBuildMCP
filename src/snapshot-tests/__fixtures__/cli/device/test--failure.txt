@@ -6,16 +6,39 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/DerivedData/CalculatorApp-<HASH>
+   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
 
-Discovered 52 test(s):
+Discovered 57 test(s):
    CalculatorAppFeatureTests/CalculatorBasicTests/testClear
    CalculatorAppFeatureTests/CalculatorBasicTests/testInitialState
    CalculatorAppFeatureTests/CalculatorBasicTests/testIntentionalFailure
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testChainCalculations
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay
-   (...and 46 more)
+   (...and 51 more)
+Running tests (1 completed, 0 failures, 0 skipped)
+Running tests (2 completed, 0 failures, 0 skipped)
+Running tests (3 completed, 0 failures, 0 skipped)
+Running tests (4 completed, 0 failures, 0 skipped)
+Running tests (5 completed, 0 failures, 0 skipped)
+Running tests (6 completed, 0 failures, 0 skipped)
+Running tests (7 completed, 0 failures, 0 skipped)
+Running tests (8 completed, 0 failures, 0 skipped)
+Running tests (9 completed, 1 failure, 0 skipped)
+Running tests (10 completed, 1 failure, 0 skipped)
+Running tests (11 completed, 1 failure, 0 skipped)
+Running tests (12 completed, 1 failure, 0 skipped)
+Running tests (13 completed, 1 failure, 0 skipped)
+Running tests (14 completed, 1 failure, 0 skipped)
+Running tests (15 completed, 1 failure, 0 skipped)
+Running tests (16 completed, 1 failure, 0 skipped)
+Running tests (17 completed, 1 failure, 0 skipped)
+Running tests (18 completed, 1 failure, 0 skipped)
+Running tests (19 completed, 1 failure, 0 skipped)
+Running tests (20 completed, 1 failure, 0 skipped)
+Running tests (21 completed, 1 failure, 0 skipped)
+Running tests (22 completed, 1 failure, 0 skipped)
+Running tests (23 completed, 2 failures, 0 skipped)
 
 CalculatorAppTests
   ✗ testCalculatorServiceFailure:
