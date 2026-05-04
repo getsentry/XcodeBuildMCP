@@ -78,8 +78,8 @@ export function normalizeSnapshotOutput(text: string): string {
     '<TMPDIR>',
   );
   normalized = normalized.replace(
-    /<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+\/logs\//g,
-    '<HOME>/Library/Developer/XcodeBuildMCP/logs/',
+    /(<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+)-[0-9a-f]{12}(?=\/logs\/)/g,
+    '$1-<HASH>',
   );
   normalized = normalized.replace(
     /(<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+)-[0-9a-f]{12}\/DerivedData(?=$|[^A-Za-z0-9])/g,

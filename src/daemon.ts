@@ -205,266 +205,278 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  removeStaleSocket(socketPath);
+  try {
+    removeStaleSocket(socketPath);
 
-  const excludedWorkflows = ['session-management', 'workflow-discovery'];
+    const excludedWorkflows = ['session-management', 'workflow-discovery'];
 
-  // Daemon runtime serves CLI routing and should not be filtered by enabledWorkflows.
-  // CLI exposure is controlled at CLI catalog/command registration time.
-  // Get all workflows from manifest (for reporting purposes and filtering).
-  const manifest = loadManifest();
-  const allWorkflowIds = Array.from(manifest.workflows.keys());
-  const daemonWorkflows = allWorkflowIds.filter(
-    (workflowId) => !excludedWorkflows.includes(workflowId),
-  );
-  const xcodeIdeWorkflowEnabled = daemonWorkflows.includes('xcode-ide');
-  const axeBinary = resolveAxeBinary();
-  const axeAvailable = axeBinary !== null;
-  const axeSource: 'env' | 'bundled' | 'path' | 'unavailable' = axeBinary?.source ?? 'unavailable';
-  const xcodemakeAvailable = isXcodemakeBinaryAvailable();
-  const xcodemakeEnabled = isXcodemakeEnabled();
-  const baseSentryRuntimeContext = {
-    mode: 'cli-daemon' as const,
-    enabledWorkflows: daemonWorkflows,
-    disableSessionDefaults: result.runtime.config.disableSessionDefaults,
-    disableXcodeAutoSync: result.runtime.config.disableXcodeAutoSync,
-    incrementalBuildsEnabled: result.runtime.config.incrementalBuildsEnabled,
-    debugEnabled: result.runtime.config.debug,
-    uiDebuggerGuardMode: result.runtime.config.uiDebuggerGuardMode,
-    xcodeIdeWorkflowEnabled,
-    axeAvailable,
-    axeSource,
-    xcodemakeAvailable,
-    xcodemakeEnabled,
-  };
-  setSentryRuntimeContext(baseSentryRuntimeContext);
-
-  const enrichSentryMetadata = async (): Promise<void> => {
-    const commandExecutor = getDefaultCommandExecutor();
-    const xcodeVersion = await getXcodeVersionMetadata(async (command) => {
-      const result = await commandExecutor(command, 'Get Xcode Version');
-      return { success: result.success, output: result.output };
-    });
-    const xcodeAvailable = Boolean(
-      xcodeVersion.version ??
-        xcodeVersion.buildVersion ??
-        xcodeVersion.developerDir ??
-        xcodeVersion.xcodebuildPath,
+    // Daemon runtime serves CLI routing and should not be filtered by enabledWorkflows.
+    // CLI exposure is controlled at CLI catalog/command registration time.
+    // Get all workflows from manifest (for reporting purposes and filtering).
+    const manifest = loadManifest();
+    const allWorkflowIds = Array.from(manifest.workflows.keys());
+    const daemonWorkflows = allWorkflowIds.filter(
+      (workflowId) => !excludedWorkflows.includes(workflowId),
     );
-    const axeVersion = await getAxeVersionMetadata(async (command) => {
-      const result = await commandExecutor(command, 'Get AXe Version');
-      return { success: result.success, output: result.output };
-    }, axeBinary?.path);
+    const xcodeIdeWorkflowEnabled = daemonWorkflows.includes('xcode-ide');
+    const axeBinary = resolveAxeBinary();
+    const axeAvailable = axeBinary !== null;
+    const axeSource: 'env' | 'bundled' | 'path' | 'unavailable' =
+      axeBinary?.source ?? 'unavailable';
+    const xcodemakeAvailable = isXcodemakeBinaryAvailable();
+    const xcodemakeEnabled = isXcodemakeEnabled();
+    const baseSentryRuntimeContext = {
+      mode: 'cli-daemon' as const,
+      enabledWorkflows: daemonWorkflows,
+      disableSessionDefaults: result.runtime.config.disableSessionDefaults,
+      disableXcodeAutoSync: result.runtime.config.disableXcodeAutoSync,
+      incrementalBuildsEnabled: result.runtime.config.incrementalBuildsEnabled,
+      debugEnabled: result.runtime.config.debug,
+      uiDebuggerGuardMode: result.runtime.config.uiDebuggerGuardMode,
+      xcodeIdeWorkflowEnabled,
+      axeAvailable,
+      axeSource,
+      xcodemakeAvailable,
+      xcodemakeEnabled,
+    };
+    setSentryRuntimeContext(baseSentryRuntimeContext);
 
-    setSentryRuntimeContext({
-      ...baseSentryRuntimeContext,
-      xcodeAvailable,
-      axeVersion,
-      xcodeDeveloperDir: xcodeVersion.developerDir,
-      xcodebuildPath: xcodeVersion.xcodebuildPath,
-      xcodeVersion: xcodeVersion.version,
-      xcodeBuildVersion: xcodeVersion.buildVersion,
+    const enrichSentryMetadata = async (): Promise<void> => {
+      const commandExecutor = getDefaultCommandExecutor();
+      const xcodeVersion = await getXcodeVersionMetadata(async (command) => {
+        const result = await commandExecutor(command, 'Get Xcode Version');
+        return { success: result.success, output: result.output };
+      });
+      const xcodeAvailable = Boolean(
+        xcodeVersion.version ??
+          xcodeVersion.buildVersion ??
+          xcodeVersion.developerDir ??
+          xcodeVersion.xcodebuildPath,
+      );
+      const axeVersion = await getAxeVersionMetadata(async (command) => {
+        const result = await commandExecutor(command, 'Get AXe Version');
+        return { success: result.success, output: result.output };
+      }, axeBinary?.path);
+
+      setSentryRuntimeContext({
+        ...baseSentryRuntimeContext,
+        xcodeAvailable,
+        axeVersion,
+        xcodeDeveloperDir: xcodeVersion.developerDir,
+        xcodebuildPath: xcodeVersion.xcodebuildPath,
+        xcodeVersion: xcodeVersion.version,
+        xcodeBuildVersion: xcodeVersion.buildVersion,
+      });
+    };
+
+    const catalog = await buildDaemonToolCatalogFromManifest({
+      excludeWorkflows: excludedWorkflows,
     });
-  };
 
-  const catalog = await buildDaemonToolCatalogFromManifest({
-    excludeWorkflows: excludedWorkflows,
-  });
+    log('info', `[Daemon] Loaded ${catalog.tools.length} tools`);
 
-  log('info', `[Daemon] Loaded ${catalog.tools.length} tools`);
+    const startedAt = new Date().toISOString();
+    const idleTimeoutMs = resolveDaemonIdleTimeoutMs();
+    const configuredIdleTimeout = process.env[DAEMON_IDLE_TIMEOUT_ENV_KEY]?.trim();
+    if (configuredIdleTimeout) {
+      const parsedIdleTimeout = Number(configuredIdleTimeout);
+      if (!Number.isFinite(parsedIdleTimeout) || parsedIdleTimeout < 0) {
+        log(
+          'warn',
+          `[Daemon] Invalid ${DAEMON_IDLE_TIMEOUT_ENV_KEY}=${configuredIdleTimeout}; using default ${idleTimeoutMs}ms`,
+        );
+      }
+    }
 
-  const startedAt = new Date().toISOString();
-  const idleTimeoutMs = resolveDaemonIdleTimeoutMs();
-  const configuredIdleTimeout = process.env[DAEMON_IDLE_TIMEOUT_ENV_KEY]?.trim();
-  if (configuredIdleTimeout) {
-    const parsedIdleTimeout = Number(configuredIdleTimeout);
-    if (!Number.isFinite(parsedIdleTimeout) || parsedIdleTimeout < 0) {
+    if (idleTimeoutMs === 0) {
+      log('info', '[Daemon] Idle shutdown disabled');
+    } else {
       log(
-        'warn',
-        `[Daemon] Invalid ${DAEMON_IDLE_TIMEOUT_ENV_KEY}=${configuredIdleTimeout}; using default ${idleTimeoutMs}ms`,
+        'info',
+        `[Daemon] Idle shutdown enabled: timeout=${idleTimeoutMs}ms interval=${DEFAULT_DAEMON_IDLE_CHECK_INTERVAL_MS}ms`,
       );
     }
-  }
+    recordDaemonGaugeMetric('idle_timeout_ms', idleTimeoutMs);
 
-  if (idleTimeoutMs === 0) {
-    log('info', '[Daemon] Idle shutdown disabled');
-  } else {
-    log(
-      'info',
-      `[Daemon] Idle shutdown enabled: timeout=${idleTimeoutMs}ms interval=${DEFAULT_DAEMON_IDLE_CHECK_INTERVAL_MS}ms`,
-    );
-  }
-  recordDaemonGaugeMetric('idle_timeout_ms', idleTimeoutMs);
+    let isShuttingDown = false;
+    let inFlightRequests = 0;
+    let lastActivityAt = Date.now();
+    let idleCheckTimer: NodeJS.Timeout | null = null;
 
-  let isShuttingDown = false;
-  let inFlightRequests = 0;
-  let lastActivityAt = Date.now();
-  let idleCheckTimer: NodeJS.Timeout | null = null;
+    const markActivity = (): void => {
+      lastActivityAt = Date.now();
+    };
 
-  const markActivity = (): void => {
-    lastActivityAt = Date.now();
-  };
-
-  // Unified shutdown handler
-  const shutdown = (exitCode = 0): void => {
-    if (isShuttingDown) {
-      return;
-    }
-    isShuttingDown = true;
-
-    if (idleCheckTimer) {
-      clearInterval(idleCheckTimer);
-      idleCheckTimer = null;
-    }
-
-    recordDaemonLifecycleMetric('shutdown');
-    log('info', '[Daemon] Shutting down...');
-
-    const cleanupArtifacts = (): Promise<unknown> =>
-      cleanupOwnedWorkspaceFilesystemArtifacts({
-        workspaceKey,
-        trigger: 'shutdown',
-        daemonCleanup: {
-          pid: process.pid,
-          socketPath,
-          allowLiveOwner: true,
-        },
-      });
-
-    server.close(() => {
-      log('info', '[Daemon] Server closed');
-      void cleanupArtifacts().finally(() => {
-        log('info', '[Daemon] Cleanup complete');
-        void flushAndCloseSentry(2000).finally(() => {
-          process.exit(exitCode);
-        });
-      });
-    });
-
-    setTimeout(() => {
-      log('warn', '[Daemon] Forced shutdown after timeout');
-      void cleanupArtifacts().finally(() => {
-        void flushAndCloseSentry(1000).finally(() => {
-          process.exit(1);
-        });
-      });
-    }, 5000);
-  };
-
-  const emitRequestGauges = (): void => {
-    recordDaemonGaugeMetric('inflight_requests', inFlightRequests);
-    recordDaemonGaugeMetric('active_sessions', getDaemonActivitySnapshot().activeOperationCount);
-  };
-
-  const server = startDaemonServer({
-    socketPath,
-    logPath: logPath ?? undefined,
-    startedAt,
-    enabledWorkflows: daemonWorkflows,
-    catalog,
-    workspaceRoot,
-    workspaceKey,
-    xcodeIdeWorkflowEnabled,
-    requestShutdown: shutdown,
-    onRequestStarted: () => {
-      inFlightRequests += 1;
-      markActivity();
-      emitRequestGauges();
-    },
-    onRequestFinished: () => {
-      inFlightRequests = Math.max(0, inFlightRequests - 1);
-      markActivity();
-      emitRequestGauges();
-    },
-  });
-  emitRequestGauges();
-
-  if (idleTimeoutMs > 0) {
-    idleCheckTimer = setInterval(() => {
+    // Unified shutdown handler
+    const shutdown = (exitCode = 0): void => {
       if (isShuttingDown) {
         return;
       }
+      isShuttingDown = true;
 
-      emitRequestGauges();
-
-      const idleForMs = Date.now() - lastActivityAt;
-      if (idleForMs < idleTimeoutMs) {
-        return;
+      if (idleCheckTimer) {
+        clearInterval(idleCheckTimer);
+        idleCheckTimer = null;
       }
 
-      if (inFlightRequests > 0) {
-        return;
-      }
+      recordDaemonLifecycleMetric('shutdown');
+      log('info', '[Daemon] Shutting down...');
 
-      if (hasActiveRuntimeSessions(getDaemonActivitySnapshot())) {
-        return;
-      }
-
-      log(
-        'info',
-        `[Daemon] Idle timeout reached (${idleForMs}ms >= ${idleTimeoutMs}ms); shutting down`,
-      );
-      shutdown();
-    }, DEFAULT_DAEMON_IDLE_CHECK_INTERVAL_MS);
-    idleCheckTimer.unref?.();
-  }
-
-  server.on('error', releaseStartupRegistryLock);
-
-  server.listen(socketPath, () => {
-    log('info', `[Daemon] Listening on ${socketPath}`);
-
-    // Write registry entry after successful listen
-    try {
-      writeDaemonRegistryEntry(
-        {
+      const cleanupArtifacts = (): Promise<unknown> =>
+        cleanupOwnedWorkspaceFilesystemArtifacts({
           workspaceKey,
-          workspaceRoot,
-          socketPath,
-          logPath: logPath ?? undefined,
-          pid: process.pid,
-          startedAt,
-          enabledWorkflows: daemonWorkflows,
-          version: String(version),
-        },
-        { lock: startupRegistryLock },
-      );
-    } finally {
-      releaseStartupRegistryLock();
+          trigger: 'shutdown',
+          daemonCleanup: {
+            pid: process.pid,
+            socketPath,
+            allowLiveOwner: true,
+          },
+        });
+
+      let forcedShutdownTimer: NodeJS.Timeout | null = setTimeout(() => {
+        forcedShutdownTimer = null;
+        log('warn', '[Daemon] Forced shutdown after timeout');
+        void cleanupArtifacts().finally(() => {
+          void flushAndCloseSentry(1000).finally(() => {
+            process.exit(1);
+          });
+        });
+      }, 5000);
+      forcedShutdownTimer.unref?.();
+
+      server.close(() => {
+        if (forcedShutdownTimer) {
+          clearTimeout(forcedShutdownTimer);
+          forcedShutdownTimer = null;
+        }
+        log('info', '[Daemon] Server closed');
+        void cleanupArtifacts().finally(() => {
+          log('info', '[Daemon] Cleanup complete');
+          void flushAndCloseSentry(2000).finally(() => {
+            process.exit(exitCode);
+          });
+        });
+      });
+    };
+
+    const emitRequestGauges = (): void => {
+      recordDaemonGaugeMetric('inflight_requests', inFlightRequests);
+      recordDaemonGaugeMetric('active_sessions', getDaemonActivitySnapshot().activeOperationCount);
+    };
+
+    const server = startDaemonServer({
+      socketPath,
+      logPath: logPath ?? undefined,
+      startedAt,
+      enabledWorkflows: daemonWorkflows,
+      catalog,
+      workspaceRoot,
+      workspaceKey,
+      xcodeIdeWorkflowEnabled,
+      requestShutdown: shutdown,
+      onRequestStarted: () => {
+        inFlightRequests += 1;
+        markActivity();
+        emitRequestGauges();
+      },
+      onRequestFinished: () => {
+        inFlightRequests = Math.max(0, inFlightRequests - 1);
+        markActivity();
+        emitRequestGauges();
+      },
+    });
+    emitRequestGauges();
+
+    if (idleTimeoutMs > 0) {
+      idleCheckTimer = setInterval(() => {
+        if (isShuttingDown) {
+          return;
+        }
+
+        emitRequestGauges();
+
+        const idleForMs = Date.now() - lastActivityAt;
+        if (idleForMs < idleTimeoutMs) {
+          return;
+        }
+
+        if (inFlightRequests > 0) {
+          return;
+        }
+
+        if (hasActiveRuntimeSessions(getDaemonActivitySnapshot())) {
+          return;
+        }
+
+        log(
+          'info',
+          `[Daemon] Idle timeout reached (${idleForMs}ms >= ${idleTimeoutMs}ms); shutting down`,
+        );
+        shutdown();
+      }, DEFAULT_DAEMON_IDLE_CHECK_INTERVAL_MS);
+      idleCheckTimer.unref?.();
     }
 
-    writeLine(`Daemon started (PID: ${process.pid})`);
-    writeLine(`Workspace: ${workspaceRoot}`);
-    writeLine(`Socket: ${socketPath}`);
-    writeLine(`Tools: ${catalog.tools.length}`);
-    recordBootstrapDurationMetric('cli-daemon', Date.now() - daemonBootstrapStart);
+    server.on('error', releaseStartupRegistryLock);
 
-    // Filesystem orphan reconciliation and log retention run fire-and-forget after listen so
-    // a slow sweep cannot delay request serving. Request handlers must not assume orphans
-    // have been cleaned at startup.
-    setImmediate(() => {
-      void enrichSentryMetadata().catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        log('warn', `[Daemon] Failed to enrich Sentry metadata: ${message}`);
+    server.listen(socketPath, () => {
+      log('info', `[Daemon] Listening on ${socketPath}`);
+
+      // Write registry entry after successful listen
+      try {
+        writeDaemonRegistryEntry(
+          {
+            workspaceKey,
+            workspaceRoot,
+            socketPath,
+            logPath: logPath ?? undefined,
+            pid: process.pid,
+            startedAt,
+            enabledWorkflows: daemonWorkflows,
+            version: String(version),
+          },
+          { lock: startupRegistryLock },
+        );
+      } finally {
+        releaseStartupRegistryLock();
+      }
+
+      writeLine(`Daemon started (PID: ${process.pid})`);
+      writeLine(`Workspace: ${workspaceRoot}`);
+      writeLine(`Socket: ${socketPath}`);
+      writeLine(`Tools: ${catalog.tools.length}`);
+      recordBootstrapDurationMetric('cli-daemon', Date.now() - daemonBootstrapStart);
+
+      // Filesystem orphan reconciliation and log retention run fire-and-forget after listen so
+      // a slow sweep cannot delay request serving. Request handlers must not assume orphans
+      // have been cleaned at startup.
+      setImmediate(() => {
+        void enrichSentryMetadata().catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          log('warn', `[Daemon] Failed to enrich Sentry metadata: ${message}`);
+        });
+        void runStartupLifecycleSweep();
       });
-      void runStartupLifecycleSweep();
     });
-  });
 
-  const handleCrash = (reason: unknown): void => {
-    recordDaemonLifecycleMetric('crash');
-    const message = reason instanceof Error ? reason.message : String(reason);
-    log('error', `[Daemon] Crash: ${message}`, { sentry: true });
-    shutdown(1);
-  };
+    const handleCrash = (reason: unknown): void => {
+      recordDaemonLifecycleMetric('crash');
+      const message = reason instanceof Error ? reason.message : String(reason);
+      log('error', `[Daemon] Crash: ${message}`, { sentry: true });
+      shutdown(1);
+    };
 
-  process.on('exit', () => {
-    terminateOwnedWorkspaceFilesystemArtifactsSync();
-  });
-  process.on('SIGTERM', () => shutdown(0));
-  process.on('SIGINT', () => shutdown(0));
-  process.on('uncaughtException', handleCrash);
-  process.on('unhandledRejection', handleCrash);
+    process.on('exit', () => {
+      terminateOwnedWorkspaceFilesystemArtifactsSync();
+    });
+    process.on('SIGTERM', () => shutdown(0));
+    process.on('SIGINT', () => shutdown(0));
+    process.on('uncaughtException', handleCrash);
+    process.on('unhandledRejection', handleCrash);
+  } catch (error) {
+    releaseStartupRegistryLock();
+    throw error;
+  }
 }
 
 main().catch(async (err) => {

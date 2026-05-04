@@ -16,7 +16,7 @@
     },
     "artifacts": {
       "packagePath": "<ROOT>/example_projects/spm",
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

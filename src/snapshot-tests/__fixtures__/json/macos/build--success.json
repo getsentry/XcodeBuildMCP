@@ -19,7 +19,7 @@
     },
     "artifacts": {
       "bundleId": "io.sentry.MCPTest.macOS",
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_macos_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

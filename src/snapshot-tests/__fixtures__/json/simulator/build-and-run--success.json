@@ -22,9 +22,9 @@
       "bundleId": "io.sentry.calculatorapp",
       "processId": 99999,
       "simulatorId": "<UUID>",
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_sim_<TIMESTAMP>_pid<PID>.log",
-      "runtimeLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/io.sentry.calculatorapp_<TIMESTAMP>_pid<PID>.log",
-      "osLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_sim_<TIMESTAMP>_pid<PID>.log",
+      "runtimeLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_<TIMESTAMP>_pid<PID>.log",
+      "osLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

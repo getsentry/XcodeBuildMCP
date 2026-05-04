@@ -203,6 +203,9 @@ describe('runMcpShutdown', () => {
       (step) => step.name === 'workspace-filesystem.cleanup-owned',
     );
     expect(filesystemStep?.status).toBe('completed');
+    expect(mocks.cleanupOwnedWorkspaceFilesystemArtifacts).toHaveBeenCalledWith({
+      timeoutMs: 2100,
+    });
   });
 
   it('uses a larger timeout budget for debugger dispose-all', async () => {

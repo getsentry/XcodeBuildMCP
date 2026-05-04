@@ -18,7 +18,7 @@
       "target": "device"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/build_device_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

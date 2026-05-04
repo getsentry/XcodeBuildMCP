@@ -8,7 +8,7 @@
 ✅ Build & Run complete
   ├ App Path: example_projects/spm/.build/arm64-apple-macosx/debug/spm
   ├ Process ID: <PID>
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log
+  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log
 
 Output
   Hello, world!

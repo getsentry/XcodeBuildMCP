@@ -25,7 +25,7 @@
       "target": "simulator"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_sim_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log"
     },
     "tests": {
       "discovered": {
@@ -137,6 +137,11 @@
       },
       {
         "test": "Decimal operations precision",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal point at start creates 0.",
         "status": "passed",
         "durationMs": 0
       },
@@ -364,12 +369,6 @@
       {
         "suite": "CalculatorAppTests",
         "test": "testStateConsistencyWithDecimalNumbers",
-        "status": "passed",
-        "durationMs": 0
-      },
-      {
-        "suite": "Decimal point at start creates 0",
-        "test": "",
         "status": "passed",
         "durationMs": 0
       },

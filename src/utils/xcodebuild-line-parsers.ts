@@ -80,7 +80,7 @@ export function parseRawTestName(rawName: string): { suiteName?: string; testNam
   }
 
   const dotIndex = rawName.lastIndexOf('.');
-  if (dotIndex > 0) {
+  if (dotIndex > 0 && dotIndex < rawName.length - 1) {
     return { suiteName: rawName.slice(0, dotIndex), testName: rawName.slice(dotIndex + 1) };
   }
 

@@ -94,4 +94,10 @@ describe('parseRawTestName', () => {
       testName: 'test',
     });
   });
+
+  it('keeps display names ending in a period as test names', () => {
+    expect(parseRawTestName('Decimal point at start creates 0.')).toEqual({
+      testName: 'Decimal point at start creates 0.',
+    });
+  });
 });

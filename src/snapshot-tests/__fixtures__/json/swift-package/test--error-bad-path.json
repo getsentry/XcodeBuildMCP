@@ -16,7 +16,7 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log",
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log",
       "packagePath": "<ROOT>/example_projects/NONEXISTENT"
     },
     "diagnostics": {

@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { daemonDirForWorkspaceKey, registryPathForWorkspaceKey } from './socket-path.ts';
+import { registryPathForWorkspaceKey } from './socket-path.ts';
 import { getWorkspacesDir, getWorkspaceFilesystemLayout } from '../utils/log-paths.ts';
 import { tryAcquireFsLockSync } from '../utils/fs-lock-sync.ts';
 import { isPidAlive } from '../utils/process-liveness.ts';
@@ -319,16 +319,14 @@ export function cleanupWorkspaceDaemonFiles(
   options?: DaemonFileCleanupOptions,
 ): void {
   withDaemonRegistryMutationLock(workspaceKey, () => {
-    const socketPath =
-      options?.socketPath ?? join(daemonDirForWorkspaceKey(workspaceKey), 'd.sock');
     const registryPath = registryPathForWorkspaceKey(workspaceKey);
     const removed = removeRegistryAtPathIfOwned(registryPath, workspaceKey, options);
-    if (!removed || removed.socketPath !== socketPath) {
+    if (!removed) {
       return;
     }
 
     try {
-      unlinkSync(socketPath);
+      unlinkSync(removed.socketPath);
     } catch {
       // ignore
     }

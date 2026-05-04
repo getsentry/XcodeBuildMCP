@@ -427,20 +427,23 @@ export function scheduleWorkspaceFilesystemLifecycleSweep(
     return;
   }
 
-  lastScheduledAtByScope.set(scheduleKey, resolved.now);
-  if (preKey !== null) {
-    lastScheduledAtByPreKey.set(preKey, resolved.now);
-  }
   runningScheduledSweeps.add(scheduleKey);
 
   const timer = setTimeout(() => {
     void runWorkspaceFilesystemLifecycleSweep(resolved)
       .then((result) => {
-        if (!result.skippedByCooldown && !result.skippedByLock && result.deleted > 0) {
-          log(
-            'info',
-            `[FilesystemLifecycle] Deleted ${result.deleted} old log files from ${result.logDir}`,
-          );
+        if (!result.skippedByCooldown && !result.skippedByLock) {
+          const completedAt = Date.now();
+          lastScheduledAtByScope.set(scheduleKey, completedAt);
+          if (preKey !== null) {
+            lastScheduledAtByPreKey.set(preKey, completedAt);
+          }
+          if (result.deleted > 0) {
+            log(
+              'info',
+              `[FilesystemLifecycle] Deleted ${result.deleted} old log files from ${result.logDir}`,
+            );
+          }
         }
       })
       .catch((error) => {

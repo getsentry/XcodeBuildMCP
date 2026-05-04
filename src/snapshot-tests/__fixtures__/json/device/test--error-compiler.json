@@ -24,7 +24,7 @@
     },
     "artifacts": {
       "deviceId": "<UUID>",
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/logs/test_device_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log"
     },
     "tests": {
       "selected": [

@@ -232,6 +232,18 @@ describe('daemon registry', () => {
     expect(existsSync(replacementEntry.socketPath)).toBe(true);
   });
 
+  it('cleans up the registry-owned socket when no socket path is provided', () => {
+    const entry = createEntry({ socketPath: path.join(daemonRunDir, 'custom.sock') });
+    writeDaemonRegistryEntry(entry);
+    mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
+    writeFileSync(entry.socketPath, 'socket placeholder');
+
+    cleanupWorkspaceDaemonFiles(entry.workspaceKey);
+
+    expect(existsSync(registryPathForWorkspaceKey(entry.workspaceKey))).toBe(false);
+    expect(existsSync(entry.socketPath)).toBe(false);
+  });
+
   it('cleans up stale matching workspace metadata and socket', () => {
     const entry = createEntry();
     writeDaemonRegistryEntry(entry);

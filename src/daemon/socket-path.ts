@@ -1,4 +1,4 @@
-import { mkdirSync, existsSync, unlinkSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, statSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -65,11 +65,33 @@ export function getSocketPath(opts?: GetSocketPathOptions): string {
   return socketPathForWorkspaceRoot(workspaceRoot);
 }
 
+function validateSocketDir(dir: string): void {
+  const linkStat = lstatSync(dir);
+  if (linkStat.isSymbolicLink()) {
+    throw new Error(`Daemon socket directory cannot be a symlink: ${dir}`);
+  }
+
+  const stat = statSync(dir);
+  if (!stat.isDirectory()) {
+    throw new Error(`Daemon socket path parent is not a directory: ${dir}`);
+  }
+
+  const uid = process.getuid?.();
+  if (uid !== undefined && stat.uid !== uid) {
+    throw new Error(`Daemon socket directory is not owned by the current user: ${dir}`);
+  }
+
+  if ((stat.mode & 0o077) !== 0) {
+    chmodSync(dir, 0o700);
+  }
+}
+
 export function ensureSocketDir(socketPath: string): void {
   const dir = dirname(socketPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
+  validateSocketDir(dir);
 }
 
 export function removeStaleSocket(socketPath: string): void {

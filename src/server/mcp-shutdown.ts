@@ -174,6 +174,10 @@ export async function runMcpShutdown(input: {
     );
   };
 
+  const workspaceFilesystemCleanupTimeoutMs = bulkStepTimeoutMs(
+    input.snapshot.ownedSimulatorLaunchOsLogSessionCount,
+  );
+
   const cleanupSteps: Array<{
     name: string;
     timeoutMs: number;
@@ -192,8 +196,11 @@ export async function runMcpShutdown(input: {
     },
     {
       name: 'workspace-filesystem.cleanup-owned',
-      timeoutMs: bulkStepTimeoutMs(input.snapshot.ownedSimulatorLaunchOsLogSessionCount),
-      operation: () => cleanupOwnedWorkspaceFilesystemArtifacts({ timeoutMs: STEP_TIMEOUT_MS }),
+      timeoutMs: workspaceFilesystemCleanupTimeoutMs,
+      operation: () =>
+        cleanupOwnedWorkspaceFilesystemArtifacts({
+          timeoutMs: workspaceFilesystemCleanupTimeoutMs,
+        }),
     },
     {
       name: 'video-capture.stop-all',

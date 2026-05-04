@@ -43,7 +43,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     );
   });
 
-  it('normalizes workspace-scoped log paths to the stable log fixture path', () => {
+  it('normalizes workspace-scoped log paths without flattening the workspace layout', () => {
     const input = [
       'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs/build_sim_2026-05-02T12-00-00-000Z_pid1234_abcd1234.log',
       'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs/io.app_2026-05-02T12-00-00-000Z_helperpid1234_ownerpid5678_abcd1234.log',
@@ -53,10 +53,10 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
+      'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
     );
     expect(result).toContain(
-      'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/logs/io.app_<TIMESTAMP>_pid<PID>.log',
+      'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/io.app_<TIMESTAMP>_pid<PID>.log',
     );
   });
 
