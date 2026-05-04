@@ -54,6 +54,7 @@ export async function forceStopDaemon(socketPath: string): Promise<void> {
     cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
       pid: entry.pid,
       socketPath,
+      allowLiveOwner: true,
     });
   } else {
     // Registry entry missing; cannot derive workspace key from socket path alone.

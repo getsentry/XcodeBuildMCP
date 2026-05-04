@@ -65,15 +65,6 @@ export function getSocketPath(opts?: GetSocketPathOptions): string {
   return socketPathForWorkspaceRoot(workspaceRoot);
 }
 
-export function getWorkspaceKey(opts?: GetSocketPathOptions): string {
-  const cwd = opts?.cwd ?? process.cwd();
-  const workspaceRoot = resolveWorkspaceRoot({
-    cwd,
-    projectConfigPath: opts?.projectConfigPath,
-  });
-  return workspaceKeyForRoot(workspaceRoot);
-}
-
 export function ensureSocketDir(socketPath: string): void {
   const dir = dirname(socketPath);
   if (!existsSync(dir)) {
