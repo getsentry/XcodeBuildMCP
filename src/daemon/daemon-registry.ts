@@ -33,7 +33,7 @@ function sleepSync(ms: number): void {
 /**
  * Synchronous lock acquisition with bounded busy-wait. Blocks the event loop for up to
  * DAEMON_REGISTRY_LOCK_WAIT_MS on contention. Only safe to call from startup or shutdown
- * paths (writeDaemonRegistryEntry, removeDaemonRegistryEntry, cleanupWorkspaceDaemonFiles)
+ * paths (writeDaemonRegistryEntry, cleanupWorkspaceDaemonFiles)
  * — never from request handlers.
  */
 export function acquireDaemonRegistryMutationLock(
@@ -209,9 +209,11 @@ function canRemoveRegistryEntry(
     return false;
   }
 
-  const pidMatches = options?.pid === undefined || entry.pid === options.pid;
-  if (pidMatches && options?.allowLiveOwner === true) {
-    return true;
+  if (options?.allowLiveOwner === true) {
+    if (options.pid === undefined) {
+      return false;
+    }
+    return entry.pid === options.pid;
   }
 
   return !isPidAlive(entry.pid);
@@ -274,18 +276,6 @@ export function writeDaemonRegistryEntry(
   if (result === null) {
     throw new Error(`Unable to acquire daemon registry lock for ${entry.workspaceKey}`);
   }
-}
-
-/**
- * Remove a daemon registry entry when it is owned by the caller or provably stale.
- */
-export function removeDaemonRegistryEntry(
-  workspaceKey: string,
-  options?: DaemonFileCleanupOptions,
-): void {
-  withDaemonRegistryMutationLock(workspaceKey, () => {
-    removeRegistryAtPathIfOwned(registryPathForWorkspaceKey(workspaceKey), workspaceKey, options);
-  });
 }
 
 /**
