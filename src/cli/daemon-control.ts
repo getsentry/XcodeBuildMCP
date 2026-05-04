@@ -1,12 +1,11 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, basename } from 'node:path';
-import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { existsSync, unlinkSync } from 'node:fs';
 import { DaemonClient, DaemonVersionMismatchError } from './daemon-client.ts';
 import {
   cleanupWorkspaceDaemonFiles,
   findDaemonRegistryEntryBySocketPath,
-  readDaemonRegistryEntry,
 } from '../daemon/daemon-registry.ts';
 
 /**
@@ -41,9 +40,7 @@ export function getDaemonExecutablePath(): string {
  * sends SIGTERM, and removes the stale socket.
  */
 export async function forceStopDaemon(socketPath: string): Promise<void> {
-  const matchingEntry = findDaemonRegistryEntryBySocketPath(socketPath);
-  const workspaceKey = matchingEntry?.workspaceKey ?? basename(dirname(socketPath));
-  const entry = matchingEntry ?? readDaemonRegistryEntry(workspaceKey);
+  const entry = findDaemonRegistryEntryBySocketPath(socketPath);
   if (entry?.pid) {
     try {
       process.kill(entry.pid, 'SIGTERM');
@@ -53,10 +50,20 @@ export async function forceStopDaemon(socketPath: string): Promise<void> {
     // Brief wait for the process to exit.
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  cleanupWorkspaceDaemonFiles(
-    workspaceKey,
-    entry ? { pid: entry.pid, socketPath } : { socketPath },
-  );
+  if (entry) {
+    cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+      pid: entry.pid,
+      socketPath,
+    });
+  } else {
+    // Registry entry missing; cannot derive workspace key from socket path alone.
+    // Clean up the socket file directly.
+    try {
+      unlinkSync(socketPath);
+    } catch {
+      // Socket may already be gone.
+    }
+  }
 }
 
 export interface StartDaemonBackgroundOptions {
