@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -186,6 +187,55 @@ describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
     expect(result.success).toBe(false);
   });
 
+  it('kills and unrefs the launch helper if helper log rename fails', async () => {
+    const children: ChildProcess[] = [];
+    const spawner = (_command: string, _args: string[], _options: SpawnOptions): ChildProcess => {
+      const child = createMockChild(null);
+      children.push(child);
+      fs.chmodSync(logDir, 0o500);
+      return child;
+    };
+
+    const result = await launchSimulatorAppWithLogging(
+      'test-sim-uuid',
+      'com.example.app',
+      createMockExecutor(42567),
+      undefined,
+      { spawner },
+    );
+    fs.chmodSync(logDir, 0o700);
+
+    expect(result.success).toBe(false);
+    expect(children[0].kill).toHaveBeenCalledWith('SIGTERM');
+    expect(children[0].unref).toHaveBeenCalledOnce();
+  });
+
+  it('kills and unrefs the OSLog helper if helper log rename fails', async () => {
+    const children: ChildProcess[] = [];
+    const spawner = (_command: string, _args: string[], _options: SpawnOptions): ChildProcess => {
+      const child = createMockChild(null);
+      children.push(child);
+      if (children.length === 2) {
+        fs.chmodSync(logDir, 0o500);
+      }
+      return child;
+    };
+
+    const result = await launchSimulatorAppWithLogging(
+      'test-sim-uuid',
+      'com.example.app',
+      createMockExecutor(42567),
+      undefined,
+      { spawner },
+    );
+    fs.chmodSync(logDir, 0o700);
+
+    expect(result.success).toBe(true);
+    expect(result.osLogPath).toBeUndefined();
+    expect(children[1].kill).toHaveBeenCalledWith('SIGTERM');
+    expect(children[1].unref).toHaveBeenCalledOnce();
+  });
+
   it('registers a tracked OSLog session after launch', async () => {
     const spawner = createMockSpawner();
     const executor = createMockExecutor(42567);
@@ -253,6 +303,7 @@ describe.sequential('launchSimulatorAppWithLogging PID resolution', () => {
     expect(result.success).toBe(true);
     expect(result.osLogPath).toBeUndefined();
     expect(children[1].kill).toHaveBeenCalledWith('SIGTERM');
+    expect(children[1].unref).toHaveBeenCalledOnce();
     await expect(listActiveSimulatorLaunchOsLogSessions()).resolves.toEqual([]);
   });
 });

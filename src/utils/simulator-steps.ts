@@ -285,6 +285,19 @@ async function resolveAppPidViaLaunch(
   return pidMatch ? parseInt(pidMatch[1], 10) : undefined;
 }
 
+function stopDetachedHelper(child: ChildProcess): void {
+  try {
+    child.kill?.('SIGTERM');
+  } catch {
+    // Best-effort cleanup for detached helpers.
+  }
+  try {
+    child.unref();
+  } catch {
+    // Best-effort event-loop release for detached helpers.
+  }
+}
+
 function renameHelperLogPathOrThrow(
   currentPath: string,
   helperPath: string,
@@ -294,11 +307,7 @@ function renameHelperLogPathOrThrow(
     fs.renameSync(currentPath, helperPath);
     return helperPath;
   } catch (error) {
-    try {
-      child.kill?.('SIGTERM');
-    } catch {
-      // Best-effort cleanup after failing to secure helper-pid log protection.
-    }
+    stopDetachedHelper(child);
     const message = toErrorMessage(error);
     throw new Error(`Failed to move log file to helper-pid protected path: ${message}`);
   }
@@ -376,11 +385,7 @@ async function startTrackedOsLogStream(
         logFilePath: osLogFilePath,
       });
     } catch (error) {
-      try {
-        child.kill?.('SIGTERM');
-      } catch {
-        // Best-effort cleanup after failed durable registration.
-      }
+      stopDetachedHelper(child);
       throw error;
     }
 
