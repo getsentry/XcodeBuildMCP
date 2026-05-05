@@ -39,15 +39,15 @@ struct SunMiniCard: View {
         case .daylight:
             "SUNSET"
         case .afterSunset:
-            "SUNSET WAS"
+            "SUNRISE"
         }
     }
 
     private var primaryTime: String {
         switch current.solarProgress {
-        case .beforeSunrise:
+        case .beforeSunrise, .afterSunset:
             current.sunrise.fullClockLabel
-        case .daylight, .afterSunset:
+        case .daylight:
             current.sunset.fullClockLabel
         }
     }
@@ -56,8 +56,10 @@ struct SunMiniCard: View {
         switch current.solarProgress {
         case .beforeSunrise:
             "Sunset at"
-        case .daylight, .afterSunset:
+        case .daylight:
             "Sunrise was"
+        case .afterSunset:
+            "Sunset was"
         }
     }
 
@@ -65,8 +67,10 @@ struct SunMiniCard: View {
         switch current.solarProgress {
         case .beforeSunrise:
             current.sunset.fullClockLabel
-        case .daylight, .afterSunset:
+        case .daylight:
             current.sunrise.fullClockLabel
+        case .afterSunset:
+            current.sunset.fullClockLabel
         }
     }
 }
