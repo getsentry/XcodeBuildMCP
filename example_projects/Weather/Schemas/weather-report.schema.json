@@ -1,0 +1,510 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "weather_report_response",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "temperatureC": {
+              "type": "integer"
+            },
+            "highC": {
+              "type": "integer"
+            },
+            "lowC": {
+              "type": "integer"
+            },
+            "feelsLikeC": {
+              "type": "integer"
+            },
+            "condition": {
+              "type": "string",
+              "enum": [
+                "sunny",
+                "mostly_sunny",
+                "partly_cloudy",
+                "cloudy",
+                "clear_day",
+                "clear_night",
+                "light_rain",
+                "heavy_rain",
+                "light_snow",
+                "snow_showers",
+                "thunderstorms",
+                "hazy"
+              ]
+            },
+            "solarProgress": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "before_sunrise",
+                    "daylight",
+                    "after_sunset"
+                  ]
+                },
+                "daylightFraction": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "daylightFraction"
+              ]
+            },
+            "sunrise": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "hour": {
+                  "type": "integer"
+                },
+                "minute": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "hour",
+                "minute"
+              ]
+            },
+            "sunset": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "hour": {
+                  "type": "integer"
+                },
+                "minute": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "hour",
+                "minute"
+              ]
+            },
+            "airQualityIndex": {
+              "type": "integer"
+            },
+            "airQualityCategory": {
+              "type": "string",
+              "enum": [
+                "good",
+                "moderate",
+                "unhealthy_for_sensitive_groups",
+                "unhealthy",
+                "very_unhealthy",
+                "hazardous"
+              ]
+            },
+            "uvIndex": {
+              "type": "integer"
+            },
+            "uvCategory": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "moderate",
+                "high",
+                "very_high",
+                "extreme"
+              ]
+            },
+            "windKph": {
+              "type": "integer"
+            },
+            "windDirectionDegrees": {
+              "type": "number"
+            },
+            "humidity": {
+              "type": "integer"
+            },
+            "visibilityKilometers": {
+              "type": "number"
+            },
+            "pressureMillibars": {
+              "type": "integer"
+            },
+            "pressureTrend": {
+              "type": "string",
+              "enum": [
+                "rising",
+                "steady",
+                "falling"
+              ]
+            },
+            "precipChance": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "temperatureC",
+            "highC",
+            "lowC",
+            "feelsLikeC",
+            "condition",
+            "solarProgress",
+            "sunrise",
+            "sunset",
+            "airQualityIndex",
+            "airQualityCategory",
+            "uvIndex",
+            "uvCategory",
+            "windKph",
+            "windDirectionDegrees",
+            "humidity",
+            "visibilityKilometers",
+            "pressureMillibars",
+            "pressureTrend",
+            "precipChance"
+          ]
+        },
+        "hourly": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "hour": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "current",
+                      "clock"
+                    ]
+                  },
+                  "hour": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "minute": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "hour",
+                  "minute"
+                ]
+              },
+              "temperatureC": {
+                "type": "integer"
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "sunny",
+                  "mostly_sunny",
+                  "partly_cloudy",
+                  "cloudy",
+                  "clear_day",
+                  "clear_night",
+                  "light_rain",
+                  "heavy_rain",
+                  "light_snow",
+                  "snow_showers",
+                  "thunderstorms",
+                  "hazy"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "hour",
+              "temperatureC",
+              "condition"
+            ]
+          }
+        },
+        "daily": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "day": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "today",
+                      "weekday"
+                    ]
+                  },
+                  "weekdayRawValue": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7,
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "weekdayRawValue"
+                ]
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "sunny",
+                  "mostly_sunny",
+                  "partly_cloudy",
+                  "cloudy",
+                  "clear_day",
+                  "clear_night",
+                  "light_rain",
+                  "heavy_rain",
+                  "light_snow",
+                  "snow_showers",
+                  "thunderstorms",
+                  "hazy"
+                ]
+              },
+              "lowC": {
+                "type": "integer"
+              },
+              "highC": {
+                "type": "integer"
+              },
+              "weekLowC": {
+                "type": "integer"
+              },
+              "weekHighC": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "day",
+              "condition",
+              "lowC",
+              "highC",
+              "weekLowC",
+              "weekHighC"
+            ]
+          }
+        },
+        "precipitationDetailCurrent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "temperatureC": {
+              "type": "integer"
+            },
+            "highC": {
+              "type": "integer"
+            },
+            "lowC": {
+              "type": "integer"
+            },
+            "feelsLikeC": {
+              "type": "integer"
+            },
+            "condition": {
+              "type": "string",
+              "enum": [
+                "sunny",
+                "mostly_sunny",
+                "partly_cloudy",
+                "cloudy",
+                "clear_day",
+                "clear_night",
+                "light_rain",
+                "heavy_rain",
+                "light_snow",
+                "snow_showers",
+                "thunderstorms",
+                "hazy"
+              ]
+            },
+            "solarProgress": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "before_sunrise",
+                    "daylight",
+                    "after_sunset"
+                  ]
+                },
+                "daylightFraction": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "daylightFraction"
+              ]
+            },
+            "sunrise": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "hour": {
+                  "type": "integer"
+                },
+                "minute": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "hour",
+                "minute"
+              ]
+            },
+            "sunset": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "hour": {
+                  "type": "integer"
+                },
+                "minute": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "hour",
+                "minute"
+              ]
+            },
+            "airQualityIndex": {
+              "type": "integer"
+            },
+            "airQualityCategory": {
+              "type": "string",
+              "enum": [
+                "good",
+                "moderate",
+                "unhealthy_for_sensitive_groups",
+                "unhealthy",
+                "very_unhealthy",
+                "hazardous"
+              ]
+            },
+            "uvIndex": {
+              "type": "integer"
+            },
+            "uvCategory": {
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "moderate",
+                "high",
+                "very_high",
+                "extreme"
+              ]
+            },
+            "windKph": {
+              "type": "integer"
+            },
+            "windDirectionDegrees": {
+              "type": "number"
+            },
+            "humidity": {
+              "type": "integer"
+            },
+            "visibilityKilometers": {
+              "type": "number"
+            },
+            "pressureMillibars": {
+              "type": "integer"
+            },
+            "pressureTrend": {
+              "type": "string",
+              "enum": [
+                "rising",
+                "steady",
+                "falling"
+              ]
+            },
+            "precipChance": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "temperatureC",
+            "highC",
+            "lowC",
+            "feelsLikeC",
+            "condition",
+            "solarProgress",
+            "sunrise",
+            "sunset",
+            "airQualityIndex",
+            "airQualityCategory",
+            "uvIndex",
+            "uvCategory",
+            "windKph",
+            "windDirectionDegrees",
+            "humidity",
+            "visibilityKilometers",
+            "pressureMillibars",
+            "pressureTrend",
+            "precipChance"
+          ]
+        }
+      },
+      "required": [
+        "current",
+        "hourly",
+        "daily",
+        "precipitationDetailCurrent"
+      ]
+    }
+  }
+}

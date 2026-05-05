@@ -1,0 +1,93 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "search_locations_response",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "temperatureC": {
+                "type": "integer"
+              },
+              "highC": {
+                "type": "integer"
+              },
+              "lowC": {
+                "type": "integer"
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "sunny",
+                  "mostly_sunny",
+                  "partly_cloudy",
+                  "cloudy",
+                  "clear_day",
+                  "clear_night",
+                  "light_rain",
+                  "heavy_rain",
+                  "light_snow",
+                  "snow_showers",
+                  "thunderstorms",
+                  "hazy"
+                ]
+              },
+              "localTime": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hour": {
+                    "type": "integer"
+                  },
+                  "minute": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "hour",
+                  "minute"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "subtitle",
+              "country",
+              "temperatureC",
+              "highC",
+              "lowC",
+              "condition",
+              "localTime"
+            ]
+          }
+        }
+      },
+      "required": [
+        "locations"
+      ]
+    }
+  }
+}
