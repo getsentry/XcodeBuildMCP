@@ -21,7 +21,6 @@ beforeAll(async () => {
       open: { success: true, output: '' },
       kill: { success: true, output: '' },
       pkill: { success: true, output: '' },
-      '/bin/sh': { success: true, output: 'io.sentry.MyApp' },
       'defaults read': { success: true, output: 'io.sentry.MyApp' },
       PlistBuddy: { success: true, output: 'io.sentry.MyApp' },
       xcresulttool: { success: true, output: '{}' },
