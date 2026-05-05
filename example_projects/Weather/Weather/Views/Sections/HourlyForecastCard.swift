@@ -100,13 +100,13 @@ private struct HourlyCurve: View {
         let minTemp = temperatures.min() ?? 0
         let maxTemp = temperatures.max() ?? minTemp + 1
         let range = max(maxTemp - minTemp, 1)
-        let step = size.width / CGFloat(max(forecasts.count - 1, 1))
+        let step = size.width / CGFloat(max(forecasts.count, 1))
         let pad: CGFloat = 8
 
         return forecasts.enumerated().map { index, forecast in
             let normalized = CGFloat(forecast.temperatureC - minTemp) / CGFloat(range)
             return CGPoint(
-                x: CGFloat(index) * step,
+                x: (CGFloat(index) + 0.5) * step,
                 y: pad + (1 - normalized) * (size.height - pad * 2)
             )
         }
