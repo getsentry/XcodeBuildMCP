@@ -66,8 +66,173 @@
     },
     "testCases": [
       {
+        "test": "Adding decimal numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Adding multiple digit numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Adding single digit numbers",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Addition operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculate without setting operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator handles invalid input gracefully",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator initializes with correct default values",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Calculator state after multiple clears",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Chain calculations",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Clear function resets calculator to initial state",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Clear input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Complex calculation sequence",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal operations precision",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Decimal point at start creates 0.",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Division by zero returns zero",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Division operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Expression display updates correctly",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Large number error handling",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiple decimal points should be ignored",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiple equals presses",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Multiplication operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Number input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Operation input through handler",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Percentage calculation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Repetitive equals press repeats last operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Setting operation without previous number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Simple addition calculation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Subtraction operation",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
         "test": "This test should fail to verify error reporting",
         "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on negative number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on positive number",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Toggle sign on zero has no effect",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "test": "Very small decimal numbers",
+        "status": "passed",
         "durationMs": 0
       },
       {

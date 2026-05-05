@@ -45,10 +45,59 @@ const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
 const SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX =
-  /(?:^Running tests \((\d+) completed, (\d+) failures?, (\d+) skipped\)\n){30,}/gm;
+  /(?:^Running tests \(\d+ completed, \d+ failures?, \d+ skipped\)\n){30,}/gm;
+const TEST_PROGRESS_LINE_REGEX =
+  /^Running tests \((\d+) completed, (\d+) failures?, (\d+) skipped\)$/u;
+
+type TestProgress = { completed: number; failed: number; skipped: number };
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function parseTestProgressLine(line: string): TestProgress | null {
+  const match = line.match(TEST_PROGRESS_LINE_REGEX);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    completed: Number(match[1]),
+    failed: Number(match[2]),
+    skipped: Number(match[3]),
+  };
+}
+
+function isMonotonicProgress(progress: TestProgress[]): boolean {
+  return progress.every((current, index) => {
+    const previous = progress[index - 1];
+    return (
+      previous === undefined ||
+      (current.completed >= previous.completed &&
+        current.failed >= previous.failed &&
+        current.skipped >= previous.skipped)
+    );
+  });
+}
+
+function normalizeSimulatorFailureTestProgressBlock(match: string): string {
+  const progress = match.trimEnd().split('\n').map(parseTestProgressLine);
+  const parsedProgress = progress.filter((line): line is TestProgress => line !== null);
+  if (parsedProgress.length !== progress.length) {
+    return match;
+  }
+  const first = parsedProgress[0];
+  const final = parsedProgress.at(-1);
+  if (!first || !final) {
+    return match;
+  }
+
+  const hasCleanStart = first.completed <= 1 && first.failed === 0 && first.skipped === 0;
+  if (!hasCleanStart || final.failed === 0 || !isMonotonicProgress(parsedProgress)) {
+    return match;
+  }
+
+  return `Running tests (<TEST_PROGRESS>; final: ${final.completed} completed, ${final.failed} failed, ${final.skipped} skipped)\n`;
 }
 
 export function normalizeSnapshotOutput(text: string): string {
@@ -142,16 +191,7 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(
     SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX,
-    (match: string, completed: string, failed: string, skipped: string) => {
-      if (
-        !match.startsWith('Running tests (0 completed, 0 failures, 0 skipped)\n') ||
-        completed !== '57'
-      ) {
-        return match;
-      }
-
-      return `Running tests (<TEST_PROGRESS>; final: ${completed} completed, ${failed} failed, ${skipped} skipped)\n`;
-    },
+    normalizeSimulatorFailureTestProgressBlock,
   );
 
   // Normalize final test summary line (counts vary across environments)

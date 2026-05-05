@@ -3,7 +3,7 @@ import type { StructuredOutputEnvelope } from '../../types/structured-output.ts'
 import { normalizeStructuredEnvelope } from '../json-normalize.ts';
 
 describe('normalizeStructuredEnvelope', () => {
-  it('normalizes volatile simulator Swift Testing passed test cases without dropping failures', () => {
+  it('keeps suite-less simulator test cases while normalizing volatile durations', () => {
     const envelope: StructuredOutputEnvelope<unknown> = {
       schema: 'xcodebuildmcp.output.test-result',
       schemaVersion: '1',
@@ -28,6 +28,7 @@ describe('normalizeStructuredEnvelope', () => {
         summary: { target: 'simulator' },
         testCases: [
           { test: 'Swift Testing failure', status: 'failed', durationMs: 0 },
+          { test: 'Volatile Swift Testing pass', status: 'passed', durationMs: 0 },
           { suite: 'XCTestSuite', test: 'testStablePass', status: 'passed', durationMs: 0 },
         ],
       },

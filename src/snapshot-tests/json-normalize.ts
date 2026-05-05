@@ -92,45 +92,10 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   return value;
 }
 
-function isSimulatorTestResultEnvelope(envelope: StructuredOutputEnvelope<unknown>): boolean {
-  if (envelope.schema !== 'xcodebuildmcp.output.test-result' || !isRecord(envelope.data)) {
-    return false;
-  }
-
-  const summary = envelope.data.summary;
-  return isRecord(summary) && summary.target === 'simulator';
-}
-
-function isSuiteLessPassedTestCase(value: unknown): boolean {
-  return isRecord(value) && value.suite === undefined && value.status === 'passed';
-}
-
-function normalizeSimulatorTestCases(
-  envelope: StructuredOutputEnvelope<unknown>,
-): StructuredOutputEnvelope<unknown> {
-  if (!isSimulatorTestResultEnvelope(envelope) || !isRecord(envelope.data)) {
-    return envelope;
-  }
-
-  const testCases = envelope.data.testCases;
-  if (!Array.isArray(testCases)) {
-    return envelope;
-  }
-
-  return {
-    ...envelope,
-    data: {
-      ...envelope.data,
-      testCases: testCases.filter((testCase) => !isSuiteLessPassedTestCase(testCase)),
-    },
-  };
-}
-
 export function normalizeStructuredEnvelope(
   envelope: StructuredOutputEnvelope<unknown>,
 ): StructuredOutputEnvelope<unknown> {
-  const normalized = normalizeValue(envelope) as StructuredOutputEnvelope<unknown>;
-  return normalizeSimulatorTestCases(normalized);
+  return normalizeValue(envelope) as StructuredOutputEnvelope<unknown>;
 }
 
 function compactFrameObjects(json: string): string {
