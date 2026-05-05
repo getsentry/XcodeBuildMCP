@@ -72,7 +72,7 @@ struct AtmosBackground: View {
         Canvas { context, size in
             for x in stride(from: 0, through: size.width, by: 18) {
                 for y in stride(from: 0, through: size.height, by: 18) {
-                    let alpha = WeatherMetricHelpers.deterministicPercent(seed: Int(x + y), index: Int(x * 3 + y)).rounded(.down) * 0.006
+                    let alpha = WeatherMetricHelpers.deterministicPercent(seed: Int(x + y), index: Int(x * 3 + y)) * 0.006
                     context.fill(
                         Path(CGRect(x: x, y: y, width: 1, height: 1)),
                         with: .color(.white.opacity(alpha))

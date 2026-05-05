@@ -6,12 +6,12 @@ struct SunMiniCard: View {
     var body: some View {
         AtmosGlassCard(theme: current.theme, padding: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(nextLabel)
+                Text(primaryLabel)
                     .font(.system(size: 10.5, weight: .semibold))
                     .tracking(1.3)
                     .foregroundStyle(current.theme.foregroundMuted)
 
-                Text(nextTime)
+                Text(primaryTime)
                     .font(.system(size: 22, weight: .light))
                     .tracking(-0.5)
                     .monospacedDigit()
@@ -21,7 +21,7 @@ struct SunMiniCard: View {
                     .frame(height: 56)
                     .padding(.horizontal, -6)
 
-                Text("\(otherLabel) \(otherTime)")
+                Text("\(secondaryLabel) \(secondaryTime)")
                     .font(.system(size: 11))
                     .monospacedDigit()
                     .foregroundStyle(current.theme.foregroundMuted)
@@ -32,16 +32,18 @@ struct SunMiniCard: View {
         }
     }
 
-    private var nextLabel: String {
+    private var primaryLabel: String {
         switch current.solarProgress {
         case .beforeSunrise:
             "SUNRISE"
-        case .daylight, .afterSunset:
+        case .daylight:
             "SUNSET"
+        case .afterSunset:
+            "SUNSET WAS"
         }
     }
 
-    private var nextTime: String {
+    private var primaryTime: String {
         switch current.solarProgress {
         case .beforeSunrise:
             current.sunrise.fullClockLabel
@@ -50,25 +52,21 @@ struct SunMiniCard: View {
         }
     }
 
-    private var otherLabel: String {
+    private var secondaryLabel: String {
         switch current.solarProgress {
         case .beforeSunrise:
             "Sunset at"
-        case .daylight:
+        case .daylight, .afterSunset:
             "Sunrise was"
-        case .afterSunset:
-            "Sunset was"
         }
     }
 
-    private var otherTime: String {
+    private var secondaryTime: String {
         switch current.solarProgress {
         case .beforeSunrise:
             current.sunset.fullClockLabel
-        case .daylight:
+        case .daylight, .afterSunset:
             current.sunrise.fullClockLabel
-        case .afterSunset:
-            current.sunset.fullClockLabel
         }
     }
 }
