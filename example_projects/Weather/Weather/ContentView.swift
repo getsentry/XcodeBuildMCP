@@ -155,6 +155,7 @@ struct ContentView: View {
             report = loadedReport
         } catch is CancellationError {
         } catch {
+            guard selectedLocation?.id == locationID else { return }
             weatherErrorMessage = "Weather unavailable"
         }
 
