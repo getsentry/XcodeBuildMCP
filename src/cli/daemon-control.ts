@@ -117,6 +117,7 @@ export async function forceStopDaemon(socketPath: string): Promise<void> {
     pid: entry.pid,
     socketPath,
     instanceId: entry.instanceId,
+    allowLiveOwner: true,
   });
 }
 

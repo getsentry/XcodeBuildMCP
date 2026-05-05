@@ -96,6 +96,33 @@ describe('daemon control', () => {
     expect(existsSync(entry.socketPath)).toBe(false);
   });
 
+  it('cleans daemon files when the stopped PID is reused before cleanup', async () => {
+    const entry = createEntry();
+    writeDaemonRegistryEntry(entry);
+    mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
+    writeFileSync(entry.socketPath, 'socket placeholder');
+    let zeroSignalChecksAfterTerm = 0;
+    const kill = vi.spyOn(process, 'kill').mockImplementation(((
+      _pid: number,
+      signal?: string | number,
+    ) => {
+      if (signal === 0) {
+        zeroSignalChecksAfterTerm += 1;
+        if (zeroSignalChecksAfterTerm === 1) {
+          throw createMissingPidError();
+        }
+        return true;
+      }
+      return true;
+    }) as typeof process.kill);
+
+    await forceStopDaemon(entry.socketPath);
+
+    expect(kill).toHaveBeenCalledWith(entry.pid, 'SIGTERM');
+    expect(readDaemonRegistryEntry(entry.workspaceKey)).toBeNull();
+    expect(existsSync(entry.socketPath)).toBe(false);
+  });
+
   it('uses SIGKILL when the process stays alive after SIGTERM', async () => {
     vi.useFakeTimers();
     const entry = createEntry();

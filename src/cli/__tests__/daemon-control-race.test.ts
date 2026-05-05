@@ -73,6 +73,7 @@ describe('daemon control force-stop registry races', () => {
         pid: originalEntry.pid,
         socketPath: originalEntry.socketPath,
         instanceId: originalEntry.instanceId,
+        allowLiveOwner: true,
       },
     );
   });
