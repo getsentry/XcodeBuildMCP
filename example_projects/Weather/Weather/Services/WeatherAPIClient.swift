@@ -24,7 +24,7 @@ struct URLSessionWeatherAPIClient: WeatherAPIClient {
     }
 
     func defaultLocations() async throws -> [WeatherLocationDTO] {
-        try await request([WeatherLocationDTO].self, path: "locations/default")
+        try await request(WeatherLocationsResponseDTO.self, path: "locations/default").locations
     }
 
     func weather(for locationID: WeatherLocation.ID) async throws -> WeatherReportDTO {
@@ -33,10 +33,10 @@ struct URLSessionWeatherAPIClient: WeatherAPIClient {
 
     func searchLocations(matching query: String) async throws -> [WeatherLocationDTO] {
         try await request(
-            [WeatherLocationDTO].self,
+            WeatherLocationsResponseDTO.self,
             path: "locations/search",
             queryItems: [URLQueryItem(name: "query", value: query)]
-        )
+        ).locations
     }
 
     private func request<Response: Decodable>(

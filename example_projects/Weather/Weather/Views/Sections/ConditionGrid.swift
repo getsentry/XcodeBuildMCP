@@ -161,12 +161,17 @@ private struct PrecipBars: View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(Array(heights.enumerated()), id: \.offset) { index, height in
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .fill(Double(index) / 7 * 100 < Double(value) ? theme.accent : theme.cardBorder)
+                    .fill(isFilled(index: index) ? theme.accent : theme.cardBorder)
                     .frame(maxWidth: .infinity)
                     .frame(height: 22 * height)
             }
         }
         .frame(height: 22)
+    }
+
+    private func isFilled(index: Int) -> Bool {
+        let clampedValue = min(100, max(0, value))
+        return Double(index) < Double(clampedValue) / 100 * Double(heights.count)
     }
 }
 

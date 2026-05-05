@@ -1,30 +1,32 @@
-[
-  {
-    "id": "loc-gb-london",
-    "name": "London",
-    "subtitle": "England, United Kingdom",
-    "country": "GB",
-    "temperatureC": 13,
-    "highC": 16,
-    "lowC": 9,
-    "condition": "light_rain",
-    "localTime": {
-      "hour": 21,
-      "minute": 24
+{
+  "locations": [
+    {
+      "id": "loc-gb-london",
+      "name": "London",
+      "subtitle": "England, United Kingdom",
+      "country": "GB",
+      "temperatureC": 13,
+      "highC": 16,
+      "lowC": 9,
+      "condition": "light_rain",
+      "localTime": {
+        "hour": 21,
+        "minute": 24
+      }
+    },
+    {
+      "id": "loc-fr-paris",
+      "name": "Paris",
+      "subtitle": "Île-de-France, France",
+      "country": "FR",
+      "temperatureC": 15,
+      "highC": 18,
+      "lowC": 11,
+      "condition": "partly_cloudy",
+      "localTime": {
+        "hour": 22,
+        "minute": 24
+      }
     }
-  },
-  {
-    "id": "loc-fr-paris",
-    "name": "Paris",
-    "subtitle": "Île-de-France, France",
-    "country": "FR",
-    "temperatureC": 15,
-    "highC": 18,
-    "lowC": 11,
-    "condition": "partly_cloudy",
-    "localTime": {
-      "hour": 22,
-      "minute": 24
-    }
-  }
-]
+  ]
+}

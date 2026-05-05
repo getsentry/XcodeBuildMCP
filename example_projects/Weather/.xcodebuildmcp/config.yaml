@@ -8,7 +8,6 @@ sessionDefaults:
   projectPath: Weather.xcodeproj
   scheme: Weather
   simulatorName: iPhone 17 Pro
-  simulatorId: A2C64636-37E9-4B68-B872-E7F0A82A5670
 setupPreferences:
   platforms:
     - iOS

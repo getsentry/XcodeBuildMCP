@@ -134,6 +134,7 @@ struct ContentView: View {
             let locations = try await weatherService.defaultLocations()
             savedLocations = locations
             selectedLocation = selectedLocation ?? locations.first
+        } catch is CancellationError {
         } catch {
             weatherErrorMessage = "Locations unavailable"
         }
@@ -149,11 +150,15 @@ struct ContentView: View {
         weatherErrorMessage = nil
 
         do {
-            report = try await weatherService.weather(for: locationID)
+            let loadedReport = try await weatherService.weather(for: locationID)
+            guard selectedLocation?.id == locationID else { return }
+            report = loadedReport
+        } catch is CancellationError {
         } catch {
             weatherErrorMessage = "Weather unavailable"
         }
 
+        guard selectedLocation?.id == locationID else { return }
         isLoadingWeather = false
     }
 }

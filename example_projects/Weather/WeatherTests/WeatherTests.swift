@@ -98,9 +98,9 @@ struct WeatherTests {
     }
 
     @Test func defaultLocationsFixtureDecodesAsExpectedDTOs() throws {
-        let decoded: [WeatherLocationDTO] = try decodeFixture(named: "default-locations")
+        let decoded: WeatherLocationsResponseDTO = try decodeFixture(named: "default-locations")
 
-        #expect(decoded == [
+        #expect(decoded.locations == [
             WeatherLocationDTO(
                 id: "loc-current-san-francisco",
                 name: "San Francisco",
@@ -127,9 +127,9 @@ struct WeatherTests {
     }
 
     @Test func searchLocationsFixtureDecodesAsExpectedDTOs() throws {
-        let decoded: [WeatherLocationDTO] = try decodeFixture(named: "search-locations")
+        let decoded: WeatherLocationsResponseDTO = try decodeFixture(named: "search-locations")
 
-        #expect(decoded == [
+        #expect(decoded.locations == [
             WeatherLocationDTO(
                 id: "loc-gb-london",
                 name: "London",
@@ -153,6 +153,40 @@ struct WeatherTests {
                 localTime: LocalClockTimeDTO(hour: 22, minute: 24)
             ),
         ])
+    }
+
+    @Test func solarProgressKindDecodesSnakeCaseValues() throws {
+        let decoder = JSONDecoder()
+
+        let beforeSunrise = try decoder.decode(
+            SolarDayProgressDTO.self,
+            from: Data(#"{"kind":"before_sunrise","daylightFraction":null}"#.utf8)
+        )
+        #expect(beforeSunrise == SolarDayProgressDTO(kind: .beforeSunrise, daylightFraction: nil))
+
+        let afterSunset = try decoder.decode(
+            SolarDayProgressDTO.self,
+            from: Data(#"{"kind":"after_sunset","daylightFraction":null}"#.utf8)
+        )
+        #expect(afterSunset == SolarDayProgressDTO(kind: .afterSunset, daylightFraction: nil))
+    }
+
+    @Test func invalidClockTimeThrowsMappingError() throws {
+        let location = WeatherLocationDTO(
+            id: "invalid-time",
+            name: "Invalid Time",
+            subtitle: "Fixture",
+            country: nil,
+            temperatureC: 18,
+            highC: 20,
+            lowC: 12,
+            condition: .sunny,
+            localTime: LocalClockTimeDTO(hour: 25, minute: 0)
+        )
+
+        #expect(throws: WeatherDTOMappingError.invalidClockTime(hour: 25, minute: 0)) {
+            _ = try WeatherLocation(dto: location)
+        }
     }
 
     @Test func weatherFixtureDecodesAsExpectedDTO() throws {

@@ -1,5 +1,9 @@
 import Foundation
 
+struct WeatherLocationsResponseDTO: Codable, Equatable, Sendable {
+    let locations: [WeatherLocationDTO]
+}
+
 struct WeatherLocationDTO: Codable, Equatable, Sendable {
     let id: String
     let name: String
@@ -120,9 +124,9 @@ enum PressureTrendDTO: String, Codable, CaseIterable, Sendable {
 }
 
 enum SolarDayProgressKindDTO: String, Codable, CaseIterable, Sendable {
-    case beforeSunrise
+    case beforeSunrise = "before_sunrise"
     case daylight
-    case afterSunset
+    case afterSunset = "after_sunset"
 }
 
 enum ForecastHourKindDTO: String, Codable, CaseIterable, Sendable {
@@ -139,6 +143,7 @@ enum WeatherDTOMappingError: Error, Equatable {
     case missingDaylightFraction
     case invalidDaylightFraction(Double)
     case missingClockTime
+    case invalidClockTime(hour: Int, minute: Int)
     case missingWeekday
     case invalidWeekday(Int)
     case invalidWindDirection(Double)
@@ -241,6 +246,10 @@ extension DailyForecast {
 
 private extension LocalClockTime {
     init(dto: LocalClockTimeDTO) throws {
+        guard (0...23).contains(dto.hour), (0...59).contains(dto.minute) else {
+            throw WeatherDTOMappingError.invalidClockTime(hour: dto.hour, minute: dto.minute)
+        }
+
         self.init(hour: dto.hour, minute: dto.minute)
     }
 }
@@ -273,7 +282,7 @@ private extension ForecastHour {
             guard let hour = dto.hour, let minute = dto.minute else {
                 throw WeatherDTOMappingError.missingClockTime
             }
-            self = .clock(LocalClockTime(hour: hour, minute: minute))
+            self = .clock(try LocalClockTime(dto: LocalClockTimeDTO(hour: hour, minute: minute)))
         }
     }
 }

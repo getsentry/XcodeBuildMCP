@@ -32,28 +32,44 @@ struct SunMiniCard: View {
         }
     }
 
-    private var isOnArc: Bool {
-        current.solarProgress.daylightFraction != nil
-    }
-
-    private var isPM: Bool {
-        (current.solarProgress.daylightFraction ?? 1) >= 0.5
-    }
-
     private var nextLabel: String {
-        isOnArc ? (isPM ? "SUNSET" : "SUNRISE") : "SUNRISE"
+        switch current.solarProgress {
+        case .beforeSunrise:
+            "SUNRISE"
+        case .daylight, .afterSunset:
+            "SUNSET"
+        }
     }
 
     private var nextTime: String {
-        isOnArc ? (isPM ? current.sunset.fullClockLabel : current.sunrise.fullClockLabel) : current.sunrise.fullClockLabel
+        switch current.solarProgress {
+        case .beforeSunrise:
+            current.sunrise.fullClockLabel
+        case .daylight, .afterSunset:
+            current.sunset.fullClockLabel
+        }
     }
 
     private var otherLabel: String {
-        isOnArc ? (isPM ? "Sunrise was" : "Sunset at") : "Sunset was"
+        switch current.solarProgress {
+        case .beforeSunrise:
+            "Sunset at"
+        case .daylight:
+            "Sunrise was"
+        case .afterSunset:
+            "Sunset was"
+        }
     }
 
     private var otherTime: String {
-        isOnArc ? (isPM ? current.sunrise.fullClockLabel : current.sunset.fullClockLabel) : current.sunset.fullClockLabel
+        switch current.solarProgress {
+        case .beforeSunrise:
+            current.sunset.fullClockLabel
+        case .daylight:
+            current.sunrise.fullClockLabel
+        case .afterSunset:
+            current.sunset.fullClockLabel
+        }
     }
 }
 
