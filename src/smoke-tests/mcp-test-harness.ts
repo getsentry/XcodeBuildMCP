@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import type { ChildProcess } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -35,6 +37,7 @@ import {
 } from '../utils/debugger/index.ts';
 import { getPackageRoot } from '../core/manifest/load-manifest.ts';
 import { shutdownXcodeToolsBridge } from '../integrations/xcode-tools-bridge/index.ts';
+import { setXcodebuildLogDirOverrideForTests } from '../utils/xcodebuild-log-capture.ts';
 
 export interface CapturedCommand {
   command: string[];
@@ -100,6 +103,9 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
   sessionStore.clear();
 
   const mockFs = createMockFileSystemExecutor();
+  const logDir = await mkdtemp(join(tmpdir(), 'xcodebuildmcp-smoke-logs-'));
+
+  setXcodebuildLogDirOverrideForTests(logDir);
 
   // Set executor overrides on the vitest-resolved source modules
   __setTestCommandExecutorOverride(capturingExecutor);
@@ -124,6 +130,13 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
   };
   builtCommandModule.__setTestCommandExecutorOverride(capturingExecutor);
   builtCommandModule.__setTestFileSystemExecutorOverride(mockFs);
+
+  const builtLogCaptureModule = (await import(
+    pathToFileURL(resolve(buildRoot, 'utils/xcodebuild-log-capture.js')).href
+  )) as {
+    setXcodebuildLogDirOverrideForTests: typeof setXcodebuildLogDirOverrideForTests;
+  };
+  builtLogCaptureModule.setXcodebuildLogDirOverrideForTests(logDir);
 
   // Set interactive spawner override (built module)
   const builtInteractiveModule = (await import(
@@ -238,6 +251,9 @@ export async function createMcpTestHarness(opts?: McpTestHarnessOptions): Promis
       builtInteractiveModule.__clearTestInteractiveSpawnerOverride();
       __clearTestDebuggerToolContextOverride();
       builtDebuggerModule.__clearTestDebuggerToolContextOverride();
+      setXcodebuildLogDirOverrideForTests(null);
+      builtLogCaptureModule.setXcodebuildLogDirOverrideForTests(null);
+      await rm(logDir, { recursive: true, force: true });
       __resetConfigStoreForTests();
       builtConfigStoreModule.__resetConfigStoreForTests();
       __resetServerStateForTests();
