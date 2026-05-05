@@ -15,7 +15,7 @@ struct ConditionGrid: View {
                 ConditionTile(title: "UV INDEX", value: "\(current.uvIndex)", caption: current.uvLabel, current: current) {
                     UVViz(value: current.uvIndex, theme: current.theme)
                 }
-                ConditionTile(title: "HUMIDITY", value: "\(current.humidity)%", caption: "Dew point: \(WeatherUnitFormatter.temperature(9, units: units))°", current: current) {
+                ConditionTile(title: "HUMIDITY", value: "\(current.humidity)%", caption: "Dew point: \(WeatherUnitFormatter.temperature(current.dewPointC, units: units))°", current: current) {
                     FilledBar(value: Double(current.humidity) / 100, theme: current.theme)
                 }
                 ConditionTile(

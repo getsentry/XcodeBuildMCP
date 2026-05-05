@@ -5,6 +5,7 @@
     "highC": 20,
     "lowC": 12,
     "feelsLikeC": 17,
+    "dewPointC": 9,
     "condition": "mostly_sunny",
     "solarProgress": {
       "kind": "daylight",
@@ -84,6 +85,7 @@
     "highC": 13,
     "lowC": 9,
     "feelsLikeC": 9,
+    "dewPointC": 8,
     "condition": "light_rain",
     "solarProgress": {
       "kind": "daylight",

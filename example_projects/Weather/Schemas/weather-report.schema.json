@@ -26,6 +26,9 @@
             "feelsLikeC": {
               "type": "integer"
             },
+            "dewPointC": {
+              "type": "integer"
+            },
             "condition": {
               "type": "string",
               "enum": [
@@ -160,6 +163,7 @@
             "highC",
             "lowC",
             "feelsLikeC",
+            "dewPointC",
             "condition",
             "solarProgress",
             "sunrise",
@@ -347,6 +351,9 @@
             "feelsLikeC": {
               "type": "integer"
             },
+            "dewPointC": {
+              "type": "integer"
+            },
             "condition": {
               "type": "string",
               "enum": [
@@ -481,6 +488,7 @@
             "highC",
             "lowC",
             "feelsLikeC",
+            "dewPointC",
             "condition",
             "solarProgress",
             "sunrise",

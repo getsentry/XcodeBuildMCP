@@ -106,6 +106,7 @@ struct CurrentWeather: Equatable, Identifiable, Sendable {
     let highC: Int
     let lowC: Int
     let feelsLikeC: Int
+    let dewPointC: Int
     let condition: WeatherCondition
     let solarProgress: SolarDayProgress
     let sunrise: LocalClockTime

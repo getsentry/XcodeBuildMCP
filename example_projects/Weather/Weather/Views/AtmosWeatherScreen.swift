@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AtmosWeatherScreen: View {
     let locationName: String
+    let locationSubtitle: String
     let current: CurrentWeather
     let hourly: [HourlyForecast]
     let daily: [DailyForecast]
@@ -17,7 +18,7 @@ struct AtmosWeatherScreen: View {
 
                 ScrollView {
                     VStack(spacing: 0) {
-                        WeatherHeroView(locationName: locationName, current: current, units: units)
+                        WeatherHeroView(locationName: locationName, locationSubtitle: locationSubtitle, current: current, units: units)
 
                         VStack(spacing: 10) {
                             HourlyForecastCard(forecasts: hourly, current: current, units: units)

@@ -34,6 +34,7 @@ struct CurrentWeatherDTO: Codable, Equatable, Sendable {
     let highC: Int
     let lowC: Int
     let feelsLikeC: Int
+    let dewPointC: Int
     let condition: WeatherConditionDTO
     let solarProgress: SolarDayProgressDTO
     let sunrise: LocalClockTimeDTO
@@ -202,6 +203,7 @@ extension CurrentWeather {
             highC: dto.highC,
             lowC: dto.lowC,
             feelsLikeC: dto.feelsLikeC,
+            dewPointC: dto.dewPointC,
             condition: WeatherCondition(dto: dto.condition),
             solarProgress: try SolarDayProgress(dto: dto.solarProgress),
             sunrise: try LocalClockTime(dto: dto.sunrise),

@@ -197,6 +197,11 @@ struct LocationPickerView: View {
         isLoading = true
         searchErrorMessage = nil
         let currentQuery = query
+        defer {
+            if currentQuery == query {
+                isLoading = false
+            }
+        }
 
         do {
             let matches = try await weatherService.searchLocations(matching: currentQuery)
@@ -207,8 +212,6 @@ struct LocationPickerView: View {
             results = []
             searchErrorMessage = "Search is unavailable right now."
         }
-
-        isLoading = false
     }
 
     private func isSaved(_ location: WeatherLocation) -> Bool {

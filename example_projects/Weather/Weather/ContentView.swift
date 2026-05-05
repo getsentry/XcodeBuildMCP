@@ -51,6 +51,7 @@ struct ContentView: View {
             if let report, let selectedLocation {
                 AtmosWeatherScreen(
                     locationName: selectedLocation.name,
+                    locationSubtitle: selectedLocation.subtitle,
                     current: report.current,
                     hourly: report.hourly,
                     daily: report.daily,

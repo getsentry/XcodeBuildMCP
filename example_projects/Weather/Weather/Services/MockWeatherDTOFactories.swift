@@ -85,7 +85,7 @@ extension CurrentWeatherDTO {
         case .clearDay:
             CurrentWeatherDTO(
                 id: "weather-current-loc-current-san-francisco",
-                temperatureC: 18, highC: 20, lowC: 12, feelsLikeC: 17, condition: .mostlySunny,
+                temperatureC: 18, highC: 20, lowC: 12, feelsLikeC: 17, dewPointC: 9, condition: .mostlySunny,
                 solarProgress: .daylight(0.62), sunrise: clock(6, 18), sunset: clock(19, 42), airQualityIndex: 38, airQualityCategory: .good,
                 uvIndex: 6, uvCategory: .high, windKph: 13, windDirectionDegrees: 292, humidity: 64,
                 visibilityKilometers: 16.1, pressureMillibars: 1018, pressureTrend: .rising, precipChance: 5
@@ -93,7 +93,7 @@ extension CurrentWeatherDTO {
         case .rainy:
             CurrentWeatherDTO(
                 id: "weather-current-loc-us-or-portland",
-                temperatureC: 11, highC: 13, lowC: 9, feelsLikeC: 9, condition: .lightRain,
+                temperatureC: 11, highC: 13, lowC: 9, feelsLikeC: 9, dewPointC: 8, condition: .lightRain,
                 solarProgress: .daylight(0.45), sunrise: clock(6, 42), sunset: clock(19, 18), airQualityIndex: 22, airQualityCategory: .good,
                 uvIndex: 1, uvCategory: .low, windKph: 23, windDirectionDegrees: 225, humidity: 89,
                 visibilityKilometers: 9.7, pressureMillibars: 1006, pressureTrend: .falling, precipChance: 78
@@ -101,7 +101,7 @@ extension CurrentWeatherDTO {
         case .snowy:
             CurrentWeatherDTO(
                 id: "weather-current-loc-us-co-aspen",
-                temperatureC: -4, highC: -2, lowC: -10, feelsLikeC: -8, condition: .lightSnow,
+                temperatureC: -4, highC: -2, lowC: -10, feelsLikeC: -8, dewPointC: -7, condition: .lightSnow,
                 solarProgress: .daylight(0.50), sunrise: clock(7, 14), sunset: clock(17, 38), airQualityIndex: 18, airQualityCategory: .good,
                 uvIndex: 2, uvCategory: .low, windKph: 10, windDirectionDegrees: 0, humidity: 78,
                 visibilityKilometers: 6.4, pressureMillibars: 1022, pressureTrend: .steady, precipChance: 65
@@ -109,7 +109,7 @@ extension CurrentWeatherDTO {
         case .night:
             CurrentWeatherDTO(
                 id: "weather-current-loc-is-reykjavik",
-                temperatureC: 3, highC: 6, lowC: 1, feelsLikeC: 1, condition: .clearNight,
+                temperatureC: 3, highC: 6, lowC: 1, feelsLikeC: 1, dewPointC: 0, condition: .clearNight,
                 solarProgress: .afterSunset, sunrise: clock(5, 46), sunset: clock(20, 24), airQualityIndex: 12, airQualityCategory: .good,
                 uvIndex: 0, uvCategory: .none, windKph: 6, windDirectionDegrees: 45, humidity: 71,
                 visibilityKilometers: 16.1, pressureMillibars: 1014, pressureTrend: .steady, precipChance: 8
@@ -117,7 +117,7 @@ extension CurrentWeatherDTO {
         case .stormy:
             CurrentWeatherDTO(
                 id: "weather-current-loc-us-la-new-orleans",
-                temperatureC: 22, highC: 26, lowC: 20, feelsLikeC: 24, condition: .thunderstorms,
+                temperatureC: 22, highC: 26, lowC: 20, feelsLikeC: 24, dewPointC: 19, condition: .thunderstorms,
                 solarProgress: .daylight(0.78), sunrise: clock(6, 8), sunset: clock(19, 52), airQualityIndex: 55, airQualityCategory: .moderate,
                 uvIndex: 3, uvCategory: .moderate, windKph: 35, windDirectionDegrees: 180, humidity: 86,
                 visibilityKilometers: 4.8, pressureMillibars: 998, pressureTrend: .falling, precipChance: 92

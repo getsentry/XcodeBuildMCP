@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WeatherHeroView: View {
     let locationName: String
+    let locationSubtitle: String
     let current: CurrentWeather
     let units: WeatherUnits
 
@@ -12,7 +13,7 @@ struct WeatherHeroView: View {
                 .tracking(-0.3)
                 .accessibilityIdentifier("weather.heroLocation")
 
-            Text("My Location")
+            Text(locationSubtitle)
                 .font(.system(size: 13))
                 .tracking(0.2)
                 .foregroundStyle(current.theme.foregroundMuted)
