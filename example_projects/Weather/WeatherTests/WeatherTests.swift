@@ -189,6 +189,35 @@ struct WeatherTests {
         }
     }
 
+    @Test func windDirection360MapsToNorth() throws {
+        let dto = CurrentWeatherDTO(
+            id: "north-wind",
+            temperatureC: 10,
+            highC: 12,
+            lowC: 8,
+            feelsLikeC: 9,
+            condition: .sunny,
+            solarProgress: SolarDayProgressDTO(kind: .daylight, daylightFraction: 0.5),
+            sunrise: LocalClockTimeDTO(hour: 6, minute: 0),
+            sunset: LocalClockTimeDTO(hour: 18, minute: 0),
+            airQualityIndex: 10,
+            airQualityCategory: .good,
+            uvIndex: 1,
+            uvCategory: .low,
+            windKph: 12,
+            windDirectionDegrees: 360,
+            humidity: 50,
+            visibilityKilometers: 10,
+            pressureMillibars: 1_013,
+            pressureTrend: .steady,
+            precipChance: 0
+        )
+
+        let current = try CurrentWeather(dto: dto)
+
+        #expect(current.windDirection == WindDirection(degrees: 0))
+    }
+
     @Test func weatherFixtureDecodesAsExpectedDTO() throws {
         let decoded: WeatherReportDTO = try decodeFixture(named: "weather-report-loc-current-san-francisco")
 

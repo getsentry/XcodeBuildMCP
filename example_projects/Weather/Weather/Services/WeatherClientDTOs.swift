@@ -190,9 +190,11 @@ extension WeatherLocation {
 
 extension CurrentWeather {
     init(dto: CurrentWeatherDTO) throws {
-        guard (0..<360).contains(dto.windDirectionDegrees) else {
+        guard (0...360).contains(dto.windDirectionDegrees) else {
             throw WeatherDTOMappingError.invalidWindDirection(dto.windDirectionDegrees)
         }
+
+        let windDirectionDegrees = dto.windDirectionDegrees == 360 ? 0 : dto.windDirectionDegrees
 
         self.init(
             id: dto.id,
@@ -209,7 +211,7 @@ extension CurrentWeather {
             uvIndex: dto.uvIndex,
             uvCategory: UVIndexCategory(dto: dto.uvCategory),
             windKph: dto.windKph,
-            windDirection: WindDirection(degrees: dto.windDirectionDegrees),
+            windDirection: WindDirection(degrees: windDirectionDegrees),
             humidity: dto.humidity,
             visibilityKilometers: dto.visibilityKilometers,
             pressureMillibars: dto.pressureMillibars,
