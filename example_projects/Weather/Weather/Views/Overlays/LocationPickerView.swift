@@ -207,6 +207,7 @@ struct LocationPickerView: View {
             let matches = try await weatherService.searchLocations(matching: currentQuery)
             guard !Task.isCancelled, currentQuery == query else { return }
             results = matches
+        } catch is CancellationError {
         } catch {
             guard !Task.isCancelled, currentQuery == query else { return }
             results = []

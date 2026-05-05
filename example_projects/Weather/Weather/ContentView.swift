@@ -149,6 +149,11 @@ struct ContentView: View {
     private func loadWeather(for locationID: WeatherLocation.ID) async {
         isLoadingWeather = true
         weatherErrorMessage = nil
+        defer {
+            if selectedLocation?.id == locationID {
+                isLoadingWeather = false
+            }
+        }
 
         do {
             let loadedReport = try await weatherService.weather(for: locationID)
@@ -159,9 +164,6 @@ struct ContentView: View {
             guard selectedLocation?.id == locationID else { return }
             weatherErrorMessage = "Weather unavailable"
         }
-
-        guard selectedLocation?.id == locationID else { return }
-        isLoadingWeather = false
     }
 }
 
