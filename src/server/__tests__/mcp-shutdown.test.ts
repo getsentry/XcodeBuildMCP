@@ -113,7 +113,7 @@ describe('runMcpShutdown', () => {
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
   });
 
-  it('marks workspace filesystem cleanup as failed when embedded errors are reported', async () => {
+  it('records workspace filesystem cleanup diagnostics without failing the step', async () => {
     mocks.cleanupOwnedWorkspaceFilesystemArtifacts.mockResolvedValueOnce({
       workspaceKey: 'workspace-a',
       trigger: 'shutdown',
@@ -135,10 +135,12 @@ describe('runMcpShutdown', () => {
     const filesystemStep = result.steps.find(
       (step) => step.name === 'workspace-filesystem.cleanup-owned',
     );
-    expect(filesystemStep?.status).toBe('failed');
+    expect(filesystemStep?.status).toBe('completed');
+    expect(filesystemStep?.diagnosticCount).toBe(1);
+    expect(filesystemStep?.diagnostics).toEqual(['could not delete stale oslog file']);
   });
 
-  it('marks video capture cleanup as failed when embedded errors are reported', async () => {
+  it('records video capture cleanup diagnostics without failing the step', async () => {
     mocks.stopAllVideoCaptureSessions.mockResolvedValueOnce({
       stoppedSessionCount: 0,
       errorCount: 1,
@@ -152,10 +154,12 @@ describe('runMcpShutdown', () => {
     });
 
     const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
-    expect(videoStep?.status).toBe('failed');
+    expect(videoStep?.status).toBe('completed');
+    expect(videoStep?.diagnosticCount).toBe(1);
+    expect(videoStep?.diagnostics).toEqual(['failed to stop recorder']);
   });
 
-  it('marks video capture cleanup as failed when errorCount is zero but errors are reported', async () => {
+  it('records video capture diagnostics when errorCount is zero but errors are reported', async () => {
     mocks.stopAllVideoCaptureSessions.mockResolvedValueOnce({
       stoppedSessionCount: 0,
       errorCount: 0,
@@ -169,10 +173,12 @@ describe('runMcpShutdown', () => {
     });
 
     const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
-    expect(videoStep?.status).toBe('failed');
+    expect(videoStep?.status).toBe('completed');
+    expect(videoStep?.diagnosticCount).toBe(1);
+    expect(videoStep?.diagnostics).toEqual(['failed to stop recorder']);
   });
 
-  it('marks swift tracked process cleanup as failed when embedded errors are reported', async () => {
+  it('records swift tracked process cleanup diagnostics without failing the step', async () => {
     mocks.stopAllTrackedProcesses.mockResolvedValueOnce({
       stoppedProcessCount: 0,
       errorCount: 1,
@@ -186,10 +192,12 @@ describe('runMcpShutdown', () => {
     });
 
     const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
-    expect(swiftStep?.status).toBe('failed');
+    expect(swiftStep?.status).toBe('completed');
+    expect(swiftStep?.diagnosticCount).toBe(1);
+    expect(swiftStep?.diagnostics).toEqual(['failed to terminate swift process']);
   });
 
-  it('marks swift tracked process cleanup as failed when errorCount is zero but errors are reported', async () => {
+  it('records swift tracked process diagnostics when errorCount is zero but errors are reported', async () => {
     mocks.stopAllTrackedProcesses.mockResolvedValueOnce({
       stoppedProcessCount: 0,
       errorCount: 0,
@@ -203,7 +211,9 @@ describe('runMcpShutdown', () => {
     });
 
     const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
-    expect(swiftStep?.status).toBe('failed');
+    expect(swiftStep?.status).toBe('completed');
+    expect(swiftStep?.diagnosticCount).toBe(1);
+    expect(swiftStep?.diagnostics).toEqual(['failed to terminate swift process']);
   });
 
   it('adds outer timeout headroom for one-item bulk cleanup', async () => {

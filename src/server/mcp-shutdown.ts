@@ -30,6 +30,8 @@ export interface ShutdownStepResult {
   status: ShutdownStepStatus;
   durationMs: number;
   error?: string;
+  diagnosticCount?: number;
+  diagnostics?: string[];
 }
 
 interface ShutdownStepOutcome<T> {
@@ -112,12 +114,22 @@ function buildExitCode(reason: McpShutdownReason): number {
   return FAILURE_REASONS.has(reason) ? 1 : 0;
 }
 
-function throwIfErrors(name: string, errors: string[], errorCount?: number): void {
-  const effectiveCount = Math.max(errorCount ?? 0, errors.length);
-  if (effectiveCount > 0) {
-    const detail = errors.length > 0 ? errors.join('; ') : 'no error details provided';
-    throw new Error(`${name} reported ${effectiveCount} error(s): ${detail}`);
+function getCleanupDiagnostics(value: unknown): { count: number; messages: string[] } | null {
+  if (value === null || typeof value !== 'object') {
+    return null;
   }
+
+  const result = value as { errorCount?: unknown; errors?: unknown };
+  const messages = Array.isArray(result.errors)
+    ? result.errors.filter((error): error is string => typeof error === 'string')
+    : [];
+  const explicitCount =
+    typeof result.errorCount === 'number' && Number.isFinite(result.errorCount)
+      ? result.errorCount
+      : 0;
+  const count = Math.max(explicitCount, messages.length);
+
+  return count > 0 ? { count, messages } : null;
 }
 
 function workspaceFilesystemCleanupTimeoutForOwnedSessions(ownedSessionCount: number): number {
@@ -161,6 +173,15 @@ export async function runMcpShutdown(input: {
     };
     if (outcome.error) {
       step.error = outcome.error;
+    }
+    if (outcome.status === 'completed') {
+      const diagnostics = getCleanupDiagnostics(outcome.value);
+      if (diagnostics) {
+        step.diagnosticCount = diagnostics.count;
+        if (diagnostics.messages.length > 0) {
+          step.diagnostics = diagnostics.messages;
+        }
+      }
     }
     steps.push(step);
   };
@@ -210,29 +231,23 @@ export async function runMcpShutdown(input: {
       name: 'workspace-filesystem.cleanup-owned',
       timeoutMs: workspaceFilesystemCleanupTimeoutMs,
       operation: async (): Promise<unknown> => {
-        const result = await cleanupOwnedWorkspaceFilesystemArtifacts({
+        return cleanupOwnedWorkspaceFilesystemArtifacts({
           timeoutMs: STEP_TIMEOUT_MS,
         });
-        throwIfErrors('workspace-filesystem.cleanup-owned', result.errors);
-        return result;
       },
     },
     {
       name: 'video-capture.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.videoCaptureSessionCount),
       operation: async (): Promise<unknown> => {
-        const result = await stopAllVideoCaptureSessions(STEP_TIMEOUT_MS);
-        throwIfErrors('video-capture.stop-all', result.errors, result.errorCount);
-        return result;
+        return stopAllVideoCaptureSessions(STEP_TIMEOUT_MS);
       },
     },
     {
       name: 'swift-processes.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.swiftPackageProcessCount),
       operation: async (): Promise<unknown> => {
-        const result = await stopAllTrackedProcesses(STEP_TIMEOUT_MS);
-        throwIfErrors('swift-processes.stop-all', result.errors, result.errorCount);
-        return result;
+        return stopAllTrackedProcesses(STEP_TIMEOUT_MS);
       },
     },
   ];
@@ -243,9 +258,13 @@ export async function runMcpShutdown(input: {
   }
 
   const triggerError = input.error === undefined ? undefined : toErrorMessage(input.error);
-  const cleanupFailureCount = steps.filter(
+  const shutdownStepFailureCount = steps.filter(
     (step) => step.status === 'failed' || step.status === 'timed_out',
   ).length;
+  const cleanupDiagnosticCount = steps.reduce(
+    (total, step) => total + (step.diagnosticCount ?? 0),
+    0,
+  );
 
   captureMcpShutdownSummary({
     reason: input.reason,
@@ -253,7 +272,8 @@ export async function runMcpShutdown(input: {
     exitCode,
     transportDisconnected,
     triggerError,
-    cleanupFailureCount,
+    shutdownStepFailureCount,
+    cleanupDiagnosticCount,
     shutdownDurationMs: Date.now() - shutdownStartedAt,
     snapshot: input.snapshot as unknown as Record<string, unknown>,
     steps: steps as unknown as Array<Record<string, unknown>>,

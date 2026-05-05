@@ -376,7 +376,8 @@ export interface McpShutdownSummaryEvent {
   exitCode: number;
   transportDisconnected: boolean;
   triggerError?: string;
-  cleanupFailureCount: number;
+  shutdownStepFailureCount: number;
+  cleanupDiagnosticCount?: number;
   shutdownDurationMs: number;
   snapshot: Record<string, unknown>;
   steps: Array<Record<string, unknown>>;
@@ -415,7 +416,7 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
     let level: 'error' | 'warning' | 'info';
     if (isCrashReason) {
       level = 'error';
-    } else if (summary.cleanupFailureCount > 0 || localAnomalyCount > 0) {
+    } else if (summary.shutdownStepFailureCount > 0 || localAnomalyCount > 0) {
       level = 'warning';
     } else {
       level = 'info';
@@ -433,7 +434,8 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
         exitCode: summary.exitCode,
         transportDisconnected: summary.transportDisconnected,
         triggerError: summary.triggerError,
-        cleanupFailureCount: summary.cleanupFailureCount,
+        shutdownStepFailureCount: summary.shutdownStepFailureCount,
+        cleanupDiagnosticCount: summary.cleanupDiagnosticCount,
         shutdownDurationMs: summary.shutdownDurationMs,
         snapshot: summary.snapshot,
         steps: summary.steps,
