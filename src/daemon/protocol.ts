@@ -82,6 +82,8 @@ export interface DaemonStatusResult {
   workspaceRoot: string;
   /** Filesystem-safe name-plus-hash key identifying this workspace */
   workspaceKey: string;
+  /** Opaque identity for this daemon process instance. */
+  instanceId?: string;
 }
 
 export interface ToolListItem {

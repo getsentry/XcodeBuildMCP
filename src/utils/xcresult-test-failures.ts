@@ -22,7 +22,7 @@ export function extractTestFailuresFromXcresult(xcresultPath: string): TestFailu
       { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] },
     );
 
-    const results: XcresultTestResults = JSON.parse(output);
+    const results = JSON.parse(output) as XcresultTestResults;
     const fragments: TestFailureFragment[] = [];
 
     function walk(node: XcresultTestNode, suiteContext?: string): void {
@@ -36,7 +36,7 @@ export function extractTestFailuresFromXcresult(xcresultPath: string): TestFailu
       if (node.nodeType === 'Test Case' && node.result === 'Failed' && node.children) {
         for (const child of node.children) {
           if (child.nodeType === 'Failure Message') {
-            const parsed = parseFailureMessage(child.name);
+            const parsed = parseXcresultFailureMessage(child.name);
             const { suiteName, testName } = parsedNodeName;
             fragments.push({
               kind: 'test-result',
@@ -69,12 +69,17 @@ export function extractTestFailuresFromXcresult(xcresultPath: string): TestFailu
   }
 }
 
-function parseFailureMessage(raw: string): { message: string; location?: string } {
-  const match = raw.match(/^(.+?):(\d+): (.+)$/);
+export function parseXcresultFailureMessage(raw: string): { message: string; location?: string } {
+  const [firstLine = '', ...continuationLines] = raw.split(/\r?\n/u);
+  const match = firstLine.match(/^(.+?):(\d+):\s*(.*)$/u);
   if (match) {
+    const message = [match[3], ...continuationLines]
+      .join('\n')
+      .replace(/^failed\s*-\s*/u, '')
+      .replace(/:\s+(?=\/\/)/u, '\n');
     return {
       location: match[2] === '0' ? undefined : `${match[1]}:${match[2]}`,
-      message: match[3].replace(/^failed\s*-\s*/u, ''),
+      message,
     };
   }
   return { message: raw };

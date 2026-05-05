@@ -662,7 +662,7 @@ describe('xcodebuild-event-parser', () => {
     ]);
   });
 
-  it('counts additional failures reported only by a Swift Testing summary', () => {
+  it('defers Swift Testing failure progress until the run summary', () => {
     const events = collectEvents('TEST', [
       {
         source: 'stdout',
@@ -675,10 +675,7 @@ describe('xcodebuild-event-parser', () => {
     ]);
 
     const progress = events.filter((event) => event.fragment === 'test-progress');
-    expect(progress).toEqual([
-      expect.objectContaining({ completed: 1, failed: 1, skipped: 0 }),
-      expect.objectContaining({ completed: 2, failed: 2, skipped: 0 }),
-    ]);
+    expect(progress).toEqual([expect.objectContaining({ completed: 2, failed: 2, skipped: 0 })]);
   });
 
   it('keeps parameterized Swift Testing result counts aligned with the run summary', () => {

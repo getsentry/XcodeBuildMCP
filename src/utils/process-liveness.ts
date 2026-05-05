@@ -8,6 +8,6 @@ export function isPidAlive(pid: number): boolean {
     return true;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    return code !== 'ESRCH' && code !== 'EPERM';
+    return code !== 'ESRCH';
   }
 }

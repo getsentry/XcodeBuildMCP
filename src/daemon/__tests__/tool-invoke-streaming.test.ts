@@ -137,6 +137,33 @@ describe('daemon tool.invoke streaming', () => {
     });
   });
 
+  it('includes daemon instance identity in status', async () => {
+    const socketPath = await createSocketPath();
+    cleanupPaths.push(socketPath);
+
+    const server = startDaemonServer({
+      socketPath,
+      startedAt: '2026-05-05T00:00:00.000Z',
+      enabledWorkflows: ['simulator'],
+      catalog: createCatalog([]),
+      workspaceRoot: '/repo',
+      workspaceKey: 'repo-key',
+      instanceId: 'daemon-instance-a',
+      xcodeIdeWorkflowEnabled: false,
+      requestShutdown: () => {},
+    });
+    cleanupServers.push(server);
+    await listen(server, socketPath);
+
+    const client = new DaemonClient({ socketPath, timeout: 1000 });
+
+    await expect(client.status()).resolves.toMatchObject({
+      instanceId: 'daemon-instance-a',
+      workspaceRoot: '/repo',
+      workspaceKey: 'repo-key',
+    });
+  });
+
   it('returns an error frame when the handler throws', async () => {
     const tool: ToolDefinition = {
       cliName: 'failing-tool',

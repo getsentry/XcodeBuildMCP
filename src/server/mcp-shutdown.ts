@@ -112,6 +112,18 @@ function buildExitCode(reason: McpShutdownReason): number {
   return FAILURE_REASONS.has(reason) ? 1 : 0;
 }
 
+function throwIfErrors(name: string, errors: string[], errorCount?: number): void {
+  const effectiveCount = Math.max(errorCount ?? 0, errors.length);
+  if (effectiveCount > 0) {
+    const detail = errors.length > 0 ? errors.join('; ') : 'no error details provided';
+    throw new Error(`${name} reported ${effectiveCount} error(s): ${detail}`);
+  }
+}
+
+function workspaceFilesystemCleanupTimeoutForOwnedSessions(ownedSessionCount: number): number {
+  return Math.max(1, ownedSessionCount) * STEP_TIMEOUT_MS * 2 + STEP_TIMEOUT_HEADROOM_MS;
+}
+
 export async function closeServerWithTimeout(
   server: Pick<McpServer, 'close'> | null | undefined,
   timeoutMs: number,
@@ -174,7 +186,7 @@ export async function runMcpShutdown(input: {
     );
   };
 
-  const workspaceFilesystemCleanupTimeoutMs = bulkStepTimeoutMs(
+  const workspaceFilesystemCleanupTimeoutMs = workspaceFilesystemCleanupTimeoutForOwnedSessions(
     input.snapshot.ownedSimulatorLaunchOsLogSessionCount,
   );
 
@@ -197,20 +209,31 @@ export async function runMcpShutdown(input: {
     {
       name: 'workspace-filesystem.cleanup-owned',
       timeoutMs: workspaceFilesystemCleanupTimeoutMs,
-      operation: () =>
-        cleanupOwnedWorkspaceFilesystemArtifacts({
+      operation: async (): Promise<unknown> => {
+        const result = await cleanupOwnedWorkspaceFilesystemArtifacts({
           timeoutMs: STEP_TIMEOUT_MS,
-        }),
+        });
+        throwIfErrors('workspace-filesystem.cleanup-owned', result.errors);
+        return result;
+      },
     },
     {
       name: 'video-capture.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.videoCaptureSessionCount),
-      operation: () => stopAllVideoCaptureSessions(STEP_TIMEOUT_MS),
+      operation: async (): Promise<unknown> => {
+        const result = await stopAllVideoCaptureSessions(STEP_TIMEOUT_MS);
+        throwIfErrors('video-capture.stop-all', result.errors, result.errorCount);
+        return result;
+      },
     },
     {
       name: 'swift-processes.stop-all',
       timeoutMs: bulkStepTimeoutMs(input.snapshot.swiftPackageProcessCount),
-      operation: () => stopAllTrackedProcesses(STEP_TIMEOUT_MS),
+      operation: async (): Promise<unknown> => {
+        const result = await stopAllTrackedProcesses(STEP_TIMEOUT_MS);
+        throwIfErrors('swift-processes.stop-all', result.errors, result.errorCount);
+        return result;
+      },
     },
   ];
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { McpLifecycleSnapshot } from '../mcp-lifecycle.ts';
 
 const mocks = vi.hoisted(() => ({
   stopXcodeStateWatcher: vi.fn(async () => undefined),
@@ -13,17 +14,17 @@ const mocks = vi.hoisted(() => ({
     stopped: 0,
     skippedByCooldown: false,
     skippedByLock: false,
-    errors: [],
+    errors: [] as string[],
   })),
   stopAllVideoCaptureSessions: vi.fn(async () => ({
     stoppedSessionCount: 0,
     errorCount: 0,
-    errors: [],
+    errors: [] as string[],
   })),
   stopAllTrackedProcesses: vi.fn(async () => ({
     stoppedProcessCount: 0,
     errorCount: 0,
-    errors: [],
+    errors: [] as string[],
   })),
   captureMcpShutdownSummary: vi.fn(),
   flushSentry: vi.fn(async () => 'flushed'),
@@ -62,6 +63,32 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createSnapshot(overrides: Partial<McpLifecycleSnapshot> = {}): McpLifecycleSnapshot {
+  return {
+    pid: 1,
+    ppid: 1,
+    orphaned: false,
+    phase: 'running',
+    shutdownReason: 'sigterm',
+    uptimeMs: 100,
+    rssBytes: 1,
+    heapUsedBytes: 1,
+    watcherRunning: false,
+    watchedPath: null,
+    activeOperationCount: 0,
+    activeOperationByCategory: {},
+    debuggerSessionCount: 0,
+    simulatorLaunchOsLogSessionCount: 0,
+    ownedSimulatorLaunchOsLogSessionCount: 0,
+    videoCaptureSessionCount: 0,
+    swiftPackageProcessCount: 0,
+    matchingMcpProcessCount: 0,
+    matchingMcpPeerSummary: [],
+    anomalies: [],
+    ...overrides,
+  };
+}
+
 describe('runMcpShutdown', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,28 +97,7 @@ describe('runMcpShutdown', () => {
   it('runs cleanup, captures summary, seals capture, and flushes', async () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
-      snapshot: {
-        pid: 1,
-        ppid: 1,
-        orphaned: true,
-        phase: 'running',
-        shutdownReason: 'sigterm',
-        uptimeMs: 100,
-        rssBytes: 1,
-        heapUsedBytes: 1,
-        watcherRunning: false,
-        watchedPath: null,
-        activeOperationCount: 0,
-        activeOperationByCategory: {},
-        debuggerSessionCount: 0,
-        simulatorLaunchOsLogSessionCount: 0,
-        ownedSimulatorLaunchOsLogSessionCount: 0,
-        videoCaptureSessionCount: 0,
-        swiftPackageProcessCount: 0,
-        matchingMcpProcessCount: 0,
-        matchingMcpPeerSummary: [],
-        anomalies: [],
-      },
+      snapshot: createSnapshot({ orphaned: true }),
       server: { close: async () => undefined },
     });
 
@@ -105,6 +111,99 @@ describe('runMcpShutdown', () => {
     expect(mocks.cleanupOwnedWorkspaceFilesystemArtifacts).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllVideoCaptureSessions).toHaveBeenCalledTimes(1);
     expect(mocks.stopAllTrackedProcesses).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks workspace filesystem cleanup as failed when embedded errors are reported', async () => {
+    mocks.cleanupOwnedWorkspaceFilesystemArtifacts.mockResolvedValueOnce({
+      workspaceKey: 'workspace-a',
+      trigger: 'shutdown',
+      logDir: '/tmp/logs',
+      scanned: 0,
+      deleted: 0,
+      stopped: 0,
+      skippedByCooldown: false,
+      skippedByLock: false,
+      errors: ['could not delete stale oslog file'],
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: createSnapshot(),
+      server: { close: async () => undefined },
+    });
+
+    const filesystemStep = result.steps.find(
+      (step) => step.name === 'workspace-filesystem.cleanup-owned',
+    );
+    expect(filesystemStep?.status).toBe('failed');
+  });
+
+  it('marks video capture cleanup as failed when embedded errors are reported', async () => {
+    mocks.stopAllVideoCaptureSessions.mockResolvedValueOnce({
+      stoppedSessionCount: 0,
+      errorCount: 1,
+      errors: ['failed to stop recorder'],
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: createSnapshot({ videoCaptureSessionCount: 1 }),
+      server: { close: async () => undefined },
+    });
+
+    const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
+    expect(videoStep?.status).toBe('failed');
+  });
+
+  it('marks video capture cleanup as failed when errorCount is zero but errors are reported', async () => {
+    mocks.stopAllVideoCaptureSessions.mockResolvedValueOnce({
+      stoppedSessionCount: 0,
+      errorCount: 0,
+      errors: ['failed to stop recorder'],
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: createSnapshot({ videoCaptureSessionCount: 1 }),
+      server: { close: async () => undefined },
+    });
+
+    const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
+    expect(videoStep?.status).toBe('failed');
+  });
+
+  it('marks swift tracked process cleanup as failed when embedded errors are reported', async () => {
+    mocks.stopAllTrackedProcesses.mockResolvedValueOnce({
+      stoppedProcessCount: 0,
+      errorCount: 1,
+      errors: ['failed to terminate swift process'],
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: createSnapshot({ swiftPackageProcessCount: 1 }),
+      server: { close: async () => undefined },
+    });
+
+    const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
+    expect(swiftStep?.status).toBe('failed');
+  });
+
+  it('marks swift tracked process cleanup as failed when errorCount is zero but errors are reported', async () => {
+    mocks.stopAllTrackedProcesses.mockResolvedValueOnce({
+      stoppedProcessCount: 0,
+      errorCount: 0,
+      errors: ['failed to terminate swift process'],
+    });
+
+    const result = await runMcpShutdown({
+      reason: 'sigterm',
+      snapshot: createSnapshot({ swiftPackageProcessCount: 1 }),
+      server: { close: async () => undefined },
+    });
+
+    const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
+    expect(swiftStep?.status).toBe('failed');
   });
 
   it('adds outer timeout headroom for one-item bulk cleanup', async () => {
@@ -125,28 +224,10 @@ describe('runMcpShutdown', () => {
 
     const result = await runMcpShutdown({
       reason: 'sigterm',
-      snapshot: {
-        pid: 1,
-        ppid: 1,
-        orphaned: false,
-        phase: 'running',
-        shutdownReason: 'sigterm',
-        uptimeMs: 100,
-        rssBytes: 1,
-        heapUsedBytes: 1,
-        watcherRunning: false,
-        watchedPath: null,
-        activeOperationCount: 0,
-        activeOperationByCategory: {},
-        debuggerSessionCount: 0,
+      snapshot: createSnapshot({
         simulatorLaunchOsLogSessionCount: 1,
         ownedSimulatorLaunchOsLogSessionCount: 1,
-        videoCaptureSessionCount: 0,
-        swiftPackageProcessCount: 0,
-        matchingMcpProcessCount: 0,
-        matchingMcpPeerSummary: [],
-        anomalies: [],
-      },
+      }),
       server: { close: async () => undefined },
     });
 
@@ -174,28 +255,10 @@ describe('runMcpShutdown', () => {
 
     const result = await runMcpShutdown({
       reason: 'sigterm',
-      snapshot: {
-        pid: 1,
-        ppid: 1,
-        orphaned: false,
-        phase: 'running',
-        shutdownReason: 'sigterm',
-        uptimeMs: 100,
-        rssBytes: 1,
-        heapUsedBytes: 1,
-        watcherRunning: false,
-        watchedPath: null,
-        activeOperationCount: 0,
-        activeOperationByCategory: {},
-        debuggerSessionCount: 0,
+      snapshot: createSnapshot({
         simulatorLaunchOsLogSessionCount: 2,
         ownedSimulatorLaunchOsLogSessionCount: 2,
-        videoCaptureSessionCount: 0,
-        swiftPackageProcessCount: 0,
-        matchingMcpProcessCount: 0,
-        matchingMcpPeerSummary: [],
-        anomalies: [],
-      },
+      }),
       server: { close: async () => undefined },
     });
 
@@ -215,28 +278,7 @@ describe('runMcpShutdown', () => {
 
     const result = await runMcpShutdown({
       reason: 'sigterm',
-      snapshot: {
-        pid: 1,
-        ppid: 1,
-        orphaned: false,
-        phase: 'running',
-        shutdownReason: 'sigterm',
-        uptimeMs: 100,
-        rssBytes: 1,
-        heapUsedBytes: 1,
-        watcherRunning: false,
-        watchedPath: null,
-        activeOperationCount: 0,
-        activeOperationByCategory: {},
-        debuggerSessionCount: 1,
-        simulatorLaunchOsLogSessionCount: 0,
-        ownedSimulatorLaunchOsLogSessionCount: 0,
-        videoCaptureSessionCount: 0,
-        swiftPackageProcessCount: 0,
-        matchingMcpProcessCount: 0,
-        matchingMcpPeerSummary: [],
-        anomalies: [],
-      },
+      snapshot: createSnapshot({ debuggerSessionCount: 1 }),
       server: { close: async () => undefined },
     });
 

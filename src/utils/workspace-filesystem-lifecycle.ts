@@ -61,6 +61,7 @@ export interface WorkspaceFilesystemLifecycleOptions {
   daemonCleanup?: {
     socketPath?: string;
     pid?: number;
+    instanceId?: string;
     allowLiveOwner?: boolean;
   };
 }

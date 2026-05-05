@@ -234,22 +234,24 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
   function recordTestCaseResult(
     testCase: ParsedTestCase,
-    source: 'xcodebuild' | 'swift-testing' = 'xcodebuild',
+    source: 'xcodebuild' | 'swift-testing' | 'swift-testing-native' = 'xcodebuild',
   ): void {
     const increment = 1;
     completedCount += increment;
     const durationMs = parseDurationMs(testCase.durationText);
 
     if (testCase.status === 'failed') {
-      failedCount += increment;
       applyFailureDuration(testCase.suiteName, testCase.testName, durationMs);
+      if (source !== 'swift-testing-native') {
+        failedCount += increment;
+      }
     } else if (testCase.status === 'skipped') {
       skippedCount += increment;
     }
 
-    if (source === 'swift-testing') {
+    if (source !== 'xcodebuild') {
       testCasesCompletedSinceSwiftTestingSummary += increment;
-      if (testCase.status === 'failed') {
+      if (source === 'swift-testing' && testCase.status === 'failed') {
         testCasesFailedSinceSwiftTestingSummary += increment;
       }
     }
@@ -265,7 +267,10 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
         ...(durationMs !== undefined ? { durationMs } : {}),
       });
     }
-    emitTestProgress();
+    const suppressProgress = source === 'swift-testing-native' && testCase.status === 'failed';
+    if (!suppressProgress) {
+      emitTestProgress();
+    }
   }
 
   function flushPendingError(): void {
@@ -340,7 +345,7 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     const stResult = parseSwiftTestingResultLine(line);
     if (stResult) {
-      recordTestCaseResult(stResult, 'swift-testing');
+      recordTestCaseResult(stResult, 'swift-testing-native');
       return;
     }
 

@@ -129,7 +129,40 @@ describe('daemon registry', () => {
     expect(existsSync(entry.socketPath)).toBe(true);
   });
 
-  it('cleans up current-owned workspace metadata and socket', () => {
+  it('cleans up current-owned workspace metadata and socket with matching instance identity', () => {
+    const entry = createEntry({ pid: process.pid, instanceId: 'daemon-instance-a' });
+    writeDaemonRegistryEntry(entry);
+    mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
+    writeFileSync(entry.socketPath, 'socket placeholder');
+
+    cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+      pid: process.pid,
+      socketPath: entry.socketPath,
+      instanceId: 'daemon-instance-a',
+      allowLiveOwner: true,
+    });
+
+    expect(readDaemonRegistryEntry(entry.workspaceKey)).toBeNull();
+    expect(existsSync(entry.socketPath)).toBe(false);
+  });
+
+  it('does not clean up live metadata when instance identity is missing', () => {
+    const entry = createEntry({ pid: process.pid, instanceId: 'daemon-instance-a' });
+    writeDaemonRegistryEntry(entry);
+    mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
+    writeFileSync(entry.socketPath, 'socket placeholder');
+
+    cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+      pid: process.pid,
+      socketPath: entry.socketPath,
+      allowLiveOwner: true,
+    });
+
+    expect(readDaemonRegistryEntry(entry.workspaceKey)).toEqual(entry);
+    expect(existsSync(entry.socketPath)).toBe(true);
+  });
+
+  it('does not live-clean legacy metadata without instance identity', () => {
     const entry = createEntry({ pid: process.pid });
     writeDaemonRegistryEntry(entry);
     mkdirSync(path.dirname(entry.socketPath), { recursive: true, mode: 0o700 });
@@ -141,8 +174,8 @@ describe('daemon registry', () => {
       allowLiveOwner: true,
     });
 
-    expect(readDaemonRegistryEntry(entry.workspaceKey)).toBeNull();
-    expect(existsSync(entry.socketPath)).toBe(false);
+    expect(readDaemonRegistryEntry(entry.workspaceKey)).toEqual(entry);
+    expect(existsSync(entry.socketPath)).toBe(true);
   });
 
   it('throws and preserves files while another daemon registry mutation holds the workspace lock', () => {
@@ -214,10 +247,15 @@ describe('daemon registry', () => {
   });
 
   it('does not unlink replacement daemon metadata or socket during old-owner cleanup', () => {
-    const oldEntry = createEntry({ pid: stalePid, startedAt: '2026-05-02T00:00:00.000Z' });
+    const oldEntry = createEntry({
+      pid: stalePid,
+      startedAt: '2026-05-02T00:00:00.000Z',
+      instanceId: 'old-instance',
+    });
     const replacementEntry = createEntry({
       pid: process.pid,
       startedAt: '2026-05-02T00:01:00.000Z',
+      instanceId: 'replacement-instance',
     });
     writeDaemonRegistryEntry(oldEntry);
     writeDaemonRegistryEntry(replacementEntry);
@@ -227,6 +265,7 @@ describe('daemon registry', () => {
     cleanupWorkspaceDaemonFiles(oldEntry.workspaceKey, {
       pid: oldEntry.pid,
       socketPath: oldEntry.socketPath,
+      instanceId: oldEntry.instanceId,
       allowLiveOwner: true,
     });
 

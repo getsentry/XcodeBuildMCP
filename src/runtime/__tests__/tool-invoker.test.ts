@@ -8,7 +8,8 @@ import type { ToolDefinition } from '../types.ts';
 import { createToolCatalog } from '../tool-catalog.ts';
 import { DefaultToolInvoker } from '../tool-invoker.ts';
 import { createRenderSession } from '../../rendering/render.ts';
-import { ensureDaemonRunning } from '../../cli/daemon-control.ts';
+import { DaemonVersionMismatchError } from '../../cli/daemon-client.ts';
+import { ensureDaemonRunning, forceStopDaemon } from '../../cli/daemon-control.ts';
 
 const daemonClientMock = {
   isRunning: vi.fn<() => Promise<boolean>>(),
@@ -117,16 +118,17 @@ function invokeAndFinalize(
     workspaceRoot?: string;
     cliExposedWorkflowIds?: string[];
   },
-) {
+): Promise<ToolResponse> {
   const session = createRenderSession('text');
   const promise = invoker.invoke(toolName, args, { ...opts, renderSession: session });
   return promise.then(() => {
     const text = session.finalize();
-    return {
-      content: text ? [{ type: 'text' as const, text }] : [],
+    const response: ToolResponse = {
+      content: text ? [{ type: 'text', text }] : [],
       isError: session.isError() || undefined,
-      nextSteps: undefined as ToolResponse['nextSteps'],
-    } as ToolResponse;
+      nextSteps: undefined,
+    };
+    return response;
   });
 }
 
@@ -307,6 +309,40 @@ describe('DefaultToolInvoker CLI routing', () => {
     );
     expect(directHandler).not.toHaveBeenCalled();
     expect(response.content[0].text).toContain('daemon-result');
+  });
+
+  it('renders restart failure when force-stopping a protocol-mismatched daemon fails', async () => {
+    daemonClientMock.invokeTool.mockRejectedValueOnce(new DaemonVersionMismatchError('old daemon'));
+    vi.mocked(forceStopDaemon).mockRejectedValueOnce(new Error('registry metadata changed'));
+    const directHandler = emitHandler('direct-result');
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'start-sim-log-cap',
+        workflow: 'logging',
+        stateful: true,
+        handler: directHandler,
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    const response = await invokeAndFinalize(
+      invoker,
+      'start-sim-log-cap',
+      { value: 'hello' },
+      {
+        runtime: 'cli',
+        socketPath: '/tmp/xcodebuildmcp.sock',
+        workspaceRoot: '/repo',
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain(
+      'Daemon restart failed after protocol mismatch: registry metadata changed',
+    );
+    expect(forceStopDaemon).toHaveBeenCalledWith('/tmp/xcodebuildmcp.sock');
+    expect(ensureDaemonRunning).not.toHaveBeenCalled();
+    expect(directHandler).not.toHaveBeenCalled();
   });
 
   it('renders streamed daemon progress without relying on terminal event replay', async () => {
@@ -801,20 +837,22 @@ describe('DefaultToolInvoker next steps post-processing', () => {
 
   it('suppresses failure next steps for structured xcodebuild failures emitted via handler context', async () => {
     const directHandler: ToolDefinition['handler'] = vi.fn(async (_params, ctx) => {
-      ctx.emit({
+      const invocationFragment: DomainFragment = {
         kind: 'build-result',
         fragment: 'invocation',
         operation: 'BUILD',
         request: { scheme: 'MyApp' },
-      } as DomainFragment);
-      ctx.emit({
+      };
+      const diagnosticFragment: DomainFragment = {
         kind: 'build-result',
         fragment: 'compiler-diagnostic',
         operation: 'BUILD',
         severity: 'error',
         message: 'Build failed',
         rawLine: 'Build failed',
-      } as DomainFragment);
+      };
+      ctx.emit(invocationFragment);
+      ctx.emit(diagnosticFragment);
       ctx.structuredOutput = {
         schema: 'xcodebuildmcp.output.build-result',
         schemaVersion: '1',

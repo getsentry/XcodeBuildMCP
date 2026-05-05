@@ -367,8 +367,8 @@ export class DefaultToolInvoker implements ToolInvoker {
     } catch (error) {
       if (error instanceof DaemonVersionMismatchError) {
         log('info', `[infra/tool-invoker] ${context.label} daemon protocol mismatch, restarting`);
-        await forceStopDaemon(socketPath);
         try {
+          await forceStopDaemon(socketPath);
           await ensureDaemonRunning({
             socketPath,
             workspaceRoot: opts.workspaceRoot,
@@ -536,11 +536,11 @@ export class DefaultToolInvoker implements ToolInvoker {
       const ctx: ToolHandlerContext = opts.handlerContext ?? {
         liveProgressEnabled: false,
         streamingFragmentsEnabled: false,
-        emit: (fragment) => {
+        emit: (fragment): void => {
           session.emit(fragment);
           opts.onProgress?.(fragment);
         },
-        attach: (image) => {
+        attach: (image): void => {
           session.attach(image);
         },
       };

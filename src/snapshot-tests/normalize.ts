@@ -44,6 +44,8 @@ const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
+const SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX =
+  /(?:^Running tests \((\d+) completed, (\d+) failures?, (\d+) skipped\)\n){30,}/gm;
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -137,6 +139,20 @@ export function normalizeSnapshotOutput(text: string): string {
   );
 
   normalized = normalized.replace(COVERAGE_CALL_COUNT_REGEX, 'called <N>x)');
+
+  normalized = normalized.replace(
+    SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX,
+    (match: string, completed: string, failed: string, skipped: string) => {
+      if (
+        !match.startsWith('Running tests (0 completed, 0 failures, 0 skipped)\n') ||
+        completed !== '57'
+      ) {
+        return match;
+      }
+
+      return `Running tests (<TEST_PROGRESS>; final: ${completed} completed, ${failed} failed, ${skipped} skipped)\n`;
+    },
+  );
 
   // Normalize final test summary line (counts vary across environments)
   normalized = normalized.replace(

@@ -1,12 +1,16 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { DaemonClient, DaemonVersionMismatchError } from './daemon-client.ts';
 import {
+  acquireDaemonRegistryMutationLock,
   cleanupWorkspaceDaemonFiles,
   findDaemonRegistryEntryBySocketPath,
+  readDaemonRegistryEntry,
+  type DaemonRegistryEntry,
 } from '../daemon/daemon-registry.ts';
+import { isPidAlive } from '../utils/process-liveness.ts';
 
 /**
  * Default timeout for daemon startup in milliseconds.
@@ -17,6 +21,50 @@ export const DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 5000;
  * Default polling interval when waiting for daemon to be ready.
  */
 export const DEFAULT_POLL_INTERVAL_MS = 100;
+
+const FORCE_STOP_SIGNAL_TIMEOUT_MS = 1500;
+const FORCE_STOP_POLL_INTERVAL_MS = 50;
+
+async function waitForPidExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isPidAlive(pid)) {
+      return true;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, FORCE_STOP_POLL_INTERVAL_MS));
+  }
+  return !isPidAlive(pid);
+}
+
+function validateCurrentRegistryEntry(
+  expectedEntry: DaemonRegistryEntry,
+  currentEntry: DaemonRegistryEntry | null,
+  socketPath: string,
+): void {
+  const matchesExpectedEntry =
+    currentEntry !== null &&
+    currentEntry.workspaceKey === expectedEntry.workspaceKey &&
+    currentEntry.socketPath === expectedEntry.socketPath &&
+    currentEntry.pid === expectedEntry.pid &&
+    currentEntry.instanceId === expectedEntry.instanceId;
+
+  if (!matchesExpectedEntry) {
+    throw new Error(`Cannot force-stop daemon at ${socketPath}: daemon registry metadata changed`);
+  }
+}
+
+function signalDaemonPid(pid: number, signal: NodeJS.Signals): boolean {
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+      return false;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to send ${signal} to daemon PID ${pid}: ${message}`);
+  }
+}
 
 /**
  * Get the path to the daemon executable.
@@ -36,35 +84,40 @@ export function getDaemonExecutablePath(): string {
 
 /**
  * Force-stop a daemon that cannot be stopped gracefully (e.g. protocol version mismatch).
- * Derives the workspace key from the socket path, reads the registry for the PID,
- * sends SIGTERM, and removes the stale socket.
+ * Uses registry ownership metadata to stop the process before unregistering daemon files.
  */
 export async function forceStopDaemon(socketPath: string): Promise<void> {
   const entry = findDaemonRegistryEntryBySocketPath(socketPath);
-  if (entry?.pid) {
-    try {
-      process.kill(entry.pid, 'SIGTERM');
-    } catch {
-      // Process may already be gone.
-    }
-    // Brief wait for the process to exit.
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  if (!entry) {
+    throw new Error(
+      `Cannot force-stop daemon at ${socketPath}: daemon registry metadata is missing`,
+    );
   }
-  if (entry) {
-    cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
-      pid: entry.pid,
-      socketPath,
-      allowLiveOwner: true,
-    });
-  } else {
-    // Registry entry missing; cannot derive workspace key from socket path alone.
-    // Clean up the socket file directly.
-    try {
-      unlinkSync(socketPath);
-    } catch {
-      // Socket may already be gone.
+
+  const lock = acquireDaemonRegistryMutationLock(entry.workspaceKey);
+  if (!lock) {
+    throw new Error(`Unable to acquire daemon registry lock for ${entry.workspaceKey}`);
+  }
+
+  let termSent: boolean;
+  try {
+    validateCurrentRegistryEntry(entry, readDaemonRegistryEntry(entry.workspaceKey), socketPath);
+    termSent = signalDaemonPid(entry.pid, 'SIGTERM');
+  } finally {
+    lock.release();
+  }
+  if (termSent && !(await waitForPidExit(entry.pid, FORCE_STOP_SIGNAL_TIMEOUT_MS))) {
+    const killSent = signalDaemonPid(entry.pid, 'SIGKILL');
+    if (killSent && !(await waitForPidExit(entry.pid, FORCE_STOP_SIGNAL_TIMEOUT_MS))) {
+      throw new Error(`Daemon PID ${entry.pid} did not exit after SIGKILL`);
     }
   }
+
+  cleanupWorkspaceDaemonFiles(entry.workspaceKey, {
+    pid: entry.pid,
+    socketPath,
+    instanceId: entry.instanceId,
+  });
 }
 
 export interface StartDaemonBackgroundOptions {

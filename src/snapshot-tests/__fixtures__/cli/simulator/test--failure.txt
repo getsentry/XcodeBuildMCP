@@ -16,64 +16,7 @@ Discovered 57 test(s):
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testComplexCalculation
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay
    (...and 51 more)
-Running tests (0 completed, 0 failures, 0 skipped)
-Running tests (1 completed, 0 failures, 0 skipped)
-Running tests (2 completed, 0 failures, 0 skipped)
-Running tests (3 completed, 0 failures, 0 skipped)
-Running tests (4 completed, 0 failures, 0 skipped)
-Running tests (5 completed, 0 failures, 0 skipped)
-Running tests (6 completed, 0 failures, 0 skipped)
-Running tests (7 completed, 0 failures, 0 skipped)
-Running tests (8 completed, 0 failures, 0 skipped)
-Running tests (9 completed, 0 failures, 0 skipped)
-Running tests (10 completed, 0 failures, 0 skipped)
-Running tests (11 completed, 0 failures, 0 skipped)
-Running tests (12 completed, 0 failures, 0 skipped)
-Running tests (13 completed, 0 failures, 0 skipped)
-Running tests (14 completed, 0 failures, 0 skipped)
-Running tests (15 completed, 0 failures, 0 skipped)
-Running tests (16 completed, 0 failures, 0 skipped)
-Running tests (17 completed, 0 failures, 0 skipped)
-Running tests (18 completed, 0 failures, 0 skipped)
-Running tests (19 completed, 0 failures, 0 skipped)
-Running tests (20 completed, 0 failures, 0 skipped)
-Running tests (21 completed, 0 failures, 0 skipped)
-Running tests (22 completed, 0 failures, 0 skipped)
-Running tests (23 completed, 0 failures, 0 skipped)
-Running tests (24 completed, 0 failures, 0 skipped)
-Running tests (25 completed, 0 failures, 0 skipped)
-Running tests (26 completed, 0 failures, 0 skipped)
-Running tests (27 completed, 0 failures, 0 skipped)
-Running tests (28 completed, 0 failures, 0 skipped)
-Running tests (29 completed, 0 failures, 0 skipped)
-Running tests (30 completed, 0 failures, 0 skipped)
-Running tests (31 completed, 0 failures, 0 skipped)
-Running tests (32 completed, 0 failures, 0 skipped)
-Running tests (33 completed, 0 failures, 0 skipped)
-Running tests (34 completed, 1 failure, 0 skipped)
-Running tests (35 completed, 1 failure, 0 skipped)
-Running tests (36 completed, 1 failure, 0 skipped)
-Running tests (37 completed, 1 failure, 0 skipped)
-Running tests (38 completed, 1 failure, 0 skipped)
-Running tests (39 completed, 1 failure, 0 skipped)
-Running tests (40 completed, 1 failure, 0 skipped)
-Running tests (41 completed, 1 failure, 0 skipped)
-Running tests (42 completed, 1 failure, 0 skipped)
-Running tests (43 completed, 2 failures, 0 skipped)
-Running tests (44 completed, 2 failures, 0 skipped)
-Running tests (45 completed, 2 failures, 0 skipped)
-Running tests (46 completed, 2 failures, 0 skipped)
-Running tests (47 completed, 2 failures, 0 skipped)
-Running tests (48 completed, 2 failures, 0 skipped)
-Running tests (49 completed, 2 failures, 0 skipped)
-Running tests (50 completed, 2 failures, 0 skipped)
-Running tests (51 completed, 2 failures, 0 skipped)
-Running tests (52 completed, 2 failures, 0 skipped)
-Running tests (53 completed, 2 failures, 0 skipped)
-Running tests (54 completed, 2 failures, 0 skipped)
-Running tests (55 completed, 2 failures, 0 skipped)
-Running tests (56 completed, 2 failures, 0 skipped)
-Running tests (57 completed, 3 failures, 0 skipped)
+Running tests (<TEST_PROGRESS>; final: 57 completed, 3 failed, 0 skipped)
 
 (Unknown Suite)
   ✗ This test should fail to verify error reporting:
@@ -91,11 +34,6 @@ IntentionalFailureTests
   ✗ test:
       - XCTAssertTrue failed - This test should fail to verify error reporting
         example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286
-
-Calculator Basic Functionality
-  ✗ This test should fail to verify error reporting:
-    - CalculatorServiceTests.swift:37: Expectation failed: (calculator.display → "0") == "999": // This test is designed to fail to test error reporting
-This should fail - display should be 0, not 999
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log

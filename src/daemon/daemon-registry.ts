@@ -71,11 +71,13 @@ export interface DaemonRegistryEntry {
   startedAt: string;
   enabledWorkflows: string[];
   version: string;
+  instanceId?: string;
 }
 
 export interface DaemonFileCleanupOptions {
   socketPath?: string;
   pid?: number;
+  instanceId?: string;
   allowLiveOwner?: boolean;
 }
 
@@ -101,7 +103,9 @@ function isDaemonRegistryEntry(value: unknown): value is DaemonRegistryEntry {
     typeof entry.startedAt === 'string' &&
     Array.isArray(entry.enabledWorkflows) &&
     entry.enabledWorkflows.every((workflow) => typeof workflow === 'string') &&
-    typeof entry.version === 'string'
+    typeof entry.version === 'string' &&
+    (entry.instanceId === undefined ||
+      (typeof entry.instanceId === 'string' && entry.instanceId.length > 0))
   );
 }
 
@@ -209,14 +213,17 @@ function canRemoveRegistryEntry(
     return false;
   }
 
-  if (options?.allowLiveOwner === true) {
-    if (options.pid === undefined) {
-      return false;
-    }
-    return entry.pid === options.pid;
+  if (!isPidAlive(entry.pid)) {
+    return true;
   }
 
-  return !isPidAlive(entry.pid);
+  if (options?.allowLiveOwner !== true) {
+    return false;
+  }
+  if (options.pid === undefined || entry.pid !== options.pid) {
+    return false;
+  }
+  return entry.instanceId !== undefined && options.instanceId === entry.instanceId;
 }
 
 function removeRegistryAtPathIfOwned(

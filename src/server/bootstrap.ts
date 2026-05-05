@@ -27,6 +27,27 @@ export interface BootstrapResult {
   runDeferredInitialization: (options?: { isShutdownRequested?: () => boolean }) => Promise<void>;
 }
 
+function runStartupFilesystemLifecycleSweep(workspaceKey: string): Promise<void> {
+  return runWorkspaceFilesystemLifecycleSweep({
+    workspaceKey,
+    trigger: 'startup',
+  })
+    .then((lifecycle) => {
+      if (lifecycle.stopped > 0 || lifecycle.deleted > 0 || lifecycle.errors.length > 0) {
+        log(
+          lifecycle.errors.length > 0 ? 'warn' : 'info',
+          `[startup] Filesystem lifecycle: ${JSON.stringify(lifecycle)}`,
+        );
+      }
+    })
+    .catch((error) => {
+      log(
+        'warn',
+        `[startup] Filesystem lifecycle failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+}
+
 export async function bootstrapServer(
   server: McpServer,
   options: BootstrapOptions = {},
@@ -74,24 +95,6 @@ export async function bootstrapServer(
   const enabledWorkflows = result.runtime.config.enabledWorkflows;
   const { workspaceRoot, workspaceKey } = result;
 
-  try {
-    const lifecycle = await runWorkspaceFilesystemLifecycleSweep({
-      workspaceKey,
-      trigger: 'startup',
-    });
-    if (lifecycle.stopped > 0 || lifecycle.deleted > 0 || lifecycle.errors.length > 0) {
-      log(
-        lifecycle.errors.length > 0 ? 'warn' : 'info',
-        `[startup] Filesystem lifecycle: ${JSON.stringify(lifecycle)}`,
-      );
-    }
-  } catch (error) {
-    log(
-      'warn',
-      `[startup] Filesystem lifecycle failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
   log('info', `🚀 Initializing server...`);
 
   const executor = getDefaultCommandExecutor();
@@ -122,6 +125,8 @@ export async function bootstrapServer(
     runDeferredInitialization: async (options = {}): Promise<void> => {
       const deferredProfiler = createStartupProfiler('bootstrap-deferred');
       const isShutdownRequested = options.isShutdownRequested;
+
+      void runStartupFilesystemLifecycleSweep(workspaceKey);
 
       if (!xcodeDetection.runningUnderXcode) {
         return;

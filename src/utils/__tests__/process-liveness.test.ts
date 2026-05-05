@@ -15,7 +15,18 @@ describe('isPidAlive', () => {
     expect(kill).not.toHaveBeenCalled();
   });
 
-  it('treats missing or inaccessible pids as not alive for cleanup ownership checks', () => {
+  it('returns false when signal zero reports the pid is missing', () => {
+    const kill = vi.spyOn(process, 'kill');
+    kill.mockImplementation((() => {
+      const error = new Error('no such process') as NodeJS.ErrnoException;
+      error.code = 'ESRCH';
+      throw error;
+    }) as typeof process.kill);
+
+    expect(isPidAlive(123)).toBe(false);
+  });
+
+  it('returns true when signal zero reports permission denied', () => {
     const kill = vi.spyOn(process, 'kill');
     kill.mockImplementation((() => {
       const error = new Error('permission denied') as NodeJS.ErrnoException;
@@ -23,7 +34,7 @@ describe('isPidAlive', () => {
       throw error;
     }) as typeof process.kill);
 
-    expect(isPidAlive(123)).toBe(false);
+    expect(isPidAlive(123)).toBe(true);
   });
 
   it('returns true when signal zero succeeds', () => {

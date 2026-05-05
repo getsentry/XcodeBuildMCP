@@ -17,7 +17,7 @@ Discovered 57 test(s):
    CalculatorAppFeatureTests/CalculatorIntegrationTests/testExpressionDisplay
    (...and 51 more)
 
-Test Failures (4):
+Test Failures (3):
 
   ✗ (Unknown Suite) / This test should fail to verify error reporting: Expectation failed: (calculator.display → "0") == "999"
     // This test is designed to fail to test error reporting
@@ -29,9 +29,6 @@ Test Failures (4):
 
   ✗ IntentionalFailureTests / test: XCTAssertTrue failed - This test should fail to verify error reporting
     <ROOT>/example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286
-
-  ✗ Calculator Basic Functionality / This test should fail to verify error reporting: CalculatorServiceTests.swift:37: Expectation failed: (calculator.display → "0") == "999": // This test is designed to fail to test error reporting
-    This should fail - display should be 0, not 999
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log

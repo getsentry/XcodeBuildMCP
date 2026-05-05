@@ -34,6 +34,7 @@ export interface DaemonServerContext {
   catalog: ToolCatalog;
   workspaceRoot: string;
   workspaceKey: string;
+  instanceId?: string;
   xcodeIdeWorkflowEnabled: boolean;
   /** Callback to request graceful shutdown (used instead of direct process.exit) */
   requestShutdown: () => void;
@@ -113,6 +114,7 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                 toolCount: ctx.catalog.tools.length,
                 workspaceRoot: ctx.workspaceRoot,
                 workspaceKey: ctx.workspaceKey,
+                instanceId: ctx.instanceId,
               };
               return writeFrame(socket, { ...base, result });
             }

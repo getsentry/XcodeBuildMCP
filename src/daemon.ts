@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { dirname } from 'node:path';
 import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
@@ -123,6 +124,7 @@ async function main(): Promise<void> {
   });
 
   const { workspaceRoot, workspaceKey } = result;
+  const daemonInstanceId = randomUUID();
 
   const logPath = resolveDaemonLogPath(workspaceKey);
   if (logPath) {
@@ -322,13 +324,14 @@ async function main(): Promise<void> {
       recordDaemonLifecycleMetric('shutdown');
       log('info', '[Daemon] Shutting down...');
 
-      const cleanupArtifacts = (): Promise<unknown> =>
+      const cleanupArtifacts = (): ReturnType<typeof cleanupOwnedWorkspaceFilesystemArtifacts> =>
         cleanupOwnedWorkspaceFilesystemArtifacts({
           workspaceKey,
           trigger: 'shutdown',
           daemonCleanup: {
             pid: process.pid,
             socketPath,
+            instanceId: daemonInstanceId,
             allowLiveOwner: true,
           },
         });
@@ -344,12 +347,27 @@ async function main(): Promise<void> {
           clearTimeout(forcedShutdownTimer);
           forcedShutdownTimer = null;
         }
-        void cleanupArtifacts().finally(() => {
-          log('info', '[Daemon] Cleanup complete');
-          void flushAndCloseSentry(flushTimeoutMs).finally(() => {
-            process.exit(finalExitCode);
+        void cleanupArtifacts()
+          .then(
+            (result) => {
+              if (result.errors.length > 0) {
+                log('error', `[Daemon] Cleanup failed: ${result.errors.join('; ')}`, {
+                  sentry: true,
+                });
+                return;
+              }
+              log('info', '[Daemon] Cleanup complete');
+            },
+            (error) => {
+              const message = error instanceof Error ? error.message : String(error);
+              log('error', `[Daemon] Cleanup failed: ${message}`, { sentry: true });
+            },
+          )
+          .finally(() => {
+            void flushAndCloseSentry(flushTimeoutMs).finally(() => {
+              process.exit(finalExitCode);
+            });
           });
-        });
       };
 
       forcedShutdownTimer = setTimeout(() => {
@@ -377,6 +395,7 @@ async function main(): Promise<void> {
       catalog,
       workspaceRoot,
       workspaceKey,
+      instanceId: daemonInstanceId,
       xcodeIdeWorkflowEnabled,
       requestShutdown: shutdown,
       onRequestStarted: () => {
@@ -449,6 +468,7 @@ async function main(): Promise<void> {
             startedAt,
             enabledWorkflows: daemonWorkflows,
             version: String(version),
+            instanceId: daemonInstanceId,
           },
           { lock: startupRegistryLock },
         );
