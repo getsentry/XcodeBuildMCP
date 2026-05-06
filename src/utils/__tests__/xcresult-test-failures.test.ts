@@ -27,6 +27,11 @@ describe('parseXcresultTestSummaryCounts', () => {
       skipped: 0,
     });
   });
+
+  it('returns null for malformed JSON summary output', () => {
+    expect(parseXcresultTestSummaryCounts('warning: no summary available')).toBeNull();
+    expect(parseXcresultTestSummaryCounts('')).toBeNull();
+  });
 });
 
 describe('parseXcresultFailureMessage', () => {

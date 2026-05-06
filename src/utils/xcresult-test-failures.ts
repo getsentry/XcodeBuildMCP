@@ -27,7 +27,17 @@ function isSummaryCount(value: unknown): value is number {
 }
 
 export function parseXcresultTestSummaryCounts(raw: string): Counts | null {
-  const summary = JSON.parse(raw) as XcresultTestSummary;
+  let summary: XcresultTestSummary;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    summary = parsed as XcresultTestSummary;
+  } catch {
+    return null;
+  }
+
   const { passedTests, failedTests, skippedTests } = summary;
 
   if (
