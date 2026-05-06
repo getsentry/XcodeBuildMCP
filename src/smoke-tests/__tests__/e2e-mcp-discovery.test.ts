@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { z } from 'zod';
 import { createMcpTestHarness, type McpTestHarness } from '../mcp-test-harness.ts';
 import { loadManifest } from '../../core/manifest/load-manifest.ts';
-import { getMcpOutputSchema } from '../../core/structured-output-schema.ts';
+import { getMcpOutputSchemaForRegistration } from '../../core/structured-output-schema.ts';
 
 let harness: McpTestHarness;
 
@@ -11,6 +12,26 @@ const COMMON_DEFS_REF =
 function expectSelfContainedOutputSchema(outputSchema: unknown): void {
   expect(outputSchema).toBeDefined();
   expect(JSON.stringify(outputSchema)).not.toContain(COMMON_DEFS_REF);
+}
+
+function expectedRegistrationSchema(schema: string, version = '1'): unknown {
+  return z.toJSONSchema(getMcpOutputSchemaForRegistration({ schema, version }));
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => {
+        const record = value as Record<string, unknown>;
+        return `${JSON.stringify(key)}:${stableStringify(record[key])}`;
+      })
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 beforeAll(async () => {
@@ -69,11 +90,14 @@ describe('MCP Discovery (e2e)', () => {
       const tool = result.tools.find((candidate) => candidate.name === toolName);
       expect(tool).toBeDefined();
       expectSelfContainedOutputSchema(tool!.outputSchema);
-      expect(tool!.outputSchema).toEqual(getMcpOutputSchema({ schema: schemaName, version: '1' }));
+      expect(tool!.outputSchema).toEqual(expectedRegistrationSchema(schemaName));
     }
 
     const listSims = result.tools.find((tool) => tool.name === 'list_sims');
-    expect(listSims?.outputSchema?.$defs).toBeDefined();
+    const listSimsOutputSchema = listSims?.outputSchema as
+      | { oneOf?: Array<{ $defs?: unknown }> }
+      | undefined;
+    expect(listSimsOutputSchema?.oneOf?.[0]?.$defs).toBeDefined();
   });
 
   it('every registered manifest tool with output metadata advertises an output schema', async () => {
@@ -98,10 +122,12 @@ describe('MCP Discovery (e2e)', () => {
         failures.push(`${tool.names.mcp}: outputSchema contains external common refs`);
       }
       if (
-        registeredTool.outputSchema.$id !==
-        `https://xcodebuildmcp.com/schemas/structured-output/${tool.outputSchema.schema}/${tool.outputSchema.version}.schema.json`
+        stableStringify(registeredTool.outputSchema) !==
+        stableStringify(
+          expectedRegistrationSchema(tool.outputSchema.schema, tool.outputSchema.version),
+        )
       ) {
-        failures.push(`${tool.names.mcp}: outputSchema $id mismatch`);
+        failures.push(`${tool.names.mcp}: outputSchema mismatch`);
       }
     }
 

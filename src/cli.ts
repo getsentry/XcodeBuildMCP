@@ -32,6 +32,23 @@ function findTopLevelCommand(argv: string[]): string | undefined {
   return undefined;
 }
 
+function findGlobalSocketOverride(argv: string[]): string | undefined {
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === '--socket') {
+      const value = argv[index + 1];
+      return value && !value.startsWith('-') ? value : undefined;
+    }
+
+    if (token.startsWith('--socket=')) {
+      const value = token.slice('--socket='.length);
+      return value || undefined;
+    }
+  }
+
+  return undefined;
+}
+
 async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yargs').default>> {
   const yargs = (await import('yargs')).default;
   const { hideBin } = await import('yargs/helpers');
@@ -120,10 +137,12 @@ async function main(): Promise<void> {
 
   const { workspaceRoot, workspaceKey } = result;
 
-  const defaultSocketPath = getSocketPath({
-    cwd: result.runtime.cwd,
-    projectConfigPath: result.configPath,
-  });
+  const socketPath =
+    findGlobalSocketOverride(process.argv.slice(2)) ??
+    getSocketPath({
+      cwd: result.runtime.cwd,
+      projectConfigPath: result.configPath,
+    });
 
   const cliExposedWorkflowIds = await listCliWorkflowIdsFromManifest({
     excludeWorkflows: ['session-management', 'workflow-discovery'],
@@ -133,7 +152,7 @@ async function main(): Promise<void> {
 
   // CLI uses a manifest-resolved catalog plus daemon-backed xcode-ide dynamic tools.
   const catalog = await buildCliToolCatalog({
-    socketPath: defaultSocketPath,
+    socketPath,
     workspaceRoot,
     cliExposedWorkflowIds,
     discoveryMode,
@@ -142,7 +161,7 @@ async function main(): Promise<void> {
   const yargsApp = buildYargsApp({
     catalog,
     runtimeConfig: result.runtime.config,
-    defaultSocketPath,
+    defaultSocketPath: socketPath,
     workspaceRoot,
     workspaceKey,
     workflowNames: cliExposedWorkflowIds,

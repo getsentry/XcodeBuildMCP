@@ -16,7 +16,9 @@ const schemaObject = z.object({
   refresh: z
     .boolean()
     .optional()
-    .describe('When true (default), refreshes from Xcode bridge before returning tool list.'),
+    .describe(
+      'When true, forces a refresh from Xcode bridge. When omitted, uses cached tools if available and refreshes only when the cache is empty.',
+    ),
 });
 
 type Params = z.infer<typeof schemaObject>;
@@ -41,6 +43,7 @@ export async function xcodeIdeListToolsLogic(params: Params): Promise<void> {
     executionContext,
     result,
     'xcodebuildmcp.output.xcode-bridge-tool-list',
+    '2',
   );
 }
 

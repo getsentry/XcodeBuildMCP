@@ -42,7 +42,7 @@ export class XcodeToolsBridgeClient {
   constructor(options: XcodeToolsBridgeClientOptions = {}) {
     this.options = {
       connectTimeoutMs: options.connectTimeoutMs ?? 15_000,
-      listToolsTimeoutMs: options.listToolsTimeoutMs ?? 15_000,
+      listToolsTimeoutMs: options.listToolsTimeoutMs ?? 60_000,
       callToolTimeoutMs: options.callToolTimeoutMs ?? 60_000,
       ...options,
     };

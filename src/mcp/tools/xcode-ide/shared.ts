@@ -16,8 +16,6 @@ import { getXcodeToolsBridgeToolHandler } from '../../../integrations/xcode-tool
 import type { ImageAttachment, ToolHandlerContext } from '../../../rendering/types.ts';
 
 export class BridgeToolExecutionContext {
-  readonly liveProgressEnabled = false;
-
   private nextStepParams?: NextStepParamsMap;
   private readonly bridgeImages: ImageAttachment[] = [];
 
@@ -75,11 +73,12 @@ export function finalizeBridgeToolExecution(
   executionContext: BridgeToolExecutionContext,
   result: ToolDomainResult,
   schema: string,
+  schemaVersion = '1',
 ): void {
   ctx.structuredOutput = {
     result,
     schema,
-    schemaVersion: '1',
+    schemaVersion,
   };
 
   for (const image of executionContext.getBridgeImages()) {
@@ -133,7 +132,7 @@ export function toBridgeToolListDomainResult(
       ? (bridgeResult.errorMessage ?? 'Failed to list bridge tools')
       : null,
     toolCount: payload?.toolCount ?? 0,
-    tools: payload?.tools ?? [],
+    ...(payload?.artifacts ? { artifacts: payload.artifacts } : {}),
   };
 }
 
@@ -152,9 +151,7 @@ export function toBridgeCallResultDomainResult(
       : null,
     succeeded: payload?.succeeded ?? !Boolean(bridgeResult.isError),
     content: payload?.content ?? [],
-    ...(payload?.structuredContent !== undefined
-      ? { structuredContent: payload.structuredContent }
-      : {}),
+    ...(payload?.artifacts ? { artifacts: payload.artifacts } : {}),
   };
 }
 

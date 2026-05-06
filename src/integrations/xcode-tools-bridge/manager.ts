@@ -1,7 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { log } from '../../utils/logger.ts';
+import { writeBridgeToolListResponseArtifact } from './bridge-response-artifact.ts';
 import {
-  callToolResultToBridgeResult,
+  callToolResultToBridgeResultWithArtifact,
   type BridgeToolPayload,
   type BridgeToolResult,
 } from './bridge-tool-result.ts';
@@ -173,18 +174,23 @@ export class XcodeToolsBridgeManager {
       return this.createBridgeFailureResult(
         'XCODE_MCP_UNAVAILABLE',
         'xcode-ide workflow is not enabled',
-        { kind: 'tool-list', toolCount: 0, tools: [] },
+        { kind: 'tool-list', toolCount: 0 },
       );
     }
 
     try {
-      const tools = await this.service.listTools({ refresh: params.refresh !== false });
-      const payload = {
-        toolCount: tools.length,
-        tools: tools.map(serializeBridgeTool),
-      };
+      const tools = await this.service.listTools({ refresh: params.refresh });
+      const serializedTools = tools.map(serializeBridgeTool);
+      const artifact = await writeBridgeToolListResponseArtifact({
+        ...(params.refresh !== undefined ? { refresh: params.refresh } : {}),
+        tools: serializedTools,
+      });
       return {
-        payload: { kind: 'tool-list', ...payload },
+        payload: {
+          kind: 'tool-list',
+          toolCount: serializedTools.length,
+          artifacts: { rawResponseJsonPath: artifact.path },
+        },
       };
     } catch (error) {
       return this.createBridgeFailureResult(
@@ -192,7 +198,7 @@ export class XcodeToolsBridgeManager {
           connected: this.service.getClientStatus().connected,
         }),
         error,
-        { kind: 'tool-list', toolCount: 0, tools: [] },
+        { kind: 'tool-list', toolCount: 0 },
       );
     }
   }
@@ -214,7 +220,11 @@ export class XcodeToolsBridgeManager {
       const response = await this.service.invokeTool(params.remoteTool, params.arguments, {
         timeoutMs: params.timeoutMs,
       });
-      return callToolResultToBridgeResult(response);
+      return await callToolResultToBridgeResultWithArtifact(response, {
+        remoteTool: params.remoteTool,
+        arguments: params.arguments,
+        ...(params.timeoutMs !== undefined ? { timeoutMs: params.timeoutMs } : {}),
+      });
     } catch (error) {
       return this.createBridgeFailureResult(
         classifyBridgeError(error, 'call', {

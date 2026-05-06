@@ -1,9 +1,8 @@
 import net from 'node:net';
 import { writeFrame, createFrameReader } from './framing.ts';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolCatalog } from '../runtime/types.ts';
-import type { ToolResponse } from '../types/common.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';
-import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
 import type {
   DaemonRequest,
   DaemonResponse,
@@ -24,7 +23,12 @@ import type { ToolHandlerContext } from '../rendering/types.ts';
 
 import { log } from '../utils/logger.ts';
 import { XcodeIdeToolService } from '../integrations/xcode-tools-bridge/tool-service.ts';
+import {
+  callToolResultToBridgeResultWithArtifact,
+  type BridgeToolResult,
+} from '../integrations/xcode-tools-bridge/bridge-tool-result.ts';
 import { toLocalToolName } from '../integrations/xcode-tools-bridge/registry.ts';
+import { toBridgeCallResultDomainResult } from '../mcp/tools/xcode-ide/shared.ts';
 
 export interface DaemonServerContext {
   socketPath: string;
@@ -44,25 +48,44 @@ export interface DaemonServerContext {
   onRequestFinished?: () => void;
 }
 
-function toolResponseToDaemonResult(response: ToolResponse): DaemonToolResult {
-  const fragments: AnyFragment[] = [];
-  for (const item of response.content) {
-    if (item.type === 'text' && item.text) {
-      const statusFragment: RuntimeStatusFragment = {
-        kind: 'infrastructure',
-        fragment: 'status',
-        level: response.isError ? 'error' : 'success',
-        message: item.text,
-      };
-      fragments.push(statusFragment);
-    }
-  }
+function bridgeResultToDaemonResult(
+  remoteTool: string,
+  bridgeResult: BridgeToolResult,
+): DaemonToolResult {
+  const result = toBridgeCallResultDomainResult(bridgeResult, remoteTool);
   return {
-    ...(fragments.length > 0 ? { fragments } : {}),
-    isError: response.isError === true,
-    nextStepParams: response.nextStepParams,
-    nextSteps: response.nextSteps,
+    structuredOutput: {
+      schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+      schemaVersion: '2',
+      result,
+    },
+    isError: result.didError,
+    nextStepParams: bridgeResult.nextStepParams,
   };
+}
+
+async function toolResponseToDaemonResult(
+  remoteTool: string,
+  response: CallToolResult,
+  args: Record<string, unknown>,
+): Promise<DaemonToolResult> {
+  return bridgeResultToDaemonResult(
+    remoteTool,
+    await callToolResultToBridgeResultWithArtifact(response, { remoteTool, arguments: args }),
+  );
+}
+
+function toolErrorToDaemonResult(remoteTool: string, error: unknown): DaemonToolResult {
+  const message = error instanceof Error ? error.message : String(error);
+  return bridgeResultToDaemonResult(remoteTool, {
+    isError: true,
+    errorMessage: message,
+    payload: {
+      kind: 'call-result',
+      succeeded: false,
+      content: [{ type: 'text', text: message }],
+    },
+  });
 }
 
 /**
@@ -180,8 +203,6 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
               };
 
               const handlerContext: ToolHandlerContext = {
-                liveProgressEnabled: false,
-                streamingFragmentsEnabled: true,
                 emit: (fragment) => {
                   streamFragment(fragment);
                 },
@@ -219,8 +240,8 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
               }
 
               const params = (req.params ?? {}) as XcodeIdeListParams;
-              const refresh = params.refresh === true;
-              if (params.prefetch === true && !refresh) {
+              const refresh = params.refresh;
+              if (params.prefetch === true && refresh !== true) {
                 void xcodeIdeService.listTools({ refresh: true }).catch((error) => {
                   const message = error instanceof Error ? error.message : String(error);
                   log('debug', `[Daemon] xcode-ide prefetch failed: ${message}`);
@@ -264,11 +285,21 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                 });
               }
 
-              const response = await xcodeIdeService.invokeTool(
-                params.remoteTool,
-                params.args ?? {},
-              );
-              const xcodeResult = toolResponseToDaemonResult(response as ToolResponse);
+              let xcodeResult: DaemonToolResult;
+              try {
+                const response = await xcodeIdeService.invokeTool(
+                  params.remoteTool,
+                  params.args ?? {},
+                );
+                xcodeResult = await toolResponseToDaemonResult(
+                  params.remoteTool,
+                  response,
+                  params.args ?? {},
+                );
+              } catch (error) {
+                xcodeResult = toolErrorToDaemonResult(params.remoteTool, error);
+              }
+
               const result: XcodeIdeInvokeResult = { result: xcodeResult };
               return writeFrame(socket, { ...base, result });
             }

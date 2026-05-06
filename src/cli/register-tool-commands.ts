@@ -18,6 +18,11 @@ import {
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
+import {
+  createStructuredErrorOutput,
+  STRUCTURED_ERROR_SCHEMA,
+  STRUCTURED_ERROR_SCHEMA_VERSION,
+} from '../utils/structured-error.ts';
 import { toCliJsonlEvent } from './jsonl-event.ts';
 
 export interface RegisterToolCommandsOptions {
@@ -73,11 +78,9 @@ function setEnvScoped(key: string, value: string): () => void {
 
 function createBufferedHandlerContext(
   session: ReturnType<typeof createRenderSession>,
-  opts: { liveProgressEnabled: boolean; onProgress?: (fragment: AnyFragment) => void },
+  opts: { onProgress?: (fragment: AnyFragment) => void },
 ): ToolHandlerContext {
   return {
-    liveProgressEnabled: opts.liveProgressEnabled,
-    streamingFragmentsEnabled: opts.liveProgressEnabled,
     emit: (fragment) => {
       session.emit(fragment);
       opts?.onProgress?.(fragment);
@@ -88,9 +91,6 @@ function createBufferedHandlerContext(
   };
 }
 
-const JSON_ERROR_SCHEMA = 'xcodebuildmcp.output.error';
-const JSON_ERROR_SCHEMA_VERSION = '1';
-
 function writeJsonOutput(handlerContext: ToolHandlerContext): boolean {
   const structuredOutput = handlerContext.structuredOutput;
 
@@ -100,13 +100,15 @@ function writeJsonOutput(handlerContext: ToolHandlerContext): boolean {
         structuredOutput.schema,
         structuredOutput.schemaVersion,
       )
-    : {
-        schema: JSON_ERROR_SCHEMA,
-        schemaVersion: JSON_ERROR_SCHEMA_VERSION,
-        didError: true,
-        error: 'Tool did not produce structured output for --output json',
-        data: null,
-      };
+    : toStructuredEnvelope(
+        createStructuredErrorOutput({
+          category: 'runtime',
+          code: 'STRUCTURED_OUTPUT_MISSING',
+          message: 'Tool did not produce structured output for --output json',
+        }).result,
+        STRUCTURED_ERROR_SCHEMA,
+        STRUCTURED_ERROR_SCHEMA_VERSION,
+      );
 
   process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
   return envelope.didError;
@@ -269,12 +271,6 @@ function registerToolSubcommand(
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
 
-      if (tool.workflow === 'xcode-ide' && (outputFormat === 'json' || outputFormat === 'jsonl')) {
-        console.error(`Error: --output ${outputFormat} is not supported for xcode-ide tools yet`);
-        process.exitCode = 1;
-        return;
-      }
-
       if (
         profileOverride &&
         !isKnownCliSessionDefaultsProfile(opts.runtimeConfig, profileOverride)
@@ -359,7 +355,6 @@ function registerToolSubcommand(
               }
             : undefined;
         const handlerContext = createBufferedHandlerContext(session, {
-          liveProgressEnabled: outputFormat === 'text' || outputFormat === 'jsonl',
           onProgress: writeJsonlFragment,
         });
 

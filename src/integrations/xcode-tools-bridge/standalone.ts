@@ -1,4 +1,8 @@
-import { callToolResultToBridgeResult, type BridgeToolResult } from './bridge-tool-result.ts';
+import { writeBridgeToolListResponseArtifact } from './bridge-response-artifact.ts';
+import {
+  callToolResultToBridgeResultWithArtifact,
+  type BridgeToolResult,
+} from './bridge-tool-result.ts';
 import {
   buildXcodeToolsBridgeStatus,
   classifyBridgeError,
@@ -21,8 +25,8 @@ export class StandaloneXcodeToolsBridge {
 
   async getStatus(): Promise<XcodeToolsBridgeStatus> {
     return buildXcodeToolsBridgeStatus({
-      workflowEnabled: false,
-      proxiedToolCount: 0,
+      workflowEnabled: this.service.isWorkflowEnabled(),
+      proxiedToolCount: this.service.getCachedTools().length,
       lastError: this.service.getLastError(),
       clientStatus: this.service.getClientStatus(),
     });
@@ -61,8 +65,6 @@ export class StandaloneXcodeToolsBridge {
           ...(status ? { status } : {}),
         },
       };
-    } finally {
-      await this.service.disconnect();
     }
   }
 
@@ -86,13 +88,18 @@ export class StandaloneXcodeToolsBridge {
 
   async listToolsTool(params: { refresh?: boolean }): Promise<BridgeToolResult> {
     try {
-      const tools = await this.service.listTools({ refresh: params.refresh !== false });
-      const payload = {
-        toolCount: tools.length,
-        tools: tools.map(serializeBridgeTool),
-      };
+      const tools = await this.service.listTools({ refresh: params.refresh });
+      const serializedTools = tools.map(serializeBridgeTool);
+      const artifact = await writeBridgeToolListResponseArtifact({
+        ...(params.refresh !== undefined ? { refresh: params.refresh } : {}),
+        tools: serializedTools,
+      });
       return {
-        payload: { kind: 'tool-list', ...payload },
+        payload: {
+          kind: 'tool-list',
+          toolCount: serializedTools.length,
+          artifacts: { rawResponseJsonPath: artifact.path },
+        },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -100,10 +107,8 @@ export class StandaloneXcodeToolsBridge {
       return {
         isError: true,
         errorMessage: `[${code}] ${message}`,
-        payload: { kind: 'tool-list', toolCount: 0, tools: [] },
+        payload: { kind: 'tool-list', toolCount: 0 },
       };
-    } finally {
-      await this.service.disconnect();
     }
   }
 
@@ -116,7 +121,11 @@ export class StandaloneXcodeToolsBridge {
       const response = await this.service.invokeTool(params.remoteTool, params.arguments, {
         timeoutMs: params.timeoutMs,
       });
-      return callToolResultToBridgeResult(response);
+      return await callToolResultToBridgeResultWithArtifact(response, {
+        remoteTool: params.remoteTool,
+        arguments: params.arguments,
+        ...(params.timeoutMs !== undefined ? { timeoutMs: params.timeoutMs } : {}),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const code = classifyBridgeError(error, 'call');
@@ -125,8 +134,6 @@ export class StandaloneXcodeToolsBridge {
         errorMessage: `[${code}] ${message}`,
         payload: { kind: 'call-result', succeeded: false, content: [] },
       };
-    } finally {
-      await this.service.disconnect();
     }
   }
 

@@ -83,9 +83,15 @@ export class XcodeIdeToolService {
   }
 
   async listTools(opts: ListBridgeToolsOptions = {}): Promise<Tool[]> {
-    if (opts.refresh === false) {
-      return this.getCachedTools();
+    if (opts.refresh === true) {
+      return this.refreshTools();
     }
+
+    const cachedTools = this.getCachedTools();
+    if (opts.refresh === false || cachedTools.length > 0) {
+      return cachedTools;
+    }
+
     return this.refreshTools();
   }
 

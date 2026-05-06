@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../server/server-state.ts', () => ({
   getServer: vi.fn(),
@@ -41,9 +44,21 @@ import {
   getMcpBridgeAvailability,
 } from '../../../../integrations/xcode-tools-bridge/core.ts';
 import { allText, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { setXcodeBuildMCPAppDirOverrideForTests } from '../../../../utils/log-paths.ts';
+import { setRuntimeInstanceForTests } from '../../../../utils/runtime-instance.ts';
 
 describe('xcode-ide bridge tools (standalone fallback)', () => {
+  let tempAppDir: string;
+
   beforeEach(async () => {
+    tempAppDir = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-xcode-ide-test-'));
+    setXcodeBuildMCPAppDirOverrideForTests(tempAppDir);
+    setRuntimeInstanceForTests({
+      instanceId: 'test-instance',
+      pid: 1234,
+      workspaceKey: 'workspace-a',
+    });
+
     await shutdownXcodeToolsBridge();
 
     vi.mocked(getServer).mockReset();
@@ -62,7 +77,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
       lastError: null,
     });
     vi.mocked(buildXcodeToolsBridgeStatus).mockResolvedValue({
-      workflowEnabled: false,
+      workflowEnabled: true,
       bridgeAvailable: true,
       bridgePath: '/usr/bin/mcpbridge',
       xcodeRunning: true,
@@ -86,6 +101,12 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
     clientMocks.disconnect.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    setRuntimeInstanceForTests(null);
+    setXcodeBuildMCPAppDirOverrideForTests(null);
+    rmSync(tempAppDir, { recursive: true, force: true });
+  });
+
   it('status handler returns bridge status without MCP server instance', async () => {
     const result = await statusHandler({});
     const text = allText(result);
@@ -101,7 +122,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
     expect(text).toContain('"total": 2');
     expect(clientMocks.connectOnce).toHaveBeenCalledOnce();
     expect(clientMocks.listTools).toHaveBeenCalledOnce();
-    expect(clientMocks.disconnect).toHaveBeenCalledOnce();
+    expect(clientMocks.disconnect).not.toHaveBeenCalled();
   });
 
   it('disconnect handler succeeds without MCP server instance', async () => {
@@ -116,16 +137,93 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
     const result = await listHandler({ refresh: true });
     const text = allText(result);
     expect(text).toContain('Xcode IDE List Tools');
-    expect(text).toContain('"toolCount": 2');
+    expect(text).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(text).toContain('Raw Response JSON');
+    expect(text).not.toContain('toolA');
+    expect(text).not.toContain('toolB');
+    expect(text).not.toContain('"toolCount": 2');
     expect(clientMocks.listTools).toHaveBeenCalledOnce();
-    expect(clientMocks.disconnect).toHaveBeenCalledOnce();
+    expect(clientMocks.disconnect).not.toHaveBeenCalled();
   });
 
-  it('call handler forwards remote tool calls without MCP server instance', async () => {
+  it('list handler can return cached bridge tools without reconnecting', async () => {
+    const refreshed = await listHandler({ refresh: true });
+    const cached = await listHandler({ refresh: false });
+
+    expect(allText(refreshed)).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(allText(cached)).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(clientMocks.connectOnce).toHaveBeenCalledOnce();
+    expect(clientMocks.listTools).toHaveBeenCalledOnce();
+    expect(clientMocks.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('list handler defaults to refresh only when cache is empty', async () => {
+    const initial = await listHandler({});
+    const cached = await listHandler({});
+    const forced = await listHandler({ refresh: true });
+
+    expect(allText(initial)).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(allText(cached)).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(allText(forced)).toContain('Found 2 tool(s). Raw response saved to artifact.');
+    expect(clientMocks.connectOnce).toHaveBeenCalledTimes(2);
+    expect(clientMocks.listTools).toHaveBeenCalledTimes(2);
+    expect(clientMocks.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('call handler forwards remote tool calls and writes a raw response artifact', async () => {
     const result = await callHandler({ remoteTool: 'toolA', arguments: { foo: 'bar' } });
+    const text = allText(result);
+    const artifactDir = join(
+      tempAppDir,
+      'workspaces',
+      'workspace-a',
+      'state',
+      'xcode-ide',
+      'call-tool',
+      'ownerpid1234_test-instance',
+    );
+    const artifactPath = join(artifactDir, readdirSync(artifactDir)[0] ?? 'missing');
+
     expect(result.isError).toBeFalsy();
+    expect(text).toContain('Xcode IDE Call Tool');
+    expect(text).toContain('Raw Response JSON');
+    expect(text).toContain(artifactPath);
+    expect(text).not.toContain('Relayed Content');
+    expect(text).not.toContain('Structured Content');
+    expect(existsSync(artifactPath)).toBe(true);
+    expect(JSON.parse(readFileSync(artifactPath, 'utf8'))).toMatchObject({
+      remoteTool: 'toolA',
+      arguments: { foo: 'bar' },
+      response: {
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      },
+    });
     expect(clientMocks.callTool).toHaveBeenCalledWith('toolA', { foo: 'bar' }, {});
-    expect(clientMocks.disconnect).toHaveBeenCalledOnce();
+    expect(clientMocks.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('call handler hard-fails when the raw response artifact cannot be written', async () => {
+    const blockingAppDir = join(tempAppDir, 'app-dir-file');
+    writeFileSync(blockingAppDir, 'not a directory');
+    setXcodeBuildMCPAppDirOverrideForTests(blockingAppDir);
+    clientMocks.callTool.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'large inline payload' }],
+      structuredContent: { raw: 'structured payload' },
+      isError: false,
+    });
+
+    const result = await callHandler({ remoteTool: 'toolA', arguments: { foo: 'bar' } });
+    const text = allText(result);
+
+    expect(result.isError).toBe(true);
+    expect(text).toContain('Failed to write Xcode IDE bridge response artifact');
+    expect(text).not.toContain('Raw Response JSON');
+    expect(text).not.toContain('Relayed Content');
+    expect(text).not.toContain('Structured Content');
+    expect(text).not.toContain('large inline payload');
+    expect(text).not.toContain('structured payload');
+    expect(clientMocks.callTool).toHaveBeenCalledWith('toolA', { foo: 'bar' }, {});
   });
 
   it('logic functions do not emit progress events', async () => {

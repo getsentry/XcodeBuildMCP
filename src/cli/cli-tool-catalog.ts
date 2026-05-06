@@ -83,6 +83,18 @@ type DynamicBridgeTool = {
   annotations?: ToolAnnotations;
 };
 
+function getBridgeDiscoveryTimeoutMs(quickMode: boolean): number {
+  const configured = process.env.XCODEBUILDMCP_XCODE_IDE_DISCOVERY_TIMEOUT_MS;
+  if (configured !== undefined) {
+    const parsed = Number(configured);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return quickMode ? 400 : 250;
+}
+
 function createCliXcodeProxyTool(remoteTool: DynamicBridgeTool): ToolDefinition {
   const cliSchema = jsonSchemaToToolSchemaShape(remoteTool.inputSchema);
 
@@ -109,7 +121,7 @@ async function loadDaemonBackedXcodeProxyTools(
   const quickMode = discoveryMode === 'quick';
   const daemonClient = new DaemonClient({
     socketPath: opts.socketPath,
-    timeout: quickMode ? 400 : 250,
+    timeout: getBridgeDiscoveryTimeoutMs(quickMode),
   });
 
   try {

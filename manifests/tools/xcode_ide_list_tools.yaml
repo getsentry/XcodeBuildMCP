@@ -6,7 +6,7 @@ names:
 description: "Lists Xcode-IDE-only MCP capabilities (Use for: SwiftUI previews image capture, code snippet execution, issue Navigator/build logs, and window/tab context)."
 outputSchema:
   schema: xcodebuildmcp.output.xcode-bridge-tool-list
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:
