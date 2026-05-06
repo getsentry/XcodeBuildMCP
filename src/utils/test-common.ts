@@ -16,6 +16,7 @@ import { getDefaultCommandExecutor } from './command.ts';
 import { type TestPreflightResult } from './test-preflight.ts';
 
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
+import { findResultBundlePathArg } from './result-bundle-args.ts';
 
 import type {
   BuildTarget,
@@ -57,37 +58,6 @@ function getFallbackErrorMessages(
   responseContent?: Array<{ type: 'text'; text: string }>,
 ): string[] {
   return [...streamedLines, ...(responseContent ?? []).map((item) => item.text)];
-}
-
-function isResultBundlePathValue(value: string | undefined): value is string {
-  return value !== undefined && value.length > 0 && !value.startsWith('-');
-}
-
-function findResultBundlePathArg(extraArgs?: readonly string[]): string | undefined {
-  if (!extraArgs) {
-    return undefined;
-  }
-
-  let resultBundlePath: string | undefined;
-  for (let index = 0; index < extraArgs.length; index += 1) {
-    const argument = extraArgs[index];
-    if (argument === '-resultBundlePath') {
-      const value = extraArgs[index + 1];
-      if (isResultBundlePathValue(value)) {
-        resultBundlePath = value;
-        index += 1;
-      }
-      continue;
-    }
-    if (argument?.startsWith('-resultBundlePath=')) {
-      const value = argument.slice('-resultBundlePath='.length);
-      if (isResultBundlePathValue(value)) {
-        resultBundlePath = value;
-      }
-    }
-  }
-
-  return resultBundlePath;
 }
 
 function createXcodebuildTestArtifacts(

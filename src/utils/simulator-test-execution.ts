@@ -1,47 +1,33 @@
+import { parseResultBundlePathArgs } from './result-bundle-args.ts';
 import type { TestPreflightResult } from './test-preflight.ts';
-
-function isResultBundlePathValue(value: string | undefined): value is string {
-  return value !== undefined && value.length > 0 && !value.startsWith('-');
-}
 
 function parseTestSelectorArgs(extraArgs: string[] | undefined): {
   remainingArgs: string[];
   selectorArgs: string[];
   resultBundlePath?: string;
 } {
-  if (!extraArgs || extraArgs.length === 0) {
-    return { remainingArgs: [], selectorArgs: [] };
+  const parsedResultBundleArgs = parseResultBundlePathArgs(extraArgs);
+  if (parsedResultBundleArgs.remainingArgs.length === 0) {
+    return {
+      remainingArgs: [],
+      selectorArgs: [],
+      ...(parsedResultBundleArgs.resultBundlePath
+        ? { resultBundlePath: parsedResultBundleArgs.resultBundlePath }
+        : {}),
+    };
   }
 
   const remainingArgs: string[] = [];
   const selectorArgs: string[] = [];
-  let resultBundlePath: string | undefined;
 
-  for (let index = 0; index < extraArgs.length; index += 1) {
-    const argument = extraArgs[index]!;
+  for (let index = 0; index < parsedResultBundleArgs.remainingArgs.length; index += 1) {
+    const argument = parsedResultBundleArgs.remainingArgs[index]!;
 
     if (argument === '-only-testing' || argument === '-skip-testing') {
-      const value = extraArgs[index + 1];
+      const value = parsedResultBundleArgs.remainingArgs[index + 1];
       if (value) {
         selectorArgs.push(argument, value);
         index += 1;
-      }
-      continue;
-    }
-
-    if (argument === '-resultBundlePath') {
-      const value = extraArgs[index + 1];
-      if (isResultBundlePathValue(value)) {
-        resultBundlePath = value;
-        index += 1;
-      }
-      continue;
-    }
-
-    if (argument.startsWith('-resultBundlePath=')) {
-      const value = argument.slice('-resultBundlePath='.length);
-      if (isResultBundlePathValue(value)) {
-        resultBundlePath = value;
       }
       continue;
     }
@@ -54,7 +40,13 @@ function parseTestSelectorArgs(extraArgs: string[] | undefined): {
     remainingArgs.push(argument);
   }
 
-  return { remainingArgs, selectorArgs, resultBundlePath };
+  return {
+    remainingArgs,
+    selectorArgs,
+    ...(parsedResultBundleArgs.resultBundlePath
+      ? { resultBundlePath: parsedResultBundleArgs.resultBundlePath }
+      : {}),
+  };
 }
 
 export function createSimulatorTwoPhaseExecutionPlan(params: {
