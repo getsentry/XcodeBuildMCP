@@ -14,7 +14,9 @@
 
 ### Changed
 
+- Updated Xcode IDE `call-tool` output to save raw remote responses as transient workspace-state JSON artifacts, summarize text output without embedding large relayed payloads, and support `--output json` / `--output jsonl` through the generic CLI output path.
 - Centralized workspace log retention and startup/shutdown filesystem cleanup so XcodeBuildMCP-owned logs are pruned consistently while preserving active daemon and simulator OSLog outputs.
+- Removed internal streaming-fragment context flags so final tool state now comes from explicit structured outputs instead of transient progress fragments ([#360](https://github.com/getsentry/XcodeBuildMCP/issues/360)).
 
 ## [2.5.0-beta.1]
 

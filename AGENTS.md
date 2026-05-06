@@ -54,6 +54,12 @@ ESM TypeScript project (`type: module`). Key layers:
 - No `.js` imports in `src/` (enforced by ESLint)
 - No barrel imports from `utils/index` - import from specific submodules (e.g., `src/utils/execution/index.ts`, `src/utils/logging/index.ts`)
 
+
+## Rendering and Streaming Contract
+- Streaming fragments are transient output only. They MUST NOT be used as internal state, cached for final responses, or promoted into final MCP/JSON/CLI text output.
+- Non-streaming runtimes/output modes, including MCP final responses, MUST render only from the final structured result and next-step metadata. If final output needs data, add it to the final result type instead of reading it from fragments.
+- Only streaming-capable renderers may observe fragment callbacks, and only to print live progress. Their fragment handling must not affect final structured output or final rendered text.
+
 ## Test Conventions
 - Vitest with colocated `__tests__/` directories using `*.test.ts`
 - Smoke tests in `src/smoke-tests/__tests__/` (separate Vitest config, serial execution)
@@ -88,6 +94,7 @@ When reading issues:
 - Use shared lock and atomic-write helpers for mutable shared files.
 - Prefer one-record-per-file registries over shared aggregate files.
 - Cleanup must verify ownership before deleting shared artifacts.
+- User-facing artifact/log paths in final text or structured output must use `displayPath()` from `src/utils/build-preflight.ts`, so paths are cwd-relative when possible or `~/...` instead of absolute home paths. Keep stored files at their real absolute paths; only normalize response/display values.
 
 ## Style
 - Keep answers short and concise
@@ -98,6 +105,7 @@ When reading issues:
 ## Docs
 - Do not commit transient investigation notes, prompt exports, or scratch analysis docs after the work is complete.
 - If an investigation leaves unresolved follow-up work, move it to a GitHub issue instead of preserving the transient doc in the branch.
+- Structured output JSON schemas are auto-published to the website/public schema mirror when merged; do not manually update public schema copies unless explicitly asked.
 
 ### Changelog
 Location: `CHANGELOG.md`
