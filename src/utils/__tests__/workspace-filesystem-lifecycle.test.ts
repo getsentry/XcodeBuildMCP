@@ -6,6 +6,7 @@ import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import {
+  cleanupOwnedWorkspaceFilesystemArtifacts,
   resetWorkspaceFilesystemLifecycleStateForTests,
   runWorkspaceFilesystemLifecycleSweep,
   scheduleWorkspaceFilesystemLifecycleSweep,
@@ -88,6 +89,44 @@ describe('workspace filesystem lifecycle', () => {
     expect(existsSync(derivedDataLog)).toBe(true);
   });
 
+  it('removes owned xcode-ide call-tool transient artifacts during shutdown cleanup', async () => {
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const currentArtifact = path.join(
+      layout.state,
+      'xcode-ide',
+      'call-tool',
+      `ownerpid${process.pid}_filesystem-lifecycle-test`,
+      'response.json',
+    );
+    const staleArtifact = path.join(
+      layout.state,
+      'xcode-ide',
+      'call-tool',
+      'ownerpid999999999_stale',
+      'response.json',
+    );
+    const liveArtifact = path.join(
+      layout.state,
+      'xcode-ide',
+      'call-tool',
+      `ownerpid${process.pid}_other-live-instance`,
+      'response.json',
+    );
+    writeFileWithMtime(currentArtifact, '{}', Date.now());
+    writeFileWithMtime(staleArtifact, '{}', Date.now());
+    writeFileWithMtime(liveArtifact, '{}', Date.now());
+
+    const result = await cleanupOwnedWorkspaceFilesystemArtifacts({
+      workspaceKey: 'workspace-a',
+      trigger: 'shutdown',
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(existsSync(currentArtifact)).toBe(false);
+    expect(existsSync(staleArtifact)).toBe(false);
+    expect(existsSync(liveArtifact)).toBe(true);
+  });
+
   it('protects active daemon logs through the existing daemon registry', async () => {
     const now = Date.UTC(2026, 4, 2, 12);
     const layout = getWorkspaceFilesystemLayout('workspace-a');
@@ -117,6 +156,38 @@ describe('workspace filesystem lifecycle', () => {
     expect(result).toMatchObject({ scanned: 2, deleted: 1 });
     expect(existsSync(daemonLog)).toBe(true);
     expect(existsSync(oldLog)).toBe(false);
+  });
+
+  it('removes stale xcode-ide call-tool transient artifacts at startup even when log retention is cooling down', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const staleArtifact = path.join(
+      layout.state,
+      'xcode-ide',
+      'call-tool',
+      'ownerpid999999999_stale',
+      'response.json',
+    );
+    const liveArtifact = path.join(
+      layout.state,
+      'xcode-ide',
+      'call-tool',
+      `ownerpid${process.pid}_other-live-instance`,
+      'response.json',
+    );
+    writeFileWithMtime(staleArtifact, '{}', now);
+    writeFileWithMtime(liveArtifact, '{}', now);
+    writeFileWithMtime(layout.filesystemLifecycle.markerPath, String(now), now);
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'startup',
+      now: now + 1000,
+    });
+
+    expect(result).toMatchObject({ skippedByCooldown: true, scanned: 0 });
+    expect(existsSync(staleArtifact)).toBe(false);
+    expect(existsSync(liveArtifact)).toBe(true);
   });
 
   it('runs startup OSLog reconciliation even when log retention is cooling down', async () => {

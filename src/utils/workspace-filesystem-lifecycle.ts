@@ -1,4 +1,6 @@
+import type { Dirent } from 'node:fs';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { cleanupWorkspaceDaemonFiles, readDaemonRegistryEntry } from '../daemon/daemon-registry.ts';
 import { getWorkspaceFilesystemLayout } from './log-paths.ts';
@@ -35,6 +37,8 @@ const XCODEBUILD_LOG_NAME_PATTERN = new RegExp(
 const SIMULATOR_LOG_NAME_PATTERN = new RegExp(
   `^.+_${ISO_TIMESTAMP_PATTERN}_(?:helperpid\\d+_)?ownerpid\\d+_${SUFFIX_PATTERN}\\.log$`,
 );
+const XCODE_IDE_CALL_TOOL_TRANSIENT_DIR = path.join('xcode-ide', 'call-tool');
+const XCODE_IDE_CALL_TOOL_OWNER_DIR_PATTERN = /^ownerpid(\d+)_/u;
 
 export type WorkspaceFilesystemLifecycleTrigger =
   | 'startup'
@@ -336,12 +340,88 @@ function runDaemonCleanup(options: ResolvedWorkspaceFilesystemLifecycleOptions):
   cleanupWorkspaceDaemonFiles(options.workspaceKey, options.daemonCleanup);
 }
 
+function xcodeIdeCallToolTransientRoot(workspaceKey: string): string {
+  return path.join(
+    getWorkspaceFilesystemLayout(workspaceKey).state,
+    XCODE_IDE_CALL_TOOL_TRANSIENT_DIR,
+  );
+}
+
+async function cleanupXcodeIdeCallToolTransientArtifacts(
+  workspaceKey: string,
+  errors: string[],
+  options: { includeCurrentOwner: boolean },
+): Promise<void> {
+  const root = xcodeIdeCallToolTransientRoot(workspaceKey);
+  const runtimeInstance = getRuntimeInstanceIfConfigured();
+  const currentOwnerDir = runtimeInstance
+    ? `ownerpid${runtimeInstance.pid}_${runtimeInstance.instanceId}`
+    : null;
+
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(root, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    errors.push(error instanceof Error ? error.message : String(error));
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const ownerPid = Number(entry.name.match(XCODE_IDE_CALL_TOOL_OWNER_DIR_PATTERN)?.[1]);
+    const ownedByCurrentRuntime = options.includeCurrentOwner && currentOwnerDir === entry.name;
+    const ownedByDeadRuntime = Number.isInteger(ownerPid) && ownerPid > 0 && !isPidAlive(ownerPid);
+    if (!ownedByCurrentRuntime && !ownedByDeadRuntime) {
+      continue;
+    }
+    try {
+      await fs.rm(path.join(root, entry.name), { recursive: true, force: true });
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+}
+
+function cleanupXcodeIdeCallToolTransientArtifactsSync(): {
+  attemptedCount: number;
+  errors: string[];
+} {
+  const runtimeInstance = getRuntimeInstanceIfConfigured();
+  if (!runtimeInstance) {
+    return { attemptedCount: 0, errors: [] };
+  }
+  const ownerDir = `ownerpid${runtimeInstance.pid}_${runtimeInstance.instanceId}`;
+  const ownerPath = path.join(
+    xcodeIdeCallToolTransientRoot(runtimeInstance.workspaceKey),
+    ownerDir,
+  );
+  try {
+    fsSync.rmSync(ownerPath, { recursive: true, force: true });
+    return { attemptedCount: 1, errors: [] };
+  } catch (error) {
+    return {
+      attemptedCount: 1,
+      errors: [error instanceof Error ? error.message : String(error)],
+    };
+  }
+}
+
 export async function runWorkspaceFilesystemLifecycleSweep(
   options: WorkspaceFilesystemLifecycleOptions,
 ): Promise<WorkspaceFilesystemLifecycleResult> {
   const resolved = resolveOptions(options);
   const errors: string[] = [];
   const stopped = await runStartupReconciliation(resolved, errors);
+  if (resolved.trigger === 'startup') {
+    await cleanupXcodeIdeCallToolTransientArtifacts(resolved.workspaceKey, errors, {
+      includeCurrentOwner: false,
+    });
+  }
 
   if (
     !resolved.force &&
@@ -483,6 +563,10 @@ export async function cleanupOwnedWorkspaceFilesystemArtifacts(
   if (options.daemonCleanup) {
     cleanupWorkspaceDaemonFiles(workspaceKey, options.daemonCleanup);
   }
+  const errors = [...stopResult.errors];
+  await cleanupXcodeIdeCallToolTransientArtifacts(workspaceKey, errors, {
+    includeCurrentOwner: true,
+  });
 
   return {
     workspaceKey,
@@ -493,7 +577,7 @@ export async function cleanupOwnedWorkspaceFilesystemArtifacts(
     stopped: stopResult.stoppedSessionCount,
     skippedByCooldown: false,
     skippedByLock: false,
-    errors: stopResult.errors,
+    errors,
   };
 }
 
@@ -502,7 +586,14 @@ export function terminateOwnedWorkspaceFilesystemArtifactsSync(): {
   errorCount: number;
   errors: string[];
 } {
-  return terminateLiveSimulatorLaunchOsLogSessionsSync();
+  const simulatorCleanup = terminateLiveSimulatorLaunchOsLogSessionsSync();
+  const transientArtifactCleanup = cleanupXcodeIdeCallToolTransientArtifactsSync();
+  const errors = [...simulatorCleanup.errors, ...transientArtifactCleanup.errors];
+  return {
+    attemptedCount: simulatorCleanup.attemptedCount + transientArtifactCleanup.attemptedCount,
+    errorCount: simulatorCleanup.errorCount + transientArtifactCleanup.errors.length,
+    errors,
+  };
 }
 
 export function resetWorkspaceFilesystemLifecycleStateForTests(): void {
