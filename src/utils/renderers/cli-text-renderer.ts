@@ -110,6 +110,8 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let structuredOutput: StructuredToolOutput | undefined;
   let sawIncomingHeaderEvent = false;
   let sawIncomingNonHeaderEvent = false;
+  let sawIncomingSummaryEvent = false;
+  let sawIncomingNonSummaryEvent = false;
   let nextSteps: readonly NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
@@ -392,6 +394,11 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
       if (item.type !== 'header') {
         sawIncomingNonHeaderEvent = true;
+        if (item.type === 'summary') {
+          sawIncomingSummaryEvent = true;
+        } else {
+          sawIncomingNonSummaryEvent = true;
+        }
       }
       processItem(item);
     },
@@ -420,6 +427,19 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
           for (const item of replayItems) {
             processItem(item);
           }
+        } else if (!sawIncomingNonSummaryEvent) {
+          const structuredItems = renderDomainResultTextItems(
+            structuredOutput.result,
+            structuredOutput.renderHints,
+          );
+          const replayItems = structuredItems.filter((item) => {
+            if (sawIncomingHeaderEvent && item.type === 'header') return false;
+            if (sawIncomingSummaryEvent && item.type === 'summary') return false;
+            return true;
+          });
+          for (const item of replayItems) {
+            processItem(item);
+          }
         } else {
           const tailItems = createStreamingTailItems(structuredOutput.result);
           for (const item of tailItems) {
@@ -445,6 +465,8 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       structuredOutput = undefined;
       sawIncomingHeaderEvent = false;
       sawIncomingNonHeaderEvent = false;
+      sawIncomingSummaryEvent = false;
+      sawIncomingNonSummaryEvent = false;
       nextSteps = [];
       nextStepsRuntime = undefined;
       parserStates.clear();

@@ -17,6 +17,11 @@ export interface StructuredOutputSchemaRef {
 export type JsonObject = Record<string, unknown>;
 export type McpOutputSchema = ZodType;
 
+const STRUCTURED_ERROR_SCHEMA_REF: StructuredOutputSchemaRef = {
+  schema: 'xcodebuildmcp.output.error',
+  version: '1',
+};
+
 const bundledSchemaCache = new Map<string, JsonObject>();
 
 function isRecord(value: unknown): value is JsonObject {
@@ -216,6 +221,20 @@ export function getMcpOutputSchema(ref: StructuredOutputSchemaRef): JsonObject {
   return cloneJson(bundled);
 }
 
+function getMcpOutputSchemaForRegistrationJson(ref: StructuredOutputSchemaRef): JsonObject {
+  const toolSchema = getMcpOutputSchema(ref);
+  if (ref.schema === STRUCTURED_ERROR_SCHEMA_REF.schema) {
+    return toolSchema;
+  }
+
+  return {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: `https://xcodebuildmcp.com/schemas/structured-output/${ref.schema}/${ref.version}.registration.schema.json`,
+    type: 'object',
+    oneOf: [toolSchema, getMcpOutputSchema(STRUCTURED_ERROR_SCHEMA_REF)],
+  };
+}
+
 export function getMcpOutputSchemaForRegistration(ref: StructuredOutputSchemaRef): McpOutputSchema {
   const zodSchema = z.object({}).passthrough();
   const schemaWithJsonHook = zodSchema as ZodType & {
@@ -225,7 +244,7 @@ export function getMcpOutputSchemaForRegistration(ref: StructuredOutputSchemaRef
     throw new Error('Zod schema internals are unavailable for MCP output schema registration.');
   }
 
-  schemaWithJsonHook._zod.toJSONSchema = () => getMcpOutputSchema(ref);
+  schemaWithJsonHook._zod.toJSONSchema = () => getMcpOutputSchemaForRegistrationJson(ref);
   return zodSchema;
 }
 

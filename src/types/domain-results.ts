@@ -1,4 +1,5 @@
 export type ToolDomainResultKind =
+  | 'error'
   | 'app-path'
   | 'build-result'
   | 'build-run-result'
@@ -36,6 +37,14 @@ export interface ToolDomainResultBase {
   didError: boolean;
   error: string | null;
   diagnostics?: BasicDiagnostics;
+}
+export type StructuredErrorCategory = 'runtime' | 'validation' | 'schema';
+export interface ErrorDomainResult extends ToolDomainResultBase {
+  kind: 'error';
+  didError: true;
+  error: string;
+  category: StructuredErrorCategory;
+  code: string;
 }
 export type AtLeastOne<T extends object> = {
   [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
@@ -294,18 +303,14 @@ export interface XcodeBridgeSyncStats {
   removed: number;
   total: number;
 }
-export interface XcodeBridgeToolDescriptor {
-  name: string;
-  title: string | null;
-  description: string | null;
-  inputSchema: Record<string, unknown> | boolean | null;
-  outputSchema: Record<string, unknown> | boolean | null;
-  annotations: Record<string, unknown> | null;
-}
 export interface XcodeBridgeRelayedContentItem {
   type: string;
   [key: string]: unknown;
 }
+export interface XcodeBridgeResponseArtifacts {
+  rawResponseJsonPath: string;
+}
+export type XcodeBridgeCallResultArtifacts = XcodeBridgeResponseArtifacts;
 export interface ProjectListSummary extends StatusSummary {
   maxDepth: number;
   projectCount?: number;
@@ -620,7 +625,7 @@ export type XcodeBridgeCallResultDomainResult = ToolDomainResultBase & {
   remoteTool: string;
   succeeded: boolean;
   content: XcodeBridgeRelayedContentItem[];
-  structuredContent?: Record<string, unknown> | null;
+  artifacts?: XcodeBridgeCallResultArtifacts;
 };
 export type XcodeBridgeStatusDomainResult = ToolDomainResultBase & {
   kind: 'xcode-bridge-status';
@@ -635,7 +640,7 @@ export type XcodeBridgeSyncDomainResult = ToolDomainResultBase & {
 export type XcodeBridgeToolListDomainResult = ToolDomainResultBase & {
   kind: 'xcode-bridge-tool-list';
   toolCount: number;
-  tools: XcodeBridgeToolDescriptor[];
+  artifacts?: XcodeBridgeResponseArtifacts;
 };
 export type WorkflowSelectionDomainResult = ToolDomainResultBase & {
   kind: 'workflow-selection';
@@ -643,6 +648,7 @@ export type WorkflowSelectionDomainResult = ToolDomainResultBase & {
   registeredToolCount: number;
 };
 export type ToolDomainResult =
+  | ErrorDomainResult
   | AppPathDomainResult
   | BuildResultDomainResult
   | BuildRunResultDomainResult

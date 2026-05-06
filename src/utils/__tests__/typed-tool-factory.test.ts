@@ -36,22 +36,30 @@ async function testLogic(params: TestParams): Promise<void> {
 function invokeAndCollect(
   handler: ToolHandler,
   args: Record<string, unknown>,
-): Promise<{ text: string; isError: boolean }> {
+): Promise<{
+  text: string;
+  isError: boolean;
+  structuredOutput: ToolHandlerContext['structuredOutput'];
+}> {
   const session = createRenderSession('text');
   const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
-    liveProgressEnabled: false,
-    streamingFragmentsEnabled: false,
     emit: (event) => {
       items.push(event);
       session.emit(event);
     },
     attach: (image) => session.attach(image),
   };
-  return handler(args, ctx).then(() => ({
-    text: renderCliTextTranscript({ items }),
-    isError: session.isError(),
-  }));
+  return handler(args, ctx).then(() => {
+    if (ctx.structuredOutput) {
+      session.setStructuredOutput?.(ctx.structuredOutput);
+    }
+    return {
+      text: renderCliTextTranscript({ items, structuredOutput: ctx.structuredOutput }),
+      isError: session.isError(),
+      structuredOutput: ctx.structuredOutput,
+    };
+  });
 }
 
 describe('createTypedTool', () => {
@@ -78,6 +86,9 @@ describe('createTypedTool', () => {
       });
 
       expect(result.isError).toBe(true);
+      expect(result.structuredOutput?.schema).toBe('xcodebuildmcp.output.error');
+      expect(result.structuredOutput?.result.didError).toBe(true);
+      expect(result.structuredOutput?.result.error).toContain('Parameter validation failed');
       expect(result.text).toContain('Parameter validation failed');
       expect(result.text).toContain('requiredParam');
     });

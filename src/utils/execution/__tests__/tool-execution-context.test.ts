@@ -54,14 +54,12 @@ describe('DefaultStreamingExecutionContext', () => {
 });
 
 describe('createStreamingExecutionContext', () => {
-  function makeHandlerContext(streamingFragmentsEnabled: boolean): {
+  function makeHandlerContext(): {
     ctx: ToolHandlerContext;
     emitted: AnyFragment[];
   } {
     const emitted: AnyFragment[] = [];
     const ctx: ToolHandlerContext = {
-      liveProgressEnabled: true,
-      streamingFragmentsEnabled,
       emit: (fragment) => emitted.push(fragment),
       attach: () => {},
     };
@@ -75,22 +73,13 @@ describe('createStreamingExecutionContext', () => {
     status: 'started',
   };
 
-  it('forwards fragments through ctx.emit when streamingFragmentsEnabled is true', () => {
-    const { ctx, emitted } = makeHandlerContext(true);
+  it('always forwards fragments through ctx.emit', () => {
+    const { ctx, emitted } = makeHandlerContext();
     const execCtx = createStreamingExecutionContext(ctx);
 
     execCtx.emitFragment(testFragment);
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toBe(testFragment);
-  });
-
-  it('silently drops fragments when streamingFragmentsEnabled is false', () => {
-    const { ctx, emitted } = makeHandlerContext(false);
-    const execCtx = createStreamingExecutionContext(ctx);
-
-    execCtx.emitFragment(testFragment);
-
-    expect(emitted).toHaveLength(0);
   });
 });

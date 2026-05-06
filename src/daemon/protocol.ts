@@ -2,7 +2,7 @@ import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { StructuredToolOutput } from '../rendering/types.ts';
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';
-export const DAEMON_PROTOCOL_VERSION = 6 as const;
+export const DAEMON_PROTOCOL_VERSION = 7 as const;
 
 export type DaemonMethod =
   | 'daemon.status'
@@ -65,7 +65,7 @@ export interface ToolInvokeResultFrame {
 }
 
 export interface DaemonToolResult {
-  fragments?: AnyFragment[];
+  structuredOutput: StructuredToolOutput | null;
   isError: boolean;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];

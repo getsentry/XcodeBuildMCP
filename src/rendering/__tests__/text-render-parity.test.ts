@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DomainFragment } from '../../types/domain-fragments.ts';
+import type { RuntimeStatusFragment } from '../../types/runtime-status.ts';
 import type { StructuredToolOutput } from '../types.ts';
-import { renderTranscript } from '../render.ts';
+import { createRenderSession, renderTranscript } from '../render.ts';
+import { createStructuredErrorOutput } from '../../utils/structured-error.ts';
 import { createCliTextRenderer } from '../../utils/renderers/cli-text-renderer.ts';
 import type { NextStep } from '../../types/common.ts';
 
@@ -33,6 +35,59 @@ function captureCliText(fixture: TranscriptFixture): string {
 describe('text render parity', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('does not mark emitted error fragments as final render errors', () => {
+    const session = createRenderSession('text');
+    const fragment: RuntimeStatusFragment = {
+      kind: 'infrastructure',
+      fragment: 'status',
+      level: 'error',
+      message: 'Transient progress error',
+    };
+
+    session.emit(fragment);
+
+    expect(session.isError()).toBe(false);
+    expect(session.getFragments()).toEqual([fragment]);
+  });
+
+  it('marks explicit structured error output as a final render error', () => {
+    const session = createRenderSession('text');
+
+    session.setStructuredOutput?.(
+      createStructuredErrorOutput({
+        category: 'runtime',
+        code: 'TEST_ERROR',
+        message: 'Final error',
+      }),
+    );
+
+    expect(session.isError()).toBe(true);
+  });
+
+  it('renders structured-only error output text', () => {
+    const fixture: TranscriptFixture = {
+      progressEvents: [],
+      structuredOutput: createStructuredErrorOutput({
+        category: 'runtime',
+        code: 'TEST_ERROR',
+        message: 'Final error',
+      }),
+    };
+
+    const rendered = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+      },
+      'text',
+    );
+
+    expect(rendered).toBe(captureCliText(fixture));
+    expect(rendered).toContain('Final error');
+    expect(rendered).toContain('Category: runtime');
+    expect(rendered).toContain('Code: TEST_ERROR');
   });
 
   it('matches non-interactive cli text for discovery and summary output', () => {
@@ -277,6 +332,86 @@ describe('text render parity', () => {
     expect(output).toBe(captureCliText(fixture));
     expect(output).toContain('get_mac_app_path({ scheme: "MCPTest" })');
     expect(output).not.toContain('xcodebuildmcp macos get-app-path');
+  });
+
+  it('does not capture streaming fragments for render session final text', () => {
+    const session = createRenderSession('text');
+    const request = {
+      scheme: 'MyApp',
+      projectPath: '/tmp/MyApp.xcodeproj',
+      configuration: 'Debug',
+      platform: 'iOS Simulator',
+    };
+    const invocation: DomainFragment = {
+      kind: 'build-result',
+      fragment: 'invocation',
+      operation: 'BUILD',
+      request,
+    };
+    const buildStage: DomainFragment = {
+      kind: 'build-result',
+      fragment: 'build-stage',
+      operation: 'BUILD',
+      stage: 'COMPILING',
+      message: 'Compiling App.swift',
+    };
+    const streamedWarning: DomainFragment = {
+      kind: 'build-result',
+      fragment: 'warning',
+      message: 'streamed warning should stay transient',
+    };
+    const buildSummary: DomainFragment = {
+      kind: 'build-result',
+      fragment: 'build-summary',
+      operation: 'BUILD',
+      status: 'SUCCEEDED',
+      durationMs: 3200,
+    };
+    const transcriptLine: DomainFragment = {
+      kind: 'transcript',
+      fragment: 'process-line',
+      stream: 'stderr',
+      line: 'raw xcodebuild line\n',
+    };
+
+    session.emit(invocation);
+    session.emit(buildStage);
+    session.emit(streamedWarning);
+    session.emit(buildSummary);
+    session.emit(transcriptLine);
+    session.setStructuredOutput?.({
+      schema: 'xcodebuildmcp.output.build-result',
+      schemaVersion: '1.0.0',
+      result: {
+        kind: 'build-result',
+        request,
+        didError: false,
+        error: null,
+        summary: { status: 'SUCCEEDED', durationMs: 3200 },
+        artifacts: { buildLogPath: '/tmp/build.log' },
+        diagnostics: {
+          warnings: [{ message: 'final warning from structured output' }],
+          errors: [],
+        },
+      },
+    });
+
+    expect(session.getFragments()).toEqual([
+      invocation,
+      buildStage,
+      streamedWarning,
+      buildSummary,
+      transcriptLine,
+    ]);
+    const rendered = session.finalize();
+
+    expect(rendered).toContain('Scheme: MyApp');
+    expect(rendered).toContain('Build succeeded');
+    expect(rendered).toContain('final warning from structured output');
+    expect(rendered).toContain('Build Logs: /tmp/build.log');
+    expect(rendered).not.toContain('Compiling App.swift');
+    expect(rendered).not.toContain('streamed warning should stay transient');
+    expect(rendered).not.toContain('raw xcodebuild line');
   });
 
   it('matches for structured-only build-result with request and no fragments', () => {

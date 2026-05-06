@@ -78,6 +78,20 @@ describe('structured output schema bundling', () => {
     expectStandaloneCompile(schema);
   });
 
+  it('bundles the shared structured error schema', () => {
+    const schema = getMcpOutputSchema({
+      schema: 'xcodebuildmcp.output.error',
+      version: '1',
+    });
+
+    expect(schema.$id).toBe(
+      'https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.error/1.schema.json',
+    );
+    expect((schema.$defs as JsonObject).errorConsistency).toBeDefined();
+    expectNoExternalCommonRefs(schema);
+    expectStandaloneCompile(schema);
+  });
+
   it('returns fresh schema objects from the cache', () => {
     const first = getMcpOutputSchema({
       schema: 'xcodebuildmcp.output.simulator-list',
@@ -92,7 +106,7 @@ describe('structured output schema bundling', () => {
     expect(second.mutated).toBeUndefined();
   });
 
-  it('advertises the bundled schema through the registration wrapper', () => {
+  it('advertises tool-specific and shared error schemas through the registration wrapper', () => {
     const ref = {
       schema: 'xcodebuildmcp.output.simulator-list',
       version: '1',
@@ -100,8 +114,66 @@ describe('structured output schema bundling', () => {
     const outputSchema = getMcpOutputSchemaForRegistration(ref);
     const jsonSchema = z.toJSONSchema(outputSchema) as JsonObject;
 
-    expect(jsonSchema).toEqual(getMcpOutputSchema(ref));
+    expect(jsonSchema).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $id: 'https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.simulator-list/1.registration.schema.json',
+      type: 'object',
+      oneOf: [
+        getMcpOutputSchema(ref),
+        getMcpOutputSchema({ schema: 'xcodebuildmcp.output.error', version: '1' }),
+      ],
+    });
     expectNoExternalCommonRefs(jsonSchema);
+    expectStandaloneCompile(jsonSchema);
+  });
+
+  it('accepts structured error envelopes in registered output schemas', () => {
+    const outputSchema = getMcpOutputSchemaForRegistration({
+      schema: 'xcodebuildmcp.output.simulator-list',
+      version: '1',
+    });
+    const jsonSchema = z.toJSONSchema(outputSchema) as JsonObject;
+    const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+    const validate = ajv.compile(jsonSchema);
+
+    expect(
+      validate({
+        schema: 'xcodebuildmcp.output.error',
+        schemaVersion: '1',
+        didError: true,
+        error: 'Parameter validation failed',
+        data: {
+          category: 'validation',
+          code: 'PARAMETER_VALIDATION_FAILED',
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('accepts xcode bridge call-result artifacts', () => {
+    const schema = getMcpOutputSchema({
+      schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+      version: '2',
+    });
+    const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+    const validate = ajv.compile(schema);
+
+    expect(
+      validate({
+        schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          remoteTool: 'DocumentationSearch',
+          succeeded: true,
+          content: [],
+          artifacts: {
+            rawResponseJsonPath: '/tmp/xcode-ide-response.json',
+          },
+        },
+      }),
+    ).toBe(true);
   });
 
   it('resolves every manifest-declared output schema', () => {

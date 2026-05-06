@@ -307,8 +307,6 @@ export async function applyWorkflowSelectionFromManifest(
             try {
               const session = createRenderSession('text');
               const ctx: ToolHandlerContext = {
-                liveProgressEnabled: false,
-                streamingFragmentsEnabled: false,
                 emit: (fragment) => {
                   session.emit(fragment);
                 },

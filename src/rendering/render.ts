@@ -13,13 +13,6 @@ import type {
   StructuredToolOutput,
 } from './types.ts';
 
-function isErrorFragment(fragment: AnyFragment): boolean {
-  return (
-    (fragment.fragment === 'compiler-diagnostic' && fragment.severity === 'error') ||
-    (fragment.fragment === 'status' && fragment.level === 'error')
-  );
-}
-
 export interface RenderTranscriptInput {
   items?: readonly AnyFragment[];
   structuredOutput?: StructuredToolOutput;
@@ -40,12 +33,10 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
   let structuredOutput: StructuredToolOutput | undefined;
   let nextSteps: NextStep[] = [];
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
-  let hasError = false;
 
   return {
     emit(fragment: AnyFragment): void {
       fragments.push(fragment);
-      if (isErrorFragment(fragment)) hasError = true;
       hooks.onEmit?.(fragment);
     },
 
@@ -55,9 +46,6 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
     setStructuredOutput(output: StructuredToolOutput): void {
       structuredOutput = output;
-      if (output.result.didError) {
-        hasError = true;
-      }
       hooks.onSetStructuredOutput?.(output);
     },
 
@@ -88,12 +76,12 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
     },
 
     isError(): boolean {
-      return hasError;
+      return structuredOutput?.result.didError === true;
     },
 
     finalize(): string {
       return hooks.finalize({
-        items: fragments,
+        items: [],
         structuredOutput,
         nextSteps,
         nextStepsRuntime,
@@ -102,72 +90,70 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
   };
 }
 
-function createTextRenderSession(): RenderSession {
+function createRenderHooks(
+  strategy: RenderStrategy,
+  options: { interactive: boolean },
+): RenderSessionHooks {
   const suppressWarnings = sessionStore.get('suppressWarnings');
   const showTestTiming = getConfig().showTestTiming;
 
-  return createBaseRenderSession({
-    finalize: (input) =>
-      renderCliTextTranscript({
-        ...input,
-        suppressWarnings: suppressWarnings ?? false,
-        showTestTiming,
-      }),
-  });
-}
-
-function createRawRenderSession(): RenderSession {
-  const suppressWarnings = sessionStore.get('suppressWarnings');
-  const showTestTiming = getConfig().showTestTiming;
-
-  return createBaseRenderSession({
-    onEmit: (fragment) => {
-      if (fragment.kind === 'transcript') {
-        if (fragment.fragment === 'process-command') {
-          const dim = process.stderr.isTTY ? '\x1B[2m' : '';
-          const reset = process.stderr.isTTY ? '\x1B[0m' : '';
-          process.stderr.write(`${dim}$ ${fragment.displayCommand}${reset}\n`);
-        } else if (fragment.fragment === 'process-line') {
-          process.stderr.write(fragment.line);
-        }
-      }
-    },
-    finalize: (input) => {
-      const nonTranscriptItems = (input.items ?? []).filter((f) => f.kind !== 'transcript');
-      const text = renderCliTextTranscript({
-        items: nonTranscriptItems,
-        structuredOutput: input.structuredOutput,
-        nextSteps: input.nextSteps,
-        nextStepsRuntime: input.nextStepsRuntime,
+  switch (strategy) {
+    case 'text':
+      return {
+        finalize: (input) =>
+          renderCliTextTranscript({
+            ...input,
+            suppressWarnings: suppressWarnings ?? false,
+            showTestTiming,
+          }),
+      };
+    case 'raw':
+      return {
+        onEmit: (fragment) => {
+          if (fragment.kind === 'transcript') {
+            if (fragment.fragment === 'process-command') {
+              const dim = process.stderr.isTTY ? '\x1B[2m' : '';
+              const reset = process.stderr.isTTY ? '\x1B[0m' : '';
+              process.stderr.write(`${dim}$ ${fragment.displayCommand}${reset}\n`);
+            } else if (fragment.fragment === 'process-line') {
+              process.stderr.write(fragment.line);
+            }
+          }
+        },
+        finalize: (input) => {
+          const nonTranscriptItems = (input.items ?? []).filter((f) => f.kind !== 'transcript');
+          const text = renderCliTextTranscript({
+            items: nonTranscriptItems,
+            structuredOutput: input.structuredOutput,
+            nextSteps: input.nextSteps,
+            nextStepsRuntime: input.nextStepsRuntime,
+            suppressWarnings: suppressWarnings ?? false,
+            showTestTiming,
+          });
+          if (text) {
+            process.stdout.write(text);
+          }
+          return '';
+        },
+      };
+    case 'cli-text': {
+      const renderer = createCliTextRenderer({
+        ...options,
         suppressWarnings: suppressWarnings ?? false,
         showTestTiming,
       });
-      if (text) {
-        process.stdout.write(text);
-      }
-      return '';
-    },
-  });
-}
 
-function createCliTextRenderSession(options: { interactive: boolean }): RenderSession {
-  const suppressWarnings = sessionStore.get('suppressWarnings');
-  const showTestTiming = getConfig().showTestTiming;
-  const renderer = createCliTextRenderer({
-    ...options,
-    suppressWarnings: suppressWarnings ?? false,
-    showTestTiming,
-  });
-
-  return createBaseRenderSession({
-    onEmit: (fragment) => renderer.onFragment(fragment),
-    onSetStructuredOutput: (output) => renderer.setStructuredOutput(output),
-    onSetNextSteps: (steps, runtime) => renderer.setNextSteps(steps, runtime),
-    finalize: () => {
-      renderer.finalize();
-      return '';
-    },
-  });
+      return {
+        onEmit: (fragment) => renderer.onFragment(fragment),
+        onSetStructuredOutput: (output) => renderer.setStructuredOutput(output),
+        onSetNextSteps: (steps, runtime) => renderer.setNextSteps(steps, runtime),
+        finalize: () => {
+          renderer.finalize();
+          return '';
+        },
+      };
+    }
+  }
 }
 
 export interface RenderSessionOptions {
@@ -178,28 +164,13 @@ export function createRenderSession(
   strategy: RenderStrategy,
   options?: RenderSessionOptions,
 ): RenderSession {
-  switch (strategy) {
-    case 'text':
-      return createTextRenderSession();
-    case 'cli-text':
-      return createCliTextRenderSession({ interactive: options?.interactive ?? false });
-    case 'raw':
-      return createRawRenderSession();
-  }
+  return createBaseRenderSession(
+    createRenderHooks(strategy, { interactive: options?.interactive ?? false }),
+  );
 }
 
 export function renderTranscript(input: RenderTranscriptInput, strategy: RenderStrategy): string {
-  const session = createRenderSession(strategy);
-  for (const item of input.items ?? []) {
-    session.emit(item);
-  }
-  if (input.structuredOutput) {
-    session.setStructuredOutput?.(input.structuredOutput);
-  }
-  if (input.nextSteps && input.nextSteps.length > 0) {
-    session.setNextSteps?.([...input.nextSteps], input.nextStepsRuntime ?? 'cli');
-  }
-  return session.finalize();
+  return createRenderHooks(strategy, { interactive: false }).finalize(input);
 }
 
 export function renderFragments(

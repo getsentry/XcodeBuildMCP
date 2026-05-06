@@ -2,10 +2,22 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import type net from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DaemonClient } from '../../cli/daemon-client.ts';
 import { startDaemonServer } from '../daemon-server.ts';
 import type { ToolCatalog, ToolDefinition } from '../../runtime/types.ts';
+
+const xcodeIdeInvokeToolMock = vi.hoisted(() => vi.fn());
+const xcodeIdeDisconnectMock = vi.hoisted(() => vi.fn(async () => undefined));
+
+vi.mock('../../integrations/xcode-tools-bridge/tool-service.ts', () => ({
+  XcodeIdeToolService: vi.fn().mockImplementation(() => ({
+    setWorkflowEnabled: vi.fn(),
+    listTools: vi.fn(async () => []),
+    invokeTool: xcodeIdeInvokeToolMock,
+    disconnect: xcodeIdeDisconnectMock,
+  })),
+}));
 
 function createCatalog(tools: ToolDefinition[]): ToolCatalog {
   return {
@@ -55,6 +67,8 @@ describe('daemon tool.invoke streaming', () => {
         await rm(path.dirname(socketPath), { recursive: true, force: true });
       }),
     );
+    xcodeIdeInvokeToolMock.mockReset();
+    xcodeIdeDisconnectMock.mockClear();
   });
 
   it('streams fragments to the daemon client callback and still returns a terminal structured result', async () => {
@@ -164,7 +178,7 @@ describe('daemon tool.invoke streaming', () => {
     });
   });
 
-  it('returns an error frame when the handler throws', async () => {
+  it('returns a terminal structured error when the handler throws', async () => {
     const tool: ToolDefinition = {
       cliName: 'failing-tool',
       mcpName: 'failing_tool',
@@ -195,7 +209,52 @@ describe('daemon tool.invoke streaming', () => {
     await listen(server, socketPath);
 
     const client = new DaemonClient({ socketPath, timeout: 1000 });
+    const result = await client.invokeTool('failing_tool', {});
 
-    await expect(client.invokeTool('failing_tool', {})).rejects.toThrow('INTERNAL: boom');
+    expect(result.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'error',
+        didError: true,
+        code: 'DIRECT_HANDLER_FAILED',
+        error: 'Tool execution failed: boom',
+      }),
+    );
+  });
+
+  it('returns a terminal xcode-ide structured error when bridge invocation throws', async () => {
+    xcodeIdeInvokeToolMock.mockRejectedValueOnce(new Error('bridge unavailable'));
+
+    const socketPath = await createSocketPath();
+    cleanupPaths.push(socketPath);
+
+    const server = startDaemonServer({
+      socketPath,
+      startedAt: new Date().toISOString(),
+      enabledWorkflows: ['xcode-ide'],
+      catalog: createCatalog([]),
+      workspaceRoot: '/repo',
+      workspaceKey: 'repo-key',
+      xcodeIdeWorkflowEnabled: true,
+      requestShutdown: () => {},
+    });
+    cleanupServers.push(server);
+    await listen(server, socketPath);
+
+    const client = new DaemonClient({ socketPath, timeout: 1000 });
+    const result = await client.invokeXcodeIdeTool('FailingRemote', {});
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredOutput).toEqual({
+      schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+      schemaVersion: '2',
+      result: {
+        kind: 'xcode-bridge-call-result',
+        remoteTool: 'FailingRemote',
+        didError: true,
+        error: 'bridge unavailable',
+        succeeded: false,
+        content: [{ type: 'text', text: 'bridge unavailable' }],
+      },
+    });
   });
 });

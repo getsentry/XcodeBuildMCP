@@ -1990,15 +1990,17 @@ export function createStreamingTailItems(result: ToolDomainResult): TextRenderab
   return items;
 }
 
-function renderBridgeCallContent(
-  content: Extract<ToolDomainResult, { kind: 'xcode-bridge-call-result' }>['content'],
-): string[] {
-  return content.map((item) => {
-    if (item.type === 'text' && typeof item.text === 'string') {
-      return item.text;
-    }
-    return JSON.stringify(item, null, 2);
-  });
+function createRawResponseArtifactItems(pathValue?: string): TextRenderableItem[] {
+  return pathValue
+    ? [
+        createDetailTree([
+          {
+            label: 'Raw Response JSON',
+            value: displayPath(pathValue),
+          },
+        ]),
+      ]
+    : [];
 }
 
 function createSpecialCaseItems(
@@ -2006,6 +2008,15 @@ function createSpecialCaseItems(
   hints?: RenderHints,
 ): TextRenderableItem[] | null {
   switch (result.kind) {
+    case 'error':
+      return [
+        createHeader('Error'),
+        createStatus('error', result.error),
+        createDetailTree([
+          { label: 'Category', value: result.category },
+          { label: 'Code', value: result.code },
+        ]),
+      ];
     case 'app-path':
       return createAppPathItems(result);
     case 'bundle-id':
@@ -2157,43 +2168,44 @@ function createSpecialCaseItems(
             ]),
             createStatus('success', 'Bridge sync completed'),
           ];
-    case 'xcode-bridge-tool-list':
-      return result.didError
-        ? [
-            createHeader('Xcode IDE List Tools'),
-            ...createFailureStatusWithDiagnostics(result, 'Failed to list bridge tools'),
-          ]
-        : [
-            createHeader('Xcode IDE List Tools'),
-            createSection('Tools', [
-              JSON.stringify({ toolCount: result.toolCount, tools: result.tools }, null, 2),
-            ]),
-            createStatus('success', `Found ${result.toolCount} tool(s)`),
-          ];
+    case 'xcode-bridge-tool-list': {
+      const items: TextRenderableItem[] = [createHeader('Xcode IDE List Tools')];
+      if (result.didError) {
+        items.push(...createFailureStatusWithDiagnostics(result, 'Failed to list bridge tools'));
+        items.push(...createRawResponseArtifactItems(result.artifacts?.rawResponseJsonPath));
+        return items;
+      }
+      items.push(
+        createStatus(
+          'success',
+          result.artifacts?.rawResponseJsonPath
+            ? `Found ${result.toolCount} tool(s). Raw response saved to artifact.`
+            : `Found ${result.toolCount} tool(s)`,
+        ),
+      );
+      items.push(...createRawResponseArtifactItems(result.artifacts?.rawResponseJsonPath));
+      return items;
+    }
     case 'xcode-bridge-call-result': {
       const items: TextRenderableItem[] = [
         createHeader('Xcode IDE Call Tool', [{ label: 'Remote Tool', value: result.remoteTool }]),
       ];
       if (result.didError) {
-        if (result.content.length > 0) {
-          items.push(createSection('Relayed Content', renderBridgeCallContent(result.content)));
-        }
         items.push(
           ...createFailureStatusWithDiagnostics(result, `Tool "${result.remoteTool}" failed`),
         );
+        items.push(...createRawResponseArtifactItems(result.artifacts?.rawResponseJsonPath));
         return items;
       }
-      if (result.content.length > 0) {
-        items.push(createSection('Relayed Content', renderBridgeCallContent(result.content)));
-      }
-      if (result.structuredContent) {
-        items.push(
-          createSection('Structured Content', [JSON.stringify(result.structuredContent, null, 2)]),
-        );
-      }
-      if (result.content.length === 0 && !result.structuredContent) {
-        items.push(createStatus('success', `Tool "${result.remoteTool}" completed successfully`));
-      }
+      items.push(
+        createStatus(
+          'success',
+          result.artifacts?.rawResponseJsonPath
+            ? `Tool "${result.remoteTool}" completed successfully. Raw response saved to artifact.`
+            : `Tool "${result.remoteTool}" completed successfully`,
+        ),
+      );
+      items.push(...createRawResponseArtifactItems(result.artifacts?.rawResponseJsonPath));
       return items;
     }
     default:

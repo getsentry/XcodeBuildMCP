@@ -11,7 +11,6 @@ export interface ToolAttachment {
  * Provides fragment emission for live progress streaming.
  */
 export interface StreamingExecutionContext {
-  liveProgressEnabled: boolean;
   attach?(image: ToolAttachment): void;
   emitFragment(fragment: AnyFragment): void;
 }

@@ -37,8 +37,6 @@ export interface StructuredToolOutput {
 export interface ToolHandlerContext {
   emit: (fragment: AnyFragment) => void;
   attach: (image: ImageAttachment) => void;
-  liveProgressEnabled: boolean;
-  streamingFragmentsEnabled: boolean;
   nextStepParams?: NextStepParamsMap;
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;

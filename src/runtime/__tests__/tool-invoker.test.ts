@@ -8,6 +8,8 @@ import type { ToolDefinition } from '../types.ts';
 import { createToolCatalog } from '../tool-catalog.ts';
 import { DefaultToolInvoker } from '../tool-invoker.ts';
 import { createRenderSession } from '../../rendering/render.ts';
+import type { StructuredToolOutput, ToolHandlerContext } from '../../rendering/types.ts';
+import { createStructuredErrorOutput } from '../../utils/structured-error.ts';
 import { DaemonVersionMismatchError } from '../../cli/daemon-client.ts';
 import { ensureDaemonRunning, forceStopDaemon } from '../../cli/daemon-control.ts';
 
@@ -54,31 +56,40 @@ function statusFragment(
 
 function daemonResult(text: string, opts?: Partial<DaemonToolResult>): DaemonToolResult {
   return {
-    fragments: [
-      {
-        kind: 'infrastructure',
-        fragment: 'status',
-        level: 'success',
-        message: text,
+    structuredOutput: {
+      schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+      schemaVersion: '2',
+      result: {
+        kind: 'xcode-bridge-call-result',
+        remoteTool: 'Alpha',
+        didError: false,
+        error: null,
+        succeeded: true,
+        content: [{ type: 'text', text }],
       },
-    ],
+    },
     isError: false,
     ...opts,
   };
 }
 
+function structuredTextOutput(text: string): StructuredToolOutput {
+  return {
+    schema: 'xcodebuildmcp.output.debug-command-result',
+    schemaVersion: '1',
+    result: {
+      kind: 'debug-command-result',
+      didError: false,
+      error: null,
+      command: 'test',
+      outputLines: [text],
+    },
+  };
+}
+
 function streamedToolResult(opts: Partial<ToolInvokeResult> = {}): ToolInvokeResult {
   return {
-    structuredOutput: {
-      schema: 'xcodebuildmcp.output.simulator-list',
-      schemaVersion: '1',
-      result: {
-        kind: 'simulator-list',
-        didError: false,
-        error: null,
-        simulators: [],
-      },
-    },
+    structuredOutput: structuredTextOutput('daemon-result'),
     ...opts,
   };
 }
@@ -118,7 +129,7 @@ function invokeAndFinalize(
     workspaceRoot?: string;
     cliExposedWorkflowIds?: string[];
   },
-): Promise<ToolResponse> {
+): Promise<ToolResponse & { structuredOutput?: StructuredToolOutput }> {
   const session = createRenderSession('text');
   const promise = invoker.invoke(toolName, args, { ...opts, renderSession: session });
   return promise.then(() => {
@@ -127,6 +138,7 @@ function invokeAndFinalize(
       content: text ? [{ type: 'text', text }] : [],
       isError: session.isError() || undefined,
       nextSteps: undefined,
+      structuredOutput: session.getStructuredOutput?.(),
     };
     return response;
   });
@@ -134,7 +146,7 @@ function invokeAndFinalize(
 
 function emitHandler(text: string): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
-    ctx.emit(statusFragment('success', text));
+    ctx.structuredOutput = structuredTextOutput(text);
   });
 }
 
@@ -150,7 +162,7 @@ function emitNextStepsHandler(
   nextStepParams?: ToolResponse['nextStepParams'],
 ): ToolDefinition['handler'] {
   return vi.fn(async (_params, ctx) => {
-    ctx.emit(statusFragment('success', text));
+    ctx.structuredOutput = structuredTextOutput(text);
     if (nextSteps) ctx.nextSteps = nextSteps;
     if (nextStepParams) ctx.nextStepParams = nextStepParams;
   });
@@ -215,6 +227,31 @@ describe('DefaultToolInvoker CLI routing', () => {
     expect(response.content[0].text).toContain('direct-result');
   });
 
+  it('sets explicit structured error output for unresolved tool names', async () => {
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'list-sims',
+        workflow: 'simulator',
+        stateful: false,
+        handler: emitHandler('direct-result'),
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    const response = await invokeAndFinalize(invoker, 'missing-tool', {}, { runtime: 'cli' });
+
+    expect(response.isError).toBe(true);
+    expect(response.structuredOutput?.schema).toBe('xcodebuildmcp.output.error');
+    expect(response.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'error',
+        didError: true,
+        code: 'TOOL_NOT_FOUND',
+      }),
+    );
+    expect(response.content[0].text).toContain("Unknown tool 'missing-tool'");
+  });
+
   it('injects direct invocation progress and structured output hooks into the handler context', async () => {
     const progressEvents: Array<{ kind: string }> = [];
     const structuredOutputs: string[] = [];
@@ -265,6 +302,71 @@ describe('DefaultToolInvoker CLI routing', () => {
     );
     expect(progressEvents).toEqual([{ kind: 'infrastructure' }]);
     expect(structuredOutputs).toEqual(['xcodebuildmcp.output.simulator-list']);
+  });
+
+  it('sets explicit structured error output when direct handlers throw', async () => {
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'list-sims',
+        workflow: 'simulator',
+        stateful: false,
+        handler: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    const response = await invokeAndFinalize(invoker, 'list-sims', {}, { runtime: 'cli' });
+
+    expect(response.isError).toBe(true);
+    expect(response.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'error',
+        didError: true,
+        code: 'DIRECT_HANDLER_FAILED',
+        error: 'Tool execution failed: boom',
+      }),
+    );
+  });
+
+  it('keeps daemon handler failures as terminal structured output instead of protocol errors', async () => {
+    const handlerContext: ToolHandlerContext = {
+      emit: () => {},
+      attach: () => {},
+    };
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'list-sims',
+        workflow: 'simulator',
+        stateful: false,
+        handler: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    await expect(
+      invoker.invokeDirect(
+        catalog.tools[0],
+        {},
+        {
+          runtime: 'daemon',
+          handlerContext,
+          renderSession: createRenderSession('text'),
+        },
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(handlerContext.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'error',
+        didError: true,
+        code: 'DIRECT_HANDLER_FAILED',
+        error: 'Tool execution failed: boom',
+      }),
+    );
   });
 
   it('routes stateful tools through daemon and auto-starts when needed', async () => {
@@ -345,7 +447,7 @@ describe('DefaultToolInvoker CLI routing', () => {
     expect(directHandler).not.toHaveBeenCalled();
   });
 
-  it('renders streamed daemon progress without relying on terminal event replay', async () => {
+  it('does not replay streamed daemon progress into the final response', async () => {
     daemonClientMock.invokeTool.mockImplementation(async (_name, _args, options) => {
       options?.onFragment?.({
         kind: 'infrastructure',
@@ -377,7 +479,8 @@ describe('DefaultToolInvoker CLI routing', () => {
       },
     );
 
-    expect(response.content[0].text).toContain('daemon-event-result');
+    expect(response.content[0].text).toContain('daemon-result');
+    expect(response.content[0].text).not.toContain('daemon-event-result');
   });
 });
 
@@ -425,7 +528,61 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     );
     expect(daemonClientMock.invokeXcodeIdeTool).toHaveBeenCalledWith('Alpha', { value: 'hello' });
     expect(directHandler).not.toHaveBeenCalled();
-    expect(response.content[0].text).toContain('daemon-result');
+    expect(response.content[0].text).toContain('Tool "Alpha" completed successfully');
+  });
+
+  it('maps dynamic xcode-ide daemon failures to explicit structured error output', async () => {
+    daemonClientMock.invokeXcodeIdeTool.mockResolvedValue(
+      daemonResult('Remote tool failed', {
+        isError: true,
+        structuredOutput: {
+          schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
+          schemaVersion: '2',
+          result: {
+            kind: 'xcode-bridge-call-result',
+            remoteTool: 'Alpha',
+            didError: true,
+            error: 'Remote tool failed',
+            succeeded: false,
+            content: [{ type: 'text', text: 'Remote tool failed' }],
+          },
+        },
+      }),
+    );
+    const directHandler = emitHandler('direct-result');
+    const catalog = createToolCatalog([
+      makeTool({
+        cliName: 'xcode-ide-alpha',
+        workflow: 'xcode-ide',
+        stateful: false,
+        xcodeIdeRemoteToolName: 'Alpha',
+        handler: directHandler,
+      }),
+    ]);
+    const invoker = new DefaultToolInvoker(catalog);
+
+    const response = await invokeAndFinalize(
+      invoker,
+      'xcode-ide-alpha',
+      { value: 'hello' },
+      {
+        runtime: 'cli',
+        socketPath: '/tmp/xcodebuildmcp.sock',
+        workspaceRoot: '/repo',
+        cliExposedWorkflowIds: ['simulator', 'xcode-ide'],
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'xcode-bridge-call-result',
+        didError: true,
+        error: 'Remote tool failed',
+      }),
+    );
+    expect(response.content[0].text).toContain('Remote tool failed');
+    expect(directHandler).not.toHaveBeenCalled();
   });
 
   it('fails for dynamic xcode-ide tools when socket path is missing', async () => {
@@ -451,6 +608,13 @@ describe('DefaultToolInvoker xcode-ide dynamic routing', () => {
     );
 
     expect(response.isError).toBe(true);
+    expect(response.structuredOutput?.result).toEqual(
+      expect.objectContaining({
+        kind: 'error',
+        didError: true,
+        code: 'SOCKET_PATH_MISSING',
+      }),
+    );
     expect(response.content[0].text).toContain('No socket path configured');
     expect(directHandler).not.toHaveBeenCalled();
     expect(daemonClientMock.invokeXcodeIdeTool).not.toHaveBeenCalled();
@@ -790,7 +954,7 @@ describe('DefaultToolInvoker next steps post-processing', () => {
     expect(text).toContain('session-123');
   });
 
-  it('renders failure next steps for ordinary error responses with replayable events', async () => {
+  it('does not render failure next steps for emitted error fragments alone', async () => {
     const directHandler = emitErrorEventsHandler([
       {
         kind: 'infrastructure',
@@ -830,6 +994,51 @@ describe('DefaultToolInvoker next steps post-processing', () => {
     const response = await invokeAndFinalize(invoker, 'list', {}, { runtime: 'cli' });
 
     expect(response.nextSteps).toBeUndefined();
+    const text = response.content.map((item) => (item.type === 'text' ? item.text : '')).join('\n');
+    expect(response.isError).toBeUndefined();
+    expect(text).not.toContain('Try building for device');
+    expect(text).not.toContain('build-device');
+  });
+
+  it('renders failure next steps for explicit structured error output', async () => {
+    const directHandler: ToolDefinition['handler'] = vi.fn(async (_params, ctx) => {
+      ctx.structuredOutput = createStructuredErrorOutput({
+        category: 'runtime',
+        code: 'ORDINARY_FAILURE',
+        message: 'failed',
+      });
+    });
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'list_devices',
+        cliName: 'list',
+        mcpName: 'list_devices',
+        workflow: 'device',
+        stateful: false,
+        nextStepTemplates: [
+          {
+            label: 'Try building for device',
+            toolId: 'build_device',
+            when: 'failure',
+          },
+        ],
+        handler: directHandler,
+      }),
+      makeTool({
+        id: 'build_device',
+        cliName: 'build-device',
+        mcpName: 'build_device',
+        workflow: 'device',
+        stateful: false,
+        handler: emitHandler('build'),
+      }),
+    ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invokeAndFinalize(invoker, 'list', {}, { runtime: 'cli' });
+
+    expect(response.isError).toBe(true);
     const text = response.content.map((item) => (item.type === 'text' ? item.text : '')).join('\n');
     expect(text).toContain('Try building for device');
     expect(text).toContain('build-device');
