@@ -15,7 +15,7 @@ import { createCliProgressReporter } from '../cli-progress-reporter.ts';
 import { formatCliTextLine } from '../terminal-output.ts';
 import {
   createNextStepsBlock,
-  createStreamingTailItems,
+  createStreamingFinalItems,
   renderDomainResultTextItems,
   type SummaryTextBlock,
   type TextRenderableItem,
@@ -116,6 +116,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
   let sawProgressNextSteps = false;
   let lastRenderedTestProgressKey: string | null = null;
+  let pendingStreamedSummary: SummaryTextBlock | null = null;
 
   function writeDurable(text: string): void {
     sink.clearTransient();
@@ -396,6 +397,8 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
         sawIncomingNonHeaderEvent = true;
         if (item.type === 'summary') {
           sawIncomingSummaryEvent = true;
+          pendingStreamedSummary = item as SummaryTextBlock;
+          return;
         } else {
           sawIncomingNonSummaryEvent = true;
         }
@@ -434,18 +437,19 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
           );
           const replayItems = structuredItems.filter((item) => {
             if (sawIncomingHeaderEvent && item.type === 'header') return false;
-            if (sawIncomingSummaryEvent && item.type === 'summary') return false;
             return true;
           });
           for (const item of replayItems) {
             processItem(item);
           }
         } else {
-          const tailItems = createStreamingTailItems(structuredOutput.result);
-          for (const item of tailItems) {
+          const finalItems = createStreamingFinalItems(structuredOutput.result);
+          for (const item of finalItems) {
             processItem(item);
           }
         }
+      } else if (pendingStreamedSummary) {
+        processItem(pendingStreamedSummary);
       }
       flushGroupedDiagnostics(lastSummaryStatus !== 'SUCCEEDED');
       groupedCompilerErrors.length = 0;
@@ -473,6 +477,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       sawProgressNextSteps = false;
       collectedTestCaseResults.length = 0;
       lastRenderedTestProgressKey = null;
+      pendingStreamedSummary = null;
     },
   };
 }

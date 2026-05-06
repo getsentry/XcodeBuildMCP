@@ -7,6 +7,7 @@ import type {
   BuildRunResultArtifacts,
   BuildRunResultDomainResult,
   BuildTarget,
+  Counts,
   TestDiagnostics,
   TestResultArtifacts,
   TestResultDomainResult,
@@ -27,6 +28,7 @@ import type { XcodebuildRunState } from './xcodebuild-run-state.js';
 import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.js';
 import { createStreamingExecutionContext } from './tool-execution-compat.js';
 import { isBuildErrorDiagnosticLine } from './xcodebuild-line-parsers.js';
+import { extractTestSummaryCountsFromXcresult } from './xcresult-test-failures.ts';
 
 const MAX_DISCOVERED_TESTS = 6;
 
@@ -170,6 +172,22 @@ function hasTestCounts(state: XcodebuildRunState): boolean {
     state.skippedTests > 0 ||
     state.testFailures.length > 0
   );
+}
+
+function createStateTestCounts(state: XcodebuildRunState): Counts | undefined {
+  if (!hasTestCounts(state)) {
+    return undefined;
+  }
+
+  const failed = Math.max(state.failedTests, state.testFailures.length);
+  const skipped = state.skippedTests;
+  const passed = Math.max(0, state.completedTests - failed - skipped);
+
+  return {
+    passed,
+    failed,
+    skipped,
+  };
 }
 
 export function createTestDiscoveryFragment(
@@ -372,9 +390,6 @@ export function createTestDomainResult(options: {
 }): TestResultDomainResult {
   const { durationMs, pipelineResult } = finalizePipelineResult(options);
   const state = pipelineResult.state;
-  const failed = Math.max(state.failedTests, state.testFailures.length);
-  const skipped = state.skippedTests;
-  const passed = Math.max(0, state.completedTests - failed - skipped);
   const testSelectionInfo = createTestSelectionInfo(options.preflight);
   const testCases = state.testCaseResults.map((fragment) => ({
     ...(fragment.suite !== undefined ? { suite: fragment.suite } : {}),
@@ -382,6 +397,18 @@ export function createTestDomainResult(options: {
     status: fragment.status,
     ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
   }));
+  const detectedXcresultPath =
+    options.target === 'swift-package' ? null : options.started.pipeline.xcresultPath;
+  const providedXcresultPath =
+    'xcresultPath' in options.artifacts ? options.artifacts.xcresultPath : undefined;
+  const xcresultPath = detectedXcresultPath ?? providedXcresultPath;
+  const artifacts: TestResultArtifacts = {
+    ...options.artifacts,
+    ...(xcresultPath ? { xcresultPath } : {}),
+  };
+  const counts =
+    (xcresultPath ? extractTestSummaryCountsFromXcresult(xcresultPath) : null) ??
+    createStateTestCounts(state);
   const result: TestResultDomainResult = {
     kind: 'test-result',
     request: options.request,
@@ -390,18 +417,10 @@ export function createTestDomainResult(options: {
     summary: {
       status: options.succeeded ? 'SUCCEEDED' : 'FAILED',
       durationMs,
-      ...(hasTestCounts(state)
-        ? {
-            counts: {
-              passed,
-              failed,
-              skipped,
-            },
-          }
-        : {}),
+      ...(counts ? { counts } : {}),
       target: options.target,
     },
-    artifacts: options.artifacts,
+    artifacts,
     ...(testSelectionInfo ? { tests: testSelectionInfo } : {}),
     diagnostics: createTestDiagnostics(state, !options.succeeded, options.fallbackErrorMessages),
     ...(testCases.length > 0 ? { testCases } : {}),

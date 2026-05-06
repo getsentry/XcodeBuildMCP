@@ -35,6 +35,24 @@ describe('normalizeStructuredEnvelope', () => {
     });
   });
 
+  it('preserves xcresult paths in test result artifacts', () => {
+    const envelope: StructuredOutputEnvelope<unknown> = {
+      schema: 'xcodebuildmcp.output.test-result',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: {
+        summary: { target: 'simulator' },
+        artifacts: {
+          buildLogPath: '/tmp/build.log',
+          xcresultPath: '/tmp/App Tests.xcresult',
+        },
+      },
+    };
+
+    expect(normalizeStructuredEnvelope(envelope)).toEqual(envelope);
+  });
+
   it('keeps suite-less passed test cases for non-simulator results', () => {
     const envelope: StructuredOutputEnvelope<unknown> = {
       schema: 'xcodebuildmcp.output.test-result',

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { log } from './logger.ts';
 import type { TestFailureFragment } from '../types/domain-fragments.ts';
+import type { Counts } from '../types/domain-results.ts';
 import { parseRawTestName } from './xcodebuild-line-parsers.ts';
 
 interface XcresultTestNode {
@@ -12,6 +13,52 @@ interface XcresultTestNode {
 
 interface XcresultTestResults {
   testNodes: XcresultTestNode[];
+}
+
+interface XcresultTestSummary {
+  totalTestCount?: unknown;
+  passedTests?: unknown;
+  failedTests?: unknown;
+  skippedTests?: unknown;
+}
+
+function isSummaryCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+export function parseXcresultTestSummaryCounts(raw: string): Counts | null {
+  const summary = JSON.parse(raw) as XcresultTestSummary;
+  const { passedTests, failedTests, skippedTests } = summary;
+
+  if (
+    !isSummaryCount(passedTests) ||
+    !isSummaryCount(failedTests) ||
+    !isSummaryCount(skippedTests)
+  ) {
+    return null;
+  }
+
+  return {
+    passed: passedTests,
+    failed: failedTests,
+    skipped: skippedTests,
+  };
+}
+
+export function extractTestSummaryCountsFromXcresult(xcresultPath: string): Counts | null {
+  try {
+    const output = execFileSync(
+      'xcrun',
+      ['xcresulttool', 'get', 'test-results', 'summary', '--path', xcresultPath, '--compact'],
+      { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    return parseXcresultTestSummaryCounts(output);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log('debug', `Failed to extract test summary from xcresult: ${message}`);
+    return null;
+  }
 }
 
 export function extractTestFailuresFromXcresult(xcresultPath: string): TestFailureFragment[] {

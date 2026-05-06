@@ -249,7 +249,10 @@ describe('text render parity', () => {
             durationMs: 2200,
             counts: { passed: 1, failed: 1, skipped: 0 },
           },
-          artifacts: { buildLogPath: '/tmp/Test.log' },
+          artifacts: {
+            buildLogPath: '/tmp/Test.log',
+            xcresultPath: '/tmp/App Tests.xcresult',
+          },
           diagnostics: {
             warnings: [],
             errors: [],
@@ -284,7 +287,57 @@ describe('text render parity', () => {
     expect(output.match(/Discovered 2 test\(s\):/g)).toHaveLength(1);
     expect(output.match(/MCPTestTests\n  ✗ testTwo\(\):/g)).toHaveLength(1);
     expect(output.match(/1 test failed, 1 passed, 0 skipped/g)).toHaveLength(1);
+    expect(output).toContain('Result Bundle: /tmp/App Tests.xcresult');
     expect(output).toContain('Build Logs: /tmp/Test.log');
+  });
+
+  it('matches cli text and uses structured build summary when streamed build-summary disagrees', () => {
+    const fixture: TranscriptFixture = {
+      progressEvents: [
+        {
+          kind: 'build-result',
+          fragment: 'invocation',
+          operation: 'BUILD',
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+        },
+        {
+          kind: 'build-result',
+          fragment: 'build-summary',
+          operation: 'BUILD',
+          status: 'FAILED',
+          durationMs: 9900,
+        },
+      ],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED', durationMs: 3200 },
+          artifacts: { scheme: 'MyApp', buildLogPath: '/tmp/build.log' },
+          diagnostics: { warnings: [], errors: [] },
+        },
+      },
+    };
+
+    const rendered = renderTranscript(
+      {
+        items: fixture.progressEvents,
+        structuredOutput: fixture.structuredOutput,
+      },
+      'text',
+    );
+
+    expect(rendered).toBe(captureCliText(fixture));
+    expect(rendered).toContain('✅ Build succeeded. (⏱️ 3.2s)');
+    expect(rendered).not.toContain('❌ Build failed. (⏱️ 9.9s)');
   });
 
   it('renders next steps in MCP tool-call syntax for MCP runtime text transcripts', () => {

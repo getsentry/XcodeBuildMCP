@@ -168,6 +168,7 @@ export type TestResultArtifacts = AtLeastOne<{
   deviceId: string;
   buildLogPath: string;
   packagePath: string;
+  xcresultPath: string;
 }>;
 export interface CoverageSummary extends StatusSummary {
   coveragePct?: number;

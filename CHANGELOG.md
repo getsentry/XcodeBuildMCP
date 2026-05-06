@@ -11,6 +11,8 @@
 - Fixed CLI test summaries showing false-positive compiler errors from xcodebuild NSError dump lines, and added compiler-error snapshot coverage for simulator, device, and macOS build-style flows ([#383](https://github.com/getsentry/XcodeBuildMCP/issues/383)).
 - Fixed simulator OSLog helper cleanup so server and daemon startup reconcile same-workspace orphaned log streams without stopping helpers owned by live sessions in other workspaces ([#382](https://github.com/getsentry/XcodeBuildMCP/issues/382)).
 - Fixed Weather example test discovery and made CLI test progress visible while tests are running instead of leaving the last build phase displayed.
+- Exposed xcresult bundle paths in test result structured output and text output when xcodebuild reports or is given a result bundle path, so agents can inspect test artifacts after simulator, device, and macOS test runs ([#392](https://github.com/getsentry/XcodeBuildMCP/issues/392)).
+- Fixed final test summaries to use xcresult top-level test declaration counts when available, avoiding overcounting dynamic-parameter test runs ([#392](https://github.com/getsentry/XcodeBuildMCP/issues/392)).
 
 ### Changed
 

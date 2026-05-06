@@ -292,6 +292,34 @@ describe('test_device plugin', () => {
       expect(result.isError()).toBeFalsy();
     });
 
+    it('should expose user-provided result bundle paths in test output', async () => {
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'Test Succeeded',
+      });
+
+      const { result } = await runTestDeviceLogic(
+        {
+          projectPath: '/path/to/project.xcodeproj',
+          scheme: 'MyScheme',
+          deviceId: 'test-device-123',
+          configuration: 'Debug',
+          extraArgs: [
+            '-resultBundlePath',
+            '/tmp/Stale Device Tests.xcresult',
+            '-resultBundlePath=/tmp/Device Tests.xcresult',
+          ],
+          preferXcodebuild: false,
+          platform: 'iOS',
+        },
+        mockExecutor,
+        mockFs(),
+      );
+
+      expectPendingBuildResponse(result);
+      expect(result.text()).toContain('Result Bundle: /tmp/Device Tests.xcresult');
+    });
+
     it('should handle workspace testing successfully', async () => {
       const mockExecutor = createMockExecutor({
         success: true,

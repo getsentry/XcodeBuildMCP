@@ -511,7 +511,7 @@ export function formatSummaryEvent(event: SummaryTextBlock): string {
     const skipped = event.skippedTests ?? 0;
 
     if (succeeded) {
-      return `${statusEmoji} ${pluralize(passed, 'test', 'tests')} passed, ${skipped} skipped${durationPart}`;
+      return `${statusEmoji} ${pluralize(passed, 'test', 'tests')} passed, ${failed} failed, ${skipped} skipped${durationPart}`;
     }
 
     return `${statusEmoji} ${pluralize(failed, 'test', 'tests')} failed, ${passed} passed, ${skipped} skipped${durationPart}`;

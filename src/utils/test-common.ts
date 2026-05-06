@@ -17,7 +17,11 @@ import { type TestPreflightResult } from './test-preflight.ts';
 
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
 
-import type { BuildTarget, TestResultDomainResult } from '../types/domain-results.ts';
+import type {
+  BuildTarget,
+  TestResultArtifacts,
+  TestResultDomainResult,
+} from '../types/domain-results.ts';
 import type { BuildInvocationRequest } from '../types/domain-fragments.ts';
 import type { StreamingExecutor } from '../types/tool-execution.ts';
 import {
@@ -53,6 +57,49 @@ function getFallbackErrorMessages(
   responseContent?: Array<{ type: 'text'; text: string }>,
 ): string[] {
   return [...streamedLines, ...(responseContent ?? []).map((item) => item.text)];
+}
+
+function isResultBundlePathValue(value: string | undefined): value is string {
+  return value !== undefined && value.length > 0 && !value.startsWith('-');
+}
+
+function findResultBundlePathArg(extraArgs?: readonly string[]): string | undefined {
+  if (!extraArgs) {
+    return undefined;
+  }
+
+  let resultBundlePath: string | undefined;
+  for (let index = 0; index < extraArgs.length; index += 1) {
+    const argument = extraArgs[index];
+    if (argument === '-resultBundlePath') {
+      const value = extraArgs[index + 1];
+      if (isResultBundlePathValue(value)) {
+        resultBundlePath = value;
+        index += 1;
+      }
+      continue;
+    }
+    if (argument?.startsWith('-resultBundlePath=')) {
+      const value = argument.slice('-resultBundlePath='.length);
+      if (isResultBundlePathValue(value)) {
+        resultBundlePath = value;
+      }
+    }
+  }
+
+  return resultBundlePath;
+}
+
+function createXcodebuildTestArtifacts(
+  params: Pick<SharedTestExecutorParams, 'deviceId'>,
+  started: ReturnType<typeof createDomainStreamingPipeline>,
+  xcresultPath?: string,
+): TestResultArtifacts {
+  return {
+    ...(params.deviceId ? { deviceId: params.deviceId } : {}),
+    buildLogPath: started.pipeline.logPath,
+    ...(xcresultPath ? { xcresultPath } : {}),
+  };
 }
 
 export function resolveTestProgressEnabled(progress: boolean | undefined): boolean {
@@ -140,10 +187,7 @@ export function createTestExecutor(
             started,
             succeeded: false,
             target,
-            artifacts: {
-              ...(params.deviceId ? { deviceId: params.deviceId } : {}),
-              buildLogPath: started.pipeline.logPath,
-            },
+            artifacts: createXcodebuildTestArtifacts(params, started),
             fallbackErrorMessages: getFallbackErrorMessages(
               started.stderrLines,
               buildForTestingResult.content,
@@ -177,10 +221,7 @@ export function createTestExecutor(
           started,
           succeeded: !testWithoutBuildingResult.isError,
           target,
-          artifacts: {
-            ...(params.deviceId ? { deviceId: params.deviceId } : {}),
-            buildLogPath: started.pipeline.logPath,
-          },
+          artifacts: createXcodebuildTestArtifacts(params, started, executionPlan.resultBundlePath),
           fallbackErrorMessages: getFallbackErrorMessages(
             started.stderrLines,
             testWithoutBuildingResult.content,
@@ -206,10 +247,11 @@ export function createTestExecutor(
         started,
         succeeded: !singlePhaseResult.isError,
         target,
-        artifacts: {
-          ...(params.deviceId ? { deviceId: params.deviceId } : {}),
-          buildLogPath: started.pipeline.logPath,
-        },
+        artifacts: createXcodebuildTestArtifacts(
+          params,
+          started,
+          findResultBundlePathArg(params.extraArgs),
+        ),
         fallbackErrorMessages: getFallbackErrorMessages(
           started.stderrLines,
           singlePhaseResult.content,
@@ -225,10 +267,7 @@ export function createTestExecutor(
         started,
         succeeded: false,
         target,
-        artifacts: {
-          ...(params.deviceId ? { deviceId: params.deviceId } : {}),
-          buildLogPath: started.pipeline.logPath,
-        },
+        artifacts: createXcodebuildTestArtifacts(params, started),
         fallbackErrorMessages: [...started.stderrLines, errorMessage],
         preflight: options.preflight,
         request: options.request,

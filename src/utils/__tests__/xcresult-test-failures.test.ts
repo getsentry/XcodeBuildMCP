@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { parseXcresultFailureMessage } from '../xcresult-test-failures.ts';
+import {
+  parseXcresultFailureMessage,
+  parseXcresultTestSummaryCounts,
+} from '../xcresult-test-failures.ts';
+
+describe('parseXcresultTestSummaryCounts', () => {
+  it('uses top-level declaration counts instead of device run counts', () => {
+    const summary = JSON.stringify({
+      totalTestCount: 16,
+      passedTests: 16,
+      failedTests: 0,
+      skippedTests: 0,
+      devicesAndConfigurations: [
+        {
+          totalTestCount: 19,
+          passedTests: 19,
+          failedTests: 0,
+          skippedTests: 0,
+        },
+      ],
+    });
+
+    expect(parseXcresultTestSummaryCounts(summary)).toEqual({
+      passed: 16,
+      failed: 0,
+      skipped: 0,
+    });
+  });
+});
 
 describe('parseXcresultFailureMessage', () => {
   it('preserves locations from multi-line Swift Testing failure messages', () => {

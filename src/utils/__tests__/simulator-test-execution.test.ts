@@ -62,6 +62,7 @@ describe('createSimulatorTwoPhaseExecutionPlan', () => {
       '/tmp/Calculator.xcresult',
     ]);
     expect(plan.usesExactSelectors).toBe(false);
+    expect(plan.resultBundlePath).toBe('/tmp/Calculator.xcresult');
   });
 
   it('preserves user-supplied selector arguments in both simulator test phases', () => {
@@ -90,5 +91,32 @@ describe('createSimulatorTwoPhaseExecutionPlan', () => {
 
     expect(plan.buildArgs).toEqual([]);
     expect(plan.testArgs).toEqual(['-resultBundlePath', '/tmp/UserProvided.xcresult']);
+    expect(plan.resultBundlePath).toBe('/tmp/UserProvided.xcresult');
+  });
+
+  it('supports equals-form resultBundlePath arguments', () => {
+    const plan = createSimulatorTwoPhaseExecutionPlan({
+      extraArgs: ['-resultBundlePath=/tmp/EqualsProvided.xcresult'],
+    });
+
+    expect(plan.buildArgs).toEqual([]);
+    expect(plan.testArgs).toEqual(['-resultBundlePath', '/tmp/EqualsProvided.xcresult']);
+    expect(plan.resultBundlePath).toBe('/tmp/EqualsProvided.xcresult');
+  });
+
+  it('uses the last valid resultBundlePath argument', () => {
+    const plan = createSimulatorTwoPhaseExecutionPlan({
+      extraArgs: [
+        '-resultBundlePath',
+        '-quiet',
+        '-resultBundlePath',
+        '/tmp/First.xcresult',
+        '-resultBundlePath=/tmp/Last.xcresult',
+      ],
+    });
+
+    expect(plan.buildArgs).toEqual(['-quiet']);
+    expect(plan.testArgs).toEqual(['-quiet', '-resultBundlePath', '/tmp/Last.xcresult']);
+    expect(plan.resultBundlePath).toBe('/tmp/Last.xcresult');
   });
 });

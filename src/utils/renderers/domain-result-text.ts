@@ -1960,6 +1960,9 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
     case 'test-result': {
       if (!('artifacts' in result) || !result.artifacts) return [];
       const items: DetailTreeTextBlock['items'] = [];
+      if ('xcresultPath' in result.artifacts && typeof result.artifacts.xcresultPath === 'string') {
+        items.push({ label: 'Result Bundle', value: displayPath(result.artifacts.xcresultPath) });
+      }
       if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
         items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
       }
@@ -1970,14 +1973,15 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
   }
 }
 
-export function createStreamingTailItems(result: ToolDomainResult): TextRenderableItem[] {
-  const items = createBuildLikeTailItems(result);
+export function createStreamingFinalItems(result: ToolDomainResult): TextRenderableItem[] {
+  const items: TextRenderableItem[] = [];
 
-  if (!('diagnostics' in result) || !result.diagnostics) {
-    return items;
-  }
-
-  if ('rawOutput' in result.diagnostics && Array.isArray(result.diagnostics.rawOutput)) {
+  if (
+    'diagnostics' in result &&
+    result.diagnostics &&
+    'rawOutput' in result.diagnostics &&
+    Array.isArray(result.diagnostics.rawOutput)
+  ) {
     items.push(
       ...createStandardDiagnosticSections({
         warnings: [],
@@ -1987,6 +1991,12 @@ export function createStreamingTailItems(result: ToolDomainResult): TextRenderab
     );
   }
 
+  const summary = createSummaryBlock(result);
+  if (summary) {
+    items.push(summary);
+  }
+
+  items.push(...createBuildLikeTailItems(result));
   return items;
 }
 

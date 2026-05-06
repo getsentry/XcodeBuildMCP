@@ -275,7 +275,7 @@ describe('cli-text-renderer', () => {
       ],
     });
 
-    expect(output).toContain('✅ 1 test passed, 0 skipped');
+    expect(output).toContain('✅ 1 test passed, 0 failed, 0 skipped');
     expect(output).not.toContain('Compiler Errors (1):');
     expect(output).not.toContain('SimCallingSelector=launchApplicationWithID:options:pid:error:,');
   });
@@ -714,8 +714,94 @@ describe('cli-text-renderer', () => {
 
     expect(output).toContain('🧪 Test');
     expect(output).toContain('Scheme: MyApp');
-    expect(output).toContain('5 tests passed, 1 skipped');
+    expect(output).toContain('5 tests passed, 0 failed, 1 skipped');
     expect(output).toContain('Build Logs: /tmp/test.log');
+  });
+
+  it('uses finalized test-result counts instead of the streamed build-summary counts', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'test-result',
+          fragment: 'test-progress',
+          operation: 'TEST',
+          completed: 19,
+          failed: 0,
+          skipped: 0,
+        },
+        {
+          kind: 'test-result',
+          fragment: 'build-summary',
+          operation: 'TEST',
+          status: 'SUCCEEDED',
+          totalTests: 19,
+          passedTests: 19,
+          failedTests: 0,
+          skippedTests: 0,
+          durationMs: 2100,
+        },
+      ],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'test-result',
+          didError: false,
+          error: null,
+          summary: {
+            status: 'SUCCEEDED',
+            durationMs: 2100,
+            counts: { passed: 16, failed: 0, skipped: 0 },
+          },
+          artifacts: {
+            xcresultPath: '/tmp/Weather.xcresult',
+            buildLogPath: '/tmp/weather-test.log',
+          },
+          diagnostics: { warnings: [], errors: [], testFailures: [] },
+        },
+      },
+    });
+
+    expect(output).toContain('Running tests (19 completed, 0 failures, 0 skipped)');
+    expect(output.match(/✅ 16 tests passed, 0 failed, 0 skipped/g)).toHaveLength(1);
+    expect(output).not.toContain('✅ 19 tests passed, 0 failed, 0 skipped');
+    expect(output).toContain('Result Bundle: /tmp/Weather.xcresult');
+    expect(output).toContain('Build Logs: /tmp/weather-test.log');
+  });
+
+  it('uses finalized build summary from structured output when streamed build-summary disagrees', () => {
+    const output = renderCliTextTranscript({
+      items: [
+        {
+          kind: 'build-result',
+          fragment: 'invocation',
+          operation: 'BUILD',
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+        },
+        {
+          kind: 'build-result',
+          fragment: 'build-summary',
+          operation: 'BUILD',
+          status: 'FAILED',
+          durationMs: 9900,
+        },
+      ],
+      structuredOutput: buildOutput({
+        didError: false,
+        error: null,
+        summary: { status: 'SUCCEEDED', durationMs: 3200 },
+        artifacts: { scheme: 'MyApp', buildLogPath: '/tmp/build.log' },
+      }),
+    });
+
+    expect(output).toContain('✅ Build succeeded. (⏱️ 3.2s)');
+    expect(output).not.toContain('❌ Build failed. (⏱️ 9.9s)');
+    expect(output).toContain('Build Logs: /tmp/build.log');
   });
 
   it('omits per-test results by default and renders them when showTestTiming is true', () => {

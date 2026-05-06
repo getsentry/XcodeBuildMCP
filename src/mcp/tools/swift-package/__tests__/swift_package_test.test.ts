@@ -147,6 +147,24 @@ describe('swift_package_test plugin', () => {
       expect(result.isError()).toBeFalsy();
     });
 
+    it('should not expose xcresult paths from SwiftPM test output', async () => {
+      const mockExecutor: CommandExecutor = async (_args, _name, _hideOutput, opts) => {
+        opts?.onStdout?.('Result bundle written to: /tmp/SwiftPM.xcresult\n');
+        return createMockCommandResponse({
+          success: true,
+          output: 'All tests passed.',
+        });
+      };
+
+      const { result } = await runSwiftPackageTestLogic(
+        { packagePath: '/test/package' },
+        mockExecutor,
+      );
+
+      expect(result.isError()).toBeFalsy();
+      expect(result.text()).not.toContain('Result Bundle: /tmp/SwiftPM.xcresult');
+    });
+
     it('should return error response for test failure', async () => {
       const mockExecutor = createMockExecutor({
         success: false,

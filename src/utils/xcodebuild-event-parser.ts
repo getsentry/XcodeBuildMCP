@@ -94,6 +94,22 @@ function normalizeEventLine(rawLine: string): string {
   return rawLine.trim().replace(/^(?:\u200B|\u200C|\u200D|\uFEFF)+/u, '');
 }
 
+function parseXcresultPathLine(line: string): string | null {
+  const resultBundleMessage = line.match(
+    /(?:Writing error result bundle to|Writing result bundle to|Result bundle written to):?\s+(.+?\.xcresult)\s*$/u,
+  );
+  if (resultBundleMessage) {
+    return resultBundleMessage[1];
+  }
+
+  const standalonePath = line.match(/^((?:\/|~\/|\.\.?\/)[^\n]*\.xcresult)\s*$/u);
+  if (standalonePath && !/\s-[A-Za-z]/u.test(standalonePath[1])) {
+    return standalonePath[1];
+  }
+
+  return null;
+}
+
 export interface EventParserOptions {
   operation: XcodebuildOperation;
   kind?: BuildLikeKind;
@@ -313,6 +329,12 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
 
     flushPendingError();
 
+    const xcresultPath = parseXcresultPathLine(line);
+    if (xcresultPath) {
+      detectedXcresultPath = xcresultPath;
+      return;
+    }
+
     const testCase = parseTestCaseLine(line);
     if (testCase) {
       const source =
@@ -415,12 +437,6 @@ export function createXcodebuildEventParser(options: EventParserOptions): Xcodeb
         message: line,
         rawLine: line,
       });
-      return;
-    }
-
-    const xcresultMatch = line.match(/^\s*(\S+\.xcresult)\s*$/u);
-    if (xcresultMatch) {
-      detectedXcresultPath = xcresultMatch[1];
       return;
     }
 

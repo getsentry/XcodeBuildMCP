@@ -91,6 +91,51 @@ describe('xcodebuild-pipeline', () => {
     expect(text.match(/1 test failed, 1 passed, 0 skipped/g)).toHaveLength(1);
   });
 
+  it('detects xcresult paths from xcodebuild result bundle output', () => {
+    const pipeline = createXcodebuildPipeline({
+      operation: 'TEST',
+      toolName: 'test_sim',
+      params: { scheme: 'MyApp' },
+      emit: () => {},
+    });
+
+    pipeline.onStderr(
+      '2026-05-06 10:00:00.000 xcodebuild[123:456] Writing error result bundle to /tmp/My App Tests.xcresult\n',
+    );
+
+    expect(pipeline.xcresultPath).toBe('/tmp/My App Tests.xcresult');
+  });
+
+  it('detects result bundle written messages and standalone xcresult paths', () => {
+    const pipeline = createXcodebuildPipeline({
+      operation: 'TEST',
+      toolName: 'test_sim',
+      params: { scheme: 'MyApp' },
+      emit: () => {},
+    });
+
+    pipeline.onStdout('Result bundle written to: /tmp/First Tests.xcresult\n');
+    expect(pipeline.xcresultPath).toBe('/tmp/First Tests.xcresult');
+
+    pipeline.onStdout('/tmp/Second Tests.xcresult\n');
+    expect(pipeline.xcresultPath).toBe('/tmp/Second Tests.xcresult');
+  });
+
+  it('does not treat xcodebuild command invocations as standalone xcresult paths', () => {
+    const pipeline = createXcodebuildPipeline({
+      operation: 'TEST',
+      toolName: 'test_sim',
+      params: { scheme: 'MyApp' },
+      emit: () => {},
+    });
+
+    pipeline.onStdout(
+      '/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme MyApp -resultBundlePath /tmp/MyApp.xcresult\n',
+    );
+
+    expect(pipeline.xcresultPath).toBeNull();
+  });
+
   it('handles build output with warnings and errors', () => {
     const emittedEvents: AnyFragment[] = [];
     const pipeline = createXcodebuildPipeline({
@@ -217,7 +262,7 @@ describe('xcodebuild-pipeline', () => {
       },
     });
     expect(text).toContain('Discovered 3 test(s):');
-    expect(text).toContain('✅ Test succeeded.');
+    expect(text).toContain('✅ 3 tests passed, 0 failed, 0 skipped');
   });
 
   it('renders test discovery in cli-text mode', () => {

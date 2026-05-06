@@ -1,9 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { createBuildDomainResult } from '../xcodebuild-domain-results.ts';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  extractTestSummaryCountsFromXcresult: vi.fn(),
+}));
+
+vi.mock('../xcresult-test-failures.ts', () => ({
+  extractTestSummaryCountsFromXcresult: mocks.extractTestSummaryCountsFromXcresult,
+}));
+
+import { createBuildDomainResult, createTestDomainResult } from '../xcodebuild-domain-results.ts';
 import { createXcodebuildRunState, type XcodebuildRunState } from '../xcodebuild-run-state.ts';
 import type { StartedPipeline, XcodebuildPipeline } from '../xcodebuild-pipeline.ts';
 
-function createStartedPipelineWithState(state: XcodebuildRunState): StartedPipeline {
+function createStartedPipelineWithState(
+  state: XcodebuildRunState,
+  xcresultPath: string | null = null,
+): StartedPipeline {
   const pipeline: XcodebuildPipeline = {
     onStdout(): void {},
     onStderr(): void {},
@@ -14,7 +26,7 @@ function createStartedPipelineWithState(state: XcodebuildRunState): StartedPipel
     highestStageRank() {
       return 0;
     },
-    xcresultPath: null,
+    xcresultPath,
     logPath: '/tmp/build.log',
   };
 
@@ -22,6 +34,98 @@ function createStartedPipelineWithState(state: XcodebuildRunState): StartedPipel
 }
 
 describe('xcodebuild-domain-results', () => {
+  beforeEach(() => {
+    mocks.extractTestSummaryCountsFromXcresult.mockReturnValue(null);
+  });
+
+  it('includes detected xcresult paths in test result artifacts', () => {
+    const runState = createXcodebuildRunState({ operation: 'TEST' });
+
+    const result = createTestDomainResult({
+      started: createStartedPipelineWithState(
+        runState.finalize(true, 1000),
+        '/tmp/App Tests.xcresult',
+      ),
+      succeeded: true,
+      target: 'simulator',
+      artifacts: { buildLogPath: '/tmp/build.log' },
+      request: { scheme: 'App' },
+    });
+
+    expect(result.artifacts).toMatchObject({
+      buildLogPath: '/tmp/build.log',
+      xcresultPath: '/tmp/App Tests.xcresult',
+    });
+  });
+
+  it('does not copy parser-detected xcresult paths into SwiftPM test results', () => {
+    const runState = createXcodebuildRunState({ operation: 'TEST' });
+
+    const result = createTestDomainResult({
+      started: createStartedPipelineWithState(
+        runState.finalize(true, 1000),
+        '/tmp/NotFromSwiftPM.xcresult',
+      ),
+      succeeded: true,
+      target: 'swift-package',
+      artifacts: { buildLogPath: '/tmp/build.log' },
+      request: { target: 'swift-package', packagePath: '/tmp/Package' },
+    });
+
+    expect(result.artifacts).toEqual({ buildLogPath: '/tmp/build.log' });
+  });
+
+  it('preserves provided xcresult paths when the pipeline does not detect one', () => {
+    const runState = createXcodebuildRunState({ operation: 'TEST' });
+
+    const result = createTestDomainResult({
+      started: createStartedPipelineWithState(runState.finalize(true, 1000)),
+      succeeded: true,
+      target: 'macos',
+      artifacts: {
+        buildLogPath: '/tmp/build.log',
+        xcresultPath: '/tmp/User Provided.xcresult',
+      },
+      request: { scheme: 'App' },
+    });
+
+    expect(result.artifacts.xcresultPath).toBe('/tmp/User Provided.xcresult');
+  });
+
+  it('uses xcresult top-level declaration counts instead of streamed run counts', () => {
+    mocks.extractTestSummaryCountsFromXcresult.mockReturnValue({
+      passed: 16,
+      failed: 0,
+      skipped: 0,
+    });
+
+    const runState = createXcodebuildRunState({ operation: 'TEST' });
+    runState.push({
+      kind: 'test-result',
+      fragment: 'test-progress',
+      operation: 'TEST',
+      completed: 19,
+      failed: 0,
+      skipped: 0,
+    });
+
+    const result = createTestDomainResult({
+      started: createStartedPipelineWithState(
+        runState.finalize(true, 1000),
+        '/tmp/Weather.xcresult',
+      ),
+      succeeded: true,
+      target: 'simulator',
+      artifacts: { buildLogPath: '/tmp/build.log' },
+      request: { scheme: 'Weather' },
+    });
+
+    expect(mocks.extractTestSummaryCountsFromXcresult).toHaveBeenCalledWith(
+      '/tmp/Weather.xcresult',
+    );
+    expect(result.summary.counts).toEqual({ passed: 16, failed: 0, skipped: 0 });
+  });
+
   it('does not duplicate fallback lines represented by multi-line parsed errors', () => {
     const runState = createXcodebuildRunState({ operation: 'BUILD' });
     runState.push({

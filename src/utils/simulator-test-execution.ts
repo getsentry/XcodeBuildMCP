@@ -1,5 +1,9 @@
 import type { TestPreflightResult } from './test-preflight.ts';
 
+function isResultBundlePathValue(value: string | undefined): value is string {
+  return value !== undefined && value.length > 0 && !value.startsWith('-');
+}
+
 function parseTestSelectorArgs(extraArgs: string[] | undefined): {
   remainingArgs: string[];
   selectorArgs: string[];
@@ -27,9 +31,17 @@ function parseTestSelectorArgs(extraArgs: string[] | undefined): {
 
     if (argument === '-resultBundlePath') {
       const value = extraArgs[index + 1];
-      if (value) {
+      if (isResultBundlePathValue(value)) {
         resultBundlePath = value;
         index += 1;
+      }
+      continue;
+    }
+
+    if (argument.startsWith('-resultBundlePath=')) {
+      const value = argument.slice('-resultBundlePath='.length);
+      if (isResultBundlePathValue(value)) {
+        resultBundlePath = value;
       }
       continue;
     }
@@ -53,6 +65,7 @@ export function createSimulatorTwoPhaseExecutionPlan(params: {
   buildArgs: string[];
   testArgs: string[];
   usesExactSelectors: boolean;
+  resultBundlePath?: string;
 } {
   const parsedArgs = parseTestSelectorArgs(params.extraArgs);
   const selectedTestArgs = parsedArgs.selectorArgs;
@@ -67,5 +80,6 @@ export function createSimulatorTwoPhaseExecutionPlan(params: {
       ...(resultBundlePath ? ['-resultBundlePath', resultBundlePath] : []),
     ],
     usesExactSelectors,
+    ...(resultBundlePath ? { resultBundlePath } : {}),
   };
 }

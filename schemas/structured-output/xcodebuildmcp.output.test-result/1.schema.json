@@ -73,6 +73,9 @@
             },
             "packagePath": {
               "type": "string"
+            },
+            "xcresultPath": {
+              "type": "string"
             }
           },
           "required": [],
