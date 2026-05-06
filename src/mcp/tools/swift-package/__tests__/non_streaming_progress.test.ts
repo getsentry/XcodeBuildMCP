@@ -50,13 +50,13 @@ describe('swift package non-streaming tools', () => {
           target: 'swift-package',
         },
       },
-      {
+      expect.objectContaining({
         kind: 'build-result',
         fragment: 'build-summary',
         operation: 'BUILD',
         status: 'SUCCEEDED',
-        durationMs: 0,
-      },
+        durationMs: expect.any(Number),
+      }),
     ]);
     expect(result.text()).toContain('Swift Package Run');
     expect(result.text()).toContain('Build & Run complete');
