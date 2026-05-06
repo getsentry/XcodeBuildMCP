@@ -38,25 +38,22 @@ export interface MockToolHandlerResult {
   isError(): boolean;
 }
 
-export function createMockToolHandlerContext(
-  options: {
-    liveProgressEnabled?: boolean;
-  } = {},
-): {
+export function createMockToolHandlerContext(): {
   ctx: ToolHandlerContext;
   result: MockToolHandlerResult;
   run: <T>(fn: () => Promise<T>) => Promise<T>;
 } {
   const events: AnyFragment[] = [];
   const attachments: ImageAttachment[] = [];
+  const session = createRenderSession('text');
   const ctx: ToolHandlerContext = {
-    liveProgressEnabled: options.liveProgressEnabled ?? true,
-    streamingFragmentsEnabled: options.liveProgressEnabled ?? true,
     emit: (fragment: AnyFragment) => {
       events.push(fragment);
+      session.emit(fragment);
     },
     attach: (image) => {
       attachments.push(image);
+      session.attach(image);
     },
   };
   const resultObj: MockToolHandlerResult = {
@@ -67,20 +64,13 @@ export function createMockToolHandlerContext(
     },
     text() {
       return renderCliTextTranscript({
-        items: events,
+        items: [],
         structuredOutput: ctx.structuredOutput,
         nextSteps: ctx.nextSteps,
       });
     },
     isError() {
-      return (
-        events.some(
-          (e) =>
-            (e.fragment === 'compiler-diagnostic' && e.severity === 'error') ||
-            e.fragment === 'test-failure' ||
-            (e.fragment === 'status' && e.level === 'error'),
-        ) || ctx.structuredOutput?.result.didError === true
-      );
+      return ctx.structuredOutput?.result.didError === true;
     },
   };
   return {
@@ -92,16 +82,11 @@ export function createMockToolHandlerContext(
   };
 }
 
-export async function runToolLogic<T>(
-  logic: () => Promise<T>,
-  options: {
-    liveProgressEnabled?: boolean;
-  } = {},
-): Promise<{
+export async function runToolLogic<T>(logic: () => Promise<T>): Promise<{
   response: T;
   result: MockToolHandlerResult;
 }> {
-  const { result, run } = createMockToolHandlerContext(options);
+  const { result, run } = createMockToolHandlerContext();
   const response = await run(logic);
   return { response, result };
 }
@@ -164,12 +149,8 @@ export async function callHandler(
   args: Record<string, unknown>,
 ): Promise<CallHandlerResult> {
   const session = createRenderSession('text');
-  const items: AnyFragment[] = [];
   const ctx: ToolHandlerContext = {
-    liveProgressEnabled: true,
-    streamingFragmentsEnabled: true,
     emit: (fragment: AnyFragment) => {
-      items.push(fragment);
       session.emit(fragment);
     },
     attach: (image) => session.attach(image),
@@ -182,7 +163,7 @@ export async function callHandler(
     session.setNextSteps?.([...ctx.nextSteps], 'cli');
   }
   const text = renderCliTextTranscript({
-    items,
+    items: [],
     structuredOutput: ctx.structuredOutput,
     nextSteps: ctx.nextSteps,
   });

@@ -78,50 +78,123 @@ export function createBuildRunMacOSExecutor(
     const configuration = params.configuration ?? 'Debug';
     const request = createBuildRunMacOSRequest(params);
     const started = createDomainStreamingPipeline('build_run_macos', 'BUILD', ctx);
-    const buildResult = await executeXcodeBuildCommand(
-      { ...params, configuration },
-      { platform: XcodePlatform.macOS, arch: params.arch, logPrefix: 'macOS Build' },
-      params.preferXcodebuild ?? false,
-      'build',
-      executor,
-      undefined,
-      started.pipeline,
-    );
+    try {
+      const buildResult = await executeXcodeBuildCommand(
+        { ...params, configuration },
+        { platform: XcodePlatform.macOS, arch: params.arch, logPrefix: 'macOS Build' },
+        params.preferXcodebuild ?? false,
+        'build',
+        executor,
+        undefined,
+        started.pipeline,
+      );
 
-    if (buildResult.isError) {
+      if (buildResult.isError) {
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'macos',
+          artifacts: {
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+          request,
+        });
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'started',
+      });
+
+      let appPath: string;
+      try {
+        appPath = await resolveAppPathFromBuildSettings(
+          {
+            projectPath: params.projectPath,
+            workspacePath: params.workspacePath,
+            scheme: params.scheme,
+            configuration,
+            platform: XcodePlatform.macOS,
+            derivedDataPath: params.derivedDataPath,
+            extraArgs: params.extraArgs,
+          },
+          executor,
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'macos',
+          artifacts: {
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to get app path to launch: ${errorMessage}`,
+          ]),
+          request,
+        });
+      }
+
+      log('info', `App path determined as: ${appPath}`);
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'succeeded',
+      });
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'launch-app',
+        status: 'started',
+      });
+
+      const macLaunchResult = await launchMacApp(appPath, executor);
+      if (!macLaunchResult.success) {
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'macos',
+          artifacts: {
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to launch app ${appPath}: ${macLaunchResult.error ?? 'Failed to launch app'}`,
+          ]),
+          request,
+        });
+      }
+
+      log('info', `macOS app launched successfully: ${appPath}`);
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'launch-app',
+        status: 'succeeded',
+      });
+
       return createBuildRunDomainResult({
         started,
-        succeeded: false,
+        succeeded: true,
         target: 'macos',
         artifacts: {
+          appPath,
+          ...(macLaunchResult.bundleId ? { bundleId: macLaunchResult.bundleId } : {}),
+          ...(macLaunchResult.processId !== undefined
+            ? { processId: macLaunchResult.processId }
+            : {}),
           buildLogPath: started.pipeline.logPath,
         },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+        output: {
+          stdout: [],
+          stderr: [],
+        },
         request,
       });
-    }
-
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'started',
-    });
-
-    let appPath: string;
-    try {
-      appPath = await resolveAppPathFromBuildSettings(
-        {
-          projectPath: params.projectPath,
-          workspacePath: params.workspacePath,
-          scheme: params.scheme,
-          configuration,
-          platform: XcodePlatform.macOS,
-          derivedDataPath: params.derivedDataPath,
-          extraArgs: params.extraArgs,
-        },
-        executor,
-      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return createBuildRunDomainResult({
@@ -132,68 +205,11 @@ export function createBuildRunMacOSExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to get app path to launch: ${errorMessage}`,
+          `Error during macOS build and run: ${errorMessage}`,
         ]),
         request,
       });
     }
-
-    log('info', `App path determined as: ${appPath}`);
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'succeeded',
-    });
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'launch-app',
-      status: 'started',
-    });
-
-    const macLaunchResult = await launchMacApp(appPath, executor);
-    if (!macLaunchResult.success) {
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'macos',
-        artifacts: {
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to launch app ${appPath}: ${macLaunchResult.error ?? 'Failed to launch app'}`,
-        ]),
-        request,
-      });
-    }
-
-    log('info', `macOS app launched successfully: ${appPath}`);
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'launch-app',
-      status: 'succeeded',
-    });
-
-    return createBuildRunDomainResult({
-      started,
-      succeeded: true,
-      target: 'macos',
-      artifacts: {
-        appPath,
-        ...(macLaunchResult.bundleId ? { bundleId: macLaunchResult.bundleId } : {}),
-        ...(macLaunchResult.processId !== undefined
-          ? { processId: macLaunchResult.processId }
-          : {}),
-        buildLogPath: started.pipeline.logPath,
-      },
-      output: {
-        stdout: [],
-        stderr: [],
-      },
-      request,
-    });
   };
 }
 
@@ -207,6 +223,7 @@ export async function buildRunMacOSLogic(
   ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', invocationRequest));
   const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunMacOS = createBuildRunMacOSExecutor(executor);
+
   const result = await executeBuildRunMacOS(params, executionContext);
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);

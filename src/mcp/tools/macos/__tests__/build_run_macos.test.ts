@@ -343,6 +343,61 @@ describe('build_run_macos', () => {
       expect(result.nextStepParams).toBeUndefined();
     });
 
+    it('should set structured output error when executor rejects after build preparation', async () => {
+      let callCount = 0;
+      const mockExecutor = (
+        command: string[],
+        description?: string,
+        logOutput?: boolean,
+        opts?: { cwd?: string },
+        detached?: boolean,
+      ) => {
+        callCount++;
+        void command;
+        void description;
+        void logOutput;
+        void opts;
+        void detached;
+
+        if (callCount === 1) {
+          return Promise.resolve({
+            success: true,
+            output: 'BUILD SUCCEEDED',
+            error: '',
+            process: mockProcess,
+          });
+        }
+
+        if (callCount === 2) {
+          return Promise.resolve({
+            success: true,
+            output: 'BUILT_PRODUCTS_DIR = /path/to/build\\nFULL_PRODUCT_NAME = MyApp.app',
+            error: '',
+            process: mockProcess,
+          });
+        }
+
+        if (callCount === 3) {
+          return Promise.reject(new Error('executor rejected during launch'));
+        }
+
+        return Promise.resolve({ success: true, output: '', error: '', process: mockProcess });
+      };
+
+      const args = {
+        projectPath: '/path/to/project.xcodeproj',
+        scheme: 'MyApp',
+        configuration: 'Debug',
+        preferXcodebuild: false,
+      };
+
+      const { response, result } = await runBuildRunMacOSLogic(args, mockExecutor);
+
+      expect(response).toBeUndefined();
+      expectPendingBuildRunResponse(result, true);
+      expect(result.nextStepParams).toBeUndefined();
+    });
+
     it('should use default configuration when not provided', async () => {
       let callCount = 0;
       const executorCalls: any[] = [];

@@ -326,6 +326,41 @@ describe('build_run_sim tool', () => {
       const text = result.text();
       expect(text).toContain('Error during simulator build and run');
     });
+
+    it('sets structured output error when executor rejects after preparation', async () => {
+      let callCount = 0;
+      const mockExecutor: CommandExecutor = async (command) => {
+        callCount++;
+
+        if (callCount === 1 && command[0] === 'xcrun' && command[1] === 'simctl') {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({
+              devices: {
+                'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
+                  { udid: 'SIM-UUID', name: 'iPhone 17', isAvailable: true },
+                ],
+              },
+            }),
+          });
+        }
+
+        return Promise.reject(new Error('executor rejected after preparation'));
+      };
+
+      const { response, result } = await runBuildRunSimLogic(
+        {
+          workspacePath: '/path/to/workspace',
+          scheme: 'MyScheme',
+          simulatorName: 'iPhone 17',
+        },
+        mockExecutor,
+      );
+
+      expect(response).toBeUndefined();
+      expect(result.isError()).toBe(true);
+      expect(result.nextStepParams).toBeUndefined();
+    });
   });
 
   describe('Command Generation', () => {

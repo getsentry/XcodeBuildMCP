@@ -190,9 +190,34 @@ export function createBuildRunSimExecutor(
 
     const started = createDomainStreamingPipeline('build_run_sim', 'BUILD', ctx);
 
-    if (params.simulatorId) {
-      const validation = await validateAvailableSimulatorId(params.simulatorId, executor);
-      if (validation.error) {
+    try {
+      if (params.simulatorId) {
+        const validation = await validateAvailableSimulatorId(params.simulatorId, executor);
+        if (validation.error) {
+          return createBuildRunDomainResult({
+            started,
+            succeeded: false,
+            target: 'simulator',
+            artifacts: {
+              buildLogPath: started.pipeline.logPath,
+            },
+            fallbackErrorMessages: collectFallbackErrorMessages(started, [validation.error]),
+            request: resolved.invocationRequest,
+          });
+        }
+      }
+
+      const buildResult = await executeXcodeBuildCommand(
+        resolved.sharedBuildParams,
+        resolved.platformOptions,
+        params.preferXcodebuild ?? false,
+        'build',
+        executor,
+        undefined,
+        started.pipeline,
+      );
+
+      if (buildResult.isError) {
         return createBuildRunDomainResult({
           started,
           succeeded: false,
@@ -200,221 +225,258 @@ export function createBuildRunSimExecutor(
           artifacts: {
             buildLogPath: started.pipeline.logPath,
           },
-          fallbackErrorMessages: collectFallbackErrorMessages(started, [validation.error]),
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
           request: resolved.invocationRequest,
         });
       }
-    }
 
-    const buildResult = await executeXcodeBuildCommand(
-      resolved.sharedBuildParams,
-      resolved.platformOptions,
-      params.preferXcodebuild ?? false,
-      'build',
-      executor,
-      undefined,
-      started.pipeline,
-    );
-
-    if (buildResult.isError) {
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'simulator',
-        artifacts: {
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
-        request: resolved.invocationRequest,
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'started',
       });
-    }
 
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'started',
-    });
-
-    let destination: string;
-    if (params.simulatorId) {
-      destination = constructDestinationString(
-        resolved.detectedPlatform,
-        undefined,
-        params.simulatorId,
-      );
-    } else if (params.simulatorName) {
-      destination = constructDestinationString(
-        resolved.detectedPlatform,
-        params.simulatorName,
-        undefined,
-        params.useLatestOS ?? true,
-      );
-    } else {
-      destination = constructDestinationString(resolved.detectedPlatform);
-    }
-
-    let appBundlePath: string;
-    try {
-      appBundlePath = await resolveAppPathFromBuildSettings(
-        {
-          projectPath: params.projectPath,
-          workspacePath: params.workspacePath,
-          scheme: params.scheme,
-          configuration: resolved.configuration,
-          platform: resolved.detectedPlatform,
-          destination,
-          derivedDataPath: params.derivedDataPath,
-          extraArgs: params.extraArgs,
-        },
-        executor,
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'simulator',
-        artifacts: {
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to get app path to launch: ${errorMessage}`,
-        ]),
-        request: resolved.invocationRequest,
-      });
-    }
-
-    log('info', `App bundle path for run: ${appBundlePath}`);
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'succeeded',
-    });
-
-    const uuidResult = await determineSimulatorUuid(
-      { simulatorId: params.simulatorId, simulatorName: params.simulatorName },
-      executor,
-    );
-
-    if (uuidResult.error || !uuidResult.uuid) {
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'simulator',
-        artifacts: {
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          uuidResult.error ?? 'Failed to resolve simulator: no simulator identifier provided',
-        ]),
-        request: resolved.invocationRequest,
-      });
-    }
-
-    if (uuidResult.warning) {
-      log('warn', uuidResult.warning);
-    }
-
-    const simulatorId = uuidResult.uuid;
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'boot-simulator',
-      status: 'started',
-    });
-
-    try {
-      const { simulator: targetSimulator, error: findError } = await findSimulatorById(
-        simulatorId,
-        executor,
-      );
-      if (!targetSimulator) {
-        throw new Error(findError ?? `Failed to find simulator with UUID: ${simulatorId}`);
-      }
-
-      if (targetSimulator.state !== 'Booted') {
-        const bootResult = await executor(
-          ['xcrun', 'simctl', 'boot', simulatorId],
-          'Boot Simulator',
+      let destination: string;
+      if (params.simulatorId) {
+        destination = constructDestinationString(
+          resolved.detectedPlatform,
+          undefined,
+          params.simulatorId,
         );
-        if (!bootResult.success) {
-          throw new Error(bootResult.error ?? 'Failed to boot simulator');
-        }
+      } else if (params.simulatorName) {
+        destination = constructDestinationString(
+          resolved.detectedPlatform,
+          params.simulatorName,
+          undefined,
+          params.useLatestOS ?? true,
+        );
+      } else {
+        destination = constructDestinationString(resolved.detectedPlatform);
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'simulator',
-        artifacts: {
-          simulatorId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to boot simulator: ${errorMessage}`,
-        ]),
-        request: resolved.invocationRequest,
+
+      let appBundlePath: string;
+      try {
+        appBundlePath = await resolveAppPathFromBuildSettings(
+          {
+            projectPath: params.projectPath,
+            workspacePath: params.workspacePath,
+            scheme: params.scheme,
+            configuration: resolved.configuration,
+            platform: resolved.detectedPlatform,
+            destination,
+            derivedDataPath: params.derivedDataPath,
+            extraArgs: params.extraArgs,
+          },
+          executor,
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to get app path to launch: ${errorMessage}`,
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+
+      log('info', `App bundle path for run: ${appBundlePath}`);
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'succeeded',
       });
-    }
 
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'boot-simulator',
-      status: 'succeeded',
-    });
-
-    try {
-      const openResult = await executor(['open', '-a', 'Simulator'], 'Open Simulator App');
-      if (!openResult.success) {
-        throw new Error(openResult.error ?? 'Failed to open Simulator app');
-      }
-    } catch (error) {
-      log(
-        'warn',
-        `Warning: Could not open Simulator app: ${error instanceof Error ? error.message : String(error)}`,
+      const uuidResult = await determineSimulatorUuid(
+        { simulatorId: params.simulatorId, simulatorName: params.simulatorName },
+        executor,
       );
-    }
 
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'install-app',
-      status: 'started',
-    });
-    const installResult = await installAppOnSimulator(simulatorId, appBundlePath, executor);
-    if (!installResult.success) {
-      const errorMessage = installResult.error ?? 'Failed to install app';
+      if (uuidResult.error || !uuidResult.uuid) {
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            uuidResult.error ?? 'Failed to resolve simulator: no simulator identifier provided',
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+
+      if (uuidResult.warning) {
+        log('warn', uuidResult.warning);
+      }
+
+      const simulatorId = uuidResult.uuid;
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'boot-simulator',
+        status: 'started',
+      });
+
+      try {
+        const { simulator: targetSimulator, error: findError } = await findSimulatorById(
+          simulatorId,
+          executor,
+        );
+        if (!targetSimulator) {
+          throw new Error(findError ?? `Failed to find simulator with UUID: ${simulatorId}`);
+        }
+
+        if (targetSimulator.state !== 'Booted') {
+          const bootResult = await executor(
+            ['xcrun', 'simctl', 'boot', simulatorId],
+            'Boot Simulator',
+          );
+          if (!bootResult.success) {
+            throw new Error(bootResult.error ?? 'Failed to boot simulator');
+          }
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            simulatorId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to boot simulator: ${errorMessage}`,
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'boot-simulator',
+        status: 'succeeded',
+      });
+
+      try {
+        const openResult = await executor(['open', '-a', 'Simulator'], 'Open Simulator App');
+        if (!openResult.success) {
+          throw new Error(openResult.error ?? 'Failed to open Simulator app');
+        }
+      } catch (error) {
+        log(
+          'warn',
+          `Warning: Could not open Simulator app: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'install-app',
+        status: 'started',
+      });
+      const installResult = await installAppOnSimulator(simulatorId, appBundlePath, executor);
+      if (!installResult.success) {
+        const errorMessage = installResult.error ?? 'Failed to install app';
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            simulatorId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to install app on simulator: ${errorMessage}`,
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'install-app',
+        status: 'succeeded',
+      });
+
+      let bundleId: string;
+      try {
+        bundleId = (await extractBundleIdFromAppPath(appBundlePath, executor)).trim();
+        if (bundleId.length === 0) {
+          throw new Error('Empty bundle ID returned');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            simulatorId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to extract bundle ID: ${errorMessage}`,
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'launch-app',
+        status: 'started',
+      });
+      const launchResult: LaunchWithLoggingResult = await launcher(simulatorId, bundleId, executor);
+      if (!launchResult.success) {
+        const errorMessage = launchResult.error ?? 'Failed to launch app';
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'simulator',
+          artifacts: {
+            simulatorId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to launch app ${appBundlePath}: ${errorMessage}`,
+          ]),
+          request: resolved.invocationRequest,
+        });
+      }
+
+      const processId = launchResult.processId;
+      if (processId !== undefined) {
+        log('info', `Launched with PID: ${processId}`);
+      }
+
       return createBuildRunDomainResult({
         started,
-        succeeded: false,
+        succeeded: true,
         target: 'simulator',
         artifacts: {
+          appPath: appBundlePath,
+          bundleId,
+          ...(processId !== undefined ? { processId } : {}),
           simulatorId,
           buildLogPath: started.pipeline.logPath,
+          ...(launchResult.logFilePath ? { runtimeLogPath: launchResult.logFilePath } : {}),
+          ...(launchResult.osLogPath ? { osLogPath: launchResult.osLogPath } : {}),
         },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to install app on simulator: ${errorMessage}`,
-        ]),
         request: resolved.invocationRequest,
       });
-    }
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'install-app',
-      status: 'succeeded',
-    });
-
-    let bundleId: string;
-    try {
-      bundleId = (await extractBundleIdFromAppPath(appBundlePath, executor)).trim();
-      if (bundleId.length === 0) {
-        throw new Error('Empty bundle ID returned');
-      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return createBuildRunDomainResult({
@@ -422,60 +484,14 @@ export function createBuildRunSimExecutor(
         succeeded: false,
         target: 'simulator',
         artifacts: {
-          simulatorId,
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to extract bundle ID: ${errorMessage}`,
+          `Error during simulator build and run: ${errorMessage}`,
         ]),
         request: resolved.invocationRequest,
       });
     }
-
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'launch-app',
-      status: 'started',
-    });
-    const launchResult: LaunchWithLoggingResult = await launcher(simulatorId, bundleId, executor);
-    if (!launchResult.success) {
-      const errorMessage = launchResult.error ?? 'Failed to launch app';
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'simulator',
-        artifacts: {
-          simulatorId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to launch app ${appBundlePath}: ${errorMessage}`,
-        ]),
-        request: resolved.invocationRequest,
-      });
-    }
-
-    const processId = launchResult.processId;
-    if (processId !== undefined) {
-      log('info', `Launched with PID: ${processId}`);
-    }
-
-    return createBuildRunDomainResult({
-      started,
-      succeeded: true,
-      target: 'simulator',
-      artifacts: {
-        appPath: appBundlePath,
-        bundleId,
-        ...(processId !== undefined ? { processId } : {}),
-        simulatorId,
-        buildLogPath: started.pipeline.logPath,
-        ...(launchResult.logFilePath ? { runtimeLogPath: launchResult.logFilePath } : {}),
-        ...(launchResult.osLogPath ? { osLogPath: launchResult.osLogPath } : {}),
-      },
-      request: resolved.invocationRequest,
-    });
   };
 }
 
@@ -533,6 +549,7 @@ export async function build_run_simLogic(
   ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', prepared.invocationRequest));
   const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunSim = createBuildRunSimExecutor(executor, launcher, prepared);
+
   const result = await executeBuildRunSim(params, executionContext);
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);

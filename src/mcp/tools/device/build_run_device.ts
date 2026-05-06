@@ -92,84 +92,178 @@ export function createBuildRunDeviceExecutor(
     };
     const started = createDomainStreamingPipeline('build_run_device', 'BUILD', ctx);
 
-    const buildResult = await executeXcodeBuildCommand(
-      sharedBuildParams,
-      {
-        platform,
-        logPrefix: `${platform} Device Build`,
-      },
-      params.preferXcodebuild ?? false,
-      'build',
-      executor,
-      undefined,
-      started.pipeline,
-    );
-
-    if (buildResult.isError) {
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'device',
-        artifacts: {
-          deviceId: params.deviceId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
-        request,
-      });
-    }
-
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'started',
-    });
-
-    let appPath: string;
     try {
-      appPath = await resolveAppPathFromBuildSettings(
+      const buildResult = await executeXcodeBuildCommand(
+        sharedBuildParams,
         {
-          projectPath: params.projectPath,
-          workspacePath: params.workspacePath,
-          scheme: params.scheme,
-          configuration,
           platform,
-          derivedDataPath: params.derivedDataPath,
-          extraArgs: params.extraArgs,
+          logPrefix: `${platform} Device Build`,
         },
+        params.preferXcodebuild ?? false,
+        'build',
         executor,
+        undefined,
+        started.pipeline,
       );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'device',
-        artifacts: {
-          deviceId: params.deviceId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to get app path to launch: ${errorMessage}`,
-        ]),
-        request,
-      });
-    }
 
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'resolve-app-path',
-      status: 'succeeded',
-    });
-
-    let bundleId: string;
-    try {
-      bundleId = (await extractBundleIdFromAppPath(appPath, executor)).trim();
-      if (bundleId.length === 0) {
-        throw new Error('Empty bundle ID returned');
+      if (buildResult.isError) {
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'device',
+          artifacts: {
+            deviceId: params.deviceId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [], buildResult.content),
+          request,
+        });
       }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'started',
+      });
+
+      let appPath: string;
+      try {
+        appPath = await resolveAppPathFromBuildSettings(
+          {
+            projectPath: params.projectPath,
+            workspacePath: params.workspacePath,
+            scheme: params.scheme,
+            configuration,
+            platform,
+            derivedDataPath: params.derivedDataPath,
+            extraArgs: params.extraArgs,
+          },
+          executor,
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'device',
+          artifacts: {
+            deviceId: params.deviceId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to get app path to launch: ${errorMessage}`,
+          ]),
+          request,
+        });
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'resolve-app-path',
+        status: 'succeeded',
+      });
+
+      let bundleId: string;
+      try {
+        bundleId = (await extractBundleIdFromAppPath(appPath, executor)).trim();
+        if (bundleId.length === 0) {
+          throw new Error('Empty bundle ID returned');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'device',
+          artifacts: {
+            deviceId: params.deviceId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to extract bundle ID: ${errorMessage}`,
+          ]),
+          request,
+        });
+      }
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'install-app',
+        status: 'started',
+      });
+      const installResult = await installAppOnDevice(params.deviceId, appPath, executor);
+      if (!installResult.success) {
+        const errorMessage = installResult.error ?? 'Failed to install app';
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'device',
+          artifacts: {
+            deviceId: params.deviceId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to install app on device: ${errorMessage}`,
+          ]),
+          request,
+        });
+      }
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'install-app',
+        status: 'succeeded',
+      });
+
+      ctx.emitFragment({
+        kind: 'build-run-result',
+        fragment: 'phase',
+        phase: 'launch-app',
+        status: 'started',
+      });
+      const launchResult = await launchAppOnDevice(
+        params.deviceId,
+        bundleId,
+        executor,
+        fileSystemExecutor,
+        { env: params.env },
+      );
+      if (!launchResult.success) {
+        const errorMessage = launchResult.error ?? 'Failed to launch app';
+        return createBuildRunDomainResult({
+          started,
+          succeeded: false,
+          target: 'device',
+          artifacts: {
+            deviceId: params.deviceId,
+            buildLogPath: started.pipeline.logPath,
+          },
+          fallbackErrorMessages: collectFallbackErrorMessages(started, [
+            `Failed to launch app on device: ${errorMessage}`,
+          ]),
+          request,
+        });
+      }
+
+      const processId = launchResult.processId;
+      log('info', `Device build and run succeeded for scheme ${params.scheme}.`);
+
+      return createBuildRunDomainResult({
+        started,
+        succeeded: true,
+        target: 'device',
+        artifacts: {
+          appPath,
+          bundleId,
+          ...(processId !== undefined ? { processId } : {}),
+          deviceId: params.deviceId,
+          buildLogPath: started.pipeline.logPath,
+        },
+        request,
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return createBuildRunDomainResult({
@@ -181,88 +275,11 @@ export function createBuildRunDeviceExecutor(
           buildLogPath: started.pipeline.logPath,
         },
         fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to extract bundle ID: ${errorMessage}`,
+          `Error during device build and run: ${errorMessage}`,
         ]),
         request,
       });
     }
-
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'install-app',
-      status: 'started',
-    });
-    const installResult = await installAppOnDevice(params.deviceId, appPath, executor);
-    if (!installResult.success) {
-      const errorMessage = installResult.error ?? 'Failed to install app';
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'device',
-        artifacts: {
-          deviceId: params.deviceId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to install app on device: ${errorMessage}`,
-        ]),
-        request,
-      });
-    }
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'install-app',
-      status: 'succeeded',
-    });
-
-    ctx.emitFragment({
-      kind: 'build-run-result',
-      fragment: 'phase',
-      phase: 'launch-app',
-      status: 'started',
-    });
-    const launchResult = await launchAppOnDevice(
-      params.deviceId,
-      bundleId,
-      executor,
-      fileSystemExecutor,
-      { env: params.env },
-    );
-    if (!launchResult.success) {
-      const errorMessage = launchResult.error ?? 'Failed to launch app';
-      return createBuildRunDomainResult({
-        started,
-        succeeded: false,
-        target: 'device',
-        artifacts: {
-          deviceId: params.deviceId,
-          buildLogPath: started.pipeline.logPath,
-        },
-        fallbackErrorMessages: collectFallbackErrorMessages(started, [
-          `Failed to launch app on device: ${errorMessage}`,
-        ]),
-        request,
-      });
-    }
-
-    const processId = launchResult.processId;
-    log('info', `Device build and run succeeded for scheme ${params.scheme}.`);
-
-    return createBuildRunDomainResult({
-      started,
-      succeeded: true,
-      target: 'device',
-      artifacts: {
-        appPath,
-        bundleId,
-        ...(processId !== undefined ? { processId } : {}),
-        deviceId: params.deviceId,
-        buildLogPath: started.pipeline.logPath,
-      },
-      request,
-    });
   };
 }
 
@@ -287,6 +304,7 @@ export async function build_run_deviceLogic(
   ctx.emit(createBuildInvocationFragment('build-run-result', 'BUILD', invocationRequest));
   const executionContext = createStreamingExecutionContext(ctx);
   const executeBuildRunDevice = createBuildRunDeviceExecutor(executor, fileSystemExecutor);
+
   const result = await executeBuildRunDevice(params, executionContext);
 
   setXcodebuildStructuredOutput(ctx, 'build-run-result', result);

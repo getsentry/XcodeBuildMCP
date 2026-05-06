@@ -325,5 +325,40 @@ describe('build_run_device tool', () => {
       expectPendingBuildRunResponse(result, true);
       expect(result.nextStepParams).toBeUndefined();
     });
+
+    it('sets structured output error when executor rejects after build preparation', async () => {
+      const mockExecutor: CommandExecutor = async (command) => {
+        if (command.includes('-showBuildSettings')) {
+          return createMockCommandResponse({
+            success: true,
+            output: 'BUILT_PRODUCTS_DIR = /tmp/build\\nFULL_PRODUCT_NAME = MyApp.app\\n',
+          });
+        }
+
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
+          return createMockCommandResponse({ success: true, output: 'io.sentry.MyApp' });
+        }
+
+        if (command.includes('install')) {
+          return Promise.reject(new Error('executor rejected during install'));
+        }
+
+        return createMockCommandResponse({ success: true, output: 'OK' });
+      };
+
+      const { response, result } = await runBuildRunDeviceLogic(
+        {
+          projectPath: '/tmp/MyApp.xcodeproj',
+          scheme: 'MyApp',
+          deviceId: 'DEVICE-UDID',
+        },
+        mockExecutor,
+        createMockFileSystemExecutor(),
+      );
+
+      expect(response).toBeUndefined();
+      expectPendingBuildRunResponse(result, true);
+      expect(result.nextStepParams).toBeUndefined();
+    });
   });
 });
