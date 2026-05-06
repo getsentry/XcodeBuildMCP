@@ -1,0 +1,7 @@
+
+🔧 Xcode IDE Call Tool
+
+   Remote Tool: DocumentationSearch
+
+✅ Tool "DocumentationSearch" completed successfully. Raw response saved to artifact.
+  └ Raw Response JSON: <RAW_RESPONSE_JSON_PATH>

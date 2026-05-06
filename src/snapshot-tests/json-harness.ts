@@ -1,9 +1,11 @@
 import { formatStructuredEnvelopeFixture } from './json-normalize.ts';
 import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
-import { createMcpSnapshotHarness } from './mcp-harness.ts';
+import { createMcpSnapshotHarness, type CreateMcpSnapshotHarnessOptions } from './mcp-harness.ts';
 
-export async function createJsonSnapshotHarness(): Promise<WorkflowSnapshotHarness> {
-  const harness = await createMcpSnapshotHarness();
+export async function createJsonSnapshotHarness(
+  opts: CreateMcpSnapshotHarnessOptions = {},
+): Promise<WorkflowSnapshotHarness> {
+  const harness = await createMcpSnapshotHarness(opts);
 
   async function invoke(
     workflow: string,

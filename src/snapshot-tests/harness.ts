@@ -13,11 +13,19 @@ const SIMULATOR_STATE_POLL_INTERVAL_MS = 250;
 export type SnapshotHarness = WorkflowSnapshotHarness;
 export type { SnapshotResult };
 
-function getSnapshotHarnessEnv(): Record<string, string> {
+export interface CreateSnapshotHarnessOptions {
+  env?: Record<string, string>;
+  globalArgs?: string[];
+}
+
+export function getSnapshotHarnessEnv(
+  overrides: Record<string, string> = {},
+): Record<string, string> {
   const { VITEST: _vitest, NODE_ENV: _nodeEnv, ...rest } = process.env;
-  return Object.fromEntries(
+  const env = Object.fromEntries(
     Object.entries(rest).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
+  return { ...env, ...overrides };
 }
 
 function runSnapshotCli(
@@ -25,8 +33,16 @@ function runSnapshotCli(
   cliToolName: string,
   args: Record<string, unknown>,
   output: 'text' | 'json' = 'text',
+  options: CreateSnapshotHarnessOptions = {},
 ): ReturnType<typeof spawnSync> {
-  const commandArgs = [CLI_PATH, workflow, cliToolName, '--json', JSON.stringify(args)];
+  const commandArgs = [
+    CLI_PATH,
+    ...(options.globalArgs ?? []),
+    workflow,
+    cliToolName,
+    '--json',
+    JSON.stringify(args),
+  ];
   if (output !== 'text') {
     commandArgs.push('--output', output);
   }
@@ -35,11 +51,13 @@ function runSnapshotCli(
     encoding: 'utf8',
     timeout: SNAPSHOT_COMMAND_TIMEOUT_MS,
     cwd: process.cwd(),
-    env: getSnapshotHarnessEnv(),
+    env: getSnapshotHarnessEnv(options.env),
   });
 }
 
-export async function createSnapshotHarness(): Promise<SnapshotHarness> {
+export async function createSnapshotHarness(
+  options: CreateSnapshotHarnessOptions = {},
+): Promise<SnapshotHarness> {
   async function invoke(
     workflow: string,
     cliToolName: string,
@@ -55,7 +73,7 @@ export async function createSnapshotHarness(): Promise<SnapshotHarness> {
       throw new Error(`Tool '${cliToolName}' in workflow '${workflow}' is not CLI-available`);
     }
 
-    const result = runSnapshotCli(workflow, cliToolName, args);
+    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options);
     const stdout =
       typeof result.stdout === 'string' ? result.stdout : (result.stdout?.toString('utf8') ?? '');
 

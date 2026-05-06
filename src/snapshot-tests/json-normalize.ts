@@ -9,6 +9,10 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
   const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
   let result = normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
 
+  if (key === 'rawResponseJsonPath') {
+    return '<RAW_RESPONSE_JSON_PATH>';
+  }
+
   if (key === 'AXFrame') {
     // Round embedded floats to 1 decimal place for rounding-stable comparison with
     // the sibling `frame` object. e.g. 82.666664123535156 -> 82.7, 250.5 stays 250.5.
@@ -92,10 +96,34 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   return value;
 }
 
+function normalizeXcodeBridgeCallEnvelope(
+  envelope: StructuredOutputEnvelope<unknown>,
+): StructuredOutputEnvelope<unknown> {
+  if (envelope.schema !== 'xcodebuildmcp.output.xcode-bridge-call-result') {
+    return envelope;
+  }
+
+  const data = (envelope as { data?: unknown }).data;
+  if (!isRecord(data)) {
+    return envelope;
+  }
+
+  return {
+    ...envelope,
+    data: {
+      ...data,
+      content: [],
+      ...(Object.hasOwn(data, 'structuredContent') ? { structuredContent: {} } : {}),
+    },
+  } as StructuredOutputEnvelope<unknown>;
+}
+
 export function normalizeStructuredEnvelope(
   envelope: StructuredOutputEnvelope<unknown>,
 ): StructuredOutputEnvelope<unknown> {
-  return normalizeValue(envelope) as StructuredOutputEnvelope<unknown>;
+  return normalizeValue(
+    normalizeXcodeBridgeCallEnvelope(envelope),
+  ) as StructuredOutputEnvelope<unknown>;
 }
 
 function compactFrameObjects(json: string): string {

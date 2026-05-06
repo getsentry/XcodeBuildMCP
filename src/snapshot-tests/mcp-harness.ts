@@ -8,7 +8,7 @@ import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
 const MCP_TOOL_TIMEOUT_MS = 120_000;
-const MCP_SNAPSHOT_PARITY_WORKFLOWS = [
+export const MCP_SNAPSHOT_PARITY_WORKFLOWS = [
   'coverage',
   'debugging',
   'device',

@@ -140,6 +140,10 @@ export function normalizeSnapshotOutput(text: string): string {
     /(Build Logs: )(?:<TMPDIR>|<HOME>\/Library\/Developer\/XcodeBuildMCP)\/logs\//g,
     '$1<HOME>/Library/Developer/XcodeBuildMCP/logs/',
   );
+  normalized = normalized.replace(
+    /Raw Response JSON: .+\/xcode-ide\/call-tool\/.+\/[A-Za-z0-9._-]+\.json/g,
+    'Raw Response JSON: <RAW_RESPONSE_JSON_PATH>',
+  );
 
   normalized = normalized.replace(DERIVED_DATA_HASH_REGEX, '$1-<HASH>');
   normalized = normalized.replace(ISO_TIMESTAMP_REGEX, '<TIMESTAMP>');
