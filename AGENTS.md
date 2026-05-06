@@ -56,9 +56,9 @@ ESM TypeScript project (`type: module`). Key layers:
 
 
 ## Rendering and Streaming Contract
-- Streaming fragments are transient output only. They MUST NOT be used as internal state, cached for final responses, or promoted into final MCP/JSON/CLI text output.
-- Non-streaming runtimes/output modes, including MCP final responses, MUST render only from the final structured result and next-step metadata. If final output needs data, add it to the final result type instead of reading it from fragments.
-- Only streaming-capable renderers may observe fragment callbacks, and only to print live progress. Their fragment handling must not affect final structured output or final rendered text.
+- Streaming fragments are transient live-progress output only. They may be displayed while a tool is running, but MUST NOT provide final settled MCP/JSON/CLI text.
+- Final settled output MUST render from the final structured/domain result and next-step metadata. If final output needs data, add it to the final result type instead of reading it from fragments.
+- Streaming-capable renderers may observe fragment callbacks only for live progress. Fragment handling must not affect final structured output or final settled text.
 
 ## Test Conventions
 - Vitest with colocated `__tests__/` directories using `*.test.ts`
