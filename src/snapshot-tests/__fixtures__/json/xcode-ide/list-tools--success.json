@@ -4,7 +4,7 @@
   "didError": false,
   "error": null,
   "data": {
-    "toolCount": 20,
+    "toolCount": 99999,
     "artifacts": {
       "rawResponseJsonPath": "<RAW_RESPONSE_JSON_PATH>"
     }

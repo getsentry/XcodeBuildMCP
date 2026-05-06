@@ -1,5 +1,5 @@
 
 🔧 Xcode IDE List Tools
 
-✅ Found 20 tool(s). Raw response saved to artifact.
+✅ Found <XCODE_IDE_TOOL_COUNT> tool(s). Raw response saved to artifact.
   └ Raw Response JSON: <RAW_RESPONSE_JSON_PATH>

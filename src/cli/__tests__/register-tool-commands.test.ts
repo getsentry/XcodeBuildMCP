@@ -493,20 +493,18 @@ describe('registerToolCommands', () => {
     );
   });
 
-  it('does not duplicate daemon-streamed fragments in the render session for jsonl output', async () => {
+  it('does not duplicate daemon-streamed fragments for jsonl output', async () => {
     const streamedFragment = {
       kind: 'transcript',
       fragment: 'process-line',
       stream: 'stderr',
       line: 'Build Log: /tmp/build.log\n',
     } as const;
-    let observedSessionFragmentCount = 0;
 
     vi.spyOn(DefaultToolInvoker.prototype, 'invokeDirect').mockImplementation(
       async (_tool, _args, opts) => {
         opts.renderSession?.emit(streamedFragment);
         opts.onProgress?.(streamedFragment);
-        observedSessionFragmentCount = opts.renderSession?.getFragments().length ?? 0;
         opts.onStructuredOutput?.({
           schema: 'xcodebuildmcp.output.simulator-list',
           schemaVersion: '1',
@@ -533,7 +531,6 @@ describe('registerToolCommands', () => {
       app.parseAsync(['simulator', 'run-tool', '--output', 'jsonl']),
     ).resolves.toBeDefined();
 
-    expect(observedSessionFragmentCount).toBe(1);
     expect(stdoutChunks.join('')).toBe(
       `${JSON.stringify({
         event: 'transcript.process-line',

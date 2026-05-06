@@ -17,7 +17,6 @@ export interface RenderSession {
   setNextSteps?(steps: NextStep[], runtime: 'cli' | 'daemon' | 'mcp'): void;
   getNextSteps?(): readonly NextStep[];
   getNextStepsRuntime?(): 'cli' | 'daemon' | 'mcp' | undefined;
-  getFragments(): readonly AnyFragment[];
   getAttachments(): readonly ImageAttachment[];
   isError(): boolean;
   finalize(): string;

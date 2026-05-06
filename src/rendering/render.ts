@@ -28,7 +28,6 @@ interface RenderSessionHooks {
 }
 
 function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
-  const fragments: AnyFragment[] = [];
   const attachments: ImageAttachment[] = [];
   let structuredOutput: StructuredToolOutput | undefined;
   let nextSteps: NextStep[] = [];
@@ -36,7 +35,6 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
   return {
     emit(fragment: AnyFragment): void {
-      fragments.push(fragment);
       hooks.onEmit?.(fragment);
     },
 
@@ -65,10 +63,6 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
     getNextStepsRuntime(): 'cli' | 'daemon' | 'mcp' | undefined {
       return nextStepsRuntime;
-    },
-
-    getFragments(): readonly AnyFragment[] {
-      return fragments;
     },
 
     getAttachments(): readonly ImageAttachment[] {

@@ -49,7 +49,6 @@ describe('text render parity', () => {
     session.emit(fragment);
 
     expect(session.isError()).toBe(false);
-    expect(session.getFragments()).toEqual([fragment]);
   });
 
   it('marks explicit structured error output as a final render error', () => {
@@ -396,13 +395,6 @@ describe('text render parity', () => {
       },
     });
 
-    expect(session.getFragments()).toEqual([
-      invocation,
-      buildStage,
-      streamedWarning,
-      buildSummary,
-      transcriptLine,
-    ]);
     const rendered = session.finalize();
 
     expect(rendered).toContain('Scheme: MyApp');

@@ -1,7 +1,6 @@
 import type { ToolCatalog, ToolDefinition, ToolInvoker, InvokeOptions } from './types.ts';
 import type { NextStep, NextStepParams, NextStepParamsMap } from '../types/common.ts';
 import type { DaemonToolResult, ToolInvokeResult } from '../daemon/protocol.ts';
-import type { RuntimeStatusFragment } from '../types/runtime-status.ts';
 
 import { DaemonClient, DaemonVersionMismatchError } from '../cli/daemon-client.ts';
 import {
@@ -26,18 +25,6 @@ type BuiltTemplateNextStep = {
   templateToolId?: string;
 };
 
-function createStatusFragment(
-  level: RuntimeStatusFragment['level'],
-  message: string,
-): RuntimeStatusFragment {
-  return {
-    kind: 'infrastructure',
-    fragment: 'status',
-    level,
-    message,
-  };
-}
-
 function emitExplicitRuntimeError(params: {
   session: RenderSession;
   handlerContext?: ToolHandlerContext;
@@ -55,7 +42,6 @@ function emitExplicitRuntimeError(params: {
     params.handlerContext.structuredOutput = output;
   }
   params.onStructuredOutput?.(output);
-  params.session.emit(createStatusFragment('error', params.message));
 }
 
 function buildTemplateNextSteps(

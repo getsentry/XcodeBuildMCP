@@ -34,6 +34,9 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
 
 function normalizeNumber(path: string[], key: string | undefined, value: number): number {
   switch (key) {
+    case 'toolCount':
+      if (path.includes('data')) return 99999;
+      return value;
     case 'durationMs':
       if (path.at(-2) === 'summary') return 1234;
       if (path.includes('testCases')) return 0;

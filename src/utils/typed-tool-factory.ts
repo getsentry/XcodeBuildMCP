@@ -4,8 +4,7 @@ import type { ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { renderCliTextTranscript } from './renderers/cli-text-renderer.ts';
 import type { CommandExecutor } from './execution/index.ts';
-import type { AnyFragment, DomainFragment } from '../types/domain-fragments.ts';
-import { infrastructureStatus } from '../types/runtime-status.ts';
+import type { DomainFragment } from '../types/domain-fragments.ts';
 import { setStructuredErrorOutput } from './structured-error.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
@@ -19,7 +18,6 @@ import { mergeSessionDefaultArgs } from './session-default-args.ts';
 export interface ToolTestResult {
   content: Array<{ type: 'text'; text: string }>;
   isError?: boolean;
-  _fragments?: AnyFragment[];
 }
 
 /**
@@ -59,11 +57,9 @@ function setValidationErrorOutput(ctx: ToolHandlerContext, message: string, code
     code,
     message,
   });
-  ctx.emit(infrastructureStatus('error', message));
 }
 
 function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {
-  const fragments = [...session.getFragments()];
   const text = renderCliTextTranscript({
     items: [],
     structuredOutput: session.getStructuredOutput?.(),
@@ -79,7 +75,6 @@ function sessionToTestResult(session: ReturnType<typeof createRenderSession>): T
   return {
     content,
     isError: session.isError() || undefined,
-    ...(fragments.length > 0 ? { _fragments: fragments } : {}),
   };
 }
 
