@@ -23,15 +23,22 @@ describe('launch_mac_app plugin', () => {
       expect(
         zodSchema.safeParse({
           appPath: '/Applications/Calculator.app',
-          args: ['--debug'],
+          launchArgs: ['--debug'],
         }).success,
       ).toBe(true);
       expect(
         zodSchema.safeParse({
           appPath: '/path/to/MyApp.app',
-          args: ['--debug', '--verbose'],
+          launchArgs: ['--debug', '--verbose'],
         }).success,
       ).toBe(true);
+      const strictSchema = z.strictObject(schema);
+      expect(
+        strictSchema.safeParse({
+          appPath: '/path/to/MyApp.app',
+          args: ['--legacy'],
+        }).success,
+      ).toBe(false);
     });
 
     it('should validate schema with invalid inputs', () => {
@@ -40,7 +47,7 @@ describe('launch_mac_app plugin', () => {
       expect(zodSchema.safeParse({ appPath: null }).success).toBe(false);
       expect(zodSchema.safeParse({ appPath: 123 }).success).toBe(false);
       expect(
-        zodSchema.safeParse({ appPath: '/path/to/MyApp.app', args: 'not-array' }).success,
+        zodSchema.safeParse({ appPath: '/path/to/MyApp.app', launchArgs: 'not-array' }).success,
       ).toBe(false);
     });
   });
@@ -93,7 +100,7 @@ describe('launch_mac_app plugin', () => {
       expect(calls[0].command).toEqual(['open', '/path/to/MyApp.app']);
     });
 
-    it('should generate correct command with args parameter', async () => {
+    it('should generate correct command with launchArgs parameter', async () => {
       const calls: any[] = [];
       const mockExecutor = async (command: string[]) => {
         calls.push({ command });
@@ -108,7 +115,7 @@ describe('launch_mac_app plugin', () => {
         launch_mac_appLogic(
           {
             appPath: '/path/to/MyApp.app',
-            args: ['--debug', '--verbose'],
+            launchArgs: ['--debug', '--verbose'],
           },
           mockExecutor,
           mockFileSystem,
@@ -124,7 +131,7 @@ describe('launch_mac_app plugin', () => {
       ]);
     });
 
-    it('should generate correct command with empty args array', async () => {
+    it('should generate correct command with empty launchArgs array', async () => {
       const calls: any[] = [];
       const mockExecutor = async (command: string[]) => {
         calls.push({ command });
@@ -139,7 +146,7 @@ describe('launch_mac_app plugin', () => {
         launch_mac_appLogic(
           {
             appPath: '/path/to/MyApp.app',
-            args: [],
+            launchArgs: [],
           },
           mockExecutor,
           mockFileSystem,

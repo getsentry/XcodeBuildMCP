@@ -66,7 +66,14 @@ const baseOptions = {
     ),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
   derivedDataPath: z.string().optional(),
-  extraArgs: z.array(z.string()).optional(),
+  extraArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Additional xcodebuild/build-settings arguments (not app launch arguments)'),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on simulator runtime'),
   useLatestOS: z
     .boolean()
     .optional()
@@ -439,7 +446,14 @@ export function createBuildRunSimExecutor(
         phase: 'launch-app',
         status: 'started',
       });
-      const launchResult: LaunchWithLoggingResult = await launcher(simulatorId, bundleId, executor);
+      const launchOptions =
+        params.launchArgs === undefined ? undefined : { args: params.launchArgs };
+      const launchResult: LaunchWithLoggingResult = await launcher(
+        simulatorId,
+        bundleId,
+        executor,
+        launchOptions,
+      );
       if (!launchResult.success) {
         const errorMessage = launchResult.error ?? 'Failed to launch app';
         return createBuildRunDomainResult({

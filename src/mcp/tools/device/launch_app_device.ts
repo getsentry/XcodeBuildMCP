@@ -31,6 +31,10 @@ import {
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
   bundleId: z.string(),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on physical device runtime'),
   env: z
     .record(z.string(), z.string())
     .optional()
@@ -88,6 +92,7 @@ export function createLaunchAppDeviceExecutor(
         fileSystem,
         {
           env: params.env,
+          args: params.launchArgs,
         },
       );
 

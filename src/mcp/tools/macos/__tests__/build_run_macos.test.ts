@@ -31,13 +31,15 @@ describe('build_run_macos', () => {
 
       expect(zodSchema.safeParse({}).success).toBe(true);
       expect(zodSchema.safeParse({ extraArgs: ['--verbose'] }).success).toBe(true);
+      expect(zodSchema.safeParse({ launchArgs: ['--uitesting'] }).success).toBe(true);
 
       expect(zodSchema.safeParse({ derivedDataPath: '/tmp/derived' }).success).toBe(false);
       expect(zodSchema.safeParse({ extraArgs: ['--ok', 2] }).success).toBe(false);
+      expect(zodSchema.safeParse({ launchArgs: ['--ok', 2] }).success).toBe(false);
       expect(zodSchema.safeParse({ preferXcodebuild: true }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs']);
+      expect(schemaKeys).toEqual(['extraArgs', 'launchArgs']);
     });
   });
 
@@ -396,6 +398,71 @@ describe('build_run_macos', () => {
       expect(response).toBeUndefined();
       expectPendingBuildRunResponse(result, true);
       expect(result.nextStepParams).toBeUndefined();
+    });
+
+    it('should pass launchArgs only to app launch and keep extraArgs on xcodebuild commands', async () => {
+      let callCount = 0;
+      const executorCalls: any[] = [];
+      const mockExecutor = (
+        command: string[],
+        description?: string,
+        logOutput?: boolean,
+        opts?: { cwd?: string },
+        detached?: boolean,
+      ) => {
+        callCount++;
+        executorCalls.push({ command, description, logOutput, opts });
+        void detached;
+
+        if (callCount === 1) {
+          return Promise.resolve({
+            success: true,
+            output: 'BUILD SUCCEEDED',
+            error: '',
+            process: mockProcess,
+          });
+        } else if (callCount === 2) {
+          return Promise.resolve({
+            success: true,
+            output: 'BUILT_PRODUCTS_DIR = /path/to/build\nFULL_PRODUCT_NAME = MyApp.app',
+            error: '',
+            process: mockProcess,
+          });
+        }
+        return Promise.resolve({ success: true, output: '', error: '', process: mockProcess });
+      };
+
+      const args = {
+        projectPath: '/path/to/project.xcodeproj',
+        scheme: 'MyApp',
+        configuration: 'Debug',
+        preferXcodebuild: false,
+        extraArgs: ['-quiet'],
+        launchArgs: ['--uitesting', '--reset-state'],
+      };
+
+      await runBuildRunMacOSLogic(args, mockExecutor);
+
+      const xcodebuildCommands = executorCalls
+        .map(({ command }) => command)
+        .filter((command) => command[0] === 'xcodebuild');
+      expect(xcodebuildCommands.length).toBeGreaterThan(0);
+      for (const command of xcodebuildCommands) {
+        expect(command).toContain('-quiet');
+        expect(command).not.toContain('--uitesting');
+        expect(command).not.toContain('--reset-state');
+      }
+
+      const openCommand = executorCalls
+        .map(({ command }) => command)
+        .find((command) => command[0] === 'open');
+      expect(openCommand).toEqual([
+        'open',
+        '/path/to/build/MyApp.app',
+        '--args',
+        '--uitesting',
+        '--reset-state',
+      ]);
     });
 
     it('should use default configuration when not provided', async () => {

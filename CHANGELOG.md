@@ -7,6 +7,7 @@
 - Added configurable file artifact text rendering with CLI output defaulting to labeled `Files:` lists, MCP text preserving compact trees, and `filePathRenderStyle` / `XCODEBUILDMCP_FILE_PATH_RENDER_STYLE` / `--file-path-render-style` overrides.
 - Added workspace-scoped default xcresult bundles for simulator, device, and macOS test tools so test artifacts are available in structured and text output even when callers do not pass `-resultBundlePath`.
 - Added opt-in MCP server idle shutdown via `XCODEBUILDMCP_MCP_IDLE_TIMEOUT_MS`, allowing unused MCP server processes to gracefully exit after a configured idle period ([#394](https://github.com/getsentry/XcodeBuildMCP/issues/394)).
+- Added canonical `launchArgs` launch-argument input across build-and-run tools (`build_run_sim`, `build_run_device`, `build_run_macos`) and launch-only tools (`launch_app_sim`, `launch_app_device`, `launch_mac_app`) so runtime launch arguments are passed only to app launch steps; `extraArgs` remains build-system-only and launch-only tools no longer use generic `args`.
 
 ### Fixed
 

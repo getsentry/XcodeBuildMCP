@@ -40,7 +40,7 @@ export async function launchAppOnDevice(
   bundleId: string,
   executor: CommandExecutor,
   fileSystem: FileSystemExecutor,
-  opts?: { env?: Record<string, string> },
+  opts?: { env?: Record<string, string>; args?: string[] },
 ): Promise<LaunchStepResult> {
   log('info', `Launching app ${bundleId} on device ${deviceId}`);
   const tempJsonPath = join(fileSystem.tmpdir(), `launch-${Date.now()}.json`);
@@ -63,6 +63,10 @@ export async function launchAppOnDevice(
   }
 
   command.push(bundleId);
+
+  if (opts?.args?.length) {
+    command.push(...opts.args);
+  }
 
   const result = await executor(command, 'Launch app on device', false);
   if (!result.success) {

@@ -54,13 +54,19 @@ describe('build_run_sim tool', () => {
           extraArgs: ['--verbose'],
         }).success,
       ).toBe(true);
+      expect(
+        schemaObj.safeParse({
+          launchArgs: ['--uitesting'],
+        }).success,
+      ).toBe(true);
 
       expect(schemaObj.safeParse({ derivedDataPath: '/path/to/derived' }).success).toBe(false);
       expect(schemaObj.safeParse({ extraArgs: [123] }).success).toBe(false);
+      expect(schemaObj.safeParse({ launchArgs: [123] }).success).toBe(false);
       expect(schemaObj.safeParse({ preferXcodebuild: false }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs']);
+      expect(schemaKeys).toEqual(['extraArgs', 'launchArgs']);
       expect(schemaKeys).not.toContain('scheme');
       expect(schemaKeys).not.toContain('simulatorName');
       expect(schemaKeys).not.toContain('projectPath');
@@ -468,6 +474,89 @@ describe('build_run_sim tool', () => {
         'build',
       ]);
       expect(callHistory[1].logPrefix).toBe('iOS Simulator Build');
+    });
+
+    it('should pass launchArgs only to launcher and keep extraArgs on xcodebuild commands', async () => {
+      const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
+      let launchArgs: string[] | undefined;
+
+      const trackingLauncher: SimulatorLauncher = async (_uuid, _bundleId, _executor, opts) => {
+        launchArgs = opts?.args;
+        return {
+          success: true,
+          processId: 11111,
+          logFilePath: '/tmp/mock-logs/test.log',
+        };
+      };
+
+      const trackingExecutor: CommandExecutor = async (command, logPrefix) => {
+        callHistory.push({ command, logPrefix });
+
+        if (command[0] === 'xcrun' && command[1] === 'simctl' && command[2] === 'list') {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({
+              devices: {
+                'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
+                  { udid: 'test-uuid-123', name: 'iPhone 17', isAvailable: true, state: 'Booted' },
+                ],
+              },
+            }),
+          });
+        }
+        if (command[0] === 'xcodebuild' && command.includes('build')) {
+          return createMockCommandResponse({
+            success: true,
+            output: 'BUILD SUCCEEDED',
+          });
+        }
+        if (command[0] === 'xcodebuild' && command.includes('-showBuildSettings')) {
+          return createMockCommandResponse({
+            success: true,
+            output: 'BUILT_PRODUCTS_DIR = /path/to/build\nFULL_PRODUCT_NAME = MyApp.app\n',
+          });
+        }
+        if (
+          command.some(
+            (c) => c.includes('plutil') || c.includes('PlistBuddy') || c.includes('defaults'),
+          )
+        ) {
+          return createMockCommandResponse({
+            success: true,
+            output: 'io.sentry.MyApp',
+          });
+        }
+
+        return createMockCommandResponse({
+          success: true,
+          output: 'Success',
+        });
+      };
+
+      const { result } = await runBuildRunSimLogic(
+        {
+          workspacePath: '/path/to/MyProject.xcworkspace',
+          scheme: 'MyScheme',
+          simulatorName: 'iPhone 17',
+          extraArgs: ['-quiet'],
+          launchArgs: ['--uitesting', '--reset-state'],
+        },
+        trackingExecutor,
+        trackingLauncher,
+      );
+
+      expectPendingBuildRunResponse(result, false);
+      expect(launchArgs).toEqual(['--uitesting', '--reset-state']);
+
+      const xcodebuildCommands = callHistory
+        .map(({ command }) => command)
+        .filter((command) => command[0] === 'xcodebuild');
+      expect(xcodebuildCommands.length).toBeGreaterThan(0);
+      for (const command of xcodebuildCommands) {
+        expect(command).toContain('-quiet');
+        expect(command).not.toContain('--uitesting');
+        expect(command).not.toContain('--reset-state');
+      }
     });
 
     it('should generate correct build settings command after successful build', async () => {

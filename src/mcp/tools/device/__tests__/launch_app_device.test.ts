@@ -22,7 +22,9 @@ describe('launch_app_device plugin (device-shared)', () => {
       const schemaObj = z.strictObject(schema);
       expect(schemaObj.safeParse({}).success).toBe(true);
       expect(schemaObj.safeParse({ bundleId: 'io.sentry.app' }).success).toBe(false);
-      expect(Object.keys(schema).sort()).toEqual(['env']);
+      expect(schemaObj.safeParse({ launchArgs: ['--uitesting'] }).success).toBe(true);
+      expect(schemaObj.safeParse({ args: ['--legacy'] }).success).toBe(false);
+      expect(Object.keys(schema).sort()).toEqual(['env', 'launchArgs']);
     });
 
     it('should validate schema with invalid inputs', () => {
@@ -122,6 +124,37 @@ describe('launch_app_device plugin (device-shared)', () => {
       expect(cmd).toContain('--environment-variables');
       const envIdx = cmd.indexOf('--environment-variables');
       expect(JSON.parse(cmd[envIdx + 1])).toEqual({ STAGING_ENABLED: '1', DEBUG: 'true' });
+    });
+
+    it('should append launchArgs after bundleId when launchArgs is provided', async () => {
+      const calls: any[] = [];
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'App launched successfully',
+        process: { pid: 12345 },
+      });
+
+      const trackingExecutor = async (command: string[]) => {
+        calls.push({ command });
+        return mockExecutor(command);
+      };
+
+      await runLogic(() =>
+        launch_app_deviceLogic(
+          {
+            deviceId: 'test-device-123',
+            bundleId: 'io.sentry.app',
+            launchArgs: ['--uitesting', '--reset-state'],
+          },
+          trackingExecutor,
+          createMockFileSystemExecutor(),
+        ),
+      );
+
+      const cmd = calls[0].command;
+      const bundleIdIndex = cmd.indexOf('io.sentry.app');
+      expect(bundleIdIndex).toBeGreaterThan(-1);
+      expect(cmd.slice(bundleIdIndex + 1)).toEqual(['--uitesting', '--reset-state']);
     });
 
     it('should not include --environment-variables when env is not provided', async () => {

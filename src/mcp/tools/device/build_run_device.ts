@@ -58,7 +58,14 @@ const baseSchemaObject = z.object({
   platform: devicePlatformSchema,
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
   derivedDataPath: z.string().optional(),
-  extraArgs: z.array(z.string()).optional(),
+  extraArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Additional xcodebuild/build-settings arguments (not app launch arguments)'),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on physical device runtime'),
   preferXcodebuild: z.boolean().optional(),
   env: z
     .record(z.string(), z.string())
@@ -229,7 +236,7 @@ export function createBuildRunDeviceExecutor(
         bundleId,
         executor,
         fileSystemExecutor,
-        { env: params.env },
+        { env: params.env, args: params.launchArgs },
       );
       if (!launchResult.success) {
         const errorMessage = launchResult.error ?? 'Failed to launch app';

@@ -28,14 +28,15 @@ describe('launch_app_sim tool', () => {
 
       expect(
         schemaObj.safeParse({
-          args: ['--debug'],
+          launchArgs: ['--debug'],
         }).success,
       ).toBe(true);
 
       expect(schemaObj.safeParse({ bundleId: 'io.sentry.testapp' }).success).toBe(false);
       expect(schemaObj.safeParse({ bundleId: 123 }).success).toBe(false);
 
-      expect(Object.keys(schema).sort()).toEqual(['args', 'env']);
+      expect(schemaObj.safeParse({ args: ['--legacy'] }).success).toBe(false);
+      expect(Object.keys(schema).sort()).toEqual(['env', 'launchArgs']);
 
       const withSimDefaults = schemaObj.safeParse({
         simulatorId: 'sim-default',
@@ -109,7 +110,7 @@ describe('launch_app_sim tool', () => {
       });
     });
 
-    it('should pass args and env through to launcher', async () => {
+    it('should pass launchArgs and env through to launcher', async () => {
       let capturedArgs: string[] | undefined;
       let capturedEnv: Record<string, string> | undefined;
       const trackingLauncher: SimulatorLauncher = async (_uuid, _bundleId, _executor, opts?) => {
@@ -130,7 +131,7 @@ describe('launch_app_sim tool', () => {
           {
             simulatorId: 'test-uuid-123',
             bundleId: 'io.sentry.testapp',
-            args: ['--debug', '--verbose'],
+            launchArgs: ['--debug', '--verbose'],
             env: { STAGING_ENABLED: '1' },
           },
           installCheckExecutor,

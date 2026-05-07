@@ -32,6 +32,7 @@ describe('build_run_device tool', () => {
 
       expect(schemaObj.safeParse({}).success).toBe(true);
       expect(schemaObj.safeParse({ extraArgs: ['-quiet'] }).success).toBe(true);
+      expect(schemaObj.safeParse({ launchArgs: ['--uitesting'] }).success).toBe(true);
       expect(schemaObj.safeParse({ env: { FOO: 'bar' } }).success).toBe(true);
       expect(schemaObj.safeParse({ platform: 'tvOS' }).success).toBe(true);
       expect(schemaObj.safeParse({ platform: 'tvOS Simulator' }).success).toBe(true);
@@ -40,8 +41,10 @@ describe('build_run_device tool', () => {
       expect(schemaObj.safeParse({ scheme: 'App' }).success).toBe(false);
       expect(schemaObj.safeParse({ deviceId: 'device-id' }).success).toBe(false);
 
+      expect(schemaObj.safeParse({ launchArgs: [123] }).success).toBe(false);
+
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['env', 'extraArgs', 'platform']);
+      expect(schemaKeys).toEqual(['env', 'extraArgs', 'launchArgs', 'platform']);
     });
   });
 
@@ -244,6 +247,68 @@ describe('build_run_device tool', () => {
       const text = result.text();
       expect(text).toContain('Build & Run complete');
       expect(text).not.toContain('Process ID');
+    });
+
+    it('passes launchArgs only to launch command and keeps extraArgs on xcodebuild commands', async () => {
+      const commandCalls: string[][] = [];
+      const mockExecutor: CommandExecutor = async (command) => {
+        commandCalls.push(command);
+
+        if (command.includes('-showBuildSettings')) {
+          return createMockCommandResponse({
+            success: true,
+            output: 'BUILT_PRODUCTS_DIR = /tmp/build\nFULL_PRODUCT_NAME = MyWatchApp.app\n',
+          });
+        }
+
+        if (command[0] === 'defaults' || command[0] === '/usr/libexec/PlistBuddy') {
+          return createMockCommandResponse({ success: true, output: 'io.sentry.MyWatchApp' });
+        }
+
+        if (command.includes('launch')) {
+          return createMockCommandResponse({
+            success: true,
+            output: JSON.stringify({ result: { process: { processIdentifier: 9876 } } }),
+          });
+        }
+
+        return createMockCommandResponse({ success: true, output: 'OK' });
+      };
+
+      const { result } = await runBuildRunDeviceLogic(
+        {
+          projectPath: '/tmp/MyWatchApp.xcodeproj',
+          scheme: 'MyWatchApp',
+          platform: 'watchOS',
+          deviceId: 'DEVICE-UDID',
+          extraArgs: ['-quiet'],
+          launchArgs: ['--uitesting', '--reset-state'],
+        },
+        mockExecutor,
+        createMockFileSystemExecutor({ existsSync: () => true }),
+      );
+
+      expectPendingBuildRunResponse(result, false);
+
+      const xcodebuildCommands = commandCalls.filter((command) => command[0] === 'xcodebuild');
+      expect(xcodebuildCommands.length).toBeGreaterThan(0);
+      for (const command of xcodebuildCommands) {
+        expect(command).toContain('-quiet');
+        expect(command).not.toContain('--uitesting');
+        expect(command).not.toContain('--reset-state');
+      }
+
+      const launchCommand = commandCalls.find(
+        (command) =>
+          command[0] === 'xcrun' &&
+          command[1] === 'devicectl' &&
+          command[2] === 'device' &&
+          command[3] === 'process' &&
+          command[4] === 'launch',
+      );
+      expect(launchCommand).toBeDefined();
+      expect(launchCommand).toContain('--uitesting');
+      expect(launchCommand).toContain('--reset-state');
     });
 
     it('uses generic destination for build-settings lookup', async () => {

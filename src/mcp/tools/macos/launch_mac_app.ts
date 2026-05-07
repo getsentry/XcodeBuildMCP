@@ -16,7 +16,10 @@ import {
 
 const launchMacAppSchema = z.object({
   appPath: z.string(),
-  args: z.array(z.string()).optional(),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on macOS runtime'),
 });
 
 type LaunchMacAppParams = z.infer<typeof launchMacAppSchema>;
@@ -57,7 +60,7 @@ export function createLaunchMacAppExecutor(
     log('info', `Starting launch macOS app request for ${params.appPath}`);
 
     try {
-      const result = await launchMacApp(params.appPath, executor, { args: params.args });
+      const result = await launchMacApp(params.appPath, executor, { args: params.launchArgs });
 
       if (!result.success) {
         return buildLaunchFailure(

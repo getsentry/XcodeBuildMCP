@@ -49,7 +49,14 @@ const baseSchemaObject = z.object({
     .enum(['arm64', 'x86_64'])
     .optional()
     .describe('Architecture to build for (arm64 or x86_64). For macOS only.'),
-  extraArgs: z.array(z.string()).optional(),
+  extraArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Additional xcodebuild/build-settings arguments (not app launch arguments)'),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on macOS runtime'),
   preferXcodebuild: z.boolean().optional(),
 });
 
@@ -153,7 +160,7 @@ export function createBuildRunMacOSExecutor(
         status: 'started',
       });
 
-      const macLaunchResult = await launchMacApp(appPath, executor);
+      const macLaunchResult = await launchMacApp(appPath, executor, { args: params.launchArgs });
       if (!macLaunchResult.success) {
         return createBuildRunDomainResult({
           started,

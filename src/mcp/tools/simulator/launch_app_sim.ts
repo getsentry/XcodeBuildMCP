@@ -36,7 +36,10 @@ const baseSchemaObject = z.object({
       "Name of the simulator (e.g., 'iPhone 17'). Provide EITHER this OR simulatorId, not both",
     ),
   bundleId: z.string().describe('Bundle identifier of the app to launch'),
-  args: z.array(z.string()).optional().describe('Optional arguments to pass to the app'),
+  launchArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments passed to the launched app process on simulator runtime'),
   env: z
     .record(z.string(), z.string())
     .optional()
@@ -49,7 +52,7 @@ const internalSchemaObject = z.object({
   simulatorId: z.string(),
   simulatorName: z.string().optional(),
   bundleId: z.string(),
-  args: z.array(z.string()).optional(),
+  launchArgs: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
 });
 
@@ -129,7 +132,7 @@ export function createLaunchAppSimExecutor(
 
     try {
       const launchResult = await launcher(params.simulatorId, params.bundleId, executor, {
-        args: params.args,
+        args: params.launchArgs,
         env: params.env,
       });
 
