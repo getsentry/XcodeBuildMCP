@@ -60,6 +60,19 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     );
   });
 
+  it('normalizes workspace-scoped result bundle paths', () => {
+    const input =
+      'Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/result-bundles/test_macos_2026-05-07T09-58-46-123Z_pid1234_abcd1234.xcresult\n';
+
+    const result = normalizeSnapshotOutput(input);
+
+    expect(result).toContain(
+      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult',
+    );
+    expect(result).not.toContain('Weather-abc123def456');
+    expect(result).not.toContain('abcd1234');
+  });
+
   it('normalizes workspace-scoped XcodeBuildMCP DerivedData hashes', () => {
     const input =
       'Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/DerivedData/CalculatorApp-22d700c6d603\n';

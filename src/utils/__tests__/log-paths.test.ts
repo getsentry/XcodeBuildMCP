@@ -25,6 +25,7 @@ describe('log paths', () => {
       state: path.join(appDir, 'workspaces', 'workspace-a', 'state'),
       locks: path.join(appDir, 'workspaces', 'workspace-a', 'locks'),
       derivedData: path.join(appDir, 'workspaces', 'workspace-a', 'DerivedData'),
+      resultBundles: path.join(appDir, 'workspaces', 'workspace-a', 'result-bundles'),
       logRetention: {
         lockDir: path.join(appDir, 'workspaces', 'workspace-a', 'locks', 'log-retention.lock'),
         markerPath: path.join(

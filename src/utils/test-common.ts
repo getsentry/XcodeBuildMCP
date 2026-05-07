@@ -16,7 +16,11 @@ import { getDefaultCommandExecutor } from './command.ts';
 import { type TestPreflightResult } from './test-preflight.ts';
 
 import { createSimulatorTwoPhaseExecutionPlan } from './simulator-test-execution.ts';
-import { findResultBundlePathArg } from './result-bundle-args.ts';
+import { parseResultBundlePathArgs } from './result-bundle-args.ts';
+import {
+  createDefaultResultBundlePath,
+  markResultBundlePathCompleted,
+} from './result-bundle-path.ts';
 
 import type {
   BuildTarget,
@@ -135,11 +139,16 @@ export function createTestExecutor(
     }
 
     try {
+      const parsedResultBundleArgs = parseResultBundlePathArgs(params.extraArgs);
+      const shouldUseDefaultResultBundlePath = !parsedResultBundleArgs.resultBundlePath;
+      const resultBundlePath =
+        parsedResultBundleArgs.resultBundlePath ?? createDefaultResultBundlePath(toolName);
+
       if (shouldUseTwoPhaseSimulatorExecution) {
         const executionPlan = createSimulatorTwoPhaseExecutionPlan({
           extraArgs: params.extraArgs,
           preflight: options.preflight,
-          resultBundlePath: undefined,
+          resultBundlePath,
         });
 
         const buildForTestingResult = await executeXcodeBuildCommand(
@@ -162,6 +171,7 @@ export function createTestExecutor(
               started.stderrLines,
               buildForTestingResult.content,
             ),
+            includeDetectedXcresult: false,
             preflight: options.preflight,
             request: options.request,
           });
@@ -185,6 +195,9 @@ export function createTestExecutor(
           started.pipeline,
         );
 
+        if (shouldUseDefaultResultBundlePath) {
+          markResultBundlePathCompleted(executionPlan.resultBundlePath);
+        }
         emitXcresultFailures(started.pipeline);
 
         return createTestDomainResult({
@@ -201,8 +214,13 @@ export function createTestExecutor(
         });
       }
 
+      const singlePhaseParams: SharedTestExecutorParams = {
+        ...params,
+        extraArgs: [...parsedResultBundleArgs.remainingArgs, '-resultBundlePath', resultBundlePath],
+      };
+
       const singlePhaseResult = await executeXcodeBuildCommand(
-        params,
+        singlePhaseParams,
         platformOptions,
         params.preferXcodebuild,
         'test',
@@ -211,17 +229,16 @@ export function createTestExecutor(
         started.pipeline,
       );
 
+      if (shouldUseDefaultResultBundlePath) {
+        markResultBundlePathCompleted(resultBundlePath);
+      }
       emitXcresultFailures(started.pipeline);
 
       return createTestDomainResult({
         started,
         succeeded: !singlePhaseResult.isError,
         target,
-        artifacts: createXcodebuildTestArtifacts(
-          params,
-          started,
-          findResultBundlePathArg(params.extraArgs),
-        ),
+        artifacts: createXcodebuildTestArtifacts(params, started, resultBundlePath),
         fallbackErrorMessages: getFallbackErrorMessages(
           started.stderrLines,
           singlePhaseResult.content,

@@ -63,14 +63,11 @@ export function createSimulatorTwoPhaseExecutionPlan(params: {
   const selectedTestArgs = parsedArgs.selectorArgs;
   const usesExactSelectors = selectedTestArgs.length > 0;
   const resultBundlePath = params.resultBundlePath ?? parsedArgs.resultBundlePath;
+  const resultBundleArgs = resultBundlePath ? ['-resultBundlePath', resultBundlePath] : [];
 
   return {
     buildArgs: [...parsedArgs.remainingArgs, ...selectedTestArgs],
-    testArgs: [
-      ...parsedArgs.remainingArgs,
-      ...selectedTestArgs,
-      ...(resultBundlePath ? ['-resultBundlePath', resultBundlePath] : []),
-    ],
+    testArgs: [...parsedArgs.remainingArgs, ...selectedTestArgs, ...resultBundleArgs],
     usesExactSelectors,
     ...(resultBundlePath ? { resultBundlePath } : {}),
   };

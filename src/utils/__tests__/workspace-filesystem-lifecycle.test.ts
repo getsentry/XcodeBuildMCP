@@ -15,6 +15,7 @@ import {
   getWorkspaceFilesystemLayout,
   setXcodeBuildMCPAppDirOverrideForTests,
 } from '../log-paths.ts';
+import { getResultBundleCompletionMarkerPath } from '../result-bundle-path.ts';
 import { writeDaemonRegistryEntry } from '../../daemon/daemon-registry.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
@@ -34,6 +35,17 @@ function writeFileWithMtime(filePath: string, content: string, mtimeMs: number):
 
 function managedXcodebuildLogName(name = 'build_sim'): string {
   return `${name}_2026-05-02T12-00-00-000Z_pid123_abcdef12.log`;
+}
+
+function managedResultBundleName(name = 'test', pid = 123): string {
+  return `${name}_2026-05-02T12-00-00-000Z_pid${pid}_abcdef12.xcresult`;
+}
+
+function writeResultBundleWithMtime(bundlePath: string, mtimeMs: number): void {
+  mkdirSync(bundlePath, { recursive: true });
+  writeFileSync(path.join(bundlePath, 'Info.plist'), 'stub');
+  const mtime = new Date(mtimeMs);
+  utimesSync(bundlePath, mtime, mtime);
 }
 
 function createTrackedChild(pid: number, onKill: () => void): ChildProcess {
@@ -249,6 +261,97 @@ describe('workspace filesystem lifecycle', () => {
     expect(result).toMatchObject({ scanned: 1, deleted: 1 });
     expect(existsSync(unknownLog)).toBe(true);
     expect(existsSync(knownLog)).toBe(false);
+  });
+
+  it('prunes only managed result bundles from workspace result-bundles', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const managedBundle = path.join(layout.resultBundles, managedResultBundleName('test'));
+    const unknownBundle = path.join(layout.resultBundles, 'manual-user-bundle.xcresult');
+    writeResultBundleWithMtime(managedBundle, now - 4 * 24 * 60 * 60 * 1000);
+    writeResultBundleWithMtime(unknownBundle, now - 4 * 24 * 60 * 60 * 1000);
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'manual',
+      now,
+      force: true,
+      minVisibleMs: 0,
+    });
+
+    expect(result).toMatchObject({ scanned: 1, deleted: 1 });
+    expect(existsSync(managedBundle)).toBe(false);
+    expect(existsSync(unknownBundle)).toBe(true);
+  });
+
+  it('applies maxFiles overflow pruning to managed result bundles', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const oldBundle = path.join(layout.resultBundles, managedResultBundleName('test_old'));
+    const newBundle = path.join(layout.resultBundles, managedResultBundleName('test_new'));
+    writeResultBundleWithMtime(oldBundle, now - 2 * 24 * 60 * 60 * 1000);
+    writeResultBundleWithMtime(newBundle, now - 1 * 24 * 60 * 60 * 1000);
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'manual',
+      now,
+      force: true,
+      minVisibleMs: 0,
+      maxFiles: 1,
+    });
+
+    expect(result).toMatchObject({ scanned: 2, deleted: 1 });
+    expect(existsSync(oldBundle)).toBe(false);
+    expect(existsSync(newBundle)).toBe(true);
+  });
+
+  it('protects live managed result bundles until their completion marker exists', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const liveBundle = path.join(
+      layout.resultBundles,
+      managedResultBundleName('test_live', process.pid),
+    );
+    writeResultBundleWithMtime(liveBundle, now - 4 * 24 * 60 * 60 * 1000);
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'manual',
+      now,
+      force: true,
+      minVisibleMs: 0,
+    });
+
+    expect(result).toMatchObject({ scanned: 1, deleted: 0 });
+    expect(existsSync(liveBundle)).toBe(true);
+  });
+
+  it('prunes completed managed result bundles even when the owner process is still alive', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const completedBundle = path.join(
+      layout.resultBundles,
+      managedResultBundleName('test_completed', process.pid),
+    );
+    writeResultBundleWithMtime(completedBundle, now - 4 * 24 * 60 * 60 * 1000);
+    writeFileWithMtime(
+      getResultBundleCompletionMarkerPath(completedBundle),
+      'completed',
+      now - 4 * 24 * 60 * 60 * 1000,
+    );
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'manual',
+      now,
+      force: true,
+      minVisibleMs: 0,
+    });
+
+    expect(result).toMatchObject({ scanned: 1, deleted: 1 });
+    expect(existsSync(completedBundle)).toBe(false);
+    expect(existsSync(getResultBundleCompletionMarkerPath(completedBundle))).toBe(false);
   });
 
   it('cooldowns repeat schedule calls for the same workspace', () => {

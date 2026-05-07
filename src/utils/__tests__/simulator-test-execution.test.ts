@@ -84,7 +84,7 @@ describe('createSimulatorTwoPhaseExecutionPlan', () => {
     expect(plan.usesExactSelectors).toBe(true);
   });
 
-  it('keeps resultBundlePath out of build-for-testing args and includes it for test-without-building', () => {
+  it('includes resultBundlePath only in the simulator test execution phase', () => {
     const plan = createSimulatorTwoPhaseExecutionPlan({
       extraArgs: ['-resultBundlePath', '/tmp/UserProvided.xcresult'],
     });

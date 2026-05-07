@@ -167,6 +167,8 @@ describe('test_device plugin', () => {
         'never',
         '-derivedDataPath',
         computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
+        '-resultBundlePath',
+        expect.stringContaining('/result-bundles/test_device_'),
         'test',
       ]);
     });

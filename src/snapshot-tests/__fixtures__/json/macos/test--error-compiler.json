@@ -19,10 +19,16 @@
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0
+      },
       "target": "macos"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log",
+      "xcresultPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult"
     },
     "tests": {
       "selected": [

@@ -14,5 +14,6 @@ Discovered 1 test(s):
    CalculatorAppTests/CalculatorAppTests/testAddition
 Running tests (1 completed, 0 failures, 0 skipped)
 
-✅ 1 test passed, 0 skipped (⏱️ <DURATION>)
+✅ 1 test passed, 0 failed, 0 skipped (⏱️ <DURATION>)
+  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log

@@ -6,5 +6,5 @@
    Platform: Swift Package
    Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData
 
-✅ 1 test passed, 0 skipped (⏱️ <DURATION>)
+✅ 1 test passed, 0 failed, 0 skipped (⏱️ <DURATION>)
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log

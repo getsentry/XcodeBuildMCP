@@ -20,4 +20,5 @@ Errors (1):
     <ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:20
 
 ❌ Test failed. (⏱️ <DURATION>)
+  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
   └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log

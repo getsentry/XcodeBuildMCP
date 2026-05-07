@@ -385,6 +385,7 @@ export function createTestDomainResult(options: {
   target: BuildTarget;
   artifacts: TestResultArtifacts;
   fallbackErrorMessages?: readonly string[];
+  includeDetectedXcresult?: boolean;
   preflight?: TestPreflightResult;
   request: BuildInvocationRequest;
 }): TestResultDomainResult {
@@ -398,10 +399,12 @@ export function createTestDomainResult(options: {
     ...(fragment.durationMs !== undefined ? { durationMs: fragment.durationMs } : {}),
   }));
   const detectedXcresultPath =
-    options.target === 'swift-package' ? null : options.started.pipeline.xcresultPath;
+    options.includeDetectedXcresult === false || options.target === 'swift-package'
+      ? null
+      : options.started.pipeline.xcresultPath;
   const providedXcresultPath =
     'xcresultPath' in options.artifacts ? options.artifacts.xcresultPath : undefined;
-  const xcresultPath = detectedXcresultPath ?? providedXcresultPath;
+  const xcresultPath = providedXcresultPath ?? detectedXcresultPath;
   const artifacts: TestResultArtifacts = {
     ...options.artifacts,
     ...(xcresultPath ? { xcresultPath } : {}),

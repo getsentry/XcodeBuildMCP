@@ -14,6 +14,7 @@ import { log } from './logging/index.ts';
 import { getRuntimeInstance, getRuntimeInstanceIfConfigured } from './runtime-instance.ts';
 import { tryAcquireFsLock } from './fs-lock.ts';
 import { isPidAlive } from './process-liveness.ts';
+import { getResultBundleCompletionMarkerPath } from './result-bundle-path.ts';
 
 export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES = 10_000;
@@ -37,6 +38,10 @@ const XCODEBUILD_LOG_NAME_PATTERN = new RegExp(
 const SIMULATOR_LOG_NAME_PATTERN = new RegExp(
   `^.+_${ISO_TIMESTAMP_PATTERN}_(?:helperpid\\d+_)?ownerpid\\d+_${SUFFIX_PATTERN}\\.log$`,
 );
+const RESULT_BUNDLE_NAME_PATTERN = new RegExp(
+  `^[A-Za-z0-9][A-Za-z0-9_-]*_${ISO_TIMESTAMP_PATTERN}_pid\\d+_${SUFFIX_PATTERN}\\.xcresult$`,
+);
+const RESULT_BUNDLE_OWNER_PID_PATTERN = /_pid(\d+)_/u;
 const XCODE_IDE_CALL_TOOL_TRANSIENT_DIR = path.join('xcode-ide', 'call-tool');
 const XCODE_IDE_CALL_TOOL_OWNER_DIR_PATTERN = /^ownerpid(\d+)_/u;
 
@@ -88,6 +93,7 @@ interface ResolvedWorkspaceFilesystemLifecycleOptions {
   logDir: string;
   markerPath: string;
   lockDir: string;
+  resultBundleDir: string | null;
   now: number;
   maxAgeMs: number;
   maxFiles: number;
@@ -142,6 +148,7 @@ function resolveOptions(
       options.lockDir ??
       layout?.filesystemLifecycle.lockDir ??
       path.join(logDir, FALLBACK_LOCK_DIR_NAME),
+    resultBundleDir: layout?.resultBundles ?? null,
     now: options.now ?? Date.now(),
     maxAgeMs: options.maxAgeMs ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS,
     maxFiles: options.maxFiles ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES,
@@ -190,6 +197,15 @@ function isXcodeBuildMCPManagedLogName(fileName: string): boolean {
     return true;
   }
   return XCODEBUILD_LOG_NAME_PATTERN.test(fileName) || SIMULATOR_LOG_NAME_PATTERN.test(fileName);
+}
+
+function isXcodeBuildMCPManagedResultBundleName(fileName: string): boolean {
+  return RESULT_BUNDLE_NAME_PATTERN.test(fileName);
+}
+
+function getManagedResultBundleOwnerPid(fileName: string): number | null {
+  const pid = Number(fileName.match(RESULT_BUNDLE_OWNER_PID_PATTERN)?.[1]);
+  return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
 async function deleteFile(filePath: string): Promise<boolean> {
@@ -287,6 +303,98 @@ async function pruneKnownLogDirectory(
 
   const deletions = await Promise.all(
     [...expired, ...overflow].map((file) => deleteFile(file.path)),
+  );
+  const deleted = deletions.reduce((count, success) => count + (success ? 1 : 0), 0);
+
+  return { scanned, deleted };
+}
+
+async function hasResultBundleCompletionMarker(bundlePath: string): Promise<boolean> {
+  try {
+    const markerStat = await fs.stat(getResultBundleCompletionMarkerPath(bundlePath));
+    return markerStat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function isProtectedResultBundleDirectory(
+  bundle: RetainedLogFile,
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+): Promise<boolean> {
+  if (options.now - bundle.mtimeMs < options.minVisibleMs) {
+    return true;
+  }
+
+  const ownerPid = getManagedResultBundleOwnerPid(bundle.name);
+  if (ownerPid && isPidAlive(ownerPid) && !(await hasResultBundleCompletionMarker(bundle.path))) {
+    return true;
+  }
+
+  return false;
+}
+
+async function pruneKnownResultBundleDirectory(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+): Promise<{ scanned: number; deleted: number }> {
+  if (!options.resultBundleDir) {
+    return { scanned: 0, deleted: 0 };
+  }
+
+  const resultBundleDir = options.resultBundleDir;
+  await fs.mkdir(resultBundleDir, { recursive: true, mode: 0o700 });
+  const entries = await fs.readdir(resultBundleDir, { withFileTypes: true });
+  const candidates = entries
+    .filter((entry) => entry.isDirectory() && isXcodeBuildMCPManagedResultBundleName(entry.name))
+    .map((entry) => ({ name: entry.name, path: path.join(resultBundleDir, entry.name) }));
+
+  const stats = await Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        const stat = await fs.stat(candidate.path);
+        return { ...candidate, mtimeMs: stat.mtimeMs } satisfies RetainedLogFile;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const retainedDeletable: RetainedLogFile[] = [];
+  const expired: RetainedLogFile[] = [];
+  let scanned = 0;
+
+  for (const bundle of stats) {
+    if (!bundle) continue;
+    scanned += 1;
+    if (await isProtectedResultBundleDirectory(bundle, options)) {
+      continue;
+    }
+    if (options.now - bundle.mtimeMs > options.maxAgeMs) {
+      expired.push(bundle);
+      continue;
+    }
+    retainedDeletable.push(bundle);
+  }
+
+  const excessFileCount = retainedDeletable.length - options.maxFiles;
+  const overflow =
+    excessFileCount > 0
+      ? retainedDeletable
+          .slice()
+          .sort((left, right) => left.mtimeMs - right.mtimeMs)
+          .slice(0, excessFileCount)
+      : [];
+
+  const deletions = await Promise.all(
+    [...expired, ...overflow].map(async (bundle) => {
+      try {
+        await fs.rm(bundle.path, { recursive: true, force: true });
+        await deleteFile(getResultBundleCompletionMarkerPath(bundle.path));
+        return true;
+      } catch {
+        return false;
+      }
+    }),
   );
   const deleted = deletions.reduce((count, success) => count + (success ? 1 : 0), 0);
 
@@ -450,15 +558,16 @@ export async function runWorkspaceFilesystemLifecycleSweep(
 
     runDaemonCleanup(resolved);
     const protectedPaths = await collectProtectedLogPaths(resolved);
-    const { scanned, deleted } = await pruneKnownLogDirectory(resolved, protectedPaths);
+    const logPrune = await pruneKnownLogDirectory(resolved, protectedPaths);
+    const resultBundlePrune = await pruneKnownResultBundleDirectory(resolved);
     await touchCleanupMarker(resolved.markerPath, resolved.now);
 
     return {
       workspaceKey: resolved.workspaceKey,
       trigger: resolved.trigger,
       logDir: resolved.logDir,
-      scanned,
-      deleted,
+      scanned: logPrune.scanned + resultBundlePrune.scanned,
+      deleted: logPrune.deleted + resultBundlePrune.deleted,
       stopped,
       skippedByCooldown: false,
       skippedByLock: false,
@@ -520,10 +629,7 @@ export function scheduleWorkspaceFilesystemLifecycleSweep(
             lastScheduledAtByPreKey.set(preKey, completedAt);
           }
           if (result.deleted > 0) {
-            log(
-              'info',
-              `[FilesystemLifecycle] Deleted ${result.deleted} old log files from ${result.logDir}`,
-            );
+            log('info', `[FilesystemLifecycle] Deleted ${result.deleted} old filesystem artifacts`);
           }
         }
       })
