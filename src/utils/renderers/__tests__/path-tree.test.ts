@@ -78,6 +78,11 @@ describe('formatPathTree', () => {
   });
 
   it('preserves raw shared ancestry even when a descendant path would display differently alone', () => {
+    const childLines = [
+      `${homeDirectoryName}/Library/Logs/build.log — User Logs`,
+      'other/Library/Logs/build.log — Other Logs',
+    ].sort();
+
     expect(
       formatPathTree(
         [
@@ -86,11 +91,7 @@ describe('formatPathTree', () => {
         ],
         { formatPath: displayPath },
       ),
-    ).toEqual([
-      `└── ${homeParentPath}/`,
-      `    ├── ${homeDirectoryName}/Library/Logs/build.log — User Logs`,
-      '    └── other/Library/Logs/build.log — Other Logs',
-    ]);
+    ).toEqual([`└── ${homeParentPath}/`, `    ├── ${childLines[0]}`, `    └── ${childLines[1]}`]);
   });
 
   it('sorts relative paths before rendering', () => {
