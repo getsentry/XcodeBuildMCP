@@ -5,6 +5,7 @@
 //  Created by Cameron on 30/04/2026.
 //
 
+import OSLog
 import SwiftUI
 
 enum WeatherSheet: Identifiable {
@@ -121,10 +122,12 @@ struct ContentView: View {
     }
 
     private func selectLocation(_ location: WeatherLocation) {
+        AppLog.location.notice("select id=\(location.id, privacy: .public) name=\"\(location.name, privacy: .public)\"")
         selectedLocation = location
     }
 
     private func previewLocation(_ location: WeatherLocation) {
+        AppLog.location.notice("preview id=\(location.id, privacy: .public) name=\"\(location.name, privacy: .public)\"")
         selectedLocation = location
     }
 

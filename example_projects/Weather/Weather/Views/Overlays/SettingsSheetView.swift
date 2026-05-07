@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 struct SettingsSheetView: View {
@@ -53,6 +54,27 @@ struct SettingsSheetView: View {
         .scrollIndicators(.hidden)
         .background(sheetBackground)
         .accessibilityIdentifier("weather.settingsSheet")
+        .onChange(of: units.temperature) { _, new in
+            AppLog.settings.notice("temperature=\(new.label, privacy: .public)")
+        }
+        .onChange(of: units.wind) { _, new in
+            AppLog.settings.notice("wind=\(new.label, privacy: .public)")
+        }
+        .onChange(of: units.pressure) { _, new in
+            AppLog.settings.notice("pressure=\(new.label, privacy: .public)")
+        }
+        .onChange(of: units.distance) { _, new in
+            AppLog.settings.notice("distance=\(new.label, privacy: .public)")
+        }
+        .onChange(of: units.animationsEnabled) { _, new in
+            AppLog.settings.notice("animationsEnabled=\(new, privacy: .public)")
+        }
+        .onChange(of: units.alertsEnabled) { _, new in
+            AppLog.settings.notice("alertsEnabled=\(new, privacy: .public)")
+        }
+        .onChange(of: units.reduceTransparency) { _, new in
+            AppLog.settings.notice("reduceTransparency=\(new, privacy: .public)")
+        }
     }
 
     private var sheetBackground: some View {
