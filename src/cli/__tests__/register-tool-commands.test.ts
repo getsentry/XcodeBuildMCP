@@ -374,6 +374,62 @@ describe('registerToolCommands', () => {
     stdoutWrite.mockRestore();
   });
 
+  it('applies --file-path-render-style to text output without forwarding it to tool args', async () => {
+    vi.spyOn(DefaultToolInvoker.prototype, 'invokeDirect').mockImplementation(
+      async (tool, args, opts) => {
+        const handlerContext: ToolHandlerContext = opts.handlerContext ?? {
+          emit: (fragment) => {
+            opts.renderSession?.emit(fragment);
+          },
+          attach: (image) => {
+            opts.renderSession?.attach(image);
+          },
+        };
+
+        await tool.handler(args, handlerContext);
+
+        if (handlerContext.structuredOutput) {
+          opts.renderSession?.setStructuredOutput?.(handlerContext.structuredOutput);
+          opts.onStructuredOutput?.(handlerContext.structuredOutput);
+        }
+      },
+    );
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.app-path',
+            schemaVersion: '1',
+            result: {
+              kind: 'app-path',
+              didError: false,
+              error: null,
+              artifacts: { appPath: '/tmp/MyApp.app' },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--file-path-render-style', 'tree']),
+    ).resolves.toBeDefined();
+
+    expect(tool.handler).toHaveBeenCalledWith(
+      { workspacePath: 'Profile.xcworkspace' },
+      expect.any(Object),
+    );
+    expect(stdoutChunks.join('')).toContain('└── /tmp/MyApp.app — App Path');
+    expect(stdoutChunks.join('')).not.toContain('└ App Path: /tmp/MyApp.app');
+  });
+
   it('writes a structured envelope for tools that provide structured output', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks: string[] = [];

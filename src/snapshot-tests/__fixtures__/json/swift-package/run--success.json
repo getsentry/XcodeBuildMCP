@@ -18,7 +18,7 @@
       "packagePath": "<ROOT>/example_projects/spm",
       "executablePath": "<ROOT>/example_projects/spm/.build/arm64-apple-macosx/debug/spm",
       "processId": 99999,
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "output": {
       "stdout": [
@@ -29,8 +29,8 @@
         "[0/6] Write sources",
         "[1/6] Write spm-entitlement.plist",
         "[2/6] Write swift-version--6988338F2F200930.txt",
-        "[4/8] Compiling spm main.swift",
-        "[5/8] Emitting module spm",
+        "[4/8] Emitting module spm",
+        "[5/8] Compiling spm main.swift",
         "[5/8] Write Objects.LinkFileList",
         "[6/8] Linking spm",
         "[7/8] Applying spm",

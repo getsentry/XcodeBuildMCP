@@ -11,19 +11,23 @@ vi.mock('../../cli-progress-reporter.ts', () => ({
   createCliProgressReporter: () => reporter,
 }));
 
-function buildOutput(overrides: Partial<StructuredToolOutput['result']>): StructuredToolOutput {
+function buildOutput(
+  overrides: Partial<Extract<StructuredToolOutput['result'], { kind: 'build-result' }>>,
+): StructuredToolOutput {
+  const result: Extract<StructuredToolOutput['result'], { kind: 'build-result' }> = {
+    kind: 'build-result',
+    didError: false,
+    error: null,
+    summary: { status: 'SUCCEEDED' },
+    artifacts: { scheme: 'MyApp', buildLogPath: '/tmp/build.log' },
+    diagnostics: { warnings: [], errors: [] },
+    ...overrides,
+  };
+
   return {
     schema: 'xcodebuildmcp.output.build-result',
     schemaVersion: '1.0.0',
-    result: {
-      kind: 'build-result',
-      didError: false,
-      error: null,
-      summary: { status: 'SUCCEEDED' },
-      artifacts: { scheme: 'MyApp', buildLogPath: '/tmp/build.log' },
-      diagnostics: { warnings: [], errors: [] },
-      ...overrides,
-    } as StructuredToolOutput['result'],
+    result,
   };
 }
 
@@ -517,7 +521,7 @@ describe('cli-text-renderer', () => {
     expect(footerIndex).toBeGreaterThan(summaryIndex);
     expect(nextStepsIndex).toBeGreaterThan(footerIndex);
     expect(output).toContain('\u{2705} Build & Run complete');
-    expect(output).toContain('\u2514 App Path: /tmp/build/MyApp.app');
+    expect(output).toContain('└ App Path: /tmp/build/MyApp.app');
   });
 
   it('replays buffered build failures once when only a header was emitted', () => {
@@ -565,6 +569,25 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('🔍 Get App Path');
     expect(output).toContain('✅ Success');
     expect(output).toContain('└ App Path: /tmp/MyApp.app');
+  });
+
+  it('renders structured output path artifacts as a tree when requested', () => {
+    const output = renderCliTextTranscript({
+      filePathRenderStyle: 'tree',
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.app-path',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'app-path',
+          didError: false,
+          error: null,
+          artifacts: { appPath: '/tmp/MyApp.app' },
+        },
+      },
+    });
+
+    expect(output).toContain('└── /tmp/MyApp.app — App Path');
+    expect(output).not.toContain('└ App Path: /tmp/MyApp.app');
   });
 
   it('renders structured-only non-build diagnostics with a short top-level error summary', () => {
@@ -685,6 +708,36 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('✅ Build succeeded. (⏱️ 5.0s)');
     expect(output).toContain('✅ Build & Run complete');
     expect(output).toContain('App Path: /tmp/build/MyApp.app');
+  });
+
+  it('renders structured-only build-run headers without frontmatter when header details are disabled', () => {
+    const output = renderCliTextTranscript({
+      includeHeaderDetails: false,
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-run-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-run-result',
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
+          },
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED', durationMs: 5000 },
+          artifacts: { appPath: '/tmp/build/MyApp.app', buildLogPath: '/tmp/build.log' },
+          diagnostics: { warnings: [], errors: [] },
+        },
+      },
+    });
+
+    expect(output).toContain('🚀 Build & Run');
+    expect(output).not.toContain('Scheme: MyApp');
+    expect(output).not.toContain('Project: /tmp/MyApp.xcodeproj');
+    expect(output).not.toContain('Configuration: Debug');
+    expect(output).toContain('✅ Build succeeded. (⏱️ 5.0s)');
   });
 
   it('renders structured-only test-result with request and no fragments', () => {

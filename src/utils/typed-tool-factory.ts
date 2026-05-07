@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../rendering/types.ts';
 import { createRenderSession } from '../rendering/render.ts';
+import { getConfig } from './config-store.ts';
+import { normalizeRenderRuntime, resolveFilePathRenderStyle } from './file-path-render-style.ts';
 import { renderCliTextTranscript } from './renderers/cli-text-renderer.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import type { DomainFragment } from '../types/domain-fragments.ts';
@@ -60,11 +62,17 @@ function setValidationErrorOutput(ctx: ToolHandlerContext, message: string, code
 }
 
 function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {
+  const runtime = normalizeRenderRuntime(process.env.XCODEBUILDMCP_RUNTIME);
   const text = renderCliTextTranscript({
     items: [],
     structuredOutput: session.getStructuredOutput?.(),
     nextSteps: session.getNextSteps?.(),
     nextStepsRuntime: session.getNextStepsRuntime?.(),
+    includeHeaderDetails: runtime !== 'mcp',
+    filePathRenderStyle: resolveFilePathRenderStyle({
+      configured: getConfig().filePathRenderStyle,
+      runtime,
+    }),
   });
 
   const content: Array<{ type: 'text'; text: string }> = [];

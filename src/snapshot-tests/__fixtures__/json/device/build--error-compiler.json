@@ -7,7 +7,7 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS",
       "target": "device"
@@ -18,7 +18,7 @@
       "target": "device"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

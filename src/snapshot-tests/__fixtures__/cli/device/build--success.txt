@@ -5,10 +5,11 @@
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
    Configuration: Debug
    Platform: iOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
 
 ✅ Build succeeded. (⏱️ <DURATION>)
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log
 
 Next steps:
 1. Get built device app path: xcodebuildmcp device get-app-path --scheme "CalculatorApp"

@@ -1,8 +1,6 @@
 
 🛑 Stop macOS App
 
-   App: PID 999999
-
 Errors (1):
 
   ✗ kill: 999999: No such process

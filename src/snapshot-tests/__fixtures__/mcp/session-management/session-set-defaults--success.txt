@@ -1,10 +1,6 @@
 
 ⚙️ Set Defaults
 
-   Workspace Path: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Scheme: CalculatorApp
-   Profile: (default)
-
 ✅ Session defaults updated (default profile)
   ├ projectPath: (not set)
   ├ workspacePath: example_projects/iOS_Calculator/CalculatorApp.xcworkspace

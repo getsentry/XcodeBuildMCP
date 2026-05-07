@@ -8,7 +8,8 @@ import {
   type ProjectConfig,
 } from './project-config.ts';
 import type { DebuggerBackendKind } from './debugger/types.ts';
-import type { UiDebuggerGuardMode } from './runtime-config-types.ts';
+import type { FilePathRenderStyle, UiDebuggerGuardMode } from './runtime-config-types.ts';
+import { isFilePathRenderStyle } from './file-path-render-style.ts';
 import { normalizeSessionDefaultsProfileName } from './session-defaults-profile.ts';
 
 export type RuntimeConfigOverrides = Partial<{
@@ -20,6 +21,7 @@ export type RuntimeConfigOverrides = Partial<{
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
   showTestTiming: boolean;
+  filePathRenderStyle: FilePathRenderStyle;
   uiDebuggerGuardMode: UiDebuggerGuardMode;
   incrementalBuildsEnabled: boolean;
   dapRequestTimeoutMs: number;
@@ -45,6 +47,7 @@ export type ResolvedRuntimeConfig = {
   disableSessionDefaults: boolean;
   disableXcodeAutoSync: boolean;
   showTestTiming: boolean;
+  filePathRenderStyle?: FilePathRenderStyle;
   uiDebuggerGuardMode: UiDebuggerGuardMode;
   incrementalBuildsEnabled: boolean;
   dapRequestTimeoutMs: number;
@@ -141,6 +144,14 @@ function parseUiDebuggerGuardMode(value: string | undefined): UiDebuggerGuardMod
   return undefined;
 }
 
+function parseFilePathRenderStyle(value: string | undefined): FilePathRenderStyle | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (isFilePathRenderStyle(normalized)) return normalized;
+  log('warn', `Unsupported file path render style '${value}', falling back to defaults.`);
+  return undefined;
+}
+
 function parseDebuggerBackend(value: string | undefined): DebuggerBackendKind | undefined {
   if (!value) return undefined;
   const normalized = value.trim().toLowerCase();
@@ -198,6 +209,12 @@ function readEnvConfig(env: NodeJS.ProcessEnv): RuntimeConfigOverrides {
   );
 
   setIfDefined(config, 'showTestTiming', parseBoolean(env.XCODEBUILDMCP_SHOW_TEST_TIMING));
+
+  setIfDefined(
+    config,
+    'filePathRenderStyle',
+    parseFilePathRenderStyle(env.XCODEBUILDMCP_FILE_PATH_RENDER_STYLE),
+  );
 
   setIfDefined(
     config,
@@ -492,6 +509,12 @@ function resolveConfig(opts: {
       fileConfig: opts.fileConfig,
       envConfig,
       fallback: DEFAULT_CONFIG.showTestTiming,
+    }),
+    filePathRenderStyle: resolveFromLayers<FilePathRenderStyle>({
+      key: 'filePathRenderStyle',
+      overrides: opts.overrides,
+      fileConfig: opts.fileConfig,
+      envConfig,
     }),
     uiDebuggerGuardMode: resolveFromLayers({
       key: 'uiDebuggerGuardMode',

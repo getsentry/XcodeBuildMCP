@@ -1,15 +1,6 @@
 
 🧪 Test
 
-   Scheme: CalculatorApp
-   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
-   Platform: iOS Simulator
-   Simulator: iPhone 17
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
-   Selective Testing:
-     CalculatorAppTests/CalculatorAppTests/testAddition
-
 Discovered 1 test(s):
    CalculatorAppTests/CalculatorAppTests/testAddition
 
@@ -19,4 +10,5 @@ Errors (1):
     <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33
 
 ❌ Test failed. (⏱️ <DURATION>)
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log — Build Logs

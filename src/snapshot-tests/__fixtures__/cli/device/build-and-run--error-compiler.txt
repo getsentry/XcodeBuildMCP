@@ -6,7 +6,7 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
 
 Compiler Errors (1):
 
@@ -14,4 +14,5 @@ Compiler Errors (1):
     example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33:42
 
 ❌ Build failed. (⏱️ <DURATION>)
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_device_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_device_<TIMESTAMP>_pid<PID>.log

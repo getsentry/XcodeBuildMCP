@@ -7,7 +7,7 @@
     "request": {
       "scheme": "MCPTest",
       "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>",
+      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>",
       "configuration": "Debug",
       "platform": "macOS",
       "target": "macos"
@@ -18,10 +18,10 @@
       "target": "macos"
     },
     "artifacts": {
-      "appPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app",
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app",
       "bundleId": "io.sentry.MCPTest.macOS",
       "processId": 99999,
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_macos_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_macos_<TIMESTAMP>_pid<PID>.log"
     },
     "output": {
       "stdout": [],

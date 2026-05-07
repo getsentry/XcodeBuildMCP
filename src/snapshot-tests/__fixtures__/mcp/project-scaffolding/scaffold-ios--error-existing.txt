@@ -1,10 +1,6 @@
 
 📝 Scaffold iOS Project
 
-   Name: SnapshotTestApp
-   Path: <TMPDIR>/ios-existing
-   Platform: iOS
-
 Errors (1):
 
   ✗ Xcode project files already exist in <TMPDIR>/ios-existing

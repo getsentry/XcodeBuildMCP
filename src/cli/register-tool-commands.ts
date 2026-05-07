@@ -9,6 +9,7 @@ import { groupToolsByWorkflow } from '../runtime/tool-catalog.ts';
 import { getWorkflowMetadataFromManifest } from '../core/manifest/load-manifest.ts';
 import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
+import type { FilePathRenderStyle } from '../utils/runtime-config-types.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';
 import { transcriptEmitterStorage } from '../utils/transcript-context.ts';
 import {
@@ -138,7 +139,10 @@ export function registerToolCommands(
       workflowDescription,
       (yargs) => {
         // Hide root-level options from workflow help
-        yargs.option('log-level', { hidden: true }).option('style', { hidden: true });
+        yargs
+          .option('log-level', { hidden: true })
+          .option('style', { hidden: true })
+          .option('file-path-render-style', { hidden: true });
 
         // Register each tool as a subcommand under this workflow
         for (const tool of tools) {
@@ -201,7 +205,10 @@ function registerToolSubcommand(
     tool.description ?? `Run the ${tool.mcpName} tool`,
     (subYargs) => {
       // Hide root-level options from tool help
-      subYargs.option('log-level', { hidden: true }).option('style', { hidden: true });
+      subYargs
+        .option('log-level', { hidden: true })
+        .option('style', { hidden: true })
+        .option('file-path-render-style', { hidden: true });
 
       // Parse option-like values as arguments (e.g. --extra-args "-only-testing:...")
       subYargs.parserConfiguration({
@@ -270,6 +277,7 @@ function registerToolSubcommand(
       const outputFormat = (argv.output as OutputFormat) ?? 'text';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
+      const filePathRenderStyle = argv.filePathRenderStyle as FilePathRenderStyle | undefined;
 
       if (
         profileOverride &&
@@ -302,6 +310,8 @@ function registerToolSubcommand(
         'socket',
         'log-level',
         'logLevel',
+        'file-path-render-style',
+        'filePathRenderStyle',
         '_',
         '$0',
       ]);
@@ -340,14 +350,19 @@ function registerToolSubcommand(
       const restoreCliOutputFormat = setEnvScoped('XCODEBUILDMCP_CLI_OUTPUT_FORMAT', outputFormat);
 
       try {
-        const session =
-          outputFormat === 'text'
-            ? createRenderSession('cli-text', {
-                interactive: process.stdout.isTTY === true,
-              })
-            : outputFormat === 'raw'
-              ? createRenderSession('raw')
-              : createRenderSession('text');
+        let renderStrategy: 'cli-text' | 'raw' | 'text';
+        if (outputFormat === 'text') {
+          renderStrategy = 'cli-text';
+        } else if (outputFormat === 'raw') {
+          renderStrategy = 'raw';
+        } else {
+          renderStrategy = 'text';
+        }
+        const session = createRenderSession(renderStrategy, {
+          interactive: outputFormat === 'text' && process.stdout.isTTY === true,
+          runtime: 'cli',
+          filePathRenderStyle,
+        });
         const writeJsonlFragment =
           outputFormat === 'jsonl'
             ? (fragment: AnyFragment) => {

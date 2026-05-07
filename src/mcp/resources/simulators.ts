@@ -11,8 +11,7 @@ import type { CommandExecutor } from '../../utils/execution/index.ts';
 import { list_simsLogic } from '../tools/simulator/list_sims.ts';
 import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
-
-import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
+import { renderTranscript } from '../../rendering/render.ts';
 
 export async function simulatorsResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
@@ -25,10 +24,15 @@ export async function simulatorsResourceLogic(
   try {
     log('info', 'Processing simulators resource request');
     await handlerContextStorage.run(ctx, () => list_simsLogic({ enabled: true }, executor));
-    const text = renderCliTextTranscript({
-      structuredOutput: ctx.structuredOutput,
-      nextSteps: ctx.nextSteps,
-    });
+    const text = renderTranscript(
+      {
+        structuredOutput: ctx.structuredOutput,
+        nextSteps: ctx.nextSteps,
+        nextStepsRuntime: 'mcp',
+      },
+      'text',
+      { runtime: 'mcp' },
+    );
     const structuredError = ctx.structuredOutput?.result.didError
       ? (ctx.structuredOutput.result.error ?? null)
       : null;

@@ -1,9 +1,6 @@
 
 ⚙️ Set Defaults
 
-   Scheme: CalculatorApp
-   Profile: (default)
-
 ✅ Session defaults updated (default profile)
   ├ projectPath: (not set)
   ├ workspacePath: (not set)

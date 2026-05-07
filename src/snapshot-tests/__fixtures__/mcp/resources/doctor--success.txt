@@ -36,6 +36,7 @@ Process Tree
    <PID> (ppid <PID>): <PROCESS>
    <PID> (ppid <PID>): <PROCESS>
    <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
 
 Xcode Information
   version: <XCODE_VERSION>

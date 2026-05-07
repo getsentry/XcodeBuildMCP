@@ -1,9 +1,6 @@
 
 📱 Statusbar
 
-   Simulator: <UUID>
-   Data Network: wifi
-
 Errors (1):
 
   ✗ Invalid device: <UUID>

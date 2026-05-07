@@ -1,8 +1,6 @@
 
 🔍 List Schemes
 
-   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-
 ✅ Found 2 schemes
 
 Schemes:

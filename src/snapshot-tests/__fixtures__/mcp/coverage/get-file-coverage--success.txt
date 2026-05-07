@@ -1,9 +1,6 @@
 
 📊 File Coverage
 
-   xcresult: <TMPDIR>/TestResults.xcresult
-   File: CalculatorService.swift
-
 File: example_projects/iOS_Calculator/CalculatorAppPackage/Sources/CalculatorAppFeature/CalculatorService.swift
 
 ℹ️ Coverage: 83.1% (157/189 lines)

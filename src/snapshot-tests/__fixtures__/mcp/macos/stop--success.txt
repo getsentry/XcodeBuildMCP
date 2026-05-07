@@ -1,6 +1,4 @@
 
 🛑 Stop macOS App
 
-   App: MCPTest
-
 ✅ App stopped successfully

@@ -6,6 +6,7 @@ import type { SessionDefaults } from './session-store.ts';
 import { log } from './logger.ts';
 import { removeUndefined } from './remove-undefined.ts';
 import { runtimeConfigFileSchema, type RuntimeConfigFile } from './runtime-config-schema.ts';
+import type { FilePathRenderStyle } from './runtime-config-types.ts';
 import { normalizeSessionDefaultsProfileName } from './session-defaults-profile.ts';
 import { resolvePathFromCwd } from './path.ts';
 
@@ -20,6 +21,7 @@ export type ProjectConfig = RuntimeConfigFile & {
   enabledWorkflows?: string[];
   customWorkflows?: Record<string, string[]>;
   debuggerBackend?: 'dap' | 'lldb-cli';
+  filePathRenderStyle?: FilePathRenderStyle;
   [key: string]: unknown;
 };
 
@@ -60,6 +62,7 @@ export type PersistProjectConfigPatchOptions = {
     sentryDisabled?: boolean;
     experimentalWorkflowDiscovery?: boolean;
     disableSessionDefaults?: boolean;
+    filePathRenderStyle?: FilePathRenderStyle;
     sessionDefaults?: Partial<SessionDefaults>;
     setupPreferences?: SetupPreferences | null;
   };
@@ -420,6 +423,7 @@ export async function persistProjectConfigPatch(
     sentryDisabled: options.patch.sentryDisabled,
     experimentalWorkflowDiscovery: options.patch.experimentalWorkflowDiscovery,
     disableSessionDefaults: options.patch.disableSessionDefaults,
+    filePathRenderStyle: options.patch.filePathRenderStyle,
   });
 
   for (const [key, value] of Object.entries(topLevelPatch)) {

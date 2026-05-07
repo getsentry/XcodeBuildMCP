@@ -5,12 +5,13 @@
    Project: example_projects/macOS/MCPTest.xcodeproj
    Configuration: Debug
    Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
 
 Errors (1):
 
   ✗ The project named "MCPTest" does not contain a scheme named "NONEXISTENT". The "-list" option can be used to find the names of the schemes in the project.
 
 ❌ Test failed. (⏱️ <DURATION>)
-  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log

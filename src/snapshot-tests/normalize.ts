@@ -41,6 +41,12 @@ const TARGET_DEVICE_IDENTIFIER_REGEX = /(TARGET_DEVICE_IDENTIFIER = )([0-9A-Fa-f
 const CODEX_ARG0_PATH_REGEX = /<HOME>\/\.codex\/tmp\/arg0\/codex-arg0[A-Za-z0-9]+/g;
 const CODEX_WORKTREE_NODE_MODULES_REGEX =
   /<HOME>\/\.codex\/worktrees\/[^/:]+\/node_modules\/\.bin/g;
+const XCODEBUILDMCP_HOME_PREFIX_REGEX = /<HOME>(?=\/Library\/Developer\/XcodeBuildMCP(?:\/|$))/g;
+const XCODEBUILDMCP_WORKSPACE_KEY_REGEX =
+  /(~\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/\n]+)-[0-9a-f]{12}(?=\/|$)/g;
+const XCODE_IDE_ARTIFACT_OWNER_PID_REGEX = /(\/state\/xcode-ide\/call-tool\/ownerpid)\d+_/g;
+const XCODE_IDE_ARTIFACT_HASH_REGEX =
+  /(\/state\/xcode-ide\/call-tool\/[^/\n]+\/[^/\n]+-)[0-9a-f]{8}(?=\.json)/g;
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
@@ -111,8 +117,6 @@ export function normalizeSnapshotOutput(text: string): string {
 
   const home = os.homedir();
   normalized = normalized.replace(new RegExp(escapeRegex(home), 'g'), '<HOME>');
-  normalized = normalized.replace(/~\//g, '<HOME>/');
-  normalized = normalized.replace(/(?<=\s|:)~(?=\s|$)/gm, '<HOME>');
 
   const username = os.userInfo().username;
   normalized = normalized.replace(
@@ -129,17 +133,13 @@ export function normalizeSnapshotOutput(text: string): string {
     new RegExp(escapeRegex(tmpDir) + '/[A-Za-z0-9._-]+(?=/|[^A-Za-z0-9._/-]|$)', 'g'),
     '<TMPDIR>',
   );
+  normalized = normalized.replace(XCODEBUILDMCP_HOME_PREFIX_REGEX, '~');
+  normalized = normalized.replace(XCODEBUILDMCP_WORKSPACE_KEY_REGEX, '$1-<HASH>');
+  normalized = normalized.replace(XCODE_IDE_ARTIFACT_OWNER_PID_REGEX, '$1<PID>_');
+  normalized = normalized.replace(XCODE_IDE_ARTIFACT_HASH_REGEX, '$1<HASH>');
   normalized = normalized.replace(
-    /(<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+)-[0-9a-f]{12}(?=\/(?:logs|result-bundles)\/)/g,
-    '$1-<HASH>',
-  );
-  normalized = normalized.replace(
-    /(<HOME>\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/]+)-[0-9a-f]{12}\/DerivedData(?=$|[^A-Za-z0-9])/g,
-    '$1-<HASH>/DerivedData',
-  );
-  normalized = normalized.replace(
-    /(Build Logs: )(?:<TMPDIR>|<HOME>\/Library\/Developer\/XcodeBuildMCP)\/logs\//g,
-    '$1<HOME>/Library/Developer/XcodeBuildMCP/logs/',
+    /(Build Logs: )(?:<TMPDIR>|~\/Library\/Developer\/XcodeBuildMCP)\/logs\//g,
+    '$1~/Library/Developer/XcodeBuildMCP/logs/',
   );
   normalized = normalized.replace(
     /Raw Response JSON: .+\/xcode-ide\/call-tool\/.+\/[A-Za-z0-9._-]+\.json/g,

@@ -34,8 +34,13 @@ function getArtifactPathFromEnvelope(result: SnapshotResult): string | null {
 }
 
 function getArtifactPathFromText(result: SnapshotResult): string | null {
-  const match = result.rawText.match(/Raw Response JSON:\s*(.+)$/m);
-  return match?.[1]?.trim() ?? null;
+  const flatMatch = result.rawText.match(/Raw Response JSON:\s*(.+)$/m);
+  if (flatMatch?.[1]) {
+    return flatMatch[1].trim();
+  }
+
+  const treeMatch = result.rawText.match(/^\s*[├└]──\s*(.+?)\s+—\s+Raw Response JSON$/m);
+  return treeMatch?.[1]?.trim() ?? null;
 }
 
 function resolveArtifactPath(artifactDisplayPath: string): string {

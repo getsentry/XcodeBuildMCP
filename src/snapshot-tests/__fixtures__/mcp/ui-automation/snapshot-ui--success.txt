@@ -1,8 +1,6 @@
 
 📷 Snapshot UI
 
-   Simulator: <UUID>
-
 Accessibility Hierarchy
   ```json
   [

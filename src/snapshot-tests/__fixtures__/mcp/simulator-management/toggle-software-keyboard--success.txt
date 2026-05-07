@@ -1,6 +1,4 @@
 
 ⚙️ Toggle Software Keyboard
 
-   Simulator: <UUID>
-
 ✅ Sent Toggle Software Keyboard (Cmd+K)

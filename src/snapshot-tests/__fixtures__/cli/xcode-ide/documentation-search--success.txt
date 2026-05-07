@@ -4,4 +4,5 @@
    Remote Tool: DocumentationSearch
 
 ✅ Tool "DocumentationSearch" completed successfully. Raw response saved to artifact.
-  └ Raw Response JSON: <RAW_RESPONSE_JSON_PATH>
+  └ Files:
+     └ Raw Response JSON: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/state/xcode-ide/call-tool/ownerpid<PID>_<UUID>/<TIMESTAMP>-DocumentationSearch-<HASH>.json

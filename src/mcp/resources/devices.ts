@@ -11,8 +11,7 @@ import { getDefaultCommandExecutor } from '../../utils/execution/index.ts';
 import { list_devicesLogic } from '../tools/device/list_devices.ts';
 import { handlerContextStorage } from '../../utils/typed-tool-factory.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
-
-import { renderCliTextTranscript } from '../../utils/renderers/cli-text-renderer.ts';
+import { renderTranscript } from '../../rendering/render.ts';
 
 export async function devicesResourceLogic(
   executor: CommandExecutor = getDefaultCommandExecutor(),
@@ -25,10 +24,15 @@ export async function devicesResourceLogic(
   try {
     log('info', 'Processing devices resource request');
     await handlerContextStorage.run(ctx, () => list_devicesLogic({}, executor));
-    const text = renderCliTextTranscript({
-      structuredOutput: ctx.structuredOutput,
-      nextSteps: ctx.nextSteps,
-    });
+    const text = renderTranscript(
+      {
+        structuredOutput: ctx.structuredOutput,
+        nextSteps: ctx.nextSteps,
+        nextStepsRuntime: 'mcp',
+      },
+      'text',
+      { runtime: 'mcp' },
+    );
     const isError = ctx.structuredOutput?.result.didError === true;
     if (isError) {
       throw new Error(text || 'Failed to retrieve device data');

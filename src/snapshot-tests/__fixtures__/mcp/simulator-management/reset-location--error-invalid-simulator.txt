@@ -1,8 +1,6 @@
 
 📍 Reset Location
 
-   Simulator: <UUID>
-
 Errors (1):
 
   ✗ Invalid device: <UUID>

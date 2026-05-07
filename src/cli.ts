@@ -10,7 +10,12 @@ import { coerceLogLevel, setLogLevel, type LogLevel } from './utils/logger.ts';
 import { hydrateSentryDisabledEnvFromProjectConfig } from './utils/sentry-config.ts';
 
 function findTopLevelCommand(argv: string[]): string | undefined {
-  const flagsWithValue = new Set(['--socket', '--log-level', '--style']);
+  const flagsWithValue = new Set([
+    '--socket',
+    '--log-level',
+    '--style',
+    '--file-path-render-style',
+  ]);
   let skipNext = false;
 
   for (const token of argv) {
@@ -74,6 +79,11 @@ async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yar
       describe: 'Output verbosity (minimal hides next steps)',
       choices: ['normal', 'minimal'] as const,
       default: 'normal',
+    })
+    .option('file-path-render-style', {
+      type: 'string',
+      describe: 'Render file artifacts as a compact tree or labeled list in text output',
+      choices: ['tree', 'list'] as const,
     })
     .middleware((argv) => {
       const level = argv['log-level'] as LogLevel | undefined;

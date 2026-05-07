@@ -10,6 +10,7 @@ disableSessionDefaults: false
 incrementalBuildsEnabled: false
 debug: false
 sentryDisabled: false
+filePathRenderStyle: 'list' # text output file artifacts: list or tree
 sessionDefaults:
   projectPath: './MyApp.xcodeproj' # xor workspacePath
   workspacePath: './MyApp.xcworkspace' # xor projectPath

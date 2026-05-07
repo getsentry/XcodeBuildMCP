@@ -1,10 +1,6 @@
 
 📝 Scaffold iOS Project
 
-   Name: SnapshotTestApp
-   Path: <TMPDIR>/ios
-   Platform: iOS
-
 ✅ Project scaffolded successfully
   └ <TMPDIR>/ios
 

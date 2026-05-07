@@ -1,9 +1,6 @@
 
 📦 Install App
 
-   Simulator: <UUID>
-   App Path: <TMPDIR>/NotAnApp.app
-
 Errors (1):
 
   ✗ An error was encountered processing the command (domain=IXErrorDomain, code=13):

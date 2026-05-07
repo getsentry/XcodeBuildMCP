@@ -18,7 +18,9 @@ import type {
   TestProgressRenderItem,
 } from '../../rendering/render-items.ts';
 import type {
+  DetailTreePathItem,
   DetailTreeTextBlock,
+  DetailTreeValueItem,
   FileRefTextBlock,
   NextStepsTextBlock,
   SectionTextBlock,
@@ -26,6 +28,8 @@ import type {
   TableTextBlock,
 } from './domain-result-text.ts';
 import { displayPath } from '../build-preflight.ts';
+import type { FilePathRenderStyle } from '../runtime-config-types.ts';
+import { formatPathTree } from './path-tree.ts';
 import { renderNextStepsSection } from '../responses/next-steps-renderer.ts';
 
 // --- Operation emoji map ---
@@ -104,11 +108,60 @@ export const OPERATION_EMOJI: Record<string, string> = {
 
 // --- Detail tree formatting ---
 
-function formatDetailTreeLines(details: Array<{ label: string; value: string }>): string[] {
+type DetailTreeItem = DetailTreeValueItem | DetailTreePathItem;
+
+function isPathDetailItem(detail: DetailTreeItem): detail is DetailTreePathItem {
+  return 'path' in detail;
+}
+
+function formatValueDetailTreeLines(details: readonly DetailTreeValueItem[]): string[] {
   return details.map((detail, index) => {
     const branch = index === details.length - 1 ? '\u2514' : '\u251C';
     return `  ${branch} ${detail.label}: ${detail.value}`;
   });
+}
+
+export interface DetailTreeFormattingOptions {
+  filePathRenderStyle?: FilePathRenderStyle;
+}
+
+function formatPathListLines(details: readonly DetailTreePathItem[]): string[] {
+  return details.map((detail, index) => {
+    const branch = index === details.length - 1 ? '└' : '├';
+    const displayed = displayPath(detail.path);
+    return detail.label ? `${branch} ${detail.label}: ${displayed}` : `${branch} ${displayed}`;
+  });
+}
+
+function formatDetailTreeLines(
+  details: readonly DetailTreeItem[],
+  options: DetailTreeFormattingOptions = {},
+): string[] {
+  const valueDetails: DetailTreeValueItem[] = [];
+  const pathDetails: DetailTreePathItem[] = [];
+  for (const detail of details) {
+    if (isPathDetailItem(detail)) {
+      pathDetails.push(detail);
+    } else {
+      valueDetails.push(detail);
+    }
+  }
+
+  if (pathDetails.length === 0) {
+    return formatValueDetailTreeLines(valueDetails);
+  }
+
+  const pathLines =
+    options.filePathRenderStyle === 'list'
+      ? formatPathListLines(pathDetails)
+      : formatPathTree(pathDetails, { formatPath: displayPath });
+
+  const lines = valueDetails.map((detail) => `  ├ ${detail.label}: ${detail.value}`);
+  lines.push('  \u2514 Files:');
+  for (const line of pathLines) {
+    lines.push(`     ${line}`);
+  }
+  return lines;
 }
 
 // --- Diagnostic path resolution ---
@@ -218,9 +271,20 @@ function parseHumanDiagnostic(
 
 // --- Canonical event formatters ---
 
-export function formatHeaderEvent(event: HeaderRenderItem): string {
+export interface HeaderFormattingOptions {
+  includeDetails?: boolean;
+}
+
+export function formatHeaderEvent(
+  event: HeaderRenderItem,
+  options: HeaderFormattingOptions = {},
+): string {
   const emoji = OPERATION_EMOJI[event.operation] ?? '\u{2699}\u{FE0F}';
   const lines: string[] = [`${emoji} ${event.operation}`];
+
+  if (options.includeDetails === false) {
+    return lines.join('\n');
+  }
 
   const onlyTestingParams = event.params.filter((param) => param.label === '-only-testing');
   const skipTestingParams = event.params.filter((param) => param.label === '-skip-testing');
@@ -331,8 +395,11 @@ export function formatFileRefEvent(
   return displayed;
 }
 
-export function formatDetailTreeEvent(event: DetailTreeRenderItem | DetailTreeTextBlock): string {
-  return formatDetailTreeLines(event.items).join('\n');
+export function formatDetailTreeEvent(
+  event: DetailTreeRenderItem | DetailTreeTextBlock,
+  options: DetailTreeFormattingOptions = {},
+): string {
+  return formatDetailTreeLines(event.items, options).join('\n');
 }
 
 // --- Xcodebuild-specific formatters ---

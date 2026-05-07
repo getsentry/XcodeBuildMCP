@@ -7,7 +7,7 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
       "configuration": "Debug",
       "platform": "iOS Simulator",
       "simulatorName": "iPhone 17",
@@ -27,8 +27,8 @@
       "target": "simulator"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log",
-      "xcresultPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_sim_<TIMESTAMP>_pid<PID>.xcresult"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log",
+      "xcresultPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_sim_<TIMESTAMP>_pid<PID>.xcresult"
     },
     "tests": {
       "selected": [

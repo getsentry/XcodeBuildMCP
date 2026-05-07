@@ -1,7 +1,4 @@
 
 🛑 Stop App
 
-   Simulator: <UUID>
-   Bundle ID: io.sentry.calculatorapp
-
 ✅ App stopped successfully

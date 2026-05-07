@@ -12,6 +12,7 @@ export const runtimeConfigFileSchema = z
     disableSessionDefaults: z.boolean().optional(),
     disableXcodeAutoSync: z.boolean().optional(),
     showTestTiming: z.boolean().optional(),
+    filePathRenderStyle: z.enum(['tree', 'list']).optional(),
     uiDebuggerGuardMode: z.enum(['error', 'warn', 'off']).optional(),
     incrementalBuildsEnabled: z.boolean().optional(),
     dapRequestTimeoutMs: z.number().int().positive().optional(),

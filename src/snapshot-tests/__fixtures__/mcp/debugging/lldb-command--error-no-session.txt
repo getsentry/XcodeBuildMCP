@@ -1,8 +1,6 @@
 
 🐛 LLDB Command
 
-   Command: bt
-
 Errors (1):
 
   ✗ No active debug session. Provide debugSessionId or attach first.

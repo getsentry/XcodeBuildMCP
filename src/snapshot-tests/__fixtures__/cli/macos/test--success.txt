@@ -5,7 +5,7 @@
    Project: example_projects/macOS/MCPTest.xcodeproj
    Configuration: Debug
    Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
    Selective Testing:
      MCPTestTests/MCPTestTests/appNameIsCorrect()
      MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect
@@ -17,5 +17,6 @@ Running tests (1 completed, 0 failures, 0 skipped)
 Running tests (2 completed, 0 failures, 0 skipped)
 
 ✅ 2 tests passed, 0 failed, 0 skipped (⏱️ <DURATION>)
-  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log

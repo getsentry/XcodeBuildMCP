@@ -41,6 +41,7 @@ describe('config-store', () => {
     expect(config.dapRequestTimeoutMs).toBe(30000);
     expect(config.dapLogEvents).toBe(false);
     expect(config.launchJsonWaitMs).toBe(8000);
+    expect(config.filePathRenderStyle).toBeUndefined();
   });
 
   it('parses env values when provided', async () => {
@@ -54,6 +55,7 @@ describe('config-store', () => {
       XCODEBUILDMCP_ENABLED_WORKFLOWS: 'simulator,logging',
       XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE: 'warn',
       XCODEBUILDMCP_DEBUGGER_BACKEND: 'lldb',
+      XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list',
     };
 
     await initConfigStore({ cwd, fs: createFs(), env });
@@ -68,25 +70,43 @@ describe('config-store', () => {
     expect(config.enabledWorkflows).toEqual(['simulator', 'logging']);
     expect(config.uiDebuggerGuardMode).toBe('warn');
     expect(config.debuggerBackend).toBe('lldb-cli');
+    expect(config.filePathRenderStyle).toBe('list');
   });
 
   it('prefers overrides over config file values and config over env', async () => {
-    const yaml = ['schemaVersion: 1', 'debug: false', 'dapRequestTimeoutMs: 4000', ''].join('\n');
+    const yaml = [
+      'schemaVersion: 1',
+      'debug: false',
+      'dapRequestTimeoutMs: 4000',
+      'filePathRenderStyle: tree',
+      '',
+    ].join('\n');
     const env = {
       XCODEBUILDMCP_DEBUG: 'true',
       XCODEBUILDMCP_DAP_REQUEST_TIMEOUT_MS: '999',
+      XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list',
     };
 
     await initConfigStore({
       cwd,
       fs: createFs(yaml),
-      overrides: { debug: true, dapRequestTimeoutMs: 12345 },
+      overrides: { debug: true, dapRequestTimeoutMs: 12345, filePathRenderStyle: 'list' },
       env,
     });
 
     const config = getConfig();
     expect(config.debug).toBe(true);
     expect(config.dapRequestTimeoutMs).toBe(12345);
+    expect(config.filePathRenderStyle).toBe('list');
+  });
+
+  it('uses filePathRenderStyle from config before env when no override is provided', async () => {
+    const yaml = ['schemaVersion: 1', 'filePathRenderStyle: tree', ''].join('\n');
+    const env = { XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list' };
+
+    await initConfigStore({ cwd, fs: createFs(yaml), env });
+
+    expect(getConfig().filePathRenderStyle).toBe('tree');
   });
 
   it('reads sentryDisabled from config file', async () => {

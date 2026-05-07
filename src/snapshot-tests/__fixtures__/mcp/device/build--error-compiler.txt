@@ -1,16 +1,11 @@
 
 🔨 Build
 
-   Scheme: CalculatorApp
-   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
-   Platform: iOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
-
 Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
     <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33
 
 ❌ Build failed. (⏱️ <DURATION>)
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log — Build Logs

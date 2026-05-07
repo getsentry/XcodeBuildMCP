@@ -3,6 +3,12 @@ import type { NextStep } from '../types/common.ts';
 import { sessionStore } from '../utils/session-store.ts';
 import { getConfig } from '../utils/config-store.ts';
 import {
+  normalizeRenderRuntime,
+  resolveFilePathRenderStyle,
+  type FilePathRenderRuntime,
+} from '../utils/file-path-render-style.ts';
+import type { FilePathRenderStyle } from '../utils/runtime-config-types.ts';
+import {
   createCliTextRenderer,
   renderCliTextTranscript,
 } from '../utils/renderers/cli-text-renderer.ts';
@@ -86,10 +92,23 @@ function createBaseRenderSession(hooks: RenderSessionHooks): RenderSession {
 
 function createRenderHooks(
   strategy: RenderStrategy,
-  options: { interactive: boolean },
+  options: {
+    interactive: boolean;
+    runtime?: FilePathRenderRuntime;
+    filePathRenderStyle?: FilePathRenderStyle;
+    includeHeaderDetails?: boolean;
+  },
 ): RenderSessionHooks {
   const suppressWarnings = sessionStore.get('suppressWarnings');
-  const showTestTiming = getConfig().showTestTiming;
+  const config = getConfig();
+  const showTestTiming = config.showTestTiming;
+  const runtime = options.runtime ?? normalizeRenderRuntime(process.env.XCODEBUILDMCP_RUNTIME);
+  const filePathRenderStyle = resolveFilePathRenderStyle({
+    explicit: options.filePathRenderStyle,
+    configured: config.filePathRenderStyle,
+    runtime,
+  });
+  const includeHeaderDetails = options.includeHeaderDetails ?? runtime !== 'mcp';
 
   switch (strategy) {
     case 'text':
@@ -99,6 +118,8 @@ function createRenderHooks(
             ...input,
             suppressWarnings: suppressWarnings ?? false,
             showTestTiming,
+            filePathRenderStyle,
+            includeHeaderDetails,
           }),
       };
     case 'raw':
@@ -123,6 +144,8 @@ function createRenderHooks(
             nextStepsRuntime: input.nextStepsRuntime,
             suppressWarnings: suppressWarnings ?? false,
             showTestTiming,
+            filePathRenderStyle,
+            includeHeaderDetails,
           });
           if (text) {
             process.stdout.write(text);
@@ -135,6 +158,8 @@ function createRenderHooks(
         ...options,
         suppressWarnings: suppressWarnings ?? false,
         showTestTiming,
+        filePathRenderStyle,
+        includeHeaderDetails,
       });
 
       return {
@@ -152,6 +177,9 @@ function createRenderHooks(
 
 export interface RenderSessionOptions {
   interactive?: boolean;
+  runtime?: FilePathRenderRuntime;
+  filePathRenderStyle?: FilePathRenderStyle;
+  includeHeaderDetails?: boolean;
 }
 
 export function createRenderSession(
@@ -159,17 +187,14 @@ export function createRenderSession(
   options?: RenderSessionOptions,
 ): RenderSession {
   return createBaseRenderSession(
-    createRenderHooks(strategy, { interactive: options?.interactive ?? false }),
+    createRenderHooks(strategy, { ...options, interactive: options?.interactive ?? false }),
   );
 }
 
-export function renderTranscript(input: RenderTranscriptInput, strategy: RenderStrategy): string {
-  return createRenderHooks(strategy, { interactive: false }).finalize(input);
-}
-
-export function renderFragments(
-  fragments: readonly AnyFragment[],
+export function renderTranscript(
+  input: RenderTranscriptInput,
   strategy: RenderStrategy,
+  options?: Pick<RenderSessionOptions, 'runtime' | 'filePathRenderStyle' | 'includeHeaderDetails'>,
 ): string {
-  return renderTranscript({ items: fragments }, strategy);
+  return createRenderHooks(strategy, { ...options, interactive: false }).finalize(input);
 }

@@ -1,9 +1,8 @@
 
 📷 Screenshot
 
-   Simulator: <UUID>
-
 ✅ Screenshot captured
-  ├ Screenshot: <TMPDIR>
   ├ Format: image/jpeg
-  └ Size: 368x800px
+  ├ Size: 368x800px
+  └ Files:
+     └── <TMPDIR> — Screenshot

@@ -26,6 +26,22 @@ describe('event formatting', () => {
     ).toBe('\u{1F680} Build & Run\n\n   Scheme: MyApp');
   });
 
+  it('formats compact header events without params when details are disabled', () => {
+    expect(
+      formatHeaderEvent(
+        {
+          type: 'header',
+          operation: 'Build & Run',
+          params: [
+            { label: 'Scheme', value: 'MyApp' },
+            { label: 'Derived Data', value: '/tmp/DerivedData' },
+          ],
+        },
+        { includeDetails: false },
+      ),
+    ).toBe('\u{1F680} Build & Run');
+  });
+
   it('groups test selection params with human-readable labels in header output', () => {
     expect(
       formatHeaderEvent({
@@ -212,7 +228,7 @@ describe('event formatting', () => {
     const rendered = formatDetailTreeEvent({
       type: 'detail-tree',
       items: [
-        { label: 'App Path', value: '/tmp/build/MyApp.app' },
+        { label: 'App Path', path: '/tmp/build/MyApp.app' },
         { label: 'Bundle ID', value: 'com.example.myapp' },
         { label: 'App ID', value: 'A1B2C3D4' },
         { label: 'Process ID', value: '12345' },
@@ -220,20 +236,44 @@ describe('event formatting', () => {
       ],
     });
 
-    expect(rendered).toContain('  \u251C App Path: /tmp/build/MyApp.app');
-    expect(rendered).toContain('  \u251C Bundle ID: com.example.myapp');
-    expect(rendered).toContain('  \u251C App ID: A1B2C3D4');
-    expect(rendered).toContain('  \u251C Process ID: 12345');
-    expect(rendered).toContain('  \u2514 Launch: Running');
+    expect(rendered).toContain('  ├ Bundle ID: com.example.myapp');
+    expect(rendered).toContain('  ├ App ID: A1B2C3D4');
+    expect(rendered).toContain('  ├ Process ID: 12345');
+    expect(rendered).toContain('  ├ Launch: Running');
+    expect(rendered).toContain('  └ Files:');
+    expect(rendered).toContain('     └── /tmp/build/MyApp.app — App Path');
   });
 
   it('formats detail-tree with single item using end branch', () => {
     expect(
       formatDetailTreeEvent({
         type: 'detail-tree',
-        items: [{ label: 'App Path', value: '/tmp/build/MyApp.app' }],
+        items: [{ label: 'App Path', path: '/tmp/build/MyApp.app' }],
       }),
-    ).toBe('  \u2514 App Path: /tmp/build/MyApp.app');
+    ).toBe(['  └ Files:', '     └── /tmp/build/MyApp.app — App Path'].join('\n'));
+  });
+
+  it('formats detail-tree path items as a labeled list when requested', () => {
+    expect(
+      formatDetailTreeEvent(
+        {
+          type: 'detail-tree',
+          items: [
+            { label: 'Bundle ID', value: 'com.example.myapp' },
+            { label: 'App Path', path: '/tmp/build/MyApp.app' },
+            { label: 'Build Logs', path: '/tmp/logs/build.log' },
+          ],
+        },
+        { filePathRenderStyle: 'list' },
+      ),
+    ).toBe(
+      [
+        '  ├ Bundle ID: com.example.myapp',
+        '  └ Files:',
+        '     ├ App Path: /tmp/build/MyApp.app',
+        '     └ Build Logs: /tmp/logs/build.log',
+      ].join('\n'),
+    );
   });
 
   it('groups test failures by test case within a suite', () => {

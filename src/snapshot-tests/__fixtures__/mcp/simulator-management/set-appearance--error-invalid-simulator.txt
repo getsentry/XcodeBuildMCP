@@ -1,9 +1,6 @@
 
 🎨 Set Appearance
 
-   Simulator: <UUID>
-   Mode: dark
-
 Errors (1):
 
   ✗ Invalid device: <UUID>

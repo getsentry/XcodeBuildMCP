@@ -1,8 +1,6 @@
 
 📷 Screenshot
 
-   Simulator: <UUID>
-
 Errors (1):
 
   ✗ Failed to capture screenshot: Invalid device: <UUID>

@@ -6,7 +6,7 @@
    Configuration: Debug
    Platform: iOS
    Device: <DEVICE> (<UUID>)
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
 
 Discovered 57 test(s):
    CalculatorAppFeatureTests/CalculatorBasicTests/testClear
@@ -51,5 +51,6 @@ IntentionalFailureTests
         example_projects/iOS_Calculator/CalculatorAppTests/CalculatorAppTests.swift:286
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
-  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log

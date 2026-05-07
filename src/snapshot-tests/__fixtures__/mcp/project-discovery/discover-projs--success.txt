@@ -1,10 +1,6 @@
 
 🔍 Discover Projects
 
-   Workspace root: <PATH>
-   Scan path: <PATH>
-   Max depth: 3
-
 ✅ Found 1 project and 1 workspace
 
 Projects:

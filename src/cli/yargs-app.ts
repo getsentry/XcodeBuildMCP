@@ -55,6 +55,11 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
       choices: ['normal', 'minimal'] as const,
       default: 'normal',
     })
+    .option('file-path-render-style', {
+      type: 'string',
+      describe: 'Render file artifacts as a compact tree or labeled list in text output',
+      choices: ['tree', 'list'] as const,
+    })
     .middleware((argv) => {
       const level = argv['log-level'] as LogLevel | undefined;
       if (level) {

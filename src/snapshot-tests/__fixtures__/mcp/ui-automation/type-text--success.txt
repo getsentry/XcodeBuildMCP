@@ -1,6 +1,4 @@
 
 ⌨️ Type Text
 
-   Simulator: <UUID>
-
 ✅ Text typing simulated successfully.

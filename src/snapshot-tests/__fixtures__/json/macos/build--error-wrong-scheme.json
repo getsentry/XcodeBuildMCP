@@ -7,7 +7,7 @@
     "request": {
       "scheme": "NONEXISTENT",
       "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
-      "derivedDataPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>",
+      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>",
       "configuration": "Debug",
       "platform": "macOS",
       "target": "macos"
@@ -18,7 +18,7 @@
       "target": "macos"
     },
     "artifacts": {
-      "buildLogPath": "<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

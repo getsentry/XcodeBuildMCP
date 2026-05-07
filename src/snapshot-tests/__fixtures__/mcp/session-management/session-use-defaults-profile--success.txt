@@ -1,6 +1,4 @@
 
 ⚙️ Use Defaults Profile
 
-   Current profile: (default)
-
 ✅ Activated profile (MyCustomProfile profile)

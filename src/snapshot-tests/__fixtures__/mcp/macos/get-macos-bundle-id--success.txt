@@ -1,8 +1,6 @@
 
 🔍 Get macOS Bundle ID
 
-   App: <TMPDIR>/BundleTest.app
-
 ✅ Bundle ID
   └ com.test.snapshot-macos
 

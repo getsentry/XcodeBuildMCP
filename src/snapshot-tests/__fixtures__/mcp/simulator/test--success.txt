@@ -1,18 +1,11 @@
 
 🧪 Test
 
-   Scheme: CalculatorApp
-   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
-   Platform: iOS Simulator
-   Simulator: iPhone 17
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
-   Selective Testing:
-     CalculatorAppTests/CalculatorAppTests/testAddition
-
 Discovered 1 test(s):
    CalculatorAppTests/CalculatorAppTests/testAddition
 
 ✅ 1 test passed, 0 failed, 0 skipped (⏱️ <DURATION>)
-  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_sim_<TIMESTAMP>_pid<PID>.xcresult
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_sim_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/
+         ├── logs/test_sim_<TIMESTAMP>_pid<PID>.log — Build Logs
+         └── result-bundles/test_sim_<TIMESTAMP>_pid<PID>.xcresult — Result Bundle

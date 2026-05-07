@@ -2,21 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { normalizeSnapshotOutput } from '../../snapshot-tests/normalize.ts';
 
 describe('normalizeSnapshotOutput tilde handling', () => {
-  it('normalizes ~/ paths to <HOME>/', () => {
+  it('normalizes XcodeBuildMCP ~/ paths to stable workspace-key placeholders', () => {
     const input =
       'Workspace Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs\n';
     const result = normalizeSnapshotOutput(input);
-    expect(result).toContain(
-      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs',
-    );
-    expect(result).not.toContain('~/');
+    expect(result).toContain('~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs');
+    expect(result).not.toContain('Weather-abc123def456');
   });
 
-  it('normalizes bare ~ (exact home directory) to <HOME>', () => {
+  it('preserves bare ~ outside path-like values', () => {
     const input = 'Home: ~\nDone\n';
     const result = normalizeSnapshotOutput(input);
-    expect(result).toContain('Home: <HOME>');
-    expect(result).not.toMatch(/: ~\n/);
+    expect(result).toContain('Home: ~');
   });
 
   it('does not alter tildes that are part of approximate numbers', () => {
@@ -53,10 +50,10 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      'Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
+      'Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
     );
     expect(result).toContain(
-      'Runtime Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/io.app_<TIMESTAMP>_pid<PID>.log',
+      'Runtime Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/io.app_<TIMESTAMP>_pid<PID>.log',
     );
   });
 
@@ -67,7 +64,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult',
+      '~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult',
     );
     expect(result).not.toContain('Weather-abc123def456');
     expect(result).not.toContain('abcd1234');
@@ -80,7 +77,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/DerivedData/CalculatorApp-<HASH>',
+      '~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/DerivedData/CalculatorApp-<HASH>',
     );
     expect(result).not.toContain('Weather-abc123def456');
     expect(result).not.toContain('22d700c6d603');
@@ -93,7 +90,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '<HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData\n',
+      '~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData\n',
     );
     expect(result).not.toContain('c5da0cbe19a7');
   });

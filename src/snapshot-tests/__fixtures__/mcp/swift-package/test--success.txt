@@ -1,10 +1,6 @@
 
 🧪 Swift Package Test
 
-   Scheme: spm
-   Configuration: debug
-   Platform: Swift Package
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData
-
 ✅ 1 test passed, 0 failed, 0 skipped (⏱️ <DURATION>)
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log — Build Logs

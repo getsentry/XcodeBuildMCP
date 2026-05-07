@@ -2,7 +2,6 @@ import type { NextStep } from '../../types/common.ts';
 import type {
   BasicDiagnostics,
   DebugThread,
-  SessionDefaultsProfile,
   TestDiagnostics,
   ToolDomainResult,
 } from '../../types/domain-results.ts';
@@ -37,9 +36,19 @@ export interface SectionTextBlock {
   blankLineAfterTitle?: boolean;
 }
 
+export interface DetailTreeValueItem {
+  label: string;
+  value: string;
+}
+
+export interface DetailTreePathItem {
+  label: string;
+  path: string;
+}
+
 export interface DetailTreeTextBlock {
   type: 'detail-tree';
-  items: Array<{ label: string; value: string }>;
+  items: Array<DetailTreeValueItem | DetailTreePathItem>;
 }
 
 export interface TableTextBlock {
@@ -293,6 +302,14 @@ function createDetailTree(items: DetailTreeTextBlock['items']): DetailTreeTextBl
   return { type: 'detail-tree', items };
 }
 
+function createPathDetailItem(label: string, path: string): DetailTreePathItem {
+  return { label, path };
+}
+
+function createValueDetailItem(label: string, value: string): DetailTreeValueItem {
+  return { label, value };
+}
+
 function createTable(
   columns: string[],
   rows: Array<Record<string, string>>,
@@ -320,20 +337,6 @@ function formatSessionDefaultsValue(value: unknown): string {
 
 function formatProfileAnnotationFromLabel(profileLabel: string): string {
   return profileLabel === '(default)' ? '(default profile)' : `(${profileLabel} profile)`;
-}
-
-function formatSessionDefaultsTree(profile: SessionDefaultsProfile): string[] {
-  return SESSION_DEFAULT_KEYS.map((key, index) => {
-    const branch = index === SESSION_DEFAULT_KEYS.length - 1 ? '└' : '├';
-    return `  ${branch} ${key}: ${formatSessionDefaultsValue(profile[key])}`;
-  });
-}
-
-function formatSessionDefaultsProfileBlock(
-  profileLabel: string,
-  profile: SessionDefaultsProfile,
-): string {
-  return [`📁 ${profileLabel}`, ...formatSessionDefaultsTree(profile)].join('\n');
 }
 
 function inferSessionDefaultsMode(
@@ -377,7 +380,7 @@ function formatVariable(variable: DebugVariableShape): string {
 function formatVariablesLines(scopes: DebugVariablesScopes): string[] {
   const lines: string[] = [];
 
-  const appendScope = (label: string, values: string[]) => {
+  const appendScope = (label: string, values: string[]): void => {
     lines.push(`${label}:`);
     if (values.length === 0) {
       lines.push('  (no variables)');
@@ -717,7 +720,7 @@ function createAppPathItems(
     ),
   );
   if (appPath) {
-    items.push(createDetailTree([{ label: 'App Path', value: displayPath(appPath) }]));
+    items.push(createDetailTree([createPathDetailItem('App Path', appPath)]));
   }
   return items;
 }
@@ -821,16 +824,16 @@ function createLaunchResultItems(
 
   const details: DetailTreeTextBlock['items'] = [];
   if (result.artifacts.bundleId && isMac) {
-    details.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+    details.push(createValueDetailItem('Bundle ID', result.artifacts.bundleId));
   }
   if (typeof result.artifacts.processId === 'number') {
-    details.push({ label: 'Process ID', value: String(result.artifacts.processId) });
+    details.push(createValueDetailItem('Process ID', String(result.artifacts.processId)));
   }
   if (result.artifacts.runtimeLogPath) {
-    details.push({ label: 'Runtime Logs', value: displayPath(result.artifacts.runtimeLogPath) });
+    details.push(createPathDetailItem('Runtime Logs', result.artifacts.runtimeLogPath));
   }
   if (result.artifacts.osLogPath) {
-    details.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
+    details.push(createPathDetailItem('OSLog', result.artifacts.osLogPath));
   }
   if (details.length > 0) {
     items.push(createDetailTree(details));
@@ -1237,13 +1240,13 @@ function createCaptureResultItems(
     );
     const details: DetailTreeTextBlock['items'] = [];
     if (typeof result.capture.fps === 'number') {
-      details.push({ label: 'FPS', value: String(result.capture.fps) });
+      details.push(createValueDetailItem('FPS', String(result.capture.fps)));
     }
     if (result.capture.sessionId) {
-      details.push({ label: 'Session ID', value: result.capture.sessionId });
+      details.push(createValueDetailItem('Session ID', result.capture.sessionId));
     }
     if (result.capture.outputFile) {
-      details.push({ label: 'Output File', value: displayPath(result.capture.outputFile) });
+      details.push(createPathDetailItem('Output File', result.capture.outputFile));
     }
     if (details.length > 0) {
       items.push(createDetailTree(details));
@@ -1295,11 +1298,13 @@ function createCaptureResultItems(
   items.push(createStatus('success', 'Screenshot captured'));
   const details: DetailTreeTextBlock['items'] = [];
   if (result.artifacts.screenshotPath) {
-    details.push({ label: 'Screenshot', value: displayPath(result.artifacts.screenshotPath) });
+    details.push(createPathDetailItem('Screenshot', result.artifacts.screenshotPath));
   }
   if (result.capture && !('type' in result.capture)) {
-    details.push({ label: 'Format', value: result.capture.format });
-    details.push({ label: 'Size', value: `${result.capture.width}x${result.capture.height}px` });
+    details.push(createValueDetailItem('Format', result.capture.format));
+    details.push(
+      createValueDetailItem('Size', `${result.capture.width}x${result.capture.height}px`),
+    );
   }
   if (details.length > 0) {
     items.push(createDetailTree(details));
@@ -1901,10 +1906,10 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
       if (!('artifacts' in result) || !result.artifacts) return [];
       const items: DetailTreeTextBlock['items'] = [];
       if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
-        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+        items.push(createValueDetailItem('Bundle ID', result.artifacts.bundleId));
       }
       if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
-        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+        items.push(createPathDetailItem('Build Logs', result.artifacts.buildLogPath));
       }
       return items.length > 0 ? [createDetailTree(items)] : [];
     }
@@ -1918,29 +1923,29 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
             ? result.artifacts.executablePath
             : undefined;
       if (typeof appLikePath === 'string') {
-        items.push({ label: 'App Path', value: displayPath(appLikePath) });
+        items.push(createPathDetailItem('App Path', appLikePath));
       }
       if ('bundleId' in result.artifacts && typeof result.artifacts.bundleId === 'string') {
-        items.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
+        items.push(createValueDetailItem('Bundle ID', result.artifacts.bundleId));
       }
       if ('processId' in result.artifacts && typeof result.artifacts.processId === 'number') {
-        items.push({ label: 'Process ID', value: String(result.artifacts.processId) });
+        items.push(createValueDetailItem('Process ID', String(result.artifacts.processId)));
       }
       if (
         'buildLogPath' in result.artifacts &&
         typeof result.artifacts.buildLogPath === 'string' &&
         !(result.didError && result.summary.target === 'swift-package')
       ) {
-        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+        items.push(createPathDetailItem('Build Logs', result.artifacts.buildLogPath));
       }
       if (
         'runtimeLogPath' in result.artifacts &&
         typeof result.artifacts.runtimeLogPath === 'string'
       ) {
-        items.push({ label: 'Runtime Logs', value: displayPath(result.artifacts.runtimeLogPath) });
+        items.push(createPathDetailItem('Runtime Logs', result.artifacts.runtimeLogPath));
       }
       if ('osLogPath' in result.artifacts && typeof result.artifacts.osLogPath === 'string') {
-        items.push({ label: 'OSLog', value: displayPath(result.artifacts.osLogPath) });
+        items.push(createPathDetailItem('OSLog', result.artifacts.osLogPath));
       }
       if (items.length === 0) return [];
       const tailItems: TextRenderableItem[] = [
@@ -1961,10 +1966,10 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
       if (!('artifacts' in result) || !result.artifacts) return [];
       const items: DetailTreeTextBlock['items'] = [];
       if ('xcresultPath' in result.artifacts && typeof result.artifacts.xcresultPath === 'string') {
-        items.push({ label: 'Result Bundle', value: displayPath(result.artifacts.xcresultPath) });
+        items.push(createPathDetailItem('Result Bundle', result.artifacts.xcresultPath));
       }
       if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
-        items.push({ label: 'Build Logs', value: displayPath(result.artifacts.buildLogPath) });
+        items.push(createPathDetailItem('Build Logs', result.artifacts.buildLogPath));
       }
       return items.length > 0 ? [createDetailTree(items)] : [];
     }
@@ -2006,7 +2011,7 @@ function createRawResponseArtifactItems(pathValue?: string): TextRenderableItem[
         createDetailTree([
           {
             label: 'Raw Response JSON',
-            value: displayPath(pathValue),
+            path: pathValue,
           },
         ]),
       ]

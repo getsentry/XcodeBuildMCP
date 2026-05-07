@@ -97,6 +97,17 @@ describe('project-config', () => {
       expect(result.notices.length).toBeGreaterThan(0);
     });
 
+    it('should load filePathRenderStyle from config', async () => {
+      const yaml = ['schemaVersion: 1', 'filePathRenderStyle: list', ''].join('\n');
+
+      const { fs } = createFsFixture({ exists: true, readFile: yaml });
+      const result = await loadProjectConfig({ fs, cwd });
+
+      if (!result.found) throw new Error('expected config to be found');
+
+      expect(result.config.filePathRenderStyle).toBe('list');
+    });
+
     it('should normalize debuggerBackend and resolve template paths', async () => {
       const yaml = [
         'schemaVersion: 1',
@@ -401,6 +412,7 @@ describe('project-config', () => {
           enabledWorkflows: ['simulator', 'ui-automation'],
           debug: true,
           sentryDisabled: true,
+          filePathRenderStyle: 'list',
           sessionDefaults: {
             workspacePath: './MyApp.xcworkspace',
             scheme: 'MyApp',
@@ -415,12 +427,14 @@ describe('project-config', () => {
         enabledWorkflows?: string[];
         debug?: boolean;
         sentryDisabled?: boolean;
+        filePathRenderStyle?: string;
         sessionDefaults?: Record<string, unknown>;
       };
 
       expect(parsed.enabledWorkflows).toEqual(['simulator', 'ui-automation']);
       expect(parsed.debug).toBe(true);
       expect(parsed.sentryDisabled).toBe(true);
+      expect(parsed.filePathRenderStyle).toBe('list');
       expect(parsed.sessionDefaults?.workspacePath).toBe('./MyApp.xcworkspace');
       expect(parsed.sessionDefaults?.projectPath).toBeUndefined();
     });

@@ -1,12 +1,6 @@
 
 🧪 Test
 
-   Scheme: MCPTest
-   Project: example_projects/macOS/MCPTest.xcodeproj
-   Configuration: Debug
-   Platform: macOS
-   Derived Data: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
-
 Discovered 4 test(s):
    MCPTestTests/MCPTestTests/appNameIsCorrect
    MCPTestTests/MCPTestTests/deliberateFailure
@@ -22,5 +16,7 @@ Test Failures (2):
     MCPTestTests.swift:11
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
-  ├ Result Bundle: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
-  └ Build Logs: <HOME>/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log
+  └ Files:
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/
+         ├── logs/test_macos_<TIMESTAMP>_pid<PID>.log — Build Logs
+         └── result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult — Result Bundle

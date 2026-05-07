@@ -1,5 +1,6 @@
 import type { NextStep } from '../../types/common.ts';
 import type { StructuredToolOutput } from '../../rendering/types.ts';
+import type { FilePathRenderStyle } from '../runtime-config-types.ts';
 import type { AnyFragment, BuildRunPhase } from '../../types/domain-fragments.ts';
 import type { XcodebuildOperation } from '../../types/domain-fragments.ts';
 import type {
@@ -69,12 +70,16 @@ interface CliTextProcessorOptions {
   sink: CliTextSink;
   suppressWarnings: boolean;
   showTestTiming: boolean;
+  filePathRenderStyle: FilePathRenderStyle;
+  includeHeaderDetails: boolean;
 }
 
 interface CliTextRendererOptions {
   interactive: boolean;
   suppressWarnings?: boolean;
   showTestTiming?: boolean;
+  filePathRenderStyle?: FilePathRenderStyle;
+  includeHeaderDetails?: boolean;
 }
 
 export interface CliTextTranscriptInput {
@@ -84,6 +89,8 @@ export interface CliTextTranscriptInput {
   nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
   suppressWarnings?: boolean;
   showTestTiming?: boolean;
+  filePathRenderStyle?: FilePathRenderStyle;
+  includeHeaderDetails?: boolean;
 }
 
 interface XcodebuildParserState {
@@ -95,7 +102,14 @@ interface XcodebuildParserState {
 type RunStateEvent = Parameters<XcodebuildRunStateHandle['push']>[0];
 
 function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRenderer {
-  const { interactive, sink, suppressWarnings, showTestTiming } = options;
+  const {
+    interactive,
+    sink,
+    suppressWarnings,
+    showTestTiming,
+    filePathRenderStyle,
+    includeHeaderDetails,
+  } = options;
   const groupedCompilerErrors: CompilerErrorRenderItem[] = [];
   const groupedWarnings: CompilerWarningRenderItem[] = [];
   const groupedTestFailures: TestFailureRenderItem[] = [];
@@ -177,7 +191,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       case 'header': {
         diagnosticBaseDir = deriveDiagnosticBaseDir(item);
         hasDurableRuntimeContent = false;
-        writeSection(formatHeaderEvent(item));
+        writeSection(formatHeaderEvent(item, { includeDetails: includeHeaderDetails }));
         lastVisibleEventType = 'header';
         lastStatusLineLevel = null;
         break;
@@ -225,7 +239,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'detail-tree': {
-        writeDurable(formatDetailTreeEvent(item));
+        writeDurable(formatDetailTreeEvent(item, { filePathRenderStyle }));
         lastVisibleEventType = 'detail-tree';
         lastStatusLineLevel = null;
         break;
@@ -489,6 +503,8 @@ export function createCliTextRenderer(options: CliTextRendererOptions): Transcri
     interactive: options.interactive,
     suppressWarnings: options.suppressWarnings ?? false,
     showTestTiming: options.showTestTiming ?? false,
+    filePathRenderStyle: options.filePathRenderStyle ?? 'list',
+    includeHeaderDetails: options.includeHeaderDetails ?? true,
     sink: {
       clearTransient(): void {
         reporter.clear();
@@ -512,6 +528,8 @@ export function renderCliTextTranscript(input: CliTextTranscriptInput = {}): str
     interactive: false,
     suppressWarnings: input.suppressWarnings ?? false,
     showTestTiming: input.showTestTiming ?? false,
+    filePathRenderStyle: input.filePathRenderStyle ?? 'list',
+    includeHeaderDetails: input.includeHeaderDetails ?? true,
     sink: {
       clearTransient(): void {},
       updateTransient(): void {},

@@ -1,9 +1,6 @@
 
 🛑 Stop App
 
-   Simulator: <UUID>
-   Bundle ID: com.nonexistent.app
-
 Errors (1):
 
   ✗ An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=3):
