@@ -5,7 +5,7 @@ enabledWorkflows:
 debug: false
 sentryDisabled: false
 sessionDefaults:
-  projectPath: Weather.xcodeproj
+  projectPath: app/Weather.xcodeproj
   scheme: Weather
   simulatorName: iPhone 17 Pro
 setupPreferences:

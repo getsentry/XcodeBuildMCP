@@ -124,8 +124,8 @@ private struct WindCompass: View {
             let opacity = cardinal ? 0.55 : intercardinal ? 0.32 : 0.16
             let radians = (Double(angle) - 90) * .pi / 180
             var path = Path()
-            path.move(to: CGPoint(x: center.x + cos(radians) * (outer - length), y: center.y + sin(radians) * (outer - length)))
-            path.addLine(to: CGPoint(x: center.x + cos(radians) * outer, y: center.y + sin(radians) * outer))
+            path.move(to: CGPoint(x: center.x + CGFloat(cos(radians)) * (outer - length), y: center.y + CGFloat(sin(radians)) * (outer - length)))
+            path.addLine(to: CGPoint(x: center.x + CGFloat(cos(radians)) * outer, y: center.y + CGFloat(sin(radians)) * outer))
             context.stroke(path, with: .color(current.theme.foreground.opacity(opacity)), style: StrokeStyle(lineWidth: width, lineCap: .round))
         }
     }
@@ -158,7 +158,7 @@ private struct WindCompass: View {
 
     private func point(center: CGPoint, radius: CGFloat, degrees: Double) -> CGPoint {
         let radians = (degrees - 90) * .pi / 180
-        return CGPoint(x: center.x + cos(radians) * radius, y: center.y + sin(radians) * radius)
+        return CGPoint(x: center.x + CGFloat(cos(radians)) * radius, y: center.y + CGFloat(sin(radians)) * radius)
     }
 }
 

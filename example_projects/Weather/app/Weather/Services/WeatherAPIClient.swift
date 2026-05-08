@@ -10,7 +10,7 @@ struct WeatherAPIConfiguration: Sendable {
     let baseURL: URL
 
     static let production = WeatherAPIConfiguration(
-        baseURL: URL(string: "https://api.atmosweather.example/v1")!
+        baseURL: URL(string: "http://localhost:3001/v1")!
     )
 }
 

@@ -1,101 +1,72 @@
 # Atmos Weather
 
-Atmos Weather is a native SwiftUI weather app prototype for iOS.
+Atmos Weather is a native SwiftUI weather app with a Node.js backend API.
 
-## Launch with mock weather data
+## Project structure
 
-Build and run the app with XcodeBuildMCP first:
-
-```bash
-../../build/cli.js simulator build-and-run
+```
+Weather/
+  app/       iOS app (Xcode project)
+  backend/   API server (Hono + Node.js)
 ```
 
-Then relaunch the installed app with the mock API argument:
+## Backend
+
+Start the API server:
 
 ```bash
-../../build/cli.js simulator launch-app \
+cd backend
+npm install
+npm run dev
+```
+
+The server runs on `http://localhost:3001` by default. Set `PORT` to change it.
+
+## iOS app
+
+Build and run with XcodeBuildMCP from the `app/` directory:
+
+```bash
+cd app
+../../../build/cli.js simulator build-and-run
+```
+
+### Mock mode
+
+Relaunch with mock data (no backend required):
+
+```bash
+../../../build/cli.js simulator launch-app \
   --bundle-id com.sentry.weather.Weather \
   --args=--mock-weather-api
 ```
 
-## JSON fixtures
-
-Fixture JSON files live in:
-
-```text
-WeatherTests/Fixtures/
-```
-
-Current fixtures:
-
-- `WeatherTests/Fixtures/default-locations.json`
-- `WeatherTests/Fixtures/search-locations.json`
-- `WeatherTests/Fixtures/weather-report-loc-current-san-francisco.json`
-
-## API schemas
-
-OpenAI-compatible API schema files live in:
-
-```text
-Schemas/
-```
-
-Current schemas:
-
-- `Schemas/default-locations.schema.json`
-- `Schemas/search-locations.schema.json`
-- `Schemas/weather-report.schema.json`
-
-These schemas describe the JSON response shape expected by the DTO layer.
-
-## Expected API endpoints
-
-The production client is `URLSessionWeatherAPIClient`. It currently expects a JSON API rooted at:
-
-```text
-https://api.atmosweather.example/v1
-```
-
-All endpoints are `GET` requests.
-
-| Purpose | Method | Path | Request shape | Schema |
-| --- | --- | --- | --- | --- |
-| Default saved locations | `GET` | `/locations/default` | No path params, query params, or body. | `Schemas/default-locations.schema.json` |
-| Search locations | `GET` | `/locations/search` | Query string: `query=<string>` | `Schemas/search-locations.schema.json` |
-| Weather report for a location | `GET` | `/weather/{locationID}` | Path param: `locationID=<WeatherLocationDTO.id>` | `Schemas/weather-report.schema.json` |
-
-### Request examples
-
-Default locations:
-
-```http
-GET /v1/locations/default
-```
-
-Search locations:
-
-```http
-GET /v1/locations/search?query=San%20Francisco
-```
-
-Weather report:
-
-```http
-GET /v1/weather/loc-current-san-francisco
-```
-
-### Response expectations
-
-- Responses must be JSON.
-- Successful responses should use a `2xx` HTTP status code.
-- Non-`2xx` responses are treated as API failures.
-
-## Tests
-
-Run the app test suite through XcodeBuildMCP:
+### Tests
 
 ```bash
-../../build/cli.js simulator test
+../../../build/cli.js simulator test
 ```
 
-UI tests inject `--mock-weather-api` themselves so they do not depend on the production API endpoint.
+UI tests inject `--mock-weather-api` so they do not depend on the backend.
+
+## API endpoints
+
+The backend serves three `GET` endpoints under `/v1`:
+
+| Purpose | Path | Params |
+| --- | --- | --- |
+| Default locations | `/v1/locations/default` | None |
+| Search locations | `/v1/locations/search` | `?query=<string>` |
+| Weather report | `/v1/weather/:locationID` | Path param |
+
+### JSON schemas
+
+Schema files in `app/Schemas/` describe the expected response shapes:
+
+- `default-locations.schema.json`
+- `search-locations.schema.json`
+- `weather-report.schema.json`
+
+### Test fixtures
+
+Fixture JSON files in `app/WeatherTests/Fixtures/` are used by unit tests.
