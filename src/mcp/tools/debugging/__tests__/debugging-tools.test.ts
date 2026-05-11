@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { DebuggerManager, type DebuggerToolContext } from '../../../../utils/debugger/index.ts';
+import {
+  DebuggerManager,
+  __clearTestDebuggerToolContextOverride,
+  __setTestDebuggerToolContextOverride,
+  type DebuggerToolContext,
+} from '../../../../utils/debugger/index.ts';
 import type { DebuggerBackend } from '../../../../utils/debugger/backends/DebuggerBackend.ts';
 import type { BreakpointSpec, DebugSessionInfo } from '../../../../utils/debugger/types.ts';
 
@@ -104,6 +109,10 @@ describe('debug_attach_sim', () => {
     sessionStore.clear();
   });
 
+  afterEach(() => {
+    __clearTestDebuggerToolContextOverride();
+  });
+
   describe('Export Field Validation', () => {
     it('should have handler function', () => {
       expect(typeof attachHandler).toBe('function');
@@ -123,6 +132,39 @@ describe('debug_attach_sim', () => {
       expect(result.isError).toBe(true);
       const text = result.content[0].text;
       expect(text).toContain('simulatorId');
+    });
+
+    it('uses explicit pid instead of inherited bundleId session default', async () => {
+      const ctx = createTestContext();
+      __setTestDebuggerToolContextOverride(ctx);
+
+      sessionStore.setDefaults({
+        simulatorId: 'test-sim-uuid',
+        bundleId: 'com.default.app',
+      });
+
+      const result = await attachHandler({ pid: 1234 });
+
+      expect(result.isError).toBeFalsy();
+      const text = result.content[0].text;
+      expect(text).toContain('Attached');
+      expect(text).toContain('1234');
+    });
+
+    it('rejects when pid and bundleId are both explicit', async () => {
+      __setTestDebuggerToolContextOverride(createTestContext());
+      sessionStore.setDefaults({ simulatorId: 'test-sim-uuid' });
+
+      const result = await attachHandler({
+        pid: 1234,
+        bundleId: 'com.test.app',
+      });
+
+      expect(result.isError).toBe(true);
+      const text = result.content[0].text;
+      expect(text).toContain('Mutually exclusive parameters provided');
+      expect(text).toContain('bundleId');
+      expect(text).toContain('pid');
     });
   });
 

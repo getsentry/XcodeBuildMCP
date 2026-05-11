@@ -293,6 +293,9 @@ export const handler = createSessionAwareToolWithContext<DebugAttachSimParams, D
     requirements: [
       { oneOf: ['simulatorId', 'simulatorName'], message: 'Provide simulatorId or simulatorName' },
     ],
-    exclusivePairs: [['simulatorId', 'simulatorName']],
+    exclusivePairs: [
+      ['simulatorId', 'simulatorName'],
+      ['bundleId', 'pid'],
+    ],
   },
 );

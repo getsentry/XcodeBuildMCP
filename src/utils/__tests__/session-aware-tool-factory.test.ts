@@ -271,6 +271,41 @@ describe('createSessionAwareTool', () => {
     expect(msg).toContain('workspacePath');
   });
 
+  it('allows exclusive pairs to include tool-local keys that are not session defaults', async () => {
+    const attachSchema = z
+      .object({
+        simulatorId: z.string(),
+        bundleId: z.string().optional(),
+        pid: z.number().optional(),
+      })
+      .refine((v) => !(v.bundleId && v.pid), {
+        message: 'bundleId and pid are mutually exclusive',
+      });
+
+    const attachHandler = createSessionAwareTool<z.infer<typeof attachSchema>>({
+      internalSchema: attachSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['simulatorId'] }],
+      exclusivePairs: [['bundleId', 'pid']],
+    });
+
+    sessionStore.setDefaults({
+      simulatorId: 'SIM-123',
+      bundleId: 'com.default.app',
+    });
+
+    const result = await invokeAndCollect(attachHandler, { pid: 1234 });
+    expect(result.isError).toBe(false);
+
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\{.*\}).*$/, '$1'));
+    expect(parsed).toMatchObject({ simulatorId: 'SIM-123', pid: 1234 });
+    expect(parsed.bundleId).toBeUndefined();
+  });
+
   it('prefers first key when both values of exclusive pair come from session defaults', async () => {
     const echoHandler = createSessionAwareTool<Params>({
       internalSchema: z.object({

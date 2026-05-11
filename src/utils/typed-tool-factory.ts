@@ -11,7 +11,7 @@ import { setStructuredErrorOutput } from './structured-error.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
-import { mergeSessionDefaultArgs } from './session-default-args.ts';
+import { mergeSessionDefaultArgs, type ExclusiveParameterGroup } from './session-default-args.ts';
 
 /**
  * Result returned by tool handlers when invoked without a ToolHandlerContext
@@ -206,7 +206,7 @@ export function createSessionAwareTool<TParams>(opts: {
   logicFunction: (params: TParams, executor: CommandExecutor) => Promise<void>;
   getExecutor: () => CommandExecutor;
   requirements?: SessionRequirement[];
-  exclusivePairs?: (keyof SessionDefaults)[][];
+  exclusivePairs?: readonly ExclusiveParameterGroup[];
 }): ToolHandler {
   return createSessionAwareHandler({
     internalSchema: opts.internalSchema,
@@ -222,7 +222,7 @@ export function createSessionAwareToolWithContext<TParams, TContext>(opts: {
   logicFunction: (params: TParams, context: TContext) => Promise<void>;
   getContext: () => TContext;
   requirements?: SessionRequirement[];
-  exclusivePairs?: (keyof SessionDefaults)[][];
+  exclusivePairs?: readonly ExclusiveParameterGroup[];
 }): ToolHandler {
   return createSessionAwareHandler(opts);
 }
@@ -232,7 +232,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
   logicFunction: (params: TParams, context: TContext) => Promise<void>;
   getContext: () => TContext;
   requirements?: SessionRequirement[];
-  exclusivePairs?: (keyof SessionDefaults)[][];
+  exclusivePairs?: readonly ExclusiveParameterGroup[];
 }): ToolHandler {
   const {
     internalSchema,

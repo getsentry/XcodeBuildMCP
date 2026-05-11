@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed `debug_attach_sim` so an explicit `pid` overrides an inherited `bundleId` session default before mutual-exclusion validation ([#410](https://github.com/getsentry/XcodeBuildMCP/issues/410)).
+
 ## [2.5.1]
 
 ### Fixed

@@ -1,5 +1,7 @@
 import type { SessionDefaults } from './session-store.ts';
 
+export type ExclusiveParameterGroup = readonly string[];
+
 export function hasConcreteSessionDefaultValue(value: unknown): boolean {
   if (value === null || value === undefined) {
     return false;
@@ -31,7 +33,7 @@ export function pickSessionDefaultsForKeys(
 export function mergeSessionDefaultArgs(opts: {
   defaults: Record<string, unknown>;
   explicitArgs: Record<string, unknown>;
-  exclusivePairs?: (keyof SessionDefaults)[][];
+  exclusivePairs?: readonly ExclusiveParameterGroup[];
 }): Record<string, unknown> {
   const sanitizedArgs: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(opts.explicitArgs)) {
