@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { toStructuredEnvelope } from '../structured-output-envelope.ts';
-import type { NextStep } from '../../types/common.ts';
 import type {
   BuildResultDomainResult,
+  CaptureResultDomainResult,
   DeviceListDomainResult,
 } from '../../types/domain-results.ts';
-import type { StructuredOutputEnvelope } from '../../types/structured-output.ts';
 
 describe('toStructuredEnvelope', () => {
   it('strips kind, didError, and error from the data payload', () => {
@@ -52,345 +51,304 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
-  it('omits nextSteps when no serializable steps are provided', () => {
-    const result: BuildResultDomainResult = {
-      kind: 'build-result',
-      didError: true,
-      error: 'Build failed',
-    };
-    const expectedEnvelope = {
-      schema: 'xcodebuildmcp.output.build-result',
-      schemaVersion: '1',
-      didError: true,
-      error: 'Build failed',
-      data: null,
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.build-result', '1', { nextSteps: [] }),
-    ).toEqual(expectedEnvelope);
-  });
-
-  it('does not serialize next steps on error envelopes because the error schema has no nextSteps field', () => {
-    const result: BuildResultDomainResult = {
-      kind: 'build-result',
-      didError: true,
-      error: 'Build failed',
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.error', '1', {
-        nextSteps: [
-          {
-            label: 'Retry build',
-            cliTool: 'build',
-            workflow: 'project',
-            params: { scheme: 'CalculatorApp' },
-          },
-        ],
-      }),
-    ).toEqual({
-      schema: 'xcodebuildmcp.output.error',
-      schemaVersion: '1',
-      didError: true,
-      error: 'Build failed',
-      data: null,
-    });
-  });
-
-  it('serializes next steps as rendered CLI command lines by default sorted by priority', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
+  it('compacts runtime snapshots inside the capture payload by default', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
       didError: false,
       error: null,
-      devices: [],
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      waitMatch: {
+        predicate: 'exists',
+        matches: [
+          {
+            ref: 'e2',
+            role: 'button',
+            label: 'San Francisco',
+            identifier: 'weather.locationButton',
+            frame: { x: 12, y: 81, width: 178, height: 33 },
+            actions: ['tap', 'longPress', 'touch'],
+          },
+        ],
+      },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-one',
+        seq: 1,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
+          {
+            ref: 'e1',
+            role: 'application',
+            label: 'Weather',
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            actions: ['swipeWithin'],
+          },
+          {
+            ref: 'e2',
+            role: 'button',
+            label: 'San Francisco',
+            identifier: 'weather.locationButton',
+            frame: { x: 12, y: 81, width: 178, height: 33 },
+            actions: ['tap', 'longPress', 'touch'],
+          },
+        ],
+        actions: [
+          { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+          { action: 'tap', elementRef: 'e2', label: 'San Francisco' },
+        ],
+      },
     };
-    const nextSteps: NextStep[] = [
-      {
-        tool: 'launch_app_sim',
-        cliTool: 'launch-app',
-        workflow: 'simulator',
-        label: 'Launch app',
-        params: { simulatorId: 'SIM-1' },
-        priority: 20,
-        when: 'success',
-      },
-      {
-        tool: 'boot_sim',
-        cliTool: 'boot',
-        workflow: 'simulator',
-        label: 'Boot the simulator',
-        params: { simulatorId: 'SIM-1', useLatestOS: true },
-        priority: 10,
-        when: 'success',
-      },
-    ];
 
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', { nextSteps }),
-    ).toEqual({
-      schema: 'xcodebuildmcp.output.device-list',
+    expect(toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2')).toEqual({
+      schema: 'xcodebuildmcp.output.capture-result',
       schemaVersion: '2',
       didError: false,
       error: null,
       data: {
-        devices: [],
-      },
-      nextSteps: [
-        'Boot the simulator: xcodebuildmcp simulator boot --simulator-id SIM-1 --use-latest-os',
-        'Launch app: xcodebuildmcp simulator launch-app --simulator-id SIM-1',
-      ],
-    });
-  });
-
-  it('shell-escapes only JSON next step arguments that need quoting', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
-      didError: false,
-      error: null,
-      devices: [],
-    };
-    const nextSteps: NextStep[] = [
-      {
-        tool: 'launch_sim',
-        cliTool: 'launch',
-        workflow: 'simulator',
-        label: 'Launch app',
-        params: {
-          simulatorId: 'SIM-1',
-          appPath: '/tmp/My App.app',
-          displayName: "Cam's App",
+        summary: { status: 'SUCCEEDED' },
+        artifacts: { simulatorId: 'SIMULATOR-1' },
+        capture: {
+          type: 'runtime-snapshot',
+          rs: '1',
+          screenHash: 'screen-one',
+          seq: 1,
+          count: 2,
+          targets: ['e2|tap|button|San Francisco||weather.locationButton'],
+          scroll: ['e1|swipe|application|Weather||'],
+          udid: 'SIMULATOR-1',
+        },
+        waitMatch: {
+          predicate: 'exists',
+          matches: ['e2|tap|button|San Francisco||weather.locationButton'],
         },
       },
-    ];
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', { nextSteps }),
-    ).toMatchObject({
-      nextSteps: [
-        "Launch app: xcodebuildmcp simulator launch --simulator-id SIM-1 --app-path '/tmp/My App.app' --display-name 'Cam'\\''s App'",
-      ],
     });
   });
 
-  it('serializes CLI next steps when only cliTool is present', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
+  it('compacts unchanged runtime snapshot captures by default', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
       didError: false,
       error: null,
-      devices: [],
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', {
-        nextSteps: [
-          {
-            cliTool: 'list',
-            workflow: 'simulator',
-            label: 'List simulators',
-            params: { platform: 'iOS Simulator' },
-          },
-        ],
-      }),
-    ).toMatchObject({
-      nextSteps: ["List simulators: xcodebuildmcp simulator list --platform 'iOS Simulator'"],
-    });
-  });
-
-  it('serializes next steps as MCP tool-call lines for MCP structured content', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
-      didError: false,
-      error: null,
-      devices: [],
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', {
-        nextSteps: [
-          {
-            tool: 'get_mac_app_path',
-            cliTool: 'get-app-path',
-            workflow: 'macos',
-            label: 'Get app path',
-            params: { scheme: 'MCPTest' },
-          },
-        ],
-        nextStepRuntime: 'mcp',
-      }),
-    ).toMatchObject({
-      nextSteps: ['Get app path: get_mac_app_path({ scheme: "MCPTest" })'],
-    });
-  });
-
-  it('escapes MCP structured next-step string params as JSON string literals', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
-      didError: false,
-      error: null,
-      devices: [],
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', {
-        nextSteps: [
-          {
-            tool: 'launch_app_sim',
-            cliTool: 'launch-app',
-            workflow: 'simulator',
-            label: 'Launch app',
-            params: {
-              scheme: 'Cam "Debug" App',
-              bundleId: 'com.example.$APP\\debug',
-              launchArg: 'line1\nline2',
-            },
-          },
-        ],
-        nextStepRuntime: 'mcp',
-      }),
-    ).toMatchObject({
-      nextSteps: [
-        'Launch app: launch_app_sim({ scheme: "Cam \\"Debug\\" App", bundleId: "com.example.$APP\\\\debug", launchArg: "line1\\nline2" })',
-      ],
-    });
-  });
-
-  it('preserves request data for normal structured output', () => {
-    const result: BuildResultDomainResult = {
-      kind: 'build-result',
-      didError: false,
-      error: null,
-      request: {
-        scheme: 'CalculatorApp',
-        workspacePath: 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace',
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot-unchanged',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-one',
+        seq: 2,
       },
-      summary: { status: 'SUCCEEDED', durationMs: 1234, target: 'simulator' },
-      artifacts: { buildLogPath: '~/Library/Developer/XcodeBuildMCP/logs/build.log' },
-      diagnostics: { warnings: [], errors: [] },
     };
 
-    expect(toStructuredEnvelope(result, 'xcodebuildmcp.output.build-result', '2')).toEqual({
-      schema: 'xcodebuildmcp.output.build-result',
+    expect(toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2')).toEqual({
+      schema: 'xcodebuildmcp.output.capture-result',
       schemaVersion: '2',
       didError: false,
       error: null,
       data: {
-        request: {
-          scheme: 'CalculatorApp',
-          workspacePath: 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace',
+        summary: { status: 'SUCCEEDED' },
+        artifacts: { simulatorId: 'SIMULATOR-1' },
+        capture: {
+          type: 'runtime-snapshot-unchanged',
+          rs: '1',
+          screenHash: 'screen-one',
+          seq: 2,
+          unchanged: true,
+          udid: 'SIMULATOR-1',
         },
-        summary: { status: 'SUCCEEDED', durationMs: 1234, target: 'simulator' },
-        artifacts: { buildLogPath: '~/Library/Developer/XcodeBuildMCP/logs/build.log' },
-        diagnostics: { warnings: [], errors: [] },
       },
     });
   });
 
-  it('preserves CLI next steps while applying minimal structured-output compactness', () => {
-    const result: BuildResultDomainResult = {
-      kind: 'build-result',
+  it('orders compact runtime snapshot targets by usefulness', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
       didError: false,
       error: null,
-      request: {
-        scheme: 'CalculatorApp',
-        workspacePath: 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace',
-      },
-      summary: { status: 'SUCCEEDED', durationMs: 1234, target: 'simulator' },
-      artifacts: { buildLogPath: '~/Library/Developer/XcodeBuildMCP/logs/build.log' },
-      diagnostics: { warnings: [], errors: [] },
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.build-result', '2', {
-        nextSteps: [
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-two',
+        seq: 2,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
           {
-            tool: 'get_mac_app_path',
-            cliTool: 'get-app-path',
-            workflow: 'macos',
-            label: 'Get built app path',
-            params: { scheme: 'CalculatorApp' },
+            ref: 'e2',
+            role: 'button',
+            label: 'Sheet Grabber',
+            value: 'Expanded',
+            frame: { x: 0, y: 0, width: 100, height: 20 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e3',
+            role: 'button',
+            label: 'Settings',
+            frame: { x: 320, y: 40, width: 40, height: 40 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e8',
+            role: 'text-field',
+            value: 'Portland',
+            frame: { x: 20, y: 100, width: 200, height: 40 },
+            actions: ['typeText'],
+          },
+          {
+            ref: 'e9',
+            role: 'button',
+            label: 'Clear search',
+            frame: { x: 230, y: 100, width: 40, height: 40 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e82',
+            role: 'button',
+            label: 'PRECIP., 78%, Next 24 hours',
+            identifier: 'weather.precipitationCard',
+            frame: { x: 20, y: 300, width: 340, height: 140 },
+            actions: ['tap'],
           },
         ],
-        outputStyle: 'minimal',
-      }),
-    ).toEqual({
-      schema: 'xcodebuildmcp.output.build-result',
+        actions: [],
+      },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+
+    expect(envelope.data).toMatchObject({
+      capture: {
+        screenHash: 'screen-two',
+        seq: 2,
+        targets: [
+          'e82|tap|button|PRECIP., 78%, Next 24 hours||weather.precipitationCard',
+          'e8|typeText|text-field||Portland|',
+          'e3|tap|button|Settings||',
+          'e9|tap|button|Clear search||',
+        ],
+      },
+    });
+  });
+
+  it('compacts runtime snapshot candidates inside recoverable UI errors by default', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: true,
+      error: 'The wait selector matched multiple runtime UI elements.',
+      summary: { status: 'FAILED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      uiError: {
+        code: 'TARGET_AMBIGUOUS',
+        message: 'The wait selector matched multiple runtime UI elements.',
+        recoveryHint: 'Provide a more specific selector.',
+        candidates: [
+          {
+            ref: 'e8',
+            role: 'text-field',
+            value: 'Lisbon',
+            identifier: 'weather.locationsSheet',
+            frame: { x: 65, y: 482, width: 272, height: 18 },
+            actions: ['tap', 'typeText', 'longPress', 'touch'],
+          },
+          {
+            ref: 'e11',
+            role: 'button',
+            label: 'Lisbon, Portugal',
+            value: 'saved',
+            frame: { x: 40, y: 552, width: 89, height: 49 },
+            actions: ['tap', 'longPress', 'touch'],
+          },
+        ],
+      },
+    };
+
+    expect(toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2')).toEqual({
+      schema: 'xcodebuildmcp.output.capture-result',
       schemaVersion: '2',
-      didError: false,
-      error: null,
+      didError: true,
+      error: 'The wait selector matched multiple runtime UI elements.',
       data: {
-        summary: { status: 'SUCCEEDED', durationMs: 1234, target: 'simulator' },
-        artifacts: { buildLogPath: '~/Library/Developer/XcodeBuildMCP/logs/build.log' },
-        diagnostics: { warnings: [], errors: [] },
-      },
-      nextSteps: ['Get built app path: xcodebuildmcp macos get-app-path --scheme CalculatorApp'],
-    });
-  });
-
-  it('uses null data when minimal pruning removes the only data field', () => {
-    const result: BuildResultDomainResult = {
-      kind: 'build-result',
-      didError: false,
-      error: null,
-      request: { scheme: 'CalculatorApp' },
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.build-result', '2', {
-        outputStyle: 'minimal',
-      }),
-    ).toEqual({
-      schema: 'xcodebuildmcp.output.build-result',
-      schemaVersion: '2',
-      didError: false,
-      error: null,
-      data: null,
-    });
-  });
-
-  it('leaves minimal structured output without request frontmatter unchanged', () => {
-    const result: StructuredOutputEnvelope<{ simulators: [] }> = {
-      schema: 'xcodebuildmcp.output.simulator-list',
-      schemaVersion: '1',
-      didError: false,
-      error: null,
-      data: { simulators: [] },
-    };
-
-    expect(
-      toStructuredEnvelope(
-        {
-          kind: 'simulator-list',
-          didError: result.didError,
-          error: result.error,
-          simulators: [],
+        summary: { status: 'FAILED' },
+        artifacts: { simulatorId: 'SIMULATOR-1' },
+        uiError: {
+          code: 'TARGET_AMBIGUOUS',
+          message: 'The wait selector matched multiple runtime UI elements.',
+          recoveryHint: 'Provide a more specific selector.',
+          candidates: [
+            'e8|typeText|text-field||Lisbon|weather.locationsSheet',
+            'e11|tap|button|Lisbon, Portugal|saved|',
+          ],
         },
-        result.schema,
-        result.schemaVersion,
-        { outputStyle: 'minimal' },
-      ),
-    ).toEqual(result);
+      },
+    });
   });
 
-  it('serializes label-only next steps as text lines', () => {
-    const result: DeviceListDomainResult = {
-      kind: 'device-list',
-      didError: false,
-      error: null,
-      devices: [],
-    };
-
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '2', {
-        nextSteps: [
+  it('can keep full runtime snapshots and candidates for verbose callers', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: true,
+      error: 'The wait selector matched multiple runtime UI elements.',
+      summary: { status: 'FAILED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-three',
+        seq: 3,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
           {
-            label: 'Open Simulator',
-            params: {},
+            ref: 'e1',
+            role: 'application',
+            label: 'Weather',
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            actions: ['swipeWithin'],
           },
         ],
+        actions: [{ action: 'swipeWithin', elementRef: 'e1', label: 'Weather' }],
+      },
+      uiError: {
+        code: 'TARGET_AMBIGUOUS',
+        message: 'The wait selector matched multiple runtime UI elements.',
+        recoveryHint: 'Provide a more specific selector.',
+        candidates: [
+          {
+            ref: 'e1',
+            role: 'application',
+            label: 'Weather',
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            actions: ['swipeWithin'],
+          },
+        ],
+      },
+    };
+
+    expect(
+      toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2', {
+        runtimeSnapshot: 'full',
       }),
-    ).toMatchObject({
-      nextSteps: ['Open Simulator'],
+    ).toEqual({
+      schema: 'xcodebuildmcp.output.capture-result',
+      schemaVersion: '2',
+      didError: true,
+      error: 'The wait selector matched multiple runtime UI elements.',
+      data: {
+        summary: { status: 'FAILED' },
+        artifacts: { simulatorId: 'SIMULATOR-1' },
+        capture: result.capture,
+        uiError: result.uiError,
+      },
     });
   });
 });

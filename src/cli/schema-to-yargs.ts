@@ -7,6 +7,16 @@ export interface YargsOptionConfig extends Options {
   type: 'string' | 'number' | 'boolean' | 'array';
 }
 
+function coerceNumberArray(value: unknown): number[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values.flatMap((entry) =>
+    String(entry)
+      .split(',')
+      .map((item) => item.trim())
+      .map((item) => (item === '' ? Number.NaN : Number(item))),
+  );
+}
+
 export interface ZodToYargsOptionOptions {
   hasHydratedDefault?: boolean;
 }
@@ -195,8 +205,16 @@ export function zodToYargsOption(
     const element = getArrayElement(unwrapped);
     if (element) {
       const elemTypeName = getZodTypeName(unwrap(element));
-      if (elemTypeName === 'string' || elemTypeName === 'number') {
+      if (elemTypeName === 'string') {
         return { type: 'array', describe: description, demandOption: false };
+      }
+      if (elemTypeName === 'number') {
+        return {
+          type: 'array',
+          describe: description,
+          demandOption: false,
+          coerce: coerceNumberArray,
+        };
       }
     }
     // Complex array types - use --json fallback

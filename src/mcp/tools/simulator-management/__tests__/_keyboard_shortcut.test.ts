@@ -183,6 +183,8 @@ describe('sendKeyboardShortcut', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toContain('iPhone 15 Pro');
+      expect(result.error).toContain('without a device window');
+      expect(result.error).toContain('retry the keyboard shortcut');
     }
     expect(calls).toHaveLength(3);
   });

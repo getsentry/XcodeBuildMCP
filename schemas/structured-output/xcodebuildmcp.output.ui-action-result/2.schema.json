@@ -8,22 +8,109 @@
       "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/errorConsistency"
     }
   ],
-  "properties": {
-    "schema": {
-      "const": "xcodebuildmcp.output.ui-action-result"
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "required": ["x", "y", "width", "height"]
     },
-    "schemaVersion": {
-      "const": "2"
+    "runtimeActionName": {
+      "enum": ["tap", "typeText", "longPress", "touch", "swipeWithin"]
     },
-    "didError": {
-      "type": "boolean"
-    },
-    "error": {
-      "type": [
-        "string",
-        "null"
+    "runtimeElementRole": {
+      "enum": [
+        "application",
+        "button",
+        "cell",
+        "image",
+        "keyboard-key",
+        "list",
+        "menu",
+        "other",
+        "scroll-view",
+        "slider",
+        "switch",
+        "tab",
+        "text",
+        "text-field",
+        "window"
       ]
     },
+    "runtimeElementState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "focused": { "type": "boolean" },
+        "selected": { "type": "boolean" },
+        "visible": { "type": "boolean" }
+      }
+    },
+    "runtimeElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "pattern": "^e[1-9][0-9]*$" },
+        "role": { "$ref": "#/$defs/runtimeElementRole" },
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "identifier": { "type": "string" },
+        "frame": { "$ref": "#/$defs/frame" },
+        "state": { "$ref": "#/$defs/runtimeElementState" },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/runtimeActionName" }
+        }
+      },
+      "required": ["ref", "frame", "actions"]
+    },
+    "direction": {
+      "enum": ["up", "down", "left", "right"]
+    },
+    "recoverableUiError": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "SNAPSHOT_MISSING",
+            "SNAPSHOT_EXPIRED",
+            "SNAPSHOT_PARSE_FAILED",
+            "ELEMENT_REF_NOT_FOUND",
+            "TARGET_NOT_FOUND",
+            "TARGET_AMBIGUOUS",
+            "TARGET_NOT_ACTIONABLE",
+            "WAIT_TIMEOUT",
+            "UI_STATE_CHANGED",
+            "ACTION_FAILED"
+          ]
+        },
+        "message": { "type": "string" },
+        "recoveryHint": { "type": "string" },
+        "elementRef": { "type": "string" },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "oneOf": [{ "$ref": "#/$defs/runtimeElement" }, { "type": "string" }]
+          }
+        },
+        "snapshotAgeMs": { "type": "integer", "minimum": 0 },
+        "timeoutMs": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["code", "message", "recoveryHint"]
+    }
+  },
+  "properties": {
+    "schema": { "const": "xcodebuildmcp.output.ui-action-result" },
+    "schemaVersion": { "const": "2" },
+    "didError": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
     "data": {
       "type": "object",
       "additionalProperties": false,
@@ -37,174 +124,99 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "tap"
-                },
-                "x": {
-                  "type": "number"
-                },
-                "y": {
-                  "type": "number"
-                },
-                "id": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
+                "type": { "const": "tap" },
+                "elementRef": { "type": "string" }
               },
-              "required": [
-                "type"
-              ]
+              "required": ["type", "elementRef"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "swipe"
-                },
-                "from": {
-                  "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/point"
-                },
-                "to": {
-                  "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/point"
-                },
-                "durationSeconds": {
-                  "type": "number",
-                  "minimum": 0
-                }
+                "type": { "const": "swipe" },
+                "withinElementRef": { "type": "string" },
+                "direction": { "$ref": "#/$defs/direction" },
+                "durationSeconds": { "type": "number", "minimum": 0 }
               },
-              "required": [
-                "type"
-              ]
+              "required": ["type", "withinElementRef", "direction"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "touch"
-                },
-                "event": {
-                  "type": "string"
-                },
-                "x": {
-                  "type": "number"
-                },
-                "y": {
-                  "type": "number"
-                }
+                "type": { "const": "touch" },
+                "elementRef": { "type": "string" },
+                "event": { "type": "string" }
               },
-              "required": [
-                "type"
-              ]
+              "required": ["type", "elementRef"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "long-press"
-                },
-                "x": {
-                  "type": "number"
-                },
-                "y": {
-                  "type": "number"
-                },
-                "durationMs": {
-                  "type": "integer",
-                  "minimum": 0
-                }
+                "type": { "const": "long-press" },
+                "elementRef": { "type": "string" },
+                "durationMs": { "type": "integer", "minimum": 0 }
               },
-              "required": [
-                "type",
-                "x",
-                "y",
-                "durationMs"
-              ]
+              "required": ["type", "elementRef", "durationMs"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "button"
-                },
-                "button": {
-                  "type": "string"
-                }
+                "type": { "const": "button" },
+                "button": { "type": "string" }
               },
-              "required": [
-                "type",
-                "button"
-              ]
+              "required": ["type", "button"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "gesture"
-                },
-                "gesture": {
-                  "type": "string"
-                }
+                "type": { "const": "gesture" },
+                "gesture": { "type": "string" }
               },
-              "required": [
-                "type",
-                "gesture"
-              ]
+              "required": ["type", "gesture"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "type-text"
-                }
+                "type": { "const": "type-text" },
+                "elementRef": { "type": "string" },
+                "textLength": { "type": "integer", "minimum": 0 }
               },
-              "required": [
-                "type"
-              ]
+              "required": ["type", "elementRef"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "key-press"
-                },
-                "keyCode": {
-                  "type": "integer",
-                  "minimum": 0
-                }
+                "type": { "const": "key-press" },
+                "keyCode": { "type": "integer", "minimum": 0 }
               },
-              "required": [
-                "type",
-                "keyCode"
-              ]
+              "required": ["type", "keyCode"]
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "type": {
-                  "const": "key-sequence"
-                },
+                "type": { "const": "key-sequence" },
                 "keyCodes": {
                   "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
+                  "items": { "type": "integer", "minimum": 0 }
                 }
               },
-              "required": [
-                "type",
-                "keyCodes"
-              ]
+              "required": ["type", "keyCodes"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "batch" },
+                "stepCount": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["type", "stepCount"]
             }
           ]
         },
@@ -212,33 +224,20 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "simulatorId": {
-              "type": "string"
-            }
+            "simulatorId": { "type": "string" }
           },
-          "required": [
-            "simulatorId"
-          ]
+          "required": ["simulatorId"]
         },
         "diagnostics": {
           "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/basicDiagnostics"
-        }
+        },
+        "uiError": { "$ref": "#/$defs/recoverableUiError" }
       },
-      "required": [
-        "summary",
-        "action",
-        "artifacts"
-      ]
+      "required": ["summary", "action", "artifacts"]
     },
     "nextSteps": {
       "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/nextSteps"
     }
   },
-  "required": [
-    "schema",
-    "schemaVersion",
-    "didError",
-    "error",
-    "data"
-  ]
+  "required": ["schema", "schemaVersion", "didError", "error", "data"]
 }

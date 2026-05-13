@@ -37,7 +37,11 @@ describe('Gesture Plugin', () => {
       ).toBe(true);
       expect(schemaObj.safeParse({ preset: 'invalid-preset' }).success).toBe(false);
       expect(schemaObj.safeParse({ preset: 'scroll-up', screenWidth: 0 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', screenWidth: 2001 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', screenHeight: 3001 }).success).toBe(false);
       expect(schemaObj.safeParse({ preset: 'scroll-up', duration: -1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', duration: 0 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', delta: 201 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',

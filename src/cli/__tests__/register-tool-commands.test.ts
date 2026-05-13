@@ -6,6 +6,7 @@ import type { ToolHandlerContext } from '../../rendering/types.ts';
 import { DefaultToolInvoker } from '../../runtime/tool-invoker.ts';
 import type { ResolvedRuntimeConfig } from '../../utils/config-store.ts';
 import { registerToolCommands } from '../register-tool-commands.ts';
+import * as simulatorResolver from '../../utils/simulator-resolver.ts';
 
 function createTool(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
   return {
@@ -260,6 +261,90 @@ describe('registerToolCommands', () => {
     stdoutWrite.mockRestore();
   });
 
+  it('resolves configured simulatorName for CLI tools that require simulatorId', async () => {
+    const resolveSimulatorNameToId = vi
+      .spyOn(simulatorResolver, 'resolveSimulatorNameToId')
+      .mockResolvedValue({
+        success: true,
+        simulatorId: 'SIM-RESOLVED',
+        simulatorName: 'iPhone 17 Pro',
+      });
+    const invokeDirect = vi
+      .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
+      .mockResolvedValue(undefined);
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const tool = createTool({
+      cliSchema: {
+        simulatorId: z.string().describe('Simulator ID'),
+      },
+      mcpSchema: {
+        simulatorId: z.string().describe('Simulator ID'),
+      },
+    });
+    const app = createApp(createCatalog([tool]), {
+      ...baseRuntimeConfig,
+      sessionDefaults: {
+        simulatorName: 'iPhone 17 Pro',
+      },
+      sessionDefaultsProfiles: undefined,
+      activeSessionDefaultsProfile: undefined,
+    });
+
+    await expect(app.parseAsync(['simulator', 'run-tool'])).resolves.toBeDefined();
+
+    expect(resolveSimulatorNameToId).toHaveBeenCalledWith(expect.any(Function), 'iPhone 17 Pro');
+    expect(invokeDirect).toHaveBeenCalledWith(
+      tool,
+      {
+        simulatorId: 'SIM-RESOLVED',
+      },
+      expect.any(Object),
+    );
+
+    stdoutWrite.mockRestore();
+  });
+
+  it('does not synthesize simulatorId for tools that already accept simulatorName', async () => {
+    const resolveSimulatorNameToId = vi.spyOn(simulatorResolver, 'resolveSimulatorNameToId');
+    const invokeDirect = vi
+      .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
+      .mockResolvedValue(undefined);
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const tool = createTool({
+      cliSchema: {
+        simulatorId: z.string().optional().describe('Simulator ID'),
+        simulatorName: z.string().optional().describe('Simulator name'),
+      },
+      mcpSchema: {
+        simulatorId: z.string().optional().describe('Simulator ID'),
+        simulatorName: z.string().optional().describe('Simulator name'),
+      },
+    });
+    const app = createApp(createCatalog([tool]), {
+      ...baseRuntimeConfig,
+      sessionDefaults: {
+        simulatorName: 'iPhone 17 Pro',
+      },
+      sessionDefaultsProfiles: undefined,
+      activeSessionDefaultsProfile: undefined,
+    });
+
+    await expect(app.parseAsync(['simulator', 'run-tool'])).resolves.toBeDefined();
+
+    expect(resolveSimulatorNameToId).not.toHaveBeenCalled();
+    expect(invokeDirect).toHaveBeenCalledWith(
+      tool,
+      {
+        simulatorName: 'iPhone 17 Pro',
+      },
+      expect.any(Object),
+    );
+
+    stdoutWrite.mockRestore();
+  });
+
   it('keeps the normal missing-argument error when no hydrated default exists', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -456,6 +541,97 @@ describe('registerToolCommands', () => {
     );
 
     stdoutWrite.mockRestore();
+  });
+
+  it('parses comma-separated numeric array args', async () => {
+    const invokeDirect = vi
+      .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
+      .mockResolvedValue(undefined);
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const tool = createTool({
+      cliSchema: {
+        workspacePath: z.string().describe('Workspace path'),
+        keyCodes: z.array(z.number()).describe('Key codes'),
+      },
+      mcpSchema: {
+        workspacePath: z.string().describe('Workspace path'),
+        keyCodes: z.array(z.number()).describe('Key codes'),
+      },
+    });
+    const app = createApp(createCatalog([tool]), {
+      ...baseRuntimeConfig,
+      sessionDefaults: undefined,
+      sessionDefaultsProfiles: undefined,
+      activeSessionDefaultsProfile: undefined,
+    });
+
+    await expect(
+      app.parseAsync([
+        'simulator',
+        'run-tool',
+        '--workspace-path',
+        'App.xcworkspace',
+        '--key-codes',
+        '23,18,14',
+      ]),
+    ).resolves.toBeDefined();
+
+    expect(invokeDirect).toHaveBeenCalledWith(
+      tool,
+      {
+        workspacePath: 'App.xcworkspace',
+        keyCodes: [23, 18, 14],
+      },
+      expect.any(Object),
+    );
+
+    stdoutWrite.mockRestore();
+  });
+
+  it('honors --style minimal by hiding next steps', async () => {
+    vi.spyOn(DefaultToolInvoker.prototype, 'invokeDirect').mockImplementation(
+      async (_tool, _args, opts) => {
+        opts.renderSession?.setStructuredOutput?.({
+          schema: 'xcodebuildmcp.output.app-path',
+          schemaVersion: '1',
+          result: {
+            kind: 'app-path',
+            didError: false,
+            error: null,
+            artifacts: { appPath: '/tmp/MyApp.app' },
+          },
+        });
+        opts.renderSession?.setNextSteps?.(
+          [
+            {
+              label: 'Run again',
+              tool: 'run_tool',
+              workflow: 'simulator',
+              cliTool: 'run-tool',
+            },
+          ],
+          'cli',
+        );
+      },
+    );
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool();
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--style', 'minimal']),
+    ).resolves.toBeDefined();
+
+    const output = stdoutChunks.join('');
+    expect(output).toContain('Get App Path');
+    expect(output).not.toContain('Next steps:');
+    expect(output).not.toContain('Run again');
   });
 
   it('applies --file-path-render-style to text output without forwarding it to tool args', async () => {
@@ -680,6 +856,376 @@ describe('registerToolCommands', () => {
         null,
         2,
       )}\n`,
+    );
+  });
+
+  it('writes compact rs/1 capture JSON for runtime snapshots by default', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.capture-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'capture-result',
+              didError: false,
+              error: null,
+              summary: { status: 'SUCCEEDED' },
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e1',
+                    role: 'application',
+                    label: 'Weather',
+                    frame: { x: 0, y: 0, width: 390, height: 844 },
+                    actions: ['swipeWithin'],
+                  },
+                  {
+                    ref: 'e2',
+                    role: 'button',
+                    label: 'San Francisco',
+                    value: 'selected',
+                    identifier: 'weather.locationButton',
+                    frame: { x: 12, y: 81.33, width: 178, height: 33.33 },
+                    actions: ['tap', 'longPress', 'touch'],
+                  },
+                  {
+                    ref: 'e3',
+                    role: 'button',
+                    label: 'Sheet Grabber',
+                    value: 'Half screen',
+                    frame: { x: 150, y: 10, width: 80, height: 20 },
+                    actions: ['tap'],
+                  },
+                ],
+                actions: [
+                  { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+                  { action: 'tap', elementRef: 'e2', label: 'San Francisco' },
+                  { action: 'tap', elementRef: 'e3', label: 'Sheet Grabber' },
+                ],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    expect(stdoutChunks.join('')).toBe(
+      `${JSON.stringify(
+        {
+          schema: 'xcodebuildmcp.output.capture-result',
+          schemaVersion: '2',
+          didError: false,
+          error: null,
+          data: {
+            summary: { status: 'SUCCEEDED' },
+            artifacts: { simulatorId: 'SIMULATOR-1' },
+            capture: {
+              type: 'runtime-snapshot',
+              rs: '1',
+              screenHash: 'screen-hash',
+              seq: 1,
+              count: 3,
+              targets: ['e2|tap|button|San Francisco|selected|weather.locationButton'],
+              scroll: ['e1|swipe|application|Weather||'],
+              udid: 'SIMULATOR-1',
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
+
+  it('orders destructive controls after useful targets in compact JSON', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.capture-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'capture-result',
+              didError: false,
+              error: null,
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e1',
+                    role: 'button',
+                    label: 'Remove',
+                    identifier: 'trash',
+                    frame: { x: 300, y: 180, width: 40, height: 40 },
+                    actions: ['tap'],
+                  },
+                  {
+                    ref: 'e2',
+                    role: 'button',
+                    label: 'Portland, 1:24 PM · Light Rain',
+                    frame: { x: 20, y: 140, width: 300, height: 80 },
+                    actions: ['tap'],
+                  },
+                ],
+                actions: [
+                  { action: 'tap', elementRef: 'e1', label: 'Remove' },
+                  { action: 'tap', elementRef: 'e2', label: 'Portland, 1:24 PM · Light Rain' },
+                ],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    const output = JSON.parse(stdoutChunks.join('')) as {
+      data: { capture: { targets: string[] } };
+    };
+    expect(output.data.capture.targets).toEqual([
+      'e2|tap|button|Portland, 1:24 PM · Light Rain||',
+      'e1|tap|button|Remove||trash',
+    ]);
+  });
+
+  it('orders unselected segmented controls before already-selected controls in compact JSON', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.capture-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'capture-result',
+              didError: false,
+              error: null,
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e9',
+                    role: 'button',
+                    label: '°F',
+                    value: 'selected',
+                    frame: { x: 20, y: 40, width: 70, height: 44 },
+                    actions: ['tap'],
+                  },
+                  {
+                    ref: 'e10',
+                    role: 'button',
+                    label: '°C',
+                    value: 'not selected',
+                    frame: { x: 100, y: 40, width: 70, height: 44 },
+                    actions: ['tap'],
+                  },
+                ],
+                actions: [
+                  { action: 'tap', elementRef: 'e9', label: '°F' },
+                  { action: 'tap', elementRef: 'e10', label: '°C' },
+                ],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    const output = JSON.parse(stdoutChunks.join('')) as {
+      data: { capture: { targets: string[] } };
+    };
+    expect(output.data.capture.targets).toEqual([
+      'e10|tap|button|°C|not selected|',
+      'e9|tap|button|°F|selected|',
+    ]);
+  });
+
+  it('writes compact wait matches with no primary action for static text', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.capture-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'capture-result',
+              didError: false,
+              error: null,
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              waitMatch: {
+                predicate: 'textContains',
+                matches: [
+                  {
+                    ref: 'e11',
+                    role: 'text',
+                    label: 'No matches',
+                    frame: { x: 20, y: 240, width: 120, height: 24 },
+                    actions: ['longPress', 'touch'],
+                  },
+                ],
+              },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e11',
+                    role: 'text',
+                    label: 'No matches',
+                    frame: { x: 20, y: 240, width: 120, height: 24 },
+                    actions: ['longPress', 'touch'],
+                  },
+                ],
+                actions: [
+                  { action: 'longPress', elementRef: 'e11', label: 'No matches' },
+                  { action: 'touch', elementRef: 'e11', label: 'No matches' },
+                ],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    const output = JSON.parse(stdoutChunks.join('')) as {
+      data: { waitMatch: { matches: string[] } };
+    };
+    expect(output.data.waitMatch.matches).toEqual(['e11|none|text|No matches||']);
+  });
+
+  it('writes the full runtime snapshot envelope for verbose JSON output', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.capture-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'capture-result',
+              didError: false,
+              error: null,
+              summary: { status: 'SUCCEEDED' },
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e1',
+                    role: 'application',
+                    label: 'Weather',
+                    frame: { x: 0, y: 0, width: 390, height: 844 },
+                    actions: ['swipeWithin'],
+                  },
+                ],
+                actions: [{ action: 'swipeWithin', elementRef: 'e1', label: 'Weather' }],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json', '--verbose']),
+    ).resolves.toBeDefined();
+
+    const output = JSON.parse(stdoutChunks.join('')) as { schema: string; data: unknown };
+    expect(output.schema).toBe('xcodebuildmcp.output.capture-result');
+    expect(output.data).toEqual(
+      expect.objectContaining({
+        capture: expect.objectContaining({
+          type: 'runtime-snapshot',
+          elements: [expect.objectContaining({ ref: 'e1', actions: ['swipeWithin'] })],
+        }),
+      }),
     );
   });
 

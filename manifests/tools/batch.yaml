@@ -1,0 +1,16 @@
+id: batch
+module: mcp/tools/ui-automation/batch
+names:
+  mcp: batch
+  cli: batch
+description: Execute multiple AXe UI interaction steps in one simulator session to reduce process launches.
+outputSchema:
+  schema: xcodebuildmcp.output.ui-action-result
+  version: "2"
+routing:
+  stateful: true
+annotations:
+  title: Batch UI Actions
+  readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

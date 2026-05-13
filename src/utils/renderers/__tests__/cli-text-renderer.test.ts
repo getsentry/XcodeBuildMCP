@@ -571,6 +571,498 @@ describe('cli-text-renderer', () => {
     expect(output).toContain('└ App Path: /tmp/MyApp.app');
   });
 
+  it('renders runtime UI snapshots as compact target lists', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Add',
+                identifier: 'add-button',
+                value: 'selected',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                state: { enabled: true, visible: true },
+                actions: ['tap', 'longPress'],
+              },
+              {
+                ref: 'e2',
+                role: 'text',
+                label: 'Total',
+                frame: { x: 0, y: 0, width: 100, height: 20 },
+                actions: [],
+              },
+            ],
+            actions: [{ action: 'tap', elementRef: 'e1', label: 'Add' }],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('📷 Snapshot UI');
+    expect(output).toContain('Targets (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e1|tap|button|Add|selected|add-button');
+    expect(output).toContain(
+      'Runtime UI snapshot captured with 2 elements, 1 likely target, and 0 scroll areas.',
+    );
+    expect(output).not.toContain('- Use scroll refs with swipe.');
+    expect(output).not.toContain('Accessibility Hierarchy');
+    expect(output).not.toContain('```json');
+  });
+
+  it('renders unchanged runtime UI snapshots compactly', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot-unchanged',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 2,
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('📷 Snapshot UI');
+    expect(output).toContain('Runtime UI snapshot unchanged (screenHash: screen-hash, seq: 2).');
+    expect(output).not.toContain('Targets (');
+    expect(output).not.toContain('Tips');
+  });
+
+  it('orders useful runtime targets before chrome controls in compact output', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e2',
+                role: 'button',
+                label: 'Sheet Grabber',
+                value: 'Expanded',
+                frame: { x: 0, y: 0, width: 100, height: 20 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e3',
+                role: 'button',
+                label: 'Settings',
+                frame: { x: 320, y: 40, width: 40, height: 40 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e8',
+                role: 'text-field',
+                value: 'Portland',
+                frame: { x: 20, y: 100, width: 200, height: 40 },
+                actions: ['typeText'],
+              },
+              {
+                ref: 'e9',
+                role: 'button',
+                label: 'Clear search',
+                frame: { x: 230, y: 100, width: 40, height: 40 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e10',
+                role: 'button',
+                label: 'Remove',
+                identifier: 'trash',
+                frame: { x: 300, y: 180, width: 40, height: 40 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e82',
+                role: 'button',
+                label: 'PRECIP., 78%, Next 24 hours',
+                identifier: 'weather.precipitationCard',
+                frame: { x: 20, y: 300, width: 340, height: 140 },
+                actions: ['tap'],
+              },
+            ],
+            actions: [
+              { action: 'tap', elementRef: 'e2', label: 'Sheet Grabber' },
+              { action: 'tap', elementRef: 'e3', label: 'Settings' },
+              { action: 'typeText', elementRef: 'e8' },
+              { action: 'tap', elementRef: 'e9', label: 'Clear search' },
+              { action: 'tap', elementRef: 'e10', label: 'Remove' },
+              { action: 'tap', elementRef: 'e82', label: 'PRECIP., 78%, Next 24 hours' },
+            ],
+          },
+        },
+      },
+    });
+
+    const precipitationIndex = output.indexOf(
+      'e82|tap|button|PRECIP., 78%, Next 24 hours||weather.precipitationCard',
+    );
+    const searchIndex = output.indexOf('e8|typeText|text-field||Portland|');
+    const settingsIndex = output.indexOf('e3|tap|button|Settings||');
+    const clearSearchIndex = output.indexOf('e9|tap|button|Clear search||');
+    const removeIndex = output.indexOf('e10|tap|button|Remove||trash');
+
+    expect(precipitationIndex).toBeGreaterThanOrEqual(0);
+    expect(searchIndex).toBeGreaterThan(precipitationIndex);
+    expect(settingsIndex).toBeGreaterThan(searchIndex);
+    expect(output).not.toContain('e2|tap|button|Sheet Grabber|Expanded|');
+    expect(clearSearchIndex).toBeGreaterThan(settingsIndex);
+    expect(removeIndex).toBeGreaterThan(settingsIndex);
+  });
+
+  it('orders unselected segmented controls before already-selected controls in compact output', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e9',
+                role: 'button',
+                label: '°F',
+                value: 'selected',
+                frame: { x: 20, y: 40, width: 70, height: 44 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e10',
+                role: 'button',
+                label: '°C',
+                value: 'not selected',
+                frame: { x: 100, y: 40, width: 70, height: 44 },
+                actions: ['tap'],
+              },
+            ],
+            actions: [
+              { action: 'tap', elementRef: 'e9', label: '°F' },
+              { action: 'tap', elementRef: 'e10', label: '°C' },
+            ],
+          },
+        },
+      },
+    });
+
+    const selectedIndex = output.indexOf('e9|tap|button|°F|selected|');
+    const unselectedIndex = output.indexOf('e10|tap|button|°C|not selected|');
+
+    expect(unselectedIndex).toBeGreaterThanOrEqual(0);
+    expect(selectedIndex).toBeGreaterThan(unselectedIndex);
+  });
+
+  it('does not list static text as a likely runtime target when only low-level actions are present', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Settings',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                actions: ['tap', 'longPress', 'touch'],
+              },
+              {
+                ref: 'e2',
+                role: 'text',
+                label: 'Updated just now',
+                frame: { x: 0, y: 0, width: 100, height: 20 },
+                actions: ['longPress', 'touch'],
+              },
+            ],
+            actions: [
+              { action: 'tap', elementRef: 'e1', label: 'Settings' },
+              { action: 'longPress', elementRef: 'e2', label: 'Updated just now' },
+              { action: 'touch', elementRef: 'e2', label: 'Updated just now' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('Targets (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e1|tap|button|Settings||');
+    expect(output).not.toContain('e2|');
+    expect(output).toContain(
+      'Runtime UI snapshot captured with 2 elements, 1 likely target, and 0 scroll areas.',
+    );
+  });
+
+  it('renders runtime UI snapshot scroll areas separately from likely targets', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'application',
+                label: 'Weather',
+                frame: { x: 0, y: 0, width: 390, height: 844 },
+                actions: ['swipeWithin'],
+              },
+              {
+                ref: 'e2',
+                role: 'button',
+                label: 'Settings',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                actions: ['tap', 'longPress', 'touch'],
+              },
+            ],
+            actions: [
+              { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+              { action: 'tap', elementRef: 'e2', label: 'Settings' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('Targets (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e2|tap|button|Settings||');
+    expect(output).toContain('Scroll (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e1|swipe|application|Weather||');
+    expect(output).toContain('- Use scroll refs with swipe.');
+    expect(output).toContain(
+      'Runtime UI snapshot captured with 2 elements, 1 likely target, and 1 scroll area.',
+    );
+  });
+
+  it('renders wait_for_ui output with wait-specific text', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        renderHints: { headerTitle: 'Wait for UI' },
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          waitMatch: {
+            predicate: 'exists',
+            matches: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Continue',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                actions: ['tap'],
+              },
+            ],
+          },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Continue',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                actions: ['tap'],
+              },
+            ],
+            actions: [{ action: 'tap', elementRef: 'e1', label: 'Continue' }],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('⚙️ Wait for UI');
+    expect(output).toContain('Matched exists (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e1|tap|button|Continue||');
+    expect(output).toContain(
+      'Wait completed; runtime UI snapshot refreshed with 1 element, 1 likely target, and 0 scroll areas.',
+    );
+  });
+
+  it('renders static wait matches with no primary action', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        renderHints: { headerTitle: 'Wait for UI' },
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          waitMatch: {
+            predicate: 'textContains',
+            matches: [
+              {
+                ref: 'e11',
+                role: 'text',
+                label: 'No matches',
+                frame: { x: 20, y: 240, width: 120, height: 24 },
+                actions: ['longPress', 'touch'],
+              },
+            ],
+          },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e11',
+                role: 'text',
+                label: 'No matches',
+                frame: { x: 20, y: 240, width: 120, height: 24 },
+                actions: ['longPress', 'touch'],
+              },
+            ],
+            actions: [
+              { action: 'longPress', elementRef: 'e11', label: 'No matches' },
+              { action: 'touch', elementRef: 'e11', label: 'No matches' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('Matched textContains (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e11|none|text|No matches||');
+    expect(output).not.toContain('e11|longPress|text|No matches||');
+  });
+
+  it('renders typed UI action recovery hints', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.ui-action-result',
+        schemaVersion: '2',
+        result: {
+          kind: 'ui-action-result',
+          didError: true,
+          error: 'Element reference e9 was not found in the current runtime snapshot.',
+          summary: { status: 'FAILED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          action: { type: 'tap', elementRef: 'e9' },
+          uiError: {
+            code: 'ELEMENT_REF_NOT_FOUND',
+            message: 'Element reference e9 was not found in the current runtime snapshot.',
+            recoveryHint: 'Run snapshot_ui again and retry with a current element reference.',
+            elementRef: 'e9',
+            candidates: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Add',
+                frame: { x: 10, y: 20, width: 30, height: 40 },
+                actions: ['tap'],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('Recovery');
+    expect(output).toContain('Code: ELEMENT_REF_NOT_FOUND');
+    expect(output).toContain('Element: e9');
+    expect(output).toContain(
+      'Hint: Run snapshot_ui again and retry with a current element reference.',
+    );
+    expect(output).toContain('Candidates (1):');
+    expect(output).toContain('e1|tap|button|Add||');
+    expect(output).toContain(
+      '❌ Element reference e9 was not found in the current runtime snapshot.',
+    );
+  });
+
   it('renders structured output path artifacts as a tree when requested', () => {
     const output = renderCliTextTranscript({
       filePathRenderStyle: 'tree',

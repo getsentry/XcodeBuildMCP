@@ -8,6 +8,12 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, boot_simLogic } from '../boot_sim.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
+
 describe('boot_sim tool', () => {
   beforeEach(() => {
     sessionStore.clear();
@@ -103,6 +109,43 @@ describe('boot_sim tool', () => {
       expect(text).toContain('Boot simulator operation failed.');
       expect(text).toContain('String error');
       expect(result.isError).toBe(true);
+    });
+
+    it('should resolve simulatorName before booting', async () => {
+      const calls: Array<{
+        command: string[];
+        description?: string;
+        allowStderr?: boolean;
+      }> = [];
+      const mockExecutor = async (
+        command: string[],
+        description?: string,
+        allowStderr?: boolean,
+      ) => {
+        calls.push({ command, description, allowStderr });
+        if (command.includes('list')) {
+          return createMockCommandResponse({ success: true, output: availableSimulatorsJson });
+        }
+        return createMockCommandResponse({
+          success: true,
+          output: 'Simulator booted successfully',
+        });
+      };
+
+      const result = await runLogic(() =>
+        boot_simLogic({ simulatorName: 'iPhone 17' }, mockExecutor),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        install_app_sim: { simulatorId: 'resolved-uuid', appPath: 'PATH_TO_YOUR_APP' },
+        launch_app_sim: { simulatorId: 'resolved-uuid', bundleId: 'YOUR_APP_BUNDLE_ID' },
+      });
+      expect(calls.map((call) => call.command)).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'boot', 'resolved-uuid'],
+      ]);
     });
 
     it('should verify command generation with mock executor', async () => {

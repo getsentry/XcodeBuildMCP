@@ -22,6 +22,10 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
     return '<RAW_RESPONSE_JSON_PATH>';
   }
 
+  if (key === 'screenHash') {
+    return '<SCREEN_HASH>';
+  }
+
   if (key === 'AXFrame') {
     // Round embedded floats to 1 decimal place for rounding-stable comparison with
     // the sibling `frame` object. e.g. 82.666664123535156 -> 82.7, 250.5 stays 250.5.
@@ -61,6 +65,15 @@ function normalizeNumber(path: string[], key: string | undefined, value: number)
       return 3600;
     case 'threadId':
       return 1;
+    case 'capturedAtMs':
+      return 1_700_000_000_000;
+    case 'expiresAtMs':
+      return 1_700_000_060_000;
+    case 'snapshotAgeMs':
+      return 1234;
+    case 'seq':
+      if (path.includes('capture')) return 1;
+      return value;
     case 'x':
     case 'y':
     case 'width':
@@ -236,14 +249,15 @@ function normalizeXcodeBridgeCallEnvelope(
     return envelope;
   }
 
-  return {
+  const normalizedEnvelope: StructuredOutputEnvelope<unknown> = {
     ...envelope,
     data: {
       ...data,
       content: [],
       ...(Object.hasOwn(data, 'structuredContent') ? { structuredContent: {} } : {}),
     },
-  } as StructuredOutputEnvelope<unknown>;
+  };
+  return normalizedEnvelope;
 }
 
 export function normalizeStructuredEnvelope(

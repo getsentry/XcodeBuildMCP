@@ -1,4 +1,4 @@
-import type { ToolHandlerContext } from '../../../../rendering/types.ts';
+import type { RenderHints, ToolHandlerContext } from '../../../../rendering/types.ts';
 import type {
   BasicDiagnostics,
   CapturePayload,
@@ -6,12 +6,19 @@ import type {
   UiAction,
   UiActionResultDomainResult,
 } from '../../../../types/domain-results.ts';
+import type {
+  UiAutomationRecoverableError,
+  UiAutomationRecoverableErrorCode,
+  UiWaitMatch,
+} from '../../../../types/ui-snapshot.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { createBasicDiagnostics } from '../../../../utils/diagnostics.ts';
 import { AxeError, DependencyError, SystemError } from '../../../../utils/errors.ts';
 
 const UI_ACTION_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
 const CAPTURE_SCHEMA = 'xcodebuildmcp.output.capture-result';
+const REFRESH_SNAPSHOT_RECOVERY_HINT =
+  'Run snapshot_ui again and retry with a current element reference from the refreshed snapshot.';
 
 function createDiagnostics(
   warnings: readonly string[] = [],
@@ -28,10 +35,25 @@ function compact(values: Array<string | null | undefined>): string[] {
   return values.filter((value): value is string => typeof value === 'string' && value.length > 0);
 }
 
+export function createUiAutomationRecoverableError(params: {
+  code: UiAutomationRecoverableErrorCode;
+  message: string;
+  recoveryHint?: string;
+  elementRef?: string;
+}): UiAutomationRecoverableError {
+  return {
+    code: params.code,
+    message: params.message,
+    recoveryHint: params.recoveryHint ?? REFRESH_SNAPSHOT_RECOVERY_HINT,
+    ...(params.elementRef ? { elementRef: params.elementRef } : {}),
+  };
+}
+
 export function createUiActionSuccessResult(
   action: UiAction,
   simulatorId: string,
   warnings: Array<string | null | undefined> = [],
+  options: { uiError?: UiAutomationRecoverableError } = {},
 ): UiActionResultDomainResult {
   return {
     kind: 'ui-action-result',
@@ -41,6 +63,7 @@ export function createUiActionSuccessResult(
     action,
     artifacts: { simulatorId },
     diagnostics: createDiagnostics(compact(warnings), []),
+    ...(options.uiError ? { uiError: options.uiError } : {}),
   };
 }
 
@@ -51,6 +74,7 @@ export function createUiActionFailureResult(
   options: {
     warnings?: Array<string | null | undefined>;
     details?: Array<string | null | undefined>;
+    uiError?: UiAutomationRecoverableError;
   } = {},
 ): UiActionResultDomainResult {
   return {
@@ -61,6 +85,7 @@ export function createUiActionFailureResult(
     action,
     artifacts: { simulatorId },
     diagnostics: createDiagnostics(compact(options.warnings ?? []), compact(options.details ?? [])),
+    ...(options.uiError ? { uiError: options.uiError } : {}),
   };
 }
 
@@ -70,6 +95,8 @@ export function createCaptureSuccessResult(
     screenshotPath?: string;
     capture?: CapturePayload;
     warnings?: Array<string | null | undefined>;
+    uiError?: UiAutomationRecoverableError;
+    waitMatch?: UiWaitMatch;
   } = {},
 ): CaptureResultDomainResult {
   return {
@@ -83,6 +110,8 @@ export function createCaptureSuccessResult(
     },
     ...(options.capture ? { capture: options.capture } : {}),
     diagnostics: createDiagnostics(compact(options.warnings ?? []), []),
+    ...(options.uiError ? { uiError: options.uiError } : {}),
+    ...(options.waitMatch ? { waitMatch: options.waitMatch } : {}),
   };
 }
 
@@ -91,8 +120,10 @@ export function createCaptureFailureResult(
   message: string,
   options: {
     screenshotPath?: string;
+    capture?: CapturePayload;
     warnings?: Array<string | null | undefined>;
     details?: Array<string | null | undefined>;
+    uiError?: UiAutomationRecoverableError;
   } = {},
 ): CaptureResultDomainResult {
   return {
@@ -104,7 +135,9 @@ export function createCaptureFailureResult(
       simulatorId,
       ...(options.screenshotPath ? { screenshotPath: options.screenshotPath } : {}),
     },
+    ...(options.capture ? { capture: options.capture } : {}),
     diagnostics: createDiagnostics(compact(options.warnings ?? []), compact(options.details ?? [])),
+    ...(options.uiError ? { uiError: options.uiError } : {}),
   };
 }
 
@@ -113,6 +146,10 @@ interface AxeErrorMessages {
   axeFailureMessage: (error: AxeError) => string;
   systemFailureMessage?: (error: SystemError) => string;
   unexpectedFailureMessage?: (message: string) => string;
+}
+
+export function shouldInvalidateRuntimeSnapshotAfterActionError(error: unknown): boolean {
+  return error instanceof AxeError;
 }
 
 export function mapAxeCommandError(
@@ -129,7 +166,7 @@ export function mapAxeCommandError(
   if (error instanceof AxeError) {
     return {
       message: messages.axeFailureMessage(error),
-      diagnostics: createDiagnostics([], compact([error.axeOutput || error.message])),
+      diagnostics: createDiagnostics([], compact([error.axeOutput ?? error.message])),
     };
   }
 
@@ -161,10 +198,12 @@ export function setUiActionStructuredOutput(
 export function setCaptureStructuredOutput(
   ctx: ToolHandlerContext,
   result: CaptureResultDomainResult,
+  renderHints?: RenderHints,
 ): void {
   ctx.structuredOutput = {
     result,
     schema: CAPTURE_SCHEMA,
     schemaVersion: '2',
+    ...(renderHints ? { renderHints } : {}),
   };
 }

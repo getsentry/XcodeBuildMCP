@@ -94,10 +94,17 @@ else
 
     echo "📥 Downloading latest AXe release from GitHub..."
 
-    AXE_RELEASE_BASE_URL="https://github.com/cameroncooke/AXe/releases/download/v${PINNED_AXE_VERSION}"
-    AXE_HOMEBREW_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-homebrew-v${PINNED_AXE_VERSION}.tar.gz"
-    AXE_UNIVERSAL_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-v${PINNED_AXE_VERSION}-universal.tar.gz"
-    AXE_LEGACY_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-v${PINNED_AXE_VERSION}.tar.gz"
+    if [[ "$PINNED_AXE_VERSION" == staging-* ]]; then
+        AXE_RELEASE_TAG="$PINNED_AXE_VERSION"
+        AXE_ASSET_VERSION="$PINNED_AXE_VERSION"
+    else
+        AXE_RELEASE_TAG="v${PINNED_AXE_VERSION}"
+        AXE_ASSET_VERSION="v${PINNED_AXE_VERSION}"
+    fi
+    AXE_RELEASE_BASE_URL="https://github.com/cameroncooke/AXe/releases/download/${AXE_RELEASE_TAG}"
+    AXE_HOMEBREW_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-homebrew-${AXE_ASSET_VERSION}.tar.gz"
+    AXE_UNIVERSAL_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-${AXE_ASSET_VERSION}-universal.tar.gz"
+    AXE_LEGACY_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-${AXE_ASSET_VERSION}.tar.gz"
 
     # Create temp directory
     mkdir -p "$AXE_TEMP_DIR"
@@ -258,7 +265,8 @@ if [ "$OS_NAME" = "Darwin" ]; then
         ad_hoc_sign_bundled_axe_assets
     fi
 
-    if [ "$AXE_ARCHIVE_FLAVOR" = "homebrew" ] || [ "$AXE_ARCHIVE_FLAVOR" = "universal" ]; then
+    if [ "$AXE_ARCHIVE_FLAVOR" = "homebrew" ] || [ "$AXE_ARCHIVE_FLAVOR" = "universal" ] || [ "$AXE_ARCHIVE_FLAVOR" = "local-signed" ]; then
+        ad_hoc_sign_bundled_axe_assets
         echo "ℹ️ ${AXE_ARCHIVE_FLAVOR} AXe archive detected; using ad-hoc signatures for local runtime compatibility"
     else
         echo "🔏 Verifying AXe signatures..."
@@ -284,7 +292,7 @@ if [ "$OS_NAME" = "Darwin" ]; then
         done < <(find "$BUNDLED_DIR/Frameworks" -name "*.framework" -type d)
     fi
 
-    if [ "$AXE_ARCHIVE_FLAVOR" = "homebrew" ] || [ "$AXE_ARCHIVE_FLAVOR" = "universal" ]; then
+    if [ "$AXE_ARCHIVE_FLAVOR" = "homebrew" ] || [ "$AXE_ARCHIVE_FLAVOR" = "universal" ] || [ "$AXE_ARCHIVE_FLAVOR" = "local-signed" ]; then
         echo "ℹ️ Skipping Gatekeeper assessment for ${AXE_ARCHIVE_FLAVOR} AXe archive"
     else
         echo "🛡️ Assessing AXe with Gatekeeper..."
@@ -316,6 +324,27 @@ else
     echo "⚠️  Skipping AXe binary verification on non-macOS (detected $OS_NAME)"
     AXE_VERSION="unknown (verification skipped)"
 fi
+validate_axe_version_metadata() {
+    if [ "$AXE_VERSION" = "unknown (verification skipped)" ]; then
+        return
+    fi
+
+    if [[ "$AXE_VERSION" == *dirty* ]] && [ "${AXE_ALLOW_DIRTY_LOCAL:-0}" != "1" ]; then
+        echo "❌ Bundled AXe reports a dirty version: $AXE_VERSION"
+        echo "   Rebuild AXe from a clean checkout or set AXE_ALLOW_DIRTY_LOCAL=1 for explicit local testing."
+        exit 1
+    fi
+
+    if [ "$USE_LOCAL_AXE" = false ]; then
+        if [ "$AXE_VERSION" != "$PINNED_AXE_VERSION" ] && [ "$AXE_VERSION" != "v$PINNED_AXE_VERSION" ]; then
+            echo "❌ Bundled AXe version '$AXE_VERSION' does not match pinned version '$PINNED_AXE_VERSION'"
+            exit 1
+        fi
+    fi
+}
+
+validate_axe_version_metadata
+
 echo "📋 AXe version: $AXE_VERSION"
 
 # Clean up temp directory if it was used

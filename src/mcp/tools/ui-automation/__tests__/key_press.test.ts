@@ -36,6 +36,8 @@ describe('Key Press Tool', () => {
       expect(schemaObj.safeParse({ keyCode: 'invalid' }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCode: -1 }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCode: 256 }).success).toBe(false);
+      expect(schemaObj.safeParse({ keyCode: 40, duration: 0 }).success).toBe(false);
+      expect(schemaObj.safeParse({ keyCode: 40, duration: 10.1 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',

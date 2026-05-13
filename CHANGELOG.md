@@ -5,6 +5,53 @@
 ### Added
 
 - Added `nextSteps` hint lines to MCP `structuredContent` and CLI `--output json` envelopes so agents can consume follow-up actions without scraping text. CLI JSON renders shell command lines; MCP structured content renders MCP tool-call hints. Structured result schemas that include `nextSteps` now use schema version 2; existing version 1 schema files remain available for current validators.
+- Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.
+- Added `batch` for executing multiple AXe UI automation steps in one simulator session.
+- Added `wait_for_ui` for polling rs/1 runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
+
+### Fixed
+
+- Fixed compact runtime snapshots so top-level app and window refs are not advertised as swipe targets just because a generic descendant overflows their frame.
+- Fixed `wait_for_ui` focus waits so elements that do not expose focus state return a typed recoverable error instead of timing out.
+- Fixed invalid `touch` calls so structured output no longer reports a fake touch event when neither `down` nor `up` was requested.
+- Fixed compact runtime snapshots so standalone `other` elements, such as keyboard suggestions, are not advertised as swipe targets unless they behave like scrollable containers.
+- Fixed runtime snapshots so off-screen elements, and clipped elements whose activation point is offscreen, are not advertised as actionable targets.
+- Fixed full-screen swipe gestures so app-level scroll refs avoid unsafe screen edges such as the status bar and notch area.
+- Clarified runtime snapshot tips so agents know element refs are snapshot-specific and must come from the latest `snapshot_ui` or `wait_for_ui` output, and only show swipe guidance when the snapshot includes a scroll ref.
+- Made `wait_for_ui` `textContains` matching case-insensitive so assertions survive platform text normalization such as keyboard auto-capitalization, treat duplicate exact text matches as successful presence assertions, narrow broad selectors by text before reporting ambiguity, reject `text` on non-`textContains` predicates instead of silently ignoring it, and keep recoverable-error candidates compact in structured output.
+- Fixed `tap` on SwiftUI switch element refs by using a touch down/up activation instead of AXe's coordinate tap path.
+- Fixed selector fallback for AXe duplicate-match diagnostics that include parenthesized match counts.
+- Fixed semantic taps and text-field focusing so element refs with duplicate AXe selectors use their resolved snapshot coordinates immediately.
+- Fixed bottom-clipped UI automation targets so taps, touches, and long presses use a visible activation point instead of the hidden center of the accessibility frame.
+- Fixed app-level horizontal swipes so full-screen refs use a content-area y-coordinate instead of missing horizontal carousels by swiping near the hero area.
+- Fixed CLI commands with `simulatorId`-only contracts so `simulatorName` session defaults are resolved to a simulator ID without adding conflicting simulator arguments to tools that already accept `simulatorName`, and fixed simulator lifecycle tools so name-only defaults resolve before simctl operations.
+- Fixed `snapshot_ui` and `wait_for_ui` next steps so they use the resolved simulator ID instead of leaking `SIMULATOR_UUID` placeholders.
+- Fixed the Weather example app so saved-location rows are not reused as search-result rows after editing locations.
+- Fixed the Weather example app's current-location button so it selects the current saved location instead of appearing as a no-op UI automation target.
+- Added a `replaceExisting` option to `type_text` so agents can replace an existing text-field value instead of accidentally appending to it.
+- Fixed `type_text` so AXe-unsupported international/accented characters fail before focusing the field, with a clear recoverable error instead of a generic typing failure.
+- Fixed `snapshot_ui` next-step guidance so the suggested tap ref prefers useful tappable controls over text fields, sheet grabbers, close buttons, and clear-search buttons.
+- Fixed compact runtime snapshot JSON so target ordering matches compact text output and prioritizes useful content targets before low-value sheet chrome.
+- Fixed `wait_for_ui` success output so compact text and JSON include the matched elements that satisfied the wait predicate.
+- Fixed `wait_for_ui textContains` so duplicate elements with the same matching visible text satisfy presence-style assertions instead of reporting ambiguity.
+- Fixed CLI `--style minimal` so final text output suppresses generated next steps for daemon-routed tools as intended.
+- Fixed `snapshot_ui` next-step guidance so snapshots with no tappable targets no longer suggest tapping the first non-actionable element.
+- Fixed next-step rendering for tools shared across workflows so follow-up commands prefer the workflow that produced the result instead of drifting to another workflow alias.
+- Fixed `snapshot_ui` next-step guidance so calculator-style utility and operator buttons no longer outrank more useful digit/content controls.
+- Fixed `snapshot_ui` compact text, JSON, and next-step guidance so already-selected segmented controls no longer outrank unselected choices.
+- Fixed compact runtime snapshots and next-step guidance so sheet grabbers remain visible as low-priority targets, allowing agents to expand or dismiss sheets without outranking useful content controls.
+- Fixed compact wait-match rows so static assertion matches render with `none` instead of exposing low-level long-press/touch actions as if they were primary agent actions.
+- Fixed compact runtime snapshot ordering and next-step guidance so destructive controls such as Remove/Delete are demoted behind safer content and navigation targets.
+- Clarified simulator keyboard shortcut failures when Simulator.app is running without a visible device window.
+- Fixed hardware button automation so successful button presses wait briefly for system UI transitions before returning, reducing stale immediate follow-up snapshots.
+- Fixed runtime snapshots so modal sheet hosts remain swipeable after the currently visible sheet content fits inside the viewport.
+- Fixed `wait_for_ui` validation so unknown JSON fields are rejected instead of silently broadening waits.
+- Fixed CLI numeric array flags so comma-separated values such as `--key-codes 23,18,14` are parsed as numbers instead of failing validation.
+- Fixed runtime snapshots so unlabeled internal custom-action nodes, such as SpringBoard icon subviews, are no longer advertised as likely tap targets.
+- Fixed AXe bundling so downloaded artifacts must report the pinned AXe version, and dirty local AXe builds require an explicit opt-in.
+- Fixed runtime snapshot tips so compact output names all target-ref action tools, including `long_press` and `touch`.
+- Clarified key press and key sequence tool descriptions so agents know key codes are AXe/macOS virtual key codes and should prefer `type_text` for text entry.
+- Clarified `wait_for_ui` timeout recovery hints so agents know selector fields match exact values and should use `textContains` for partial visible text.
 
 ## [2.5.2]
 

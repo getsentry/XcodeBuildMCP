@@ -135,13 +135,31 @@ function mergeTemplateAndResponseNextSteps(
   });
 }
 
-function normalizeNextSteps(steps: NextStep[], catalog: ToolCatalog): NextStep[] {
+function getNextStepTarget(params: {
+  catalog: ToolCatalog;
+  mcpName: string;
+  preferredWorkflow: string;
+}): ToolDefinition | null {
+  return (
+    params.catalog.tools.find(
+      (tool) =>
+        tool.mcpName.toLowerCase() === params.mcpName.toLowerCase().trim() &&
+        tool.workflow === params.preferredWorkflow,
+    ) ?? params.catalog.getByMcpName(params.mcpName)
+  );
+}
+
+function normalizeNextSteps(
+  steps: NextStep[],
+  catalog: ToolCatalog,
+  preferredWorkflow: string,
+): NextStep[] {
   return steps.map((step) => {
     if (!step.tool) {
       return step;
     }
 
-    const target = catalog.getByMcpName(step.tool);
+    const target = getNextStepTarget({ catalog, mcpName: step.tool, preferredWorkflow });
     if (!target) {
       return step;
     }
@@ -238,7 +256,7 @@ export function postProcessSession(params: {
     return;
   }
 
-  const normalized = normalizeNextSteps(finalSteps, catalog);
+  const normalized = normalizeNextSteps(finalSteps, catalog, tool.workflow);
 
   if (normalized.length > 0) {
     session.setNextSteps?.(normalized, runtime);

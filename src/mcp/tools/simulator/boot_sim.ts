@@ -11,6 +11,7 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
+import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
@@ -30,11 +31,12 @@ const baseSchemaObject = z.object({
 });
 
 const internalSchemaObject = z.object({
-  simulatorId: z.string(),
+  simulatorId: z.string().optional(),
   simulatorName: z.string().optional(),
 });
 
 type BootSimParams = z.infer<typeof internalSchemaObject>;
+type ResolvedBootSimParams = BootSimParams & { simulatorId: string };
 type BootSimResult = SimulatorActionResultDomainResult;
 
 const publicSchemaObject = z.strictObject(
@@ -45,7 +47,7 @@ const publicSchemaObject = z.strictObject(
 );
 
 function createBootSimResult(params: {
-  simulatorId: string;
+  simulatorId?: string;
   didError: boolean;
   error?: string;
   diagnosticMessage?: string;
@@ -63,9 +65,13 @@ function createBootSimResult(params: {
     ...(params.diagnosticMessage
       ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
       : {}),
-    artifacts: {
-      simulatorId: params.simulatorId,
-    },
+    ...(params.simulatorId
+      ? {
+          artifacts: {
+            simulatorId: params.simulatorId,
+          },
+        }
+      : {}),
   };
 }
 
@@ -79,7 +85,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: BootSimResult): vo
 
 export function createBootSimExecutor(
   executor: CommandExecutor,
-): NonStreamingExecutor<BootSimParams, BootSimResult> {
+): NonStreamingExecutor<ResolvedBootSimParams, BootSimResult> {
   return async (params) => {
     try {
       const result = await executor(
@@ -118,11 +124,28 @@ export async function boot_simLogic(
   params: BootSimParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  log('info', `Starting xcrun simctl boot request for simulator ${params.simulatorId}`);
-
   const ctx = getHandlerContext();
+  const simulatorResult = await determineSimulatorUuid(params, executor);
+  if (simulatorResult.error || !simulatorResult.uuid) {
+    const result = createBootSimResult({
+      didError: true,
+      error: 'Boot simulator operation failed.',
+      diagnosticMessage: `Failed to resolve simulator: ${simulatorResult.error ?? 'No simulator UUID returned'}`,
+    });
+    setStructuredOutput(ctx, result);
+    log('error', `Error during boot simulator operation: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  if (simulatorResult.warning) {
+    log('warn', simulatorResult.warning);
+  }
+
+  const resolvedParams: ResolvedBootSimParams = { ...params, simulatorId: simulatorResult.uuid };
+  log('info', `Starting xcrun simctl boot request for simulator ${resolvedParams.simulatorId}`);
+
   const executeBootSim = createBootSimExecutor(executor);
-  const result = await executeBootSim(params);
+  const result = await executeBootSim(resolvedParams);
   setStructuredOutput(ctx, result);
 
   if (result.didError) {
@@ -132,8 +155,8 @@ export async function boot_simLogic(
 
   ctx.nextStepParams = {
     open_sim: {},
-    install_app_sim: { simulatorId: params.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
-    launch_app_sim: { simulatorId: params.simulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
+    install_app_sim: { simulatorId: resolvedParams.simulatorId, appPath: 'PATH_TO_YOUR_APP' },
+    launch_app_sim: { simulatorId: resolvedParams.simulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
   };
 }
 

@@ -1,7 +1,7 @@
 /**
  * UI Testing Plugin: Swipe
  *
- * Swipe from one coordinate to another on iOS simulator with customizable duration and delta.
+ * Swipes within a semantic UI element from the runtime snapshot store.
  */
 
 import * as z from 'zod';
@@ -17,7 +17,8 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
+import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { getRuntimeElementSwipePoints } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
@@ -26,30 +27,32 @@ import type { UiActionResultDomainResult } from '../../../types/domain-results.t
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
+  createUiAutomationRecoverableError,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const swipeSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
-  x1: z.number().int({ message: 'Start X coordinate' }),
-  y1: z.number().int({ message: 'Start Y coordinate' }),
-  x2: z.number().int({ message: 'End X coordinate' }),
-  y2: z.number().int({ message: 'End Y coordinate' }),
+  withinElementRef: z.string().min(1, { message: 'withinElementRef must be non-empty' }),
+  direction: z.enum(['up', 'down', 'left', 'right']).describe('up|down|left|right'),
   duration: z
     .number()
-    .min(0, { message: 'Duration must be non-negative' })
+    .positive({ message: 'Duration must be greater than 0 seconds' })
     .optional()
     .describe('seconds'),
-  delta: z.number().min(0, { message: 'Delta must be non-negative' }).optional(),
+  distance: z.number().positive({ message: 'Distance must be greater than 0' }).optional(),
   preDelay: z
     .number()
     .min(0, { message: 'Pre-delay must be non-negative' })
+    .max(10, { message: 'Pre-delay must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
   postDelay: z
     .number()
     .min(0, { message: 'Post-delay must be non-negative' })
+    .max(10, { message: 'Post-delay must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });
@@ -68,14 +71,31 @@ export function createSwipeExecutor(
 ): NonStreamingExecutor<SwipeParams, SwipeResult> {
   return async (params) => {
     const toolName = 'swipe';
-    const { simulatorId, x1, y1, x2, y2, duration, delta, preDelay, postDelay } = params;
-    const baseAction = { type: 'swipe' as const };
-    const fullAction = {
+    const { simulatorId, withinElementRef, direction, duration, distance, preDelay, postDelay } =
+      params;
+    const action = {
       type: 'swipe' as const,
-      from: { x: x1, y: y1 },
-      to: { x: x2, y: y2 },
+      withinElementRef,
+      direction,
       ...(duration !== undefined ? { durationSeconds: duration } : {}),
     };
+
+    const resolution = resolveElementRef(simulatorId, withinElementRef, 'swipeWithin');
+    if (!resolution.ok) {
+      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+        uiError: resolution.error,
+      });
+    }
+
+    const points = getRuntimeElementSwipePoints(resolution.element, direction);
+    if (!points.ok) {
+      const uiError = createUiAutomationRecoverableError({
+        code: 'TARGET_NOT_ACTIONABLE',
+        message: points.message,
+        elementRef: withinElementRef,
+      });
+      return createUiActionFailureResult(action, simulatorId, points.message, { uiError });
+    }
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,
@@ -83,25 +103,25 @@ export function createSwipeExecutor(
       toolName,
     });
     if (guard.blockedMessage) {
-      return createUiActionFailureResult(baseAction, simulatorId, guard.blockedMessage);
+      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
     const commandArgs = [
       'swipe',
       '--start-x',
-      String(x1),
+      String(points.from.x),
       '--start-y',
-      String(y1),
+      String(points.from.y),
       '--end-x',
-      String(x2),
+      String(points.to.x),
       '--end-y',
-      String(y2),
+      String(points.to.y),
     ];
     if (duration !== undefined) {
       commandArgs.push('--duration', String(duration));
     }
-    if (delta !== undefined) {
-      commandArgs.push('--delta', String(delta));
+    if (distance !== undefined) {
+      commandArgs.push('--delta', String(distance));
     }
     if (preDelay !== undefined) {
       commandArgs.push('--pre-delay', String(preDelay));
@@ -110,26 +130,33 @@ export function createSwipeExecutor(
       commandArgs.push('--post-delay', String(postDelay));
     }
 
-    const optionsText = duration ? ` duration=${duration}s` : '';
+    const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
     log(
       'info',
-      `${LOG_PREFIX}/${toolName}: Starting swipe (${x1},${y1})->(${x2},${y2})${optionsText} on ${simulatorId}`,
+      `${LOG_PREFIX}/${toolName}: Starting ${direction} swipe within ${withinElementRef}${optionsText} on ${simulatorId}`,
     );
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(fullAction, simulatorId, [
-        guard.warningText,
-        getSnapshotUiWarning(simulatorId),
-      ]);
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => 'Failed to simulate swipe.',
+        axeFailureMessage: () =>
+          `Failed to simulate ${direction} swipe within ${withinElementRef}.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(baseAction, simulatorId, failure.message, {
+      return createUiActionFailureResult(action, simulatorId, failure.message, {
         details: failure.diagnostics?.errors.map((entry) => entry.message),
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+          elementRef: withinElementRef,
+        }),
       });
     }
   };

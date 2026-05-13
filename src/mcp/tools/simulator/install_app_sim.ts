@@ -11,6 +11,7 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
+import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { installAppOnSimulator } from '../../../utils/simulator-steps.ts';
 import {
@@ -36,12 +37,13 @@ const baseSchemaObject = z.object({
 });
 
 const internalSchemaObject = z.object({
-  simulatorId: z.string(),
+  simulatorId: z.string().optional(),
   simulatorName: z.string().optional(),
   appPath: z.string(),
 });
 
 type InstallAppSimParams = z.infer<typeof internalSchemaObject>;
+type ResolvedInstallAppSimParams = InstallAppSimParams & { simulatorId: string };
 
 const publicSchemaObject = z.strictObject(
   baseSchemaObject.omit({
@@ -56,8 +58,27 @@ export async function install_app_simLogic(
   fileSystem?: FileSystemExecutor,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const simulatorResult = await determineSimulatorUuid(params, executor);
+  if (simulatorResult.error || !simulatorResult.uuid) {
+    const result = buildInstallFailure(
+      { appPath: params.appPath },
+      `Failed to resolve simulator: ${simulatorResult.error ?? 'No simulator UUID returned'}`,
+    );
+    setInstallResultStructuredOutput(ctx, result);
+    log('error', `Error during install app in simulator operation: ${result.error}`);
+    return;
+  }
+
+  if (simulatorResult.warning) {
+    log('warn', simulatorResult.warning);
+  }
+
+  const resolvedParams: ResolvedInstallAppSimParams = {
+    ...params,
+    simulatorId: simulatorResult.uuid,
+  };
   const executeInstallAppSim = createInstallAppSimExecutor(executor, fileSystem);
-  const result = await executeInstallAppSim(params);
+  const result = await executeInstallAppSim(resolvedParams);
 
   setInstallResultStructuredOutput(ctx, result);
 
@@ -73,7 +94,7 @@ export async function install_app_simLogic(
   ctx.nextStepParams = {
     open_sim: {},
     launch_app_sim: {
-      simulatorId: params.simulatorId,
+      simulatorId: resolvedParams.simulatorId,
       bundleId: bundleId || 'YOUR_APP_BUNDLE_ID',
     },
   };
@@ -103,7 +124,7 @@ async function extractBundleId(
 export function createInstallAppSimExecutor(
   executor: CommandExecutor,
   fileSystem?: FileSystemExecutor,
-): NonStreamingExecutor<InstallAppSimParams, InstallResultDomainResult> {
+): NonStreamingExecutor<ResolvedInstallAppSimParams, InstallResultDomainResult> {
   return async (params) => {
     const artifacts = { simulatorId: params.simulatorId, appPath: params.appPath };
 

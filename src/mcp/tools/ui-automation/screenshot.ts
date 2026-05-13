@@ -60,6 +60,44 @@ interface SimctlDeviceList {
   devices: Record<string, SimctlDevice[]>;
 }
 
+async function getSimulatorDeviceForSimulatorId(
+  simulatorId: string,
+  executor: CommandExecutor,
+): Promise<SimctlDevice | null> {
+  const listCommand = ['xcrun', 'simctl', 'list', 'devices', '-j'];
+  const result = await executor(listCommand, `${LOG_PREFIX}: list devices`, false);
+
+  if (!result.success || !result.output) {
+    return null;
+  }
+
+  const data = JSON.parse(result.output) as SimctlDeviceList;
+  for (const devices of Object.values(data.devices)) {
+    const match = devices.find((device) => device.udid === simulatorId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+async function assertSimulatorBooted(
+  simulatorId: string,
+  executor: CommandExecutor,
+): Promise<SimctlDevice> {
+  const device = await getSimulatorDeviceForSimulatorId(simulatorId, executor);
+  if (!device) {
+    throw new SystemError(`Simulator ${simulatorId} was not found.`);
+  }
+  if (device.state !== 'Booted') {
+    throw new SystemError(
+      `Simulator ${simulatorId} is ${device.state ?? 'not booted'}. Boot the simulator and try again.`,
+    );
+  }
+  return device;
+}
+
 function escapeSwiftStringLiteral(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
@@ -96,21 +134,10 @@ export async function getDeviceNameForSimulatorId(
   executor: CommandExecutor,
 ): Promise<string | null> {
   try {
-    const listCommand = ['xcrun', 'simctl', 'list', 'devices', '-j'];
-    const result = await executor(listCommand, `${LOG_PREFIX}: list devices`, false);
-
-    if (result.success && result.output) {
-      const data = JSON.parse(result.output) as SimctlDeviceList;
-      const devices = data.devices;
-
-      for (const runtime of Object.keys(devices)) {
-        for (const device of devices[runtime]) {
-          if (device.udid === simulatorId) {
-            log('info', `${LOG_PREFIX}: Found device name "${device.name}" for ${simulatorId}`);
-            return device.name;
-          }
-        }
-      }
+    const device = await getSimulatorDeviceForSimulatorId(simulatorId, executor);
+    if (device) {
+      log('info', `${LOG_PREFIX}: Found device name "${device.name}" for ${simulatorId}`);
+      return device.name;
     }
     log('warn', `${LOG_PREFIX}: Could not find device name for ${simulatorId}`);
     return null;
@@ -219,6 +246,7 @@ export function createScreenshotExecutor(
     );
 
     try {
+      const simulatorDevice = await assertSimulatorBooted(simulatorId, executor);
       const result = await executor(commandArgs, `${LOG_PREFIX}: screenshot`, false);
 
       if (!result.success) {
@@ -228,8 +256,7 @@ export function createScreenshotExecutor(
       log('info', `${LOG_PREFIX}/screenshot: Success for ${simulatorId}`);
 
       try {
-        const deviceName = await getDeviceNameForSimulatorId(simulatorId, executor);
-        const isLandscape = await detectLandscapeMode(executor, deviceName ?? undefined);
+        const isLandscape = await detectLandscapeMode(executor, simulatorDevice.name);
         if (isLandscape) {
           log('info', `${LOG_PREFIX}/screenshot: Landscape mode detected, rotating +90`);
           const rotated = await rotateImage(screenshotPath, 90, executor);

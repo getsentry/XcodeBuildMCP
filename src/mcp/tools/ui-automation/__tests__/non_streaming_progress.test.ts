@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createCommandMatchingMockExecutor,
   createMockExecutor,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { createMockToolHandlerContext, runToolLogic } from '../../../../test-utils/test-helpers.ts';
 import { buttonLogic } from '../button.ts';
 import { gestureLogic } from '../gesture.ts';
 import { key_pressLogic } from '../key_press.ts';
@@ -15,6 +16,8 @@ import { swipeLogic } from '../swipe.ts';
 import { tapLogic } from '../tap.ts';
 import { touchLogic } from '../touch.ts';
 import { type_textLogic } from '../type_text.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import { createNode, recordSnapshot } from './ui-action-test-helpers.ts';
 
 const simulatorId = '12345678-1234-4234-8234-123456789012';
 
@@ -71,60 +74,76 @@ describe('ui automation non-streaming tools', () => {
       },
       {
         name: 'long_press',
-        run: () =>
-          long_pressLogic(
-            { simulatorId, x: 100, y: 200, duration: 1500 },
+        run: () => {
+          __resetRuntimeSnapshotStoreForTests();
+          recordSnapshot([createNode()]);
+          return long_pressLogic(
+            { simulatorId, elementRef: 'e1', duration: 1500 },
             createMockExecutor({ success: true }),
             axeHelpers,
-          ),
-        expectedText: 'Long press at (100, 200) for 1500ms simulated successfully.',
+          );
+        },
       },
       {
         name: 'swipe',
-        run: () =>
-          swipeLogic(
-            { simulatorId, x1: 10, y1: 20, x2: 30, y2: 40 },
+        run: () => {
+          __resetRuntimeSnapshotStoreForTests();
+          recordSnapshot([createNode({ type: 'ScrollView', role: 'AXScrollArea' })]);
+          return swipeLogic(
+            { simulatorId, withinElementRef: 'e1', direction: 'up' },
             createMockExecutor({ success: true }),
             axeHelpers,
-          ),
-        expectedText: 'Swipe from (10, 20) to (30, 40) simulated successfully.',
+          );
+        },
       },
       {
         name: 'tap',
-        run: () =>
-          tapLogic(
-            { simulatorId, x: 100, y: 200 },
+        run: () => {
+          __resetRuntimeSnapshotStoreForTests();
+          recordSnapshot([createNode()]);
+          return tapLogic(
+            { simulatorId, elementRef: 'e1' },
             createMockExecutor({ success: true }),
             axeHelpers,
-          ),
-        expectedText: 'Tap at (100, 200) simulated successfully.',
+          );
+        },
       },
       {
         name: 'touch',
-        run: () =>
-          touchLogic(
-            { simulatorId, x: 100, y: 200, down: true },
+        run: () => {
+          __resetRuntimeSnapshotStoreForTests();
+          recordSnapshot([createNode()]);
+          return touchLogic(
+            { simulatorId, elementRef: 'e1', down: true },
             createMockExecutor({ success: true }),
             axeHelpers,
-          ),
-        expectedText: 'Touch event (touch down) at (100, 200) executed successfully.',
+          );
+        },
       },
       {
         name: 'type_text',
-        run: () =>
-          type_textLogic(
-            { simulatorId, text: 'Hello' },
+        run: () => {
+          __resetRuntimeSnapshotStoreForTests();
+          recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
+          return type_textLogic(
+            { simulatorId, elementRef: 'e1', text: 'Hello' },
             createMockExecutor({ success: true }),
             axeHelpers,
-          ),
-        expectedText: 'Text typing simulated successfully.',
+          );
+        },
+        expectedText: 'Text typed into elementRef e1 (5 characters) successfully.',
       },
     ];
 
     for (const testCase of cases) {
       const { result } = await runToolLogic(testCase.run);
       expect(result.events, `${testCase.name} should not emit progress events`).toEqual([]);
-      expect(result.text()).toContain(testCase.expectedText);
+      expect(result.isError()).toBe(false);
+      if (testCase.expectedText) {
+        expect(result.text()).toContain(testCase.expectedText);
+      } else {
+        expect(result.text().trim().length).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -132,7 +151,19 @@ describe('ui automation non-streaming tools', () => {
     const { result } = await runToolLogic(() =>
       screenshotLogic(
         { simulatorId, returnFormat: 'path' },
-        createMockExecutor({ success: true, output: 'Screenshot saved' }),
+        createCommandMatchingMockExecutor({
+          'xcrun simctl list devices -j': {
+            output: JSON.stringify({
+              devices: {
+                'iOS 26.0': [{ udid: simulatorId, name: 'iPhone 17', state: 'Booted' }],
+              },
+            }),
+          },
+          'xcrun simctl io': { output: 'Screenshot saved' },
+          'swift -e': { output: '368,800' },
+          'sips -Z': { output: 'optimized' },
+          'sips -g pixelWidth': { output: 'pixelWidth: 368\npixelHeight: 800' },
+        }),
         createMockFileSystemExecutor(),
         { tmpdir: () => '/tmp', join: (...paths) => paths.join('/') },
         { v4: () => 'test-uuid' },
@@ -143,8 +174,9 @@ describe('ui automation non-streaming tools', () => {
     expect(result.text()).toContain('Screenshot captured');
   });
 
-  it('returns snapshot_ui text from structured output without progress events', async () => {
-    const { result } = await runToolLogic(() =>
+  it('returns snapshot_ui structured output without emitting progress events', async () => {
+    const { ctx, result, run } = createMockToolHandlerContext();
+    await run(() =>
       snapshot_uiLogic(
         {
           simulatorId,
@@ -159,8 +191,17 @@ describe('ui automation non-streaming tools', () => {
     );
 
     expect(result.events).toEqual([]);
-    expect(result.text()).toContain('Accessibility hierarchy retrieved successfully.');
-    expect(result.text()).toContain('Accessibility Hierarchy');
-    expect(result.text()).toContain('"type" : "Button"');
+    expect(ctx.structuredOutput?.schemaVersion).toBe('2');
+    const capture =
+      ctx.structuredOutput?.result.kind === 'capture-result'
+        ? ctx.structuredOutput.result.capture
+        : undefined;
+    expect(capture).toEqual(
+      expect.objectContaining({
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        elements: [expect.objectContaining({ ref: 'e1' })],
+      }),
+    );
   });
 });

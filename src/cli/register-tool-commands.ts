@@ -17,6 +17,7 @@ import {
   getCliSessionDefaultsForTool,
   isKnownCliSessionDefaultsProfile,
   mergeCliSessionDefaults,
+  resolveCliSessionDefaults,
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
@@ -26,6 +27,8 @@ import {
   STRUCTURED_ERROR_SCHEMA_VERSION,
 } from '../utils/structured-error.ts';
 import { toCliJsonlEvent } from './jsonl-event.ts';
+import { resolveSimulatorNameToId } from '../utils/simulator-resolver.ts';
+import { getDefaultCommandExecutor } from '../utils/execution/index.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -96,7 +99,7 @@ function createBufferedHandlerContext(
 function writeJsonOutput(
   handlerContext: ToolHandlerContext,
   session: ReturnType<typeof createRenderSession>,
-  outputStyle: OutputStyle,
+  options: { outputStyle: OutputStyle; verbose?: boolean },
 ): boolean {
   const { structuredOutput } = handlerContext;
   const envelope = structuredOutput
@@ -106,7 +109,9 @@ function writeJsonOutput(
         structuredOutput.schemaVersion,
         {
           nextSteps: session.getNextSteps?.(),
-          outputStyle,
+          nextStepRuntime: session.getNextStepsRuntime?.(),
+          outputStyle: options.outputStyle,
+          runtimeSnapshot: options.verbose ? 'full' : 'compact',
         },
       )
     : toStructuredEnvelope(
@@ -117,7 +122,7 @@ function writeJsonOutput(
         }).result,
         STRUCTURED_ERROR_SCHEMA,
         STRUCTURED_ERROR_SCHEMA_VERSION,
-        { outputStyle },
+        { outputStyle: options.outputStyle },
       );
 
   process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
@@ -251,12 +256,18 @@ function registerToolSubcommand(
         describe: 'Output format',
       });
 
+      subYargs.option('verbose', {
+        type: 'boolean',
+        default: false,
+        describe: 'Render verbose output data when supported',
+      });
+
       // Group options for cleaner help display
       if (toolArgNames.length > 0) {
         subYargs.group(toolArgNames, 'Tool Arguments:');
       }
       subYargs.group(['profile'], 'Session Defaults:');
-      subYargs.group(['json', 'output'], 'Output Options:');
+      subYargs.group(['json', 'output', 'verbose'], 'Output Options:');
 
       // Add note about unsupported keys if any
       if (unsupportedKeys.length > 0) {
@@ -287,7 +298,9 @@ function registerToolSubcommand(
       const outputStyle: OutputStyle = argv.style === 'minimal' ? 'minimal' : 'normal';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
+      const style = argv.style as string | undefined;
       const filePathRenderStyle = argv.filePathRenderStyle as FilePathRenderStyle | undefined;
+      const verboseOutput = argv.verbose === true;
 
       if (
         profileOverride &&
@@ -322,6 +335,7 @@ function registerToolSubcommand(
         'logLevel',
         'file-path-render-style',
         'filePathRenderStyle',
+        'verbose',
         '_',
         '$0',
       ]);
@@ -335,6 +349,10 @@ function registerToolSubcommand(
 
       // Merge: flag args first, then JSON overrides
       const explicitArgs = { ...toolParams, ...jsonArgs };
+      const rawDefaults = resolveCliSessionDefaults({
+        runtimeConfig: opts.runtimeConfig,
+        profileOverride,
+      });
       const args = mergeCliSessionDefaults({
         defaults: getCliSessionDefaultsForTool({
           tool,
@@ -343,6 +361,24 @@ function registerToolSubcommand(
         }),
         explicitArgs,
       });
+
+      if (
+        args.simulatorId === undefined &&
+        tool.cliSchema.simulatorId !== undefined &&
+        tool.cliSchema.simulatorName === undefined &&
+        typeof rawDefaults.simulatorName === 'string'
+      ) {
+        const resolvedSimulator = await resolveSimulatorNameToId(
+          getDefaultCommandExecutor(),
+          rawDefaults.simulatorName,
+        );
+        if (!resolvedSimulator.success) {
+          console.error(`Error: ${resolvedSimulator.error}`);
+          process.exitCode = 1;
+          return;
+        }
+        args.simulatorId = resolvedSimulator.simulatorId;
+      }
 
       const missingRequiredFlags = requiredFlagNames.filter((flagName) => {
         const camelKey = convertArgvToToolParams({ [flagName]: true });
@@ -373,6 +409,7 @@ function registerToolSubcommand(
           runtime: 'cli',
           outputStyle,
           filePathRenderStyle,
+          includeNextSteps: style !== 'minimal',
         });
         const writeJsonlFragment =
           outputFormat === 'jsonl'
@@ -406,7 +443,7 @@ function registerToolSubcommand(
         }
 
         if (outputFormat === 'json') {
-          if (writeJsonOutput(handlerContext, session, outputStyle)) {
+          if (writeJsonOutput(handlerContext, session, { outputStyle, verbose: verboseOutput })) {
             process.exitCode = 1;
           }
           return;

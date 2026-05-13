@@ -1,8 +1,7 @@
 /**
  * UI Testing Plugin: Long Press
  *
- * Long press at specific coordinates for given duration (ms).
- * Use snapshot_ui for precise coordinates (don't guess from screenshots).
+ * Long presses a semantic UI element from the runtime snapshot store.
  */
 
 import * as z from 'zod';
@@ -18,7 +17,8 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
+import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -26,17 +26,19 @@ import type { UiActionResultDomainResult } from '../../../types/domain-results.t
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
+  createUiAutomationRecoverableError,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const longPressSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
-  x: z.number().int({ message: 'X coordinate for the long press' }),
-  y: z.number().int({ message: 'Y coordinate for the long press' }),
+  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
   duration: z
     .number()
-    .positive({ message: 'Duration of the long press in milliseconds' })
+    .positive({ message: 'Duration must be greater than 0 milliseconds' })
+    .max(10_000, { message: 'Duration must be at most 10000 milliseconds' })
     .describe('milliseconds'),
 });
 
@@ -56,8 +58,15 @@ export function createLongPressExecutor(
 ): NonStreamingExecutor<LongPressParams, LongPressResult> {
   return async (params) => {
     const toolName = 'long_press';
-    const { simulatorId, x, y, duration } = params;
-    const action = { type: 'long-press' as const, x, y, durationMs: duration };
+    const { simulatorId, elementRef, duration } = params;
+    const action = { type: 'long-press' as const, elementRef, durationMs: duration };
+
+    const resolution = resolveElementRef(simulatorId, elementRef, 'longPress');
+    if (!resolution.ok) {
+      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+        uiError: resolution.error,
+      });
+    }
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,
@@ -68,13 +77,14 @@ export function createLongPressExecutor(
       return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const delayInSeconds = Number(duration) / 1000;
+    const center = getRuntimeElementActivationPoint(resolution.element);
+    const delayInSeconds = duration / 1000;
     const commandArgs = [
       'touch',
       '-x',
-      String(x),
+      String(center.x),
       '-y',
-      String(y),
+      String(center.y),
       '--down',
       '--up',
       '--delay',
@@ -83,23 +93,29 @@ export function createLongPressExecutor(
 
     log(
       'info',
-      `${LOG_PREFIX}/${toolName}: Starting for (${x}, ${y}), ${duration}ms on ${simulatorId}`,
+      `${LOG_PREFIX}/${toolName}: Starting for elementRef ${elementRef}, ${duration}ms on ${simulatorId}`,
     );
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'touch', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [
-        guard.warningText,
-        getSnapshotUiWarning(simulatorId),
-      ]);
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to simulate long press at (${x}, ${y}).`,
+        axeFailureMessage: () => `Failed to simulate long press on elementRef ${elementRef}.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
         details: failure.diagnostics?.errors.map((entry) => entry.message),
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+          elementRef,
+        }),
       });
     }
   };

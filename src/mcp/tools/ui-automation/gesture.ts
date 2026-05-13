@@ -19,6 +19,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -27,6 +28,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const gestureSchema = z.object({
@@ -49,6 +51,7 @@ const gestureSchema = z.object({
     .number()
     .int()
     .min(1)
+    .max(2000)
     .optional()
     .describe(
       'Screen width in pixels. Used for gesture calculations. Auto-detected if not provided.',
@@ -57,28 +60,33 @@ const gestureSchema = z.object({
     .number()
     .int()
     .min(1)
+    .max(3000)
     .optional()
     .describe(
       'Screen height in pixels. Used for gesture calculations. Auto-detected if not provided.',
     ),
   duration: z
     .number()
-    .min(0, { message: 'Duration must be non-negative' })
+    .positive({ message: 'Duration must be greater than 0 seconds' })
+    .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('Duration of the gesture in seconds.'),
   delta: z
     .number()
-    .min(0, { message: 'Delta must be non-negative' })
+    .positive({ message: 'Delta must be greater than 0' })
+    .max(200, { message: 'Delta must be at most 200' })
     .optional()
     .describe('Distance to move in pixels.'),
   preDelay: z
     .number()
     .min(0, { message: 'Pre-delay must be non-negative' })
+    .max(10, { message: 'Pre-delay must be at most 10 seconds' })
     .optional()
     .describe('Delay before starting the gesture in seconds.'),
   postDelay: z
     .number()
     .min(0, { message: 'Post-delay must be non-negative' })
+    .max(10, { message: 'Post-delay must be at most 10 seconds' })
     .optional()
     .describe('Delay after completing the gesture in seconds.'),
 });
@@ -132,9 +140,13 @@ export function createGestureExecutor(
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'gesture', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
         axeFailureMessage: () => `Failed to execute gesture '${preset}'.`,
       });

@@ -3,8 +3,8 @@
 
    Simulator: <UUID>
 
-Errors (1):
+Recovery
+  Code: SNAPSHOT_MISSING
+  Hint: Run snapshot_ui for this simulator, then retry with an elementRef from that snapshot.
 
-  ✗ CLIError(errorDescription: "Simulator with UDID <UUID> not found in set.")
-
-❌ Failed to execute touch event.
+❌ No runtime UI snapshot is available for this simulator.

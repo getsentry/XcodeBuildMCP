@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as z from 'zod';
 import {
   createMockExecutor,
   createNoopExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
-import { schema, handler, buttonLogic } from '../button.ts';
+import { schema, handler, buttonLogic, createButtonExecutor } from '../button.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
@@ -23,6 +23,8 @@ describe('Button Plugin', () => {
       expect(schemaObj.safeParse({ buttonType: 'home', duration: 2.5 }).success).toBe(true);
       expect(schemaObj.safeParse({ buttonType: 'invalid-button' }).success).toBe(false);
       expect(schemaObj.safeParse({ buttonType: 'home', duration: -1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 0 }).success).toBe(false);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10.1 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',
@@ -60,6 +62,8 @@ describe('Button Plugin', () => {
           },
           trackingExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -97,6 +101,8 @@ describe('Button Plugin', () => {
           },
           trackingExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -135,6 +141,8 @@ describe('Button Plugin', () => {
           },
           trackingExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -171,6 +179,8 @@ describe('Button Plugin', () => {
           },
           trackingExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -181,6 +191,46 @@ describe('Button Plugin', () => {
         '--udid',
         '12345678-1234-4234-8234-123456789012',
       ]);
+    });
+  });
+
+  describe('Executor Behavior', () => {
+    it('waits briefly after successful button presses so system UI transitions can settle', async () => {
+      vi.useFakeTimers();
+      try {
+        const mockExecutor = createMockExecutor({
+          success: true,
+          output: 'button press completed',
+          error: undefined,
+          process: { pid: 12345 },
+        });
+
+        const mockAxeHelpers = {
+          getAxePath: () => '/usr/local/bin/axe',
+          getBundledAxeEnvironment: () => ({}),
+        };
+
+        const executeButton = createButtonExecutor(mockExecutor, mockAxeHelpers, undefined, 500);
+        let settled = false;
+        const resultPromise = executeButton({
+          simulatorId: '12345678-1234-4234-8234-123456789012',
+          buttonType: 'home',
+        }).then((result) => {
+          settled = true;
+          return result;
+        });
+
+        await vi.advanceTimersByTimeAsync(499);
+        expect(settled).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        const result = await resultPromise;
+
+        expect(settled).toBe(true);
+        expect(result.didError).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -235,7 +285,7 @@ describe('Button Plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('Parameter validation failed');
-      expect(allText(result)).toContain('Duration must be non-negative');
+      expect(allText(result)).toContain('Duration must be greater than 0 seconds');
     });
 
     it('should return success for valid button press', async () => {
@@ -259,6 +309,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -288,6 +340,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -309,6 +363,8 @@ describe('Button Plugin', () => {
           },
           createNoopExecutor(),
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -337,6 +393,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -364,6 +422,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -391,6 +451,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 
@@ -418,6 +480,8 @@ describe('Button Plugin', () => {
           },
           mockExecutor,
           mockAxeHelpers,
+          undefined,
+          0,
         ),
       );
 

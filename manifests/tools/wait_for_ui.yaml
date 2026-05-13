@@ -1,0 +1,28 @@
+id: wait_for_ui
+module: mcp/tools/ui-automation/wait_for_ui
+names:
+  mcp: wait_for_ui
+  cli: wait-for-ui
+description: Poll rs/1 runtime UI snapshots until a selector-based UI predicate, selector-free textContains predicate, or selector-free settled predicate is satisfied. Select with elementRef, identifier, label, role, or value when a selector is needed.
+outputSchema:
+  schema: xcodebuildmcp.output.capture-result
+  version: "2"
+routing:
+  stateful: true
+nextSteps:
+  - label: Refresh runtime snapshot
+    toolId: snapshot_ui
+    params:
+      simulatorId: SIMULATOR_UUID
+    when: success
+  - label: Wait again
+    toolId: wait_for_ui
+    params:
+      simulatorId: SIMULATOR_UUID
+      predicate: settled
+    when: success
+annotations:
+  title: Wait for UI
+  readOnlyHint: true
+  destructiveHint: false
+  openWorldHint: false

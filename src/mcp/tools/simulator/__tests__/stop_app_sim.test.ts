@@ -22,6 +22,12 @@ import * as path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { setRuntimeInstanceForTests } from '../../../../utils/runtime-instance.ts';
 
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
+
 function createTrackedChild(options?: {
   pid?: number;
   killImplementation?: (signal?: NodeJS.Signals | number) => boolean;
@@ -189,6 +195,33 @@ describe('stop_app_sim tool', () => {
       expect(child.kill).toHaveBeenCalledWith('SIGTERM');
       expect(text).toContain('stopped successfully');
       expect(text).not.toContain('Tracked OSLog sessions cleaned up');
+    });
+
+    it('should resolve simulatorName before stopping', async () => {
+      const calls: string[][] = [];
+      const mockExecutor: CommandExecutor = async (command) => {
+        calls.push(command);
+        if (command.includes('list')) {
+          return createMockCommandResponse({ success: true, output: availableSimulatorsJson });
+        }
+        return createMockCommandResponse({ success: true, output: '' });
+      };
+
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorName: 'iPhone 17',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(calls).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'terminate', 'resolved-uuid', 'io.sentry.App'],
+      ]);
     });
 
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {

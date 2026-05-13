@@ -13,6 +13,15 @@ import { schema, handler, screenshotLogic } from '../../ui-automation/screenshot
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('screenshot plugin', () => {
+  const bootedDeviceListJson = JSON.stringify({
+    devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-17-2': [
+        { udid: 'test-uuid', name: 'iPhone 15 Pro', state: 'Booted' },
+        { udid: 'another-uuid', name: 'iPhone 15', state: 'Booted' },
+      ],
+    },
+  });
+
   beforeEach(() => {
     sessionStore.clear();
   });
@@ -89,7 +98,11 @@ describe('screenshot plugin', () => {
 
       expect(capturedCommands).toHaveLength(5);
 
-      expect(capturedCommands[0]).toEqual([
+      expect(capturedCommands[0][0]).toBe('xcrun');
+      expect(capturedCommands[0][1]).toBe('simctl');
+      expect(capturedCommands[0][2]).toBe('list');
+
+      expect(capturedCommands[1]).toEqual([
         'xcrun',
         'simctl',
         'io',
@@ -97,10 +110,6 @@ describe('screenshot plugin', () => {
         'screenshot',
         '/tmp/screenshot_mock-uuid-123.png',
       ]);
-
-      expect(capturedCommands[1][0]).toBe('xcrun');
-      expect(capturedCommands[1][1]).toBe('simctl');
-      expect(capturedCommands[1][2]).toBe('list');
 
       expect(capturedCommands[2][0]).toBe('swift');
       expect(capturedCommands[2][1]).toBe('-e');
@@ -168,7 +177,11 @@ describe('screenshot plugin', () => {
 
       expect(capturedCommands).toHaveLength(5);
 
-      expect(capturedCommands[0]).toEqual([
+      expect(capturedCommands[0][0]).toBe('xcrun');
+      expect(capturedCommands[0][1]).toBe('simctl');
+      expect(capturedCommands[0][2]).toBe('list');
+
+      expect(capturedCommands[1]).toEqual([
         'xcrun',
         'simctl',
         'io',
@@ -176,10 +189,6 @@ describe('screenshot plugin', () => {
         'screenshot',
         '/tmp/screenshot_different-uuid-456.png',
       ]);
-
-      expect(capturedCommands[1][0]).toBe('xcrun');
-      expect(capturedCommands[1][1]).toBe('simctl');
-      expect(capturedCommands[1][2]).toBe('list');
 
       expect(capturedCommands[2][0]).toBe('swift');
       expect(capturedCommands[2][1]).toBe('-e');
@@ -234,21 +243,21 @@ describe('screenshot plugin', () => {
         ),
       );
 
-      // Should execute all commands in sequence: screenshot, list devices, orientation detection, optimization, dimensions
+      // Should execute all commands in sequence: list devices, screenshot, orientation detection, optimization, dimensions
       expect(capturedCommands).toHaveLength(5);
 
-      const firstCommand = capturedCommands[0];
-      expect(firstCommand).toHaveLength(6);
-      expect(firstCommand[0]).toBe('xcrun');
-      expect(firstCommand[1]).toBe('simctl');
-      expect(firstCommand[2]).toBe('io');
-      expect(firstCommand[3]).toBe('test-uuid');
-      expect(firstCommand[4]).toBe('screenshot');
-      expect(firstCommand[5]).toMatch(/\/.*\/screenshot_.*\.png/);
+      expect(capturedCommands[0][0]).toBe('xcrun');
+      expect(capturedCommands[0][1]).toBe('simctl');
+      expect(capturedCommands[0][2]).toBe('list');
 
-      expect(capturedCommands[1][0]).toBe('xcrun');
-      expect(capturedCommands[1][1]).toBe('simctl');
-      expect(capturedCommands[1][2]).toBe('list');
+      const screenshotCommand = capturedCommands[1];
+      expect(screenshotCommand).toHaveLength(6);
+      expect(screenshotCommand[0]).toBe('xcrun');
+      expect(screenshotCommand[1]).toBe('simctl');
+      expect(screenshotCommand[2]).toBe('io');
+      expect(screenshotCommand[3]).toBe('test-uuid');
+      expect(screenshotCommand[4]).toBe('screenshot');
+      expect(screenshotCommand[5]).toMatch(/\/.*\/screenshot_.*\.png/);
 
       expect(capturedCommands[2][0]).toBe('swift');
       expect(capturedCommands[2][1]).toBe('-e');
@@ -267,7 +276,9 @@ describe('screenshot plugin', () => {
       const mockImageBuffer = Buffer.from('fake-image-data');
 
       const mockExecutor = createCommandMatchingMockExecutor({
-        'xcrun simctl': { success: true, output: 'Screenshot saved' },
+        'xcrun simctl list devices': { success: true, output: bootedDeviceListJson },
+        'xcrun simctl io': { success: true, output: 'Screenshot saved' },
+        'swift -e': { success: true, output: '' },
         sips: { success: true, output: 'Image optimized' },
       });
 
@@ -320,11 +331,21 @@ describe('screenshot plugin', () => {
     });
 
     it('should handle command failure', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'Command failed',
-      });
+      const mockExecutor: CommandExecutor = async (command) => {
+        const cmdStr = command.join(' ');
+        if (cmdStr.includes('simctl list devices')) {
+          return {
+            success: true,
+            output: bootedDeviceListJson,
+            error: undefined,
+            process: mockProcess,
+          };
+        }
+        if (cmdStr.includes('simctl io')) {
+          return { success: false, output: '', error: 'Command failed', process: mockProcess };
+        }
+        return { success: true, output: '', error: undefined, process: mockProcess };
+      };
 
       const mockPathDeps = {
         tmpdir: () => '/tmp',
@@ -354,10 +375,11 @@ describe('screenshot plugin', () => {
     });
 
     it('should handle file read failure', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: '',
-        error: undefined,
+      const mockExecutor = createCommandMatchingMockExecutor({
+        'xcrun simctl list devices': { success: true, output: bootedDeviceListJson },
+        'xcrun simctl io': { success: true, output: 'Screenshot saved' },
+        'swift -e': { success: true, output: '' },
+        sips: { success: true, output: 'Image optimized' },
       });
 
       const mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -446,17 +468,17 @@ describe('screenshot plugin', () => {
 
       expect(capturedArgs).toHaveLength(5);
 
-      expect(capturedArgs[0]).toEqual([
+      expect(capturedArgs[0][0][0]).toBe('xcrun');
+      expect(capturedArgs[0][0][1]).toBe('simctl');
+      expect(capturedArgs[0][0][2]).toBe('list');
+      expect(capturedArgs[0][1]).toBe('[Screenshot]: list devices');
+      expect(capturedArgs[0][2]).toBe(false);
+
+      expect(capturedArgs[1]).toEqual([
         ['xcrun', 'simctl', 'io', 'test-uuid', 'screenshot', '/tmp/screenshot_mock-uuid-123.png'],
         '[Screenshot]: screenshot',
         false,
       ]);
-
-      expect(capturedArgs[1][0][0]).toBe('xcrun');
-      expect(capturedArgs[1][0][1]).toBe('simctl');
-      expect(capturedArgs[1][0][2]).toBe('list');
-      expect(capturedArgs[1][1]).toBe('[Screenshot]: list devices');
-      expect(capturedArgs[1][2]).toBe(false);
 
       expect(capturedArgs[2][0][0]).toBe('swift');
       expect(capturedArgs[2][0][1]).toBe('-e');
@@ -578,10 +600,11 @@ describe('screenshot plugin', () => {
     });
 
     it('should handle file read error with fileSystemExecutor', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: '',
-        error: undefined,
+      const mockExecutor = createCommandMatchingMockExecutor({
+        'xcrun simctl list devices': { success: true, output: bootedDeviceListJson },
+        'xcrun simctl io': { success: true, output: 'Screenshot saved' },
+        'swift -e': { success: true, output: '' },
+        sips: { success: true, output: 'Image optimized' },
       });
 
       const mockFileSystemExecutor = createMockFileSystemExecutor({

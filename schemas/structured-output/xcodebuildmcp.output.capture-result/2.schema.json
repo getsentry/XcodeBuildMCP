@@ -13,132 +13,206 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "x": {
-          "type": "number"
-        },
-        "y": {
-          "type": "number"
-        },
-        "width": {
-          "type": "number"
-        },
-        "height": {
-          "type": "number"
-        }
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
       },
-      "required": [
-        "x",
-        "y",
-        "width",
-        "height"
+      "required": ["x", "y", "width", "height"]
+    },
+    "runtimeActionName": {
+      "enum": ["tap", "typeText", "longPress", "touch", "swipeWithin"]
+    },
+    "runtimeElementRole": {
+      "enum": [
+        "application",
+        "button",
+        "cell",
+        "image",
+        "keyboard-key",
+        "list",
+        "menu",
+        "other",
+        "scroll-view",
+        "slider",
+        "switch",
+        "tab",
+        "text",
+        "text-field",
+        "window"
       ]
     },
-    "accessibilityNode": {
+    "runtimeElementState": {
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": false,
       "properties": {
-        "frame": {
-          "$ref": "#/$defs/frame"
-        },
-        "type": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "children": {
+        "enabled": { "type": "boolean" },
+        "focused": { "type": "boolean" },
+        "selected": { "type": "boolean" },
+        "visible": { "type": "boolean" }
+      }
+    },
+    "runtimeElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "pattern": "^e[1-9][0-9]*$" },
+        "role": { "$ref": "#/$defs/runtimeElementRole" },
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "identifier": { "type": "string" },
+        "frame": { "$ref": "#/$defs/frame" },
+        "state": { "$ref": "#/$defs/runtimeElementState" },
+        "actions": {
           "type": "array",
-          "items": {
-            "$ref": "#/$defs/accessibilityNode"
-          }
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "custom_actions": {
+          "items": { "$ref": "#/$defs/runtimeActionName" }
+        }
+      },
+      "required": ["ref", "frame", "actions"]
+    },
+    "runtimeActionHint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": { "$ref": "#/$defs/runtimeActionName" },
+        "elementRef": { "type": "string", "pattern": "^e[1-9][0-9]*$" },
+        "label": { "type": "string" }
+      },
+      "required": ["action", "elementRef"]
+    },
+    "runtimeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "runtime-snapshot" },
+        "protocol": { "const": "rs/1" },
+        "simulatorId": { "type": "string" },
+        "screenHash": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0 },
+        "capturedAtMs": { "type": "integer", "minimum": 0 },
+        "expiresAtMs": { "type": "integer", "minimum": 0 },
+        "elements": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": { "$ref": "#/$defs/runtimeElement" }
         },
-        "AXFrame": {
-          "type": "string"
-        },
-        "AXUniqueId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "role_description": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "AXLabel": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "content_required": {
-          "type": "boolean"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "help": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "AXValue": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "subrole": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "pid": {
-          "type": "number"
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/runtimeActionHint" }
         }
       },
       "required": [
-        "frame",
         "type",
-        "role",
-        "children",
-        "enabled",
-        "custom_actions"
+        "protocol",
+        "simulatorId",
+        "screenHash",
+        "seq",
+        "capturedAtMs",
+        "expiresAtMs",
+        "elements",
+        "actions"
       ]
+    },
+    "compactRuntimeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "runtime-snapshot" },
+        "rs": { "const": "1" },
+        "screenHash": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0 },
+        "count": { "type": "integer", "minimum": 0 },
+        "targets": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scroll": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "udid": { "type": "string" }
+      },
+      "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
+    },
+    "runtimeSnapshotUnchanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "runtime-snapshot-unchanged" },
+        "protocol": { "const": "rs/1" },
+        "simulatorId": { "type": "string" },
+        "screenHash": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["type", "protocol", "simulatorId", "screenHash", "seq"]
+    },
+    "compactRuntimeSnapshotUnchanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "runtime-snapshot-unchanged" },
+        "rs": { "const": "1" },
+        "screenHash": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0 },
+        "unchanged": { "const": true },
+        "udid": { "type": "string" }
+      },
+      "required": ["type", "rs", "screenHash", "seq", "unchanged", "udid"]
+    },
+    "waitPredicate": {
+      "enum": ["exists", "gone", "enabled", "focused", "textContains", "settled"]
+    },
+    "waitMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "predicate": { "$ref": "#/$defs/waitPredicate" },
+        "matches": {
+          "type": "array",
+          "items": {
+            "oneOf": [{ "$ref": "#/$defs/runtimeElement" }, { "type": "string" }]
+          }
+        }
+      },
+      "required": ["predicate", "matches"]
+    },
+    "recoverableUiError": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "SNAPSHOT_MISSING",
+            "SNAPSHOT_EXPIRED",
+            "SNAPSHOT_PARSE_FAILED",
+            "ELEMENT_REF_NOT_FOUND",
+            "TARGET_NOT_FOUND",
+            "TARGET_AMBIGUOUS",
+            "TARGET_NOT_ACTIONABLE",
+            "WAIT_TIMEOUT",
+            "UI_STATE_CHANGED",
+            "ACTION_FAILED"
+          ]
+        },
+        "message": { "type": "string" },
+        "recoveryHint": { "type": "string" },
+        "elementRef": { "type": "string" },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "oneOf": [{ "$ref": "#/$defs/runtimeElement" }, { "type": "string" }]
+          }
+        },
+        "snapshotAgeMs": { "type": "integer", "minimum": 0 },
+        "timeoutMs": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["code", "message", "recoveryHint"]
     }
   },
   "properties": {
-    "schema": {
-      "const": "xcodebuildmcp.output.capture-result"
-    },
-    "schemaVersion": {
-      "const": "2"
-    },
-    "didError": {
-      "type": "boolean"
-    },
-    "error": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
+    "schema": { "const": "xcodebuildmcp.output.capture-result" },
+    "schemaVersion": { "const": "2" },
+    "didError": { "type": "boolean" },
+    "error": { "type": ["string", "null"] },
     "data": {
       "type": "object",
       "additionalProperties": false,
@@ -150,16 +224,10 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "simulatorId": {
-              "type": "string"
-            },
-            "screenshotPath": {
-              "type": "string"
-            }
+            "simulatorId": { "type": "string" },
+            "screenshotPath": { "type": "string" }
           },
-          "required": [
-            "simulatorId"
-          ]
+          "required": ["simulatorId"]
         },
         "capture": {
           "oneOf": [
@@ -167,92 +235,29 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "format": {
-                  "type": "string"
-                },
-                "width": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "height": {
-                  "type": "integer",
-                  "minimum": 0
-                }
+                "format": { "type": "string" },
+                "width": { "type": "integer", "minimum": 0 },
+                "height": { "type": "integer", "minimum": 0 }
               },
-              "required": [
-                "format",
-                "width",
-                "height"
-              ]
+              "required": ["format", "width", "height"]
             },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "const": "ui-hierarchy"
-                },
-                "uiHierarchy": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/accessibilityNode"
-                  }
-                }
-              },
-              "required": [
-                "type",
-                "uiHierarchy"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "const": "video-recording"
-                },
-                "state": {
-                  "enum": [
-                    "started",
-                    "stopped"
-                  ]
-                },
-                "fps": {
-                  "type": "integer",
-                  "minimum": 1
-                },
-                "outputFile": {
-                  "type": "string"
-                },
-                "sessionId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "state"
-              ]
-            }
+            { "$ref": "#/$defs/runtimeSnapshot" },
+            { "$ref": "#/$defs/compactRuntimeSnapshot" },
+            { "$ref": "#/$defs/runtimeSnapshotUnchanged" },
+            { "$ref": "#/$defs/compactRuntimeSnapshotUnchanged" }
           ]
         },
         "diagnostics": {
           "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/basicDiagnostics"
-        }
+        },
+        "uiError": { "$ref": "#/$defs/recoverableUiError" },
+        "waitMatch": { "$ref": "#/$defs/waitMatch" }
       },
-      "required": [
-        "summary",
-        "artifacts"
-      ]
+      "required": ["summary", "artifacts"]
     },
     "nextSteps": {
       "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/nextSteps"
     }
   },
-  "required": [
-    "schema",
-    "schemaVersion",
-    "didError",
-    "error",
-    "data"
-  ]
+  "required": ["schema", "schemaVersion", "didError", "error", "data"]
 }

@@ -10,6 +10,7 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
+import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { stopSimulatorLaunchOsLogSessionsForApp } from '../../../utils/log-capture/index.ts';
 import {
@@ -35,17 +36,18 @@ const baseSchemaObject = z.object({
 });
 
 const internalSchemaObject = z.object({
-  simulatorId: z.string(),
+  simulatorId: z.string().optional(),
   simulatorName: z.string().optional(),
   bundleId: z.string(),
 });
 
 export type StopAppSimParams = z.infer<typeof internalSchemaObject>;
+type ResolvedStopAppSimParams = StopAppSimParams & { simulatorId: string };
 type StopAppSimResult = StopResultDomainResult;
 
 export function createStopAppSimExecutor(
   executor: CommandExecutor,
-): NonStreamingExecutor<StopAppSimParams, StopAppSimResult> {
+): NonStreamingExecutor<ResolvedStopAppSimParams, StopAppSimResult> {
   return async (params) => {
     const simulatorId = params.simulatorId;
     const artifacts = { simulatorId, bundleId: params.bundleId };
@@ -92,13 +94,32 @@ export async function stop_app_simLogic(
   params: StopAppSimParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  const simulatorId = params.simulatorId;
+  const ctx = getHandlerContext();
+  const simulatorResult = await determineSimulatorUuid(params, executor);
+  if (simulatorResult.error || !simulatorResult.uuid) {
+    const result = buildStopFailure(
+      { bundleId: params.bundleId },
+      `Failed to resolve simulator: ${simulatorResult.error ?? 'No simulator UUID returned'}`,
+    );
+    setStopResultStructuredOutput(ctx, result);
+    log('error', `Error stopping app in simulator: ${result.error}`);
+    return;
+  }
+
+  if (simulatorResult.warning) {
+    log('warn', simulatorResult.warning);
+  }
+
+  const resolvedParams: ResolvedStopAppSimParams = {
+    ...params,
+    simulatorId: simulatorResult.uuid,
+  };
+  const simulatorId = resolvedParams.simulatorId;
 
   log('info', `Stopping app ${params.bundleId} in simulator ${simulatorId}`);
 
-  const ctx = getHandlerContext();
   const executeStopAppSim = createStopAppSimExecutor(executor);
-  const result = await executeStopAppSim(params);
+  const result = await executeStopAppSim(resolvedParams);
   setStopResultStructuredOutput(ctx, result);
 
   if (result.didError) {

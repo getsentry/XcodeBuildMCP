@@ -1,8 +1,4 @@
 
 👆 Tap
 
-Warnings (1):
-
-  ⚠ snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots.
-
-✅ Tap at (100, 400) simulated successfully.
+✅ Tap on elementRef e3 simulated successfully.

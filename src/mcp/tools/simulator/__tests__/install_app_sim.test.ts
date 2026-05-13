@@ -11,6 +11,12 @@ import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { schema, handler, install_app_simLogic } from '../install_app_sim.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
+
 describe('install_app_sim tool', () => {
   beforeEach(() => {
     sessionStore.clear();
@@ -97,6 +103,53 @@ describe('install_app_sim tool', () => {
           'Extract Bundle ID',
           false,
         ],
+      ]);
+    });
+
+    it('should resolve simulatorName before installing', async () => {
+      const executorCalls: Array<Parameters<CommandExecutor>> = [];
+      const mockExecutor: CommandExecutor = (...args) => {
+        executorCalls.push(args);
+        const command = args[0];
+        if (command.includes('list')) {
+          return Promise.resolve(
+            createMockCommandResponse({ success: true, output: availableSimulatorsJson }),
+          );
+        }
+        if (command[0] === 'defaults') {
+          return Promise.resolve(
+            createMockCommandResponse({ success: true, output: 'io.sentry.myapp' }),
+          );
+        }
+        return Promise.resolve(
+          createMockCommandResponse({ success: true, output: 'App installed' }),
+        );
+      };
+
+      const mockFileSystem = createMockFileSystemExecutor({
+        existsSync: () => true,
+      });
+
+      const result = await runLogic(() =>
+        install_app_simLogic(
+          {
+            simulatorName: 'iPhone 17',
+            appPath: '/path/to/app.app',
+          },
+          mockExecutor,
+          mockFileSystem,
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        launch_app_sim: { simulatorId: 'resolved-uuid', bundleId: 'io.sentry.myapp' },
+      });
+      expect(executorCalls.map((call) => call[0])).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'install', 'resolved-uuid', '/path/to/app.app'],
+        ['defaults', 'read', '/path/to/app.app/Info', 'CFBundleIdentifier'],
       ]);
     });
 

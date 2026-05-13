@@ -95,6 +95,7 @@ function createRenderHooks(
     outputStyle?: OutputStyle;
     filePathRenderStyle?: FilePathRenderStyle;
     includeHeaderDetails?: boolean;
+    includeNextSteps?: boolean;
   },
 ): RenderSessionHooks {
   const suppressWarnings = sessionStore.get('suppressWarnings');
@@ -118,6 +119,7 @@ function createRenderHooks(
             showTestTiming,
             filePathRenderStyle,
             includeHeaderDetails,
+            includeNextSteps: options.includeNextSteps ?? true,
           }),
       };
     case 'raw':
@@ -144,6 +146,7 @@ function createRenderHooks(
             showTestTiming,
             filePathRenderStyle,
             includeHeaderDetails,
+            includeNextSteps: options.includeNextSteps ?? true,
           });
           if (text) {
             process.stdout.write(text);
@@ -158,6 +161,7 @@ function createRenderHooks(
         showTestTiming,
         filePathRenderStyle,
         includeHeaderDetails,
+        includeNextSteps: options.includeNextSteps ?? true,
       });
 
       return {
@@ -179,6 +183,7 @@ export interface RenderSessionOptions {
   outputStyle?: OutputStyle;
   filePathRenderStyle?: FilePathRenderStyle;
   includeHeaderDetails?: boolean;
+  includeNextSteps?: boolean;
 }
 
 export function createRenderSession(
@@ -195,7 +200,7 @@ export function renderTranscript(
   strategy: RenderStrategy,
   options?: Pick<
     RenderSessionOptions,
-    'runtime' | 'outputStyle' | 'filePathRenderStyle' | 'includeHeaderDetails'
+    'runtime' | 'outputStyle' | 'filePathRenderStyle' | 'includeHeaderDetails' | 'includeNextSteps'
   >,
 ): string {
   return createRenderHooks(strategy, { ...options, interactive: false }).finalize(input);

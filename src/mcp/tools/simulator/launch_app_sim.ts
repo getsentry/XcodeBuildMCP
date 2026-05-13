@@ -14,6 +14,7 @@ import {
   launchSimulatorAppWithLogging,
   type LaunchWithLoggingResult,
 } from '../../../utils/simulator-steps.ts';
+import { determineSimulatorUuid } from '../../../utils/simulator-utils.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import {
   buildLaunchFailure,
@@ -49,7 +50,7 @@ const baseSchemaObject = z.object({
 });
 
 const internalSchemaObject = z.object({
-  simulatorId: z.string(),
+  simulatorId: z.string().optional(),
   simulatorName: z.string().optional(),
   bundleId: z.string(),
   launchArgs: z.array(z.string()).optional(),
@@ -57,6 +58,7 @@ const internalSchemaObject = z.object({
 });
 
 export type LaunchAppSimParams = z.infer<typeof internalSchemaObject>;
+type ResolvedLaunchAppSimParams = LaunchAppSimParams & { simulatorId: string };
 type LaunchAppSimResult = LaunchResultDomainResult;
 
 export type SimulatorLauncher = typeof launchSimulatorAppWithLogging;
@@ -67,8 +69,27 @@ export async function launch_app_simLogic(
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
 ): Promise<void> {
   const ctx = getHandlerContext();
+  const simulatorResult = await determineSimulatorUuid(params, executor);
+  if (simulatorResult.error || !simulatorResult.uuid) {
+    const result = buildLaunchFailure(
+      { bundleId: params.bundleId },
+      `Failed to resolve simulator: ${simulatorResult.error ?? 'No simulator UUID returned'}`,
+    );
+    setLaunchResultStructuredOutput(ctx, result);
+    log('error', `Error during launch app in simulator operation: ${result.error}`);
+    return;
+  }
+
+  if (simulatorResult.warning) {
+    log('warn', simulatorResult.warning);
+  }
+
+  const resolvedParams: ResolvedLaunchAppSimParams = {
+    ...params,
+    simulatorId: simulatorResult.uuid,
+  };
   const executeLaunchAppSim = createLaunchAppSimExecutor(executor, launcher);
-  const result = await executeLaunchAppSim(params);
+  const result = await executeLaunchAppSim(resolvedParams);
 
   setLaunchResultStructuredOutput(ctx, result);
 
@@ -82,12 +103,12 @@ export async function launch_app_simLogic(
 
   ctx.nextStepParams = {
     open_sim: {},
-    stop_app_sim: { simulatorId: params.simulatorId, bundleId: params.bundleId },
+    stop_app_sim: { simulatorId: resolvedParams.simulatorId, bundleId: params.bundleId },
   };
 }
 
 function buildSuccessArtifacts(
-  params: LaunchAppSimParams,
+  params: ResolvedLaunchAppSimParams,
   launchResult: LaunchWithLoggingResult,
 ): LaunchResultArtifacts {
   return {
@@ -102,7 +123,7 @@ function buildSuccessArtifacts(
 export function createLaunchAppSimExecutor(
   executor: CommandExecutor,
   launcher: SimulatorLauncher = launchSimulatorAppWithLogging,
-): NonStreamingExecutor<LaunchAppSimParams, LaunchAppSimResult> {
+): NonStreamingExecutor<ResolvedLaunchAppSimParams, LaunchAppSimResult> {
   return async (params) => {
     log('info', `Starting xcrun simctl launch request for simulator ${params.simulatorId}`);
 

@@ -3,28 +3,12 @@ module: mcp/tools/ui-automation/snapshot_ui
 names:
   mcp: snapshot_ui
   cli: snapshot-ui
-description: Print view hierarchy with precise view coordinates (x, y, width, height) for visible elements.
+description: Capture a semantic rs/1 runtime UI snapshot with stable elementRef targets for UI automation.
 outputSchema:
   schema: xcodebuildmcp.output.capture-result
   version: "2"
-nextSteps:
-  - label: Refresh after layout changes
-    toolId: snapshot_ui
-    params:
-      simulatorId: SIMULATOR_UUID
-    when: success
-  - label: Tap on element
-    toolId: tap
-    params:
-      simulatorId: SIMULATOR_UUID
-      x: 0
-      y: 0
-    when: success
-  - label: Take screenshot for verification
-    toolId: screenshot
-    params:
-      simulatorId: SIMULATOR_UUID
-    when: success
+routing:
+  stateful: true
 annotations:
   title: Snapshot UI
   readOnlyHint: true

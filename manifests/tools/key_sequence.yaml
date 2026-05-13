@@ -3,7 +3,7 @@ module: mcp/tools/ui-automation/key_sequence
 names:
   mcp: key_sequence
   cli: key-sequence
-description: Press a sequence of keys by their keycodes.
+description: Press hardware keys using AXe HID key codes. Prefer type_text for text entry. Common values include 40 Return/Enter, 42 Backspace, 43 Tab, and 44 Space.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"

@@ -25,4 +25,18 @@ describe('schemaToYargsOptions', () => {
 
     expect(options.get('workspace-path')?.demandOption).toBe(false);
   });
+
+  it('coerces comma-separated numeric array flags', () => {
+    const options = schemaToYargsOptions({
+      keyCodes: z.array(z.number()),
+    });
+
+    const coerce = options.get('key-codes')?.coerce;
+
+    expect(typeof coerce).toBe('function');
+    expect(coerce?.('23,18,14')).toEqual([23, 18, 14]);
+    expect(coerce?.('23, 18, 14')).toEqual([23, 18, 14]);
+    expect(coerce?.(['23', '18,14'])).toEqual([23, 18, 14]);
+    expect(coerce?.('23,')).toEqual([23, Number.NaN]);
+  });
 });

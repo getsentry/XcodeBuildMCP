@@ -50,6 +50,12 @@ export type AtLeastOne<T extends object> = {
   [K in keyof T]-?: Required<Pick<T, K>> & Partial<Omit<T, K>>;
 }[keyof T];
 import type { BuildInvocationRequest } from './domain-fragments.ts';
+import type {
+  RuntimeSnapshotUnchangedV1,
+  RuntimeSnapshotV1,
+  UiAutomationRecoverableError,
+  UiWaitMatch,
+} from './ui-snapshot.ts';
 
 export type ExecutionStatus = 'SUCCEEDED' | 'FAILED';
 export type BuildTarget = 'simulator' | 'device' | 'macos' | 'swift-package';
@@ -242,7 +248,9 @@ export interface CaptureVideoRecordingPayload {
 export type CapturePayload =
   | CaptureImagePayload
   | CaptureUiHierarchyPayload
-  | CaptureVideoRecordingPayload;
+  | CaptureVideoRecordingPayload
+  | RuntimeSnapshotV1
+  | RuntimeSnapshotUnchangedV1;
 export interface DebugFileLineBreakpoint {
   kind: 'file-line';
   file: string;
@@ -349,27 +357,22 @@ export interface TestSelectionInfo {
 }
 export interface UiActionTap {
   type: 'tap';
-  x?: number;
-  y?: number;
-  id?: string;
-  label?: string;
+  elementRef: string;
 }
 export interface UiActionSwipe {
   type: 'swipe';
-  from?: Point;
-  to?: Point;
+  withinElementRef: string;
+  direction: 'up' | 'down' | 'left' | 'right';
   durationSeconds?: number;
 }
 export interface UiActionTouch {
   type: 'touch';
+  elementRef: string;
   event?: string;
-  x?: number;
-  y?: number;
 }
 export interface UiActionLongPress {
   type: 'long-press';
-  x: number;
-  y: number;
+  elementRef: string;
   durationMs: number;
 }
 export interface UiActionButton {
@@ -382,6 +385,8 @@ export interface UiActionGesture {
 }
 export interface UiActionTypeText {
   type: 'type-text';
+  elementRef: string;
+  textLength?: number;
 }
 export interface UiActionKeyPress {
   type: 'key-press';
@@ -390,6 +395,10 @@ export interface UiActionKeyPress {
 export interface UiActionKeySequence {
   type: 'key-sequence';
   keyCodes: number[];
+}
+export interface UiActionBatch {
+  type: 'batch';
+  stepCount: number;
 }
 export type UiAction =
   | UiActionTap
@@ -400,7 +409,8 @@ export type UiAction =
   | UiActionGesture
   | UiActionTypeText
   | UiActionKeyPress
-  | UiActionKeySequence;
+  | UiActionKeySequence
+  | UiActionBatch;
 export interface SimulatorActionBoot {
   type: 'boot';
 }
@@ -491,6 +501,8 @@ export type CaptureResultDomainResult = ToolDomainResultBase & {
   artifacts: { simulatorId: string; screenshotPath?: string };
   capture?: CapturePayload;
   diagnostics?: BasicDiagnostics;
+  uiError?: UiAutomationRecoverableError;
+  waitMatch?: UiWaitMatch;
 };
 export type CoverageResultDomainResult = ToolDomainResultBase & {
   kind: 'coverage-result';
@@ -630,6 +642,7 @@ export type UiActionResultDomainResult = ToolDomainResultBase & {
   action: UiAction;
   artifacts: { simulatorId: string };
   diagnostics?: BasicDiagnostics;
+  uiError?: UiAutomationRecoverableError;
 };
 export type XcodeBridgeCallResultDomainResult = ToolDomainResultBase & {
   kind: 'xcode-bridge-call-result';

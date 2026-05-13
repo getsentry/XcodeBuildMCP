@@ -132,6 +132,7 @@ private struct SegmentRow<Option: Identifiable & Hashable>: View {
                     Button(optionLabel(option)) {
                         selection = option
                     }
+                    .accessibilityValue(selection == option ? "selected" : "not selected")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(selection == option ? .black : .white)
                     .padding(.horizontal, 14)

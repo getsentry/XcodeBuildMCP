@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -20,6 +21,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const buttonSchema = z.object({
@@ -29,7 +31,8 @@ const buttonSchema = z.object({
     .describe('apple-pay|home|lock|side-button|siri'),
   duration: z
     .number()
-    .min(0, { message: 'Duration must be non-negative' })
+    .positive({ message: 'Duration must be greater than 0 seconds' })
+    .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });
@@ -38,11 +41,19 @@ type ButtonParams = z.infer<typeof buttonSchema>;
 type ButtonResult = UiActionResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
+const DEFAULT_BUTTON_SETTLE_DELAY_MS = 750;
+
+function delayMs(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
+}
 
 export function createButtonExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
 ): NonStreamingExecutor<ButtonParams, ButtonResult> {
   return async (params) => {
     const toolName = 'button';
@@ -67,9 +78,16 @@ export function createButtonExecutor(
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'button', executor, axeHelpers);
+      if (settleDelayMs > 0) {
+        await delayMs(settleDelayMs);
+      }
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
         axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
       });
@@ -86,9 +104,10 @@ export async function buttonLogic(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executeButton = createButtonExecutor(executor, axeHelpers, debuggerManager);
+  const executeButton = createButtonExecutor(executor, axeHelpers, debuggerManager, settleDelayMs);
   const result = await executeButton(params);
 
   setUiActionStructuredOutput(ctx, result);

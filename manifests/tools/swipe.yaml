@@ -3,10 +3,12 @@ module: mcp/tools/ui-automation/swipe
 names:
   mcp: swipe
   cli: swipe
-description: Swipe between points.
+description: Swipe within a UI element by withinElementRef and direction from a current rs/1 runtime snapshot.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"
+routing:
+  stateful: true
 annotations:
   title: Swipe
   readOnlyHint: true

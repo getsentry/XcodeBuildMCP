@@ -96,6 +96,7 @@ struct SearchLocationRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
+            .accessibilityValue(saved || added ? "saved" : "not saved")
 
             VStack(alignment: .trailing, spacing: 3) {
                 Text(WeatherUnitFormatter.temperatureString(location.temperatureC, units: units))

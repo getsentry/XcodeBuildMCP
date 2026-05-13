@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
 import {
-  createMockExecutor,
   createMockFileSystemExecutor,
   mockProcess,
 } from '../../../../test-utils/mock-executors.ts';
@@ -15,6 +14,43 @@ import {
   rotateImage,
 } from '../screenshot.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+
+function isDeviceListCommand(command: string[]): boolean {
+  return command.join(' ') === 'xcrun simctl list devices -j';
+}
+
+function bootedDeviceListJson(simulatorId: string): string {
+  return JSON.stringify({
+    devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-17-2': [
+        {
+          udid: simulatorId,
+          name: 'iPhone 15 Pro',
+          state: 'Booted',
+        },
+      ],
+    },
+  });
+}
+
+function createBootedScreenshotMockExecutor(simulatorId: string) {
+  return async (command: string[]) => {
+    if (isDeviceListCommand(command)) {
+      return {
+        success: true,
+        output: bootedDeviceListJson(simulatorId),
+        error: undefined,
+        process: mockProcess,
+      };
+    }
+    return {
+      success: true,
+      output: 'Screenshot saved',
+      error: undefined,
+      process: mockProcess,
+    };
+  };
+}
 
 describe('Screenshot Plugin', () => {
   beforeEach(() => {
@@ -68,6 +104,14 @@ describe('Screenshot Plugin', () => {
       const capturedCommands: string[][] = [];
       const trackingExecutor = async (command: string[]) => {
         capturedCommands.push(command);
+        if (isDeviceListCommand(command)) {
+          return {
+            success: true,
+            output: bootedDeviceListJson('12345678-1234-4234-8234-123456789012'),
+            error: undefined,
+            process: mockProcess,
+          };
+        }
         return {
           success: true,
           output: 'Screenshot saved',
@@ -93,8 +137,7 @@ describe('Screenshot Plugin', () => {
         ),
       );
 
-      // Should capture the screenshot command first
-      expect(capturedCommands[0]).toEqual([
+      expect(capturedCommands[1]).toEqual([
         'xcrun',
         'simctl',
         'io',
@@ -108,6 +151,14 @@ describe('Screenshot Plugin', () => {
       const capturedCommands: string[][] = [];
       const trackingExecutor = async (command: string[]) => {
         capturedCommands.push(command);
+        if (isDeviceListCommand(command)) {
+          return {
+            success: true,
+            output: bootedDeviceListJson('ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF'),
+            error: undefined,
+            process: mockProcess,
+          };
+        }
         return {
           success: true,
           output: 'Screenshot saved',
@@ -133,7 +184,7 @@ describe('Screenshot Plugin', () => {
         ),
       );
 
-      expect(capturedCommands[0]).toEqual([
+      expect(capturedCommands[1]).toEqual([
         'xcrun',
         'simctl',
         'io',
@@ -147,6 +198,14 @@ describe('Screenshot Plugin', () => {
       const capturedCommands: string[][] = [];
       const trackingExecutor = async (command: string[]) => {
         capturedCommands.push(command);
+        if (isDeviceListCommand(command)) {
+          return {
+            success: true,
+            output: bootedDeviceListJson('98765432-1098-7654-3210-987654321098'),
+            error: undefined,
+            process: mockProcess,
+          };
+        }
         return {
           success: true,
           output: 'Screenshot saved',
@@ -175,7 +234,7 @@ describe('Screenshot Plugin', () => {
         ),
       );
 
-      expect(capturedCommands[0]).toEqual([
+      expect(capturedCommands[1]).toEqual([
         'xcrun',
         'simctl',
         'io',
@@ -189,6 +248,14 @@ describe('Screenshot Plugin', () => {
       const capturedCommands: string[][] = [];
       const trackingExecutor = async (command: string[]) => {
         capturedCommands.push(command);
+        if (isDeviceListCommand(command)) {
+          return {
+            success: true,
+            output: bootedDeviceListJson('12345678-1234-4234-8234-123456789012'),
+            error: undefined,
+            process: mockProcess,
+          };
+        }
         return {
           success: true,
           output: 'Screenshot saved',
@@ -215,24 +282,22 @@ describe('Screenshot Plugin', () => {
       );
 
       // Verify the command structure but not the exact UUID since it's generated
-      expect(capturedCommands[0].slice(0, 5)).toEqual([
+      expect(capturedCommands[1].slice(0, 5)).toEqual([
         'xcrun',
         'simctl',
         'io',
         '12345678-1234-4234-8234-123456789012',
         'screenshot',
       ]);
-      expect(capturedCommands[0][5]).toMatch(/^\/tmp\/screenshot_[a-f0-9-]+\.png$/);
+      expect(capturedCommands[1][5]).toMatch(/^\/tmp\/screenshot_[a-f0-9-]+\.png$/);
     });
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should handle file reading errors', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Screenshot saved',
-        error: undefined,
-      });
+      const mockExecutor = createBootedScreenshotMockExecutor(
+        '12345678-1234-4234-8234-123456789012',
+      );
 
       const mockFileSystemExecutor = createMockFileSystemExecutor({
         readFile: async () => {
@@ -260,11 +325,9 @@ describe('Screenshot Plugin', () => {
     it('should handle file cleanup errors gracefully', async () => {
       const mockImageBuffer = Buffer.from('fake-image-data', 'utf8');
 
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Screenshot saved',
-        error: undefined,
-      });
+      const mockExecutor = createBootedScreenshotMockExecutor(
+        '12345678-1234-4234-8234-123456789012',
+      );
 
       const mockFileSystemExecutor = createMockFileSystemExecutor({
         readFile: async () => mockImageBuffer.toString('utf8'),
@@ -364,6 +427,45 @@ describe('Screenshot Plugin', () => {
       expect(
         result.content.some((item) => item.type === 'image' && item.mimeType === 'image/png'),
       ).toBe(true);
+    });
+
+    it('fails before screenshot capture when the simulator is shutdown', async () => {
+      const capturedCommands: string[][] = [];
+      const mockExecutor = async (command: string[]) => {
+        capturedCommands.push(command);
+        return {
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'com.apple.CoreSimulator.SimRuntime.iOS-17-2': [
+                {
+                  udid: '12345678-1234-4234-8234-123456789012',
+                  name: 'iPhone 15 Pro',
+                  state: 'Shutdown',
+                },
+              ],
+            },
+          }),
+          error: undefined,
+          process: mockProcess,
+        };
+      };
+
+      const result = await runLogic(() =>
+        screenshotLogic(
+          {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+          },
+          mockExecutor,
+          createMockFileSystemExecutor(),
+        ),
+      );
+
+      expect(result.isError).toBe(true);
+      const text = allText(result);
+      expect(text).toContain('Failed to capture screenshot.');
+      expect(text).toContain('is Shutdown');
+      expect(capturedCommands).toEqual([['xcrun', 'simctl', 'list', 'devices', '-j']]);
     });
 
     it('should handle SystemError from command execution', async () => {
@@ -614,20 +716,20 @@ describe('Screenshot Plugin', () => {
         capturedCommands.push(command);
         const idx = commandIndex++;
 
-        // First call: screenshot command
+        // First call: simulator boot preflight
         if (idx === 0) {
           return {
             success: true,
-            output: 'Screenshot saved',
+            output: mockDeviceListJson,
             error: undefined,
             process: mockProcess,
           };
         }
-        // Second call: list devices to get device name
+        // Second call: screenshot command
         if (idx === 1) {
           return {
             success: true,
-            output: mockDeviceListJson,
+            output: 'Screenshot saved',
             error: undefined,
             process: mockProcess,
           };
@@ -689,20 +791,20 @@ describe('Screenshot Plugin', () => {
         capturedCommands.push(command);
         const idx = commandIndex++;
 
-        // First call: screenshot command
+        // First call: simulator boot preflight
         if (idx === 0) {
           return {
             success: true,
-            output: 'Screenshot saved',
+            output: mockDeviceListJson,
             error: undefined,
             process: mockProcess,
           };
         }
-        // Second call: list devices to get device name
+        // Second call: screenshot command
         if (idx === 1) {
           return {
             success: true,
-            output: mockDeviceListJson,
+            output: 'Screenshot saved',
             error: undefined,
             process: mockProcess,
           };
@@ -756,20 +858,20 @@ describe('Screenshot Plugin', () => {
         capturedCommands.push(command);
         const idx = commandIndex++;
 
-        // First call: screenshot command
+        // First call: simulator boot preflight
         if (idx === 0) {
           return {
             success: true,
-            output: 'Screenshot saved',
+            output: mockDeviceListJson,
             error: undefined,
             process: mockProcess,
           };
         }
-        // Second call: list devices to get device name
+        // Second call: screenshot command
         if (idx === 1) {
           return {
             success: true,
-            output: mockDeviceListJson,
+            output: 'Screenshot saved',
             error: undefined,
             process: mockProcess,
           };
@@ -819,20 +921,20 @@ describe('Screenshot Plugin', () => {
         capturedCommands.push(command);
         const idx = commandIndex++;
 
-        // First call: screenshot command
+        // First call: simulator boot preflight
         if (idx === 0) {
           return {
             success: true,
-            output: 'Screenshot saved',
+            output: mockDeviceListJson,
             error: undefined,
             process: mockProcess,
           };
         }
-        // Second call: list devices to get device name
+        // Second call: screenshot command
         if (idx === 1) {
           return {
             success: true,
-            output: mockDeviceListJson,
+            output: 'Screenshot saved',
             error: undefined,
             process: mockProcess,
           };

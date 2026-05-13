@@ -1,657 +1,238 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-executors.ts';
+import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
 import { schema, handler, touchLogic } from '../touch.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+import {
+  createFailingExecutor,
+  createMockAxeHelpers,
+  createNode,
+  createTrackingExecutor,
+  recordSnapshot,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
+
+async function runTouch(
+  params: Parameters<typeof touchLogic>[0],
+  executor = createTrackingExecutor().executor,
+): Promise<UiActionResultDomainResult> {
+  const { ctx, run } = createMockToolHandlerContext();
+  await run(() => touchLogic(params, executor, createMockAxeHelpers()));
+  expect(ctx.structuredOutput?.schemaVersion).toBe('2');
+  return ctx.structuredOutput?.result as UiActionResultDomainResult;
+}
 
 describe('Touch Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Schema Validation', () => {
-    it('should have handler function', () => {
+    it('exposes elementRef and touch flags without coordinate fields', () => {
       expect(typeof handler).toBe('function');
-    });
+      expect(schema).toHaveProperty('elementRef');
+      expect(schema).toHaveProperty('down');
+      expect(schema).toHaveProperty('up');
+      expect(schema).not.toHaveProperty('x');
+      expect(schema).not.toHaveProperty('y');
 
-    it('should validate schema fields with safeParse', () => {
-      const schemaObj = z.object(schema);
-
-      expect(
-        schemaObj.safeParse({
-          x: 100,
-          y: 200,
-          down: true,
-        }).success,
-      ).toBe(true);
-
-      expect(
-        schemaObj.safeParse({
-          x: 100,
-          y: 200,
-          up: true,
-        }).success,
-      ).toBe(true);
-
-      expect(
-        schemaObj.safeParse({
-          x: 100.5,
-          y: 200,
-          down: true,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObj.safeParse({
-          x: 100,
-          y: 200.5,
-          down: true,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObj.safeParse({
-          x: 100,
-          y: 200,
-          down: true,
-          delay: -1,
-        }).success,
-      ).toBe(false);
-
-      const withSimId = schemaObj.safeParse({
-        simulatorId: '12345678-1234-4234-8234-123456789012',
-        x: 100,
-        y: 200,
-        down: true,
-      });
-      expect(withSimId.success).toBe(true);
-      expect('simulatorId' in (withSimId.data as Record<string, unknown>)).toBe(false);
-    });
-  });
-
-  describe('Handler Requirements', () => {
-    it('should require simulatorId session default', async () => {
-      const result = await callHandler(handler, {
-        x: 100,
-        y: 200,
-        down: true,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Missing required session defaults');
-      expect(message).toContain('simulatorId is required');
-      expect(message).toContain('session-set-defaults');
-    });
-
-    it('should surface parameter validation errors when defaults exist', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await callHandler(handler, {
-        y: 200,
-        down: true,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('x: Invalid input: expected number, received undefined');
+      const schemaObject = z.object(schema);
+      expect(schemaObject.safeParse({ elementRef: 'e1', down: true }).success).toBe(true);
+      expect(schemaObject.safeParse({ elementRef: 'e1', up: true }).success).toBe(true);
+      expect(schemaObject.safeParse({ elementRef: 'e1', down: true, delay: -1 }).success).toBe(
+        false,
+      );
+      expect(schemaObject.safeParse({ elementRef: 'e1', down: true, delay: 10.1 }).success).toBe(
+        false,
+      );
+      expect(schemaObject.safeParse({ down: true }).success).toBe(false);
     });
   });
 
   describe('Command Generation', () => {
-    it('should generate correct axe command for touch down', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'touch completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('touches down at the referenced element center', async () => {
+      recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
+      const result = await runTouch({ simulatorId, elementRef: 'e1', down: true }, executor);
 
-      await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'touch', elementRef: 'e1', event: 'touch down' },
+      });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '100',
+        '60',
         '-y',
-        '200',
+        '40',
         '--down',
         '--udid',
-        '12345678-1234-4234-8234-123456789012',
+        simulatorId,
       ]);
     });
 
-    it('should generate correct axe command for touch up', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'touch completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('touches up at the referenced element center', async () => {
+      recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
+      await runTouch({ simulatorId, elementRef: 'e1', up: true }, executor);
 
-      await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 150,
-            y: 250,
-            up: true,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '150',
+        '60',
         '-y',
-        '250',
+        '40',
         '--up',
         '--udid',
-        '12345678-1234-4234-8234-123456789012',
+        simulatorId,
       ]);
     });
 
-    it('should generate correct axe command for touch down+up', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'touch completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('touches down and up with delay at the referenced element center', async () => {
+      recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
+      await runTouch({ simulatorId, elementRef: 'e1', down: true, up: true, delay: 1.5 }, executor);
 
-      await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 300,
-            y: 400,
-            down: true,
-            up: true,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '300',
+        '60',
         '-y',
-        '400',
-        '--down',
-        '--up',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
-      ]);
-    });
-
-    it('should generate correct axe command for touch with delay', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'touch completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 50,
-            y: 75,
-            down: true,
-            up: true,
-            delay: 1.5,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'touch',
-        '-x',
-        '50',
-        '-y',
-        '75',
+        '40',
         '--down',
         '--up',
         '--delay',
         '1.5',
         '--udid',
-        '12345678-1234-4234-8234-123456789012',
+        simulatorId,
       ]);
     });
 
-    it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'touch completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('uses the switch activation point for wide switch rows', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Switch',
+          role: 'AXSwitch',
+          frame: { x: 42.57, y: 889.68, width: 316.87, height: 26.89 },
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/path/to/bundled/axe',
-        getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
-      };
+      await runTouch({ simulatorId, elementRef: 'e1', down: true, up: true }, executor);
 
-      await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: 'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
-            x: 0,
-            y: 0,
-            up: true,
-            delay: 0.5,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/path/to/bundled/axe',
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '0',
+        '307',
         '-y',
-        '0',
+        '903',
+        '--down',
         '--up',
-        '--delay',
-        '0.5',
         '--udid',
-        'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
+        simulatorId,
       ]);
     });
   });
 
-  describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should handle axe dependency error', async () => {
-      const mockExecutor = createMockExecutor({ success: true });
-      const mockAxeHelpers = {
-        getAxePath: () => null,
-        getBundledAxeEnvironment: () => ({}),
-      };
+  describe('Resolution failures', () => {
+    it('keeps down/up validation before snapshot resolution', async () => {
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
+      const result = await runTouch({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.error).toBe('At least one of "down" or "up" must be true');
+      expect(result.action).toEqual({ type: 'touch', elementRef: 'e1' });
+      expect(result.uiError).toBeUndefined();
+      expect(calls).toEqual([]);
+    });
+
+    it('returns SNAPSHOT_MISSING without calling AXe', async () => {
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTouch({ simulatorId, elementRef: 'e1', down: true }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_MISSING');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns SNAPSHOT_EXPIRED without calling AXe', async () => {
+      recordSnapshot([createNode()], Date.now() - 61_000);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTouch({ simulatorId, elementRef: 'e1', down: true }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_EXPIRED');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns ELEMENT_REF_NOT_FOUND without calling AXe', async () => {
+      recordSnapshot([createNode()]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTouch({ simulatorId, elementRef: 'e404', down: true }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'ELEMENT_REF_NOT_FOUND', elementRef: 'e404' });
+      expect(calls).toEqual([]);
+    });
+
+    it('returns TARGET_NOT_ACTIONABLE without calling AXe', async () => {
+      recordSnapshot([createNode({ role: 'AXApplication', type: 'Application' })]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTouch({ simulatorId, elementRef: 'e1', down: true }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'TARGET_NOT_ACTIONABLE', elementRef: 'e1' });
+      expect(calls).toEqual([]);
+    });
+  });
+
+  describe('Handler Behavior', () => {
+    it('rejects delay unless both down and up are true before AXe runs', async () => {
+      const result = await callHandler(handler, { simulatorId, elementRef: 'e1', down: true, delay: 1 });
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should successfully perform touch down', async () => {
-      const mockExecutor = createMockExecutor({ success: true, output: 'Touch down completed' });
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Touch event (touch down) at (100, 200) executed successfully.',
+      expect(result.content[0].text).toContain(
+        'Delay can only be used when both down and up are true',
       );
     });
 
-    it('should successfully perform touch up', async () => {
-      const mockExecutor = createMockExecutor({ success: true, output: 'Touch up completed' });
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            up: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Touch event (touch up) at (100, 200) executed successfully.',
-      );
-    });
-
-    it('should return error when neither down nor up is specified', async () => {
-      const mockExecutor = createMockExecutor({ success: true });
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-        ),
-      );
+    it('requires simulatorId session default', async () => {
+      const result = await callHandler(handler, { elementRef: 'e1', down: true });
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain('At least one of "down" or "up" must be true');
+      expect(result.content[0].text).toContain('Missing required session defaults');
+      expect(result.content[0].text).toContain('simulatorId is required');
     });
 
-    it('should return success for touch down event', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'touch completed',
-        error: undefined,
+    it('returns ACTION_FAILED when AXe fails after ref resolution', async () => {
+      recordSnapshot([createNode()]);
+
+      const result = await runTouch(
+        { simulatorId, elementRef: 'e1', down: true },
+        createFailingExecutor('touch failed'),
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Touch event (touch down) at (100, 200) executed successfully.',
-      );
-    });
-
-    it('should return success for touch up event', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'touch completed',
-        error: undefined,
-      });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            up: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Touch event (touch up) at (100, 200) executed successfully.',
-      );
-    });
-
-    it('should return success for touch down+up event', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'touch completed',
-        error: undefined,
-      });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-            up: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Touch event (touch down+up) at (100, 200) executed successfully.',
-      );
-    });
-
-    it('should handle DependencyError when axe is not available', async () => {
-      const mockExecutor = createMockExecutor({ success: true });
-
-      const mockAxeHelpers = {
-        getAxePath: () => null,
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle AxeError from failed command execution', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'axe command failed',
-      });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('Failed to execute touch event.');
-      expect(text).toContain('axe command failed');
-    });
-
-    it('should handle SystemError from command execution', async () => {
-      const mockExecutor = async () => {
-        throw new Error('System error occurred');
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected Error objects', async () => {
-      const mockExecutor = async () => {
-        throw new Error('Unexpected error');
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected string errors', async () => {
-      const mockExecutor = async () => {
-        throw 'String error';
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        touchLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            down: true,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('System error executing axe command.');
-      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

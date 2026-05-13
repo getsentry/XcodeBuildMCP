@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import {
+  createMockCommandResponse,
+  createMockExecutor,
+} from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, launch_app_simLogic, type SimulatorLauncher } from '../launch_app_sim.ts';
 import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.ts';
 import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
 
 function createMockLauncher(overrides?: Partial<LaunchWithLoggingResult>): SimulatorLauncher {
   return async (_uuid, _bundleId, _executor, _opts?) => ({
@@ -141,6 +150,44 @@ describe('launch_app_sim tool', () => {
 
       expect(capturedArgs).toEqual(['--debug', '--verbose']);
       expect(capturedEnv).toEqual({ STAGING_ENABLED: '1' });
+    });
+
+    it('should resolve simulatorName before checking install and launching', async () => {
+      const executorCalls: string[][] = [];
+      const installCheckExecutor = async (command: string[]) => {
+        executorCalls.push(command);
+        if (command.includes('list')) {
+          return createMockCommandResponse({ success: true, output: availableSimulatorsJson });
+        }
+        return createMockCommandResponse({ success: true, output: '/path/to/app/container' });
+      };
+      let launchedUuid: string | undefined;
+      const trackingLauncher: SimulatorLauncher = async (uuid, _bundleId, _executor, _opts?) => {
+        launchedUuid = uuid;
+        return { success: true, processId: 12345, logFilePath: '/tmp/test.log' };
+      };
+
+      const result = await runLogic(() =>
+        launch_app_simLogic(
+          {
+            simulatorName: 'iPhone 17',
+            bundleId: 'io.sentry.testapp',
+          },
+          installCheckExecutor,
+          trackingLauncher,
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(launchedUuid).toBe('resolved-uuid');
+      expect(executorCalls).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'get_app_container', 'resolved-uuid', 'io.sentry.testapp', 'app'],
+      ]);
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        stop_app_sim: { simulatorId: 'resolved-uuid', bundleId: 'io.sentry.testapp' },
+      });
     });
 
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {

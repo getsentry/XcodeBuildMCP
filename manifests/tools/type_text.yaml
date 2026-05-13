@@ -3,10 +3,12 @@ module: mcp/tools/ui-automation/type_text
 names:
   mcp: type_text
   cli: type-text
-description: Type text.
+description: Type text into a UI element by elementRef from a current rs/1 runtime snapshot, optionally replacing existing field contents.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"
+routing:
+  stateful: true
 annotations:
   title: Type Text
   readOnlyHint: true

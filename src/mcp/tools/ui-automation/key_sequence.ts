@@ -18,6 +18,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -26,6 +27,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const keySequenceSchema = z.object({
@@ -33,8 +35,13 @@ const keySequenceSchema = z.object({
   keyCodes: z
     .array(z.number().int().min(0).max(255))
     .min(1, { message: 'At least one key code required' })
-    .describe('HID keycodes'),
-  delay: z.number().min(0, { message: 'Delay must be non-negative' }).optional(),
+    .max(100, { message: 'At most 100 key codes are supported' })
+    .describe('HID keycodes. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.'),
+  delay: z
+    .number()
+    .min(0, { message: 'Delay must be non-negative' })
+    .max(5, { message: 'Delay must be at most 5 seconds' })
+    .optional(),
 });
 
 type KeySequenceParams = z.infer<typeof keySequenceSchema>;
@@ -73,9 +80,13 @@ export function createKeySequenceExecutor(
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'key-sequence', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
         axeFailureMessage: () => 'Failed to execute key sequence.',
       });

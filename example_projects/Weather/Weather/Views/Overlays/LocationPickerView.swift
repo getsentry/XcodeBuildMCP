@@ -103,7 +103,7 @@ struct LocationPickerView: View {
     }
 
     private var currentLocationButton: some View {
-        Button(action: {}) {
+        Button(action: selectCurrentLocation) {
             HStack(spacing: 12) {
                 Image(systemName: "location.fill")
                     .font(.system(size: 14))
@@ -145,6 +145,7 @@ struct LocationPickerView: View {
                             onSelect: { select(location) },
                             onRemove: { remove(location) }
                         )
+                        .id("saved-\(location.id)-\(isEditing)")
                     }
                 } else if isLoading {
                     ForEach(0..<3, id: \.self) { _ in SearchSkeletonRow() }
@@ -160,6 +161,7 @@ struct LocationPickerView: View {
                             onPreview: { preview(location) },
                             onAdd: { add(location) }
                         )
+                        .id("search-\(location.id)-\(isSaved(location))-\(justAddedID == location.id)")
                     }
                 }
             }
@@ -227,6 +229,11 @@ struct LocationPickerView: View {
         guard !isSaved(location) else { return }
         savedLocations.append(location)
         justAddedID = location.id
+    }
+
+    private func selectCurrentLocation() {
+        guard let currentLocation = savedLocations.first else { return }
+        select(currentLocation)
     }
 
     private func clearAddedIndicator() async {

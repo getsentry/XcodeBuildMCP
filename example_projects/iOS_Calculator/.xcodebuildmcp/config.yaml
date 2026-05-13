@@ -11,12 +11,11 @@ sessionDefaults:
   workspacePath: CalculatorApp.xcworkspace
   scheme: CalculatorApp
   configuration: Debug
-  simulatorId: A2C64636-37E9-4B68-B872-E7F0A82A5670
   simulatorPlatform: iOS Simulator
   useLatestOS: true
   arch: arm64
   suppressWarnings: false
-  derivedDataPath: ./iOS_Calculator/.derivedData
+  derivedDataPath: ./.build/DerivedData
   preferXcodebuild: true
   bundleId: io.sentry.calculatorapp
   simulatorName: iPhone 17 Pro

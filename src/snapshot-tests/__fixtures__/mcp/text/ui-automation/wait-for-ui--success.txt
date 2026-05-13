@@ -1,0 +1,34 @@
+
+⚙️ Wait for UI
+
+Targets (19) — ref|action|role|label|id
+  e3|tap|button|C|
+  e4|tap|button|±|
+  e5|tap|button|%|
+  e6|tap|button|÷|
+  e7|tap|button|7|
+  e8|tap|button|8|
+  e9|tap|button|9|
+  e10|tap|button|×|
+  e11|tap|button|4|
+  e12|tap|button|5|
+  e13|tap|button|6|
+  e14|tap|button|-|
+  e15|tap|button|1|
+  e16|tap|button|2|
+  e17|tap|button|3|
+  e18|tap|button|+|
+  e19|tap|button|0|
+  e20|tap|button|.|
+  e21|tap|button|=|
+
+Tips
+  - Use target refs with tap/type_text.
+  - Use scroll refs with swipe.
+  - Use wait_for_ui for text/assertions or changing UI.
+
+✅ Wait completed; runtime UI snapshot refreshed with 21 elements, 19 likely targets, and 0 scroll areas.
+
+Next steps:
+1. Refresh runtime snapshot: snapshot_ui({ simulatorId: "SIMULATOR_UUID" })
+2. Wait again: wait_for_ui({ simulatorId: "SIMULATOR_UUID", predicate: "settled" })

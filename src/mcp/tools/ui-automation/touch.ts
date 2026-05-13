@@ -1,8 +1,7 @@
 /**
  * UI Testing Plugin: Touch
  *
- * Perform touch down/up events at specific coordinates.
- * Use snapshot_ui for precise coordinates (don't guess from screenshots).
+ * Performs touch down/up events on a semantic UI element from the runtime snapshot store.
  */
 
 import * as z from 'zod';
@@ -18,7 +17,8 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { getSnapshotUiWarning } from './shared/snapshot-ui-state.ts';
+import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -26,27 +26,43 @@ import type { UiActionResultDomainResult } from '../../../types/domain-results.t
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
+  createUiAutomationRecoverableError,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
-const touchSchema = z.object({
+const touchSchemaObject = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
-  x: z.number().int({ message: 'X coordinate must be an integer' }),
-  y: z.number().int({ message: 'Y coordinate must be an integer' }),
+  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
   down: z.boolean().optional(),
   up: z.boolean().optional(),
   delay: z
     .number()
     .min(0, { message: 'Delay must be non-negative' })
+    .max(10, { message: 'Delay must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });
 
-type TouchParams = z.infer<typeof touchSchema>;
+function refineTouchDelay(value: z.infer<typeof touchSchemaObject>, ctx: z.RefinementCtx): void {
+  if (value.delay !== undefined && !(value.down === true && value.up === true)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['delay'],
+      message: 'Delay can only be used when both down and up are true',
+    });
+  }
+}
+
+const touchSchema = touchSchemaObject.superRefine(refineTouchDelay);
+
+type TouchParams = z.infer<typeof touchSchemaObject>;
 type TouchResult = UiActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(touchSchema.omit({ simulatorId: true } as const).shape);
+const publicSchemaObject = z.strictObject(
+  touchSchemaObject.omit({ simulatorId: true } as const).shape,
+);
 
 const LOG_PREFIX = '[AXe]';
 
@@ -57,17 +73,28 @@ export function createTouchExecutor(
 ): NonStreamingExecutor<TouchParams, TouchResult> {
   return async (params) => {
     const toolName = 'touch';
-    const { simulatorId, x, y, down, up, delay } = params;
-    const actionText = down && up ? 'touch down+up' : down ? 'touch down' : 'touch up';
-    const baseAction = { type: 'touch' as const };
-    const fullAction = { type: 'touch' as const, event: actionText, x, y };
+    const { simulatorId, elementRef, down, up, delay } = params;
+    const actionText =
+      down && up ? 'touch down+up' : down ? 'touch down' : up ? 'touch up' : undefined;
+    const action = {
+      type: 'touch' as const,
+      elementRef,
+      ...(actionText ? { event: actionText } : {}),
+    };
 
     if (!down && !up) {
       return createUiActionFailureResult(
-        baseAction,
+        action,
         simulatorId,
         'At least one of "down" or "up" must be true',
       );
+    }
+
+    const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
+    if (!resolution.ok) {
+      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+        uiError: resolution.error,
+      });
     }
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
@@ -76,10 +103,11 @@ export function createTouchExecutor(
       toolName,
     });
     if (guard.blockedMessage) {
-      return createUiActionFailureResult(baseAction, simulatorId, guard.blockedMessage);
+      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const commandArgs = ['touch', '-x', String(x), '-y', String(y)];
+    const center = getRuntimeElementActivationPoint(resolution.element);
+    const commandArgs = ['touch', '-x', String(center.x), '-y', String(center.y)];
     if (down) {
       commandArgs.push('--down');
     }
@@ -92,23 +120,29 @@ export function createTouchExecutor(
 
     log(
       'info',
-      `${LOG_PREFIX}/${toolName}: Starting ${actionText} at (${x}, ${y}) on ${simulatorId}`,
+      `${LOG_PREFIX}/${toolName}: Starting ${actionText ?? 'touch'} on elementRef ${elementRef} on ${simulatorId}`,
     );
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'touch', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(fullAction, simulatorId, [
-        guard.warningText,
-        getSnapshotUiWarning(simulatorId),
-      ]);
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
         axeFailureMessage: () => 'Failed to execute touch event.',
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(baseAction, simulatorId, failure.message, {
+      return createUiActionFailureResult(action, simulatorId, failure.message, {
         details: failure.diagnostics?.errors.map((entry) => entry.message),
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+          elementRef,
+        }),
       });
     }
   };
@@ -129,7 +163,7 @@ export async function touchLogic(
 
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,
-  legacy: touchSchema,
+  legacy: touchSchemaObject,
 });
 
 export const handler = createSessionAwareTool<TouchParams>({

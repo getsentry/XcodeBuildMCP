@@ -383,6 +383,125 @@ describe('structured output schema bundling', () => {
     ).toBe(true);
   });
 
+  it('accepts ui automation v2 runtime snapshots and semantic action errors', () => {
+    const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+    const captureValidate = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.capture-result', version: '2' }),
+    );
+    const actionValidate = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.ui-action-result', version: '2' }),
+    );
+
+    expect(
+      captureValidate({
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIM-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIM-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1_000,
+            expiresAtMs: 61_000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Continue',
+                frame: { x: 10, y: 20, width: 100, height: 40 },
+                state: { enabled: true, selected: true, visible: true },
+                actions: ['tap'],
+              },
+            ],
+            actions: [{ action: 'tap', elementRef: 'e1', label: 'Continue' }],
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      captureValidate({
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIM-1' },
+          capture: {
+            type: 'runtime-snapshot-unchanged',
+            protocol: 'rs/1',
+            simulatorId: 'SIM-1',
+            screenHash: 'screen-hash',
+            seq: 2,
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      captureValidate({
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIM-1' },
+          capture: {
+            type: 'runtime-snapshot-unchanged',
+            rs: '1',
+            screenHash: 'screen-hash',
+            seq: 2,
+            unchanged: true,
+            udid: 'SIM-1',
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      actionValidate({
+        schema: 'xcodebuildmcp.output.ui-action-result',
+        schemaVersion: '2',
+        didError: true,
+        error: 'Element ref was not found in the current snapshot.',
+        data: {
+          summary: { status: 'FAILED' },
+          action: { type: 'tap', elementRef: 'e404' },
+          artifacts: { simulatorId: 'SIM-1' },
+          uiError: {
+            code: 'ELEMENT_REF_NOT_FOUND',
+            message: 'Element ref was not found in the current snapshot.',
+            recoveryHint: 'Run snapshot_ui again and retry with a current elementRef.',
+            elementRef: 'e404',
+            snapshotAgeMs: 1_000,
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      actionValidate({
+        schema: 'xcodebuildmcp.output.ui-action-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          action: { type: 'batch', stepCount: 2 },
+          artifacts: { simulatorId: 'SIM-1' },
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('accepts xcode bridge call-result artifacts', () => {
     const schema = getMcpOutputSchema({
       schema: 'xcodebuildmcp.output.xcode-bridge-call-result',

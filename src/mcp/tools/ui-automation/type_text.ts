@@ -1,8 +1,7 @@
 /**
  * UI Testing Plugin: Type Text
  *
- * Types text into the iOS Simulator using keyboard input.
- * Supports standard US keyboard characters.
+ * Types text into a semantic UI element from the runtime snapshot store.
  */
 
 import * as z from 'zod';
@@ -18,22 +17,47 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
+import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import {
+  createSemanticTapCommand,
+  executeSemanticTapWithAmbiguityFallback,
+} from './shared/semantic-tap.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
+  createUiAutomationRecoverableError,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const LOG_PREFIX = '[AXe]';
+const AXE_UNSUPPORTED_TEXT_MESSAGE =
+  'Text contains characters unsupported by AXe typing. AXe type supports US keyboard characters only.';
+
+function containsUnsupportedAxeTypeText(text: string): boolean {
+  for (const character of text) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined || codePoint < 0x20 || codePoint > 0x7e) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 const typeTextSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
+  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
   text: z.string().min(1, { message: 'Text cannot be empty' }),
+  replaceExisting: z
+    .boolean()
+    .optional()
+    .describe('Select and replace existing field contents before typing'),
 });
 
 type TypeTextParams = z.infer<typeof typeTextSchema>;
@@ -50,8 +74,15 @@ export function createTypeTextExecutor(
 ): NonStreamingExecutor<TypeTextParams, TypeTextResult> {
   return async (params) => {
     const toolName = 'type_text';
-    const { simulatorId, text } = params;
-    const action = { type: 'type-text' as const };
+    const { simulatorId, elementRef, text, replaceExisting } = params;
+    const action = { type: 'type-text' as const, elementRef, textLength: text.length };
+
+    const resolution = resolveElementRef(simulatorId, elementRef, 'typeText');
+    if (!resolution.ok) {
+      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+        uiError: resolution.error,
+      });
+    }
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,
@@ -62,24 +93,82 @@ export function createTypeTextExecutor(
       return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const commandArgs = ['type', text];
+    if (containsUnsupportedAxeTypeText(text)) {
+      return createUiActionFailureResult(action, simulatorId, AXE_UNSUPPORTED_TEXT_MESSAGE, {
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: AXE_UNSUPPORTED_TEXT_MESSAGE,
+          recoveryHint: 'Use only US keyboard characters supported by AXe type.',
+          elementRef,
+        }),
+      });
+    }
+
+    const focusCommand = createSemanticTapCommand(
+      resolution.element,
+      elementRef,
+      [],
+      resolution.snapshot.elements,
+    );
+    const typeCommandArgs = ['type', text];
 
     log(
       'info',
-      `${LOG_PREFIX}/${toolName}: Starting type "${text.substring(0, 20)}..." on ${simulatorId}`,
+      `${LOG_PREFIX}/${toolName}: Starting type into elementRef ${elementRef}, length=${text.length} on ${simulatorId}`,
     );
 
     try {
-      await executeAxeCommand(commandArgs, simulatorId, 'type', executor, axeHelpers);
+      await executeSemanticTapWithAmbiguityFallback({
+        command: focusCommand,
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
+    } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
+      const failure = mapAxeCommandError(error, {
+        axeFailureMessage: () => `Failed to focus elementRef ${elementRef} before typing.`,
+      });
+      log('error', `${LOG_PREFIX}/${toolName}: Focus failed - ${failure.message}`);
+      return createUiActionFailureResult(action, simulatorId, failure.message, {
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+          elementRef,
+        }),
+      });
+    }
+
+    try {
+      if (replaceExisting === true) {
+        await executeAxeCommand(
+          ['key-combo', '--modifiers', '227', '--key', '4'],
+          simulatorId,
+          'key-combo',
+          executor,
+          axeHelpers,
+        );
+      }
+      await executeAxeCommand(typeCommandArgs, simulatorId, 'type', executor, axeHelpers);
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
       return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
+      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+        clearRuntimeSnapshot(simulatorId);
+      }
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => 'Failed to simulate text typing.',
+        axeFailureMessage: () => `Failed to type text into elementRef ${elementRef}.`,
       });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+      log('error', `${LOG_PREFIX}/${toolName}: Typing failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+          elementRef,
+        }),
       });
     }
   };

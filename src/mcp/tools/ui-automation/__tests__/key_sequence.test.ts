@@ -29,6 +29,10 @@ describe('Key Sequence Tool', () => {
       expect(schemaObj.safeParse({ keyCodes: [-1] }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCodes: [256] }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCodes: [40], delay: -0.1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ keyCodes: [40], delay: 5.1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ keyCodes: Array.from({ length: 101 }, () => 40) }).success).toBe(
+        false,
+      );
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',

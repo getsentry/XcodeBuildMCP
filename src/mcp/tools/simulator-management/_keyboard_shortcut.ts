@@ -123,7 +123,7 @@ export async function sendKeyboardShortcut(
   if (focusResult.output.trim() === 'NO_WINDOW') {
     return {
       success: false,
-      error: `No Simulator window found for "${device.name}". Is the simulator window visible?`,
+      error: `No visible Simulator window found for "${device.name}". Simulator.app may be running without a device window; open the simulator device window manually, then retry the keyboard shortcut.`,
     };
   }
 

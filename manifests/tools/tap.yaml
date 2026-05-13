@@ -3,10 +3,12 @@ module: mcp/tools/ui-automation/tap
 names:
   mcp: tap
   cli: tap
-description: Tap UI element by accessibility id/label (recommended) or coordinates as fallback.
+description: Tap a UI element by elementRef from a current rs/1 runtime snapshot.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"
+routing:
+  stateful: true
 annotations:
   title: Tap
   readOnlyHint: true
