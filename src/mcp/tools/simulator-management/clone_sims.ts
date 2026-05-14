@@ -30,15 +30,9 @@ const internalSchemaObject = z.object({
 type CloneSimsParams = z.infer<typeof internalSchemaObject>;
 type CloneSimsResult = SimulatorActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(
-  baseSchemaObject.omit({
-    sourceSimulatorId: true,
-    newName: true,
-  } as const).shape,
-);
-
 function createCloneSimsResult(params: {
   sourceSimulatorId: string;
+  clonedSimulatorId?: string;
   didError: boolean;
   error?: string;
   diagnosticMessage?: string;
@@ -58,7 +52,7 @@ function createCloneSimsResult(params: {
       ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
       : {}),
     artifacts: {
-      simulatorId: params.sourceSimulatorId,
+      simulatorId: params.clonedSimulatorId ?? params.sourceSimulatorId,
     },
   };
 }
@@ -93,8 +87,10 @@ export function createCloneSimsExecutor(
         });
       }
 
+      const clonedSimulatorId = result.output.trim();
       return createCloneSimsResult({
         sourceSimulatorId: params.sourceSimulatorId,
+        clonedSimulatorId,
         didError: false,
       });
     } catch (error) {
@@ -128,15 +124,18 @@ export async function clone_simsLogic(
     return;
   }
 
+  const newSimulatorId = result.artifacts?.simulatorId ?? params.sourceSimulatorId;
   ctx.nextStepParams = {
-    boot_sim: { simulatorId: params.sourceSimulatorId },
+    boot_sim: { simulatorId: newSimulatorId },
     open_sim: {},
+    install_app_sim: { simulatorId: newSimulatorId, appPath: 'PATH_TO_YOUR_APP' },
+    launch_app_sim: { simulatorId: newSimulatorId, bundleId: 'YOUR_APP_BUNDLE_ID' },
     list_sims: {},
   };
 }
 
 export const schema = getSessionAwareToolSchemaShape({
-  sessionAware: publicSchemaObject,
+  sessionAware: baseSchemaObject,
   legacy: baseSchemaObject,
 });
 

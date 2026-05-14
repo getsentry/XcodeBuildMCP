@@ -39,18 +39,11 @@ const internalSchemaObject = z.object({
 type CreateSimParams = z.infer<typeof internalSchemaObject>;
 type CreateSimResult = SimulatorActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(
-  baseSchemaObject.omit({
-    name: true,
-    deviceType: true,
-    runtime: true,
-  } as const).shape,
-);
-
 function createCreateSimResult(params: {
   name: string;
   deviceType: string;
   runtime: string;
+  simulatorId?: string;
   didError: boolean;
   error?: string;
   diagnosticMessage?: string;
@@ -71,6 +64,7 @@ function createCreateSimResult(params: {
     ...(params.diagnosticMessage
       ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
       : {}),
+    ...(params.simulatorId ? { artifacts: { simulatorId: params.simulatorId } } : {}),
   };
 }
 
@@ -105,10 +99,12 @@ export function createCreateSimExecutor(
         });
       }
 
+      const simulatorId = result.output.trim();
       return createCreateSimResult({
         name: params.name,
         deviceType: params.deviceType,
         runtime: params.runtime,
+        simulatorId,
         didError: false,
       });
     } catch (error) {
@@ -144,15 +140,16 @@ export async function create_simLogic(
     return;
   }
 
+  const newSimulatorId = result.artifacts?.simulatorId;
   ctx.nextStepParams = {
-    boot_sim: {},
+    boot_sim: newSimulatorId ? { simulatorId: newSimulatorId } : {},
     open_sim: {},
     list_sims: {},
   };
 }
 
 export const schema = getSessionAwareToolSchemaShape({
-  sessionAware: publicSchemaObject,
+  sessionAware: baseSchemaObject,
   legacy: baseSchemaObject,
 });
 

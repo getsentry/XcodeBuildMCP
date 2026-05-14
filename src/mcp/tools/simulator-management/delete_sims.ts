@@ -35,13 +35,6 @@ const internalSchemaObject = z.object({
 type DeleteSimsParams = z.infer<typeof internalSchemaObject>;
 type DeleteSimsResult = SimulatorActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(
-  baseSchemaObject.omit({
-    target: true,
-    shutdownFirst: true,
-  } as const).shape,
-);
-
 function createDeleteSimsResult(params: {
   target: string;
   didError: boolean;
@@ -80,7 +73,7 @@ export function createDeleteSimsExecutor(
     try {
       const target = params.target;
 
-      if (params.shutdownFirst && target !== 'all' && target !== 'unavailable') {
+      if (params.shutdownFirst && target !== 'unavailable') {
         try {
           await executor(
             ['xcrun', 'simctl', 'shutdown', target],
@@ -153,7 +146,7 @@ export async function delete_simsLogic(
 }
 
 export const schema = getSessionAwareToolSchemaShape({
-  sessionAware: publicSchemaObject,
+  sessionAware: baseSchemaObject,
   legacy: baseSchemaObject,
 });
 
