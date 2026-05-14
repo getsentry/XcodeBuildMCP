@@ -421,8 +421,25 @@ export interface SimulatorActionToggleSoftwareKeyboard {
 export interface SimulatorActionToggleConnectHardwareKeyboard {
   type: 'toggle-connect-hardware-keyboard';
 }
+export interface SimulatorActionClone {
+  type: 'clone';
+  sourceSimulatorId: string;
+}
+export interface SimulatorActionCreate {
+  type: 'create';
+  name: string;
+  deviceType: string;
+  runtime: string;
+}
+export interface SimulatorActionDelete {
+  type: 'delete';
+  target: string;
+}
 export type SimulatorAction =
   | SimulatorActionBoot
+  | SimulatorActionClone
+  | SimulatorActionCreate
+  | SimulatorActionDelete
   | SimulatorActionErase
   | SimulatorActionOpen
   | SimulatorActionResetLocation

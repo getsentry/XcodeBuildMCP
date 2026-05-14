@@ -1162,6 +1162,9 @@ function createSimulatorActionItems(
 ): TextRenderableItem[] {
   const titleMap: Record<typeof result.action.type, string> = {
     boot: 'Boot Simulator',
+    clone: 'Clone Simulator',
+    create: 'Create Simulator',
+    delete: 'Delete Simulator',
     erase: 'Erase Simulator',
     open: 'Open Simulator',
     'reset-location': 'Reset Location',
@@ -1195,6 +1198,9 @@ function createSimulatorActionItems(
   } else {
     const successMessages: Record<typeof result.action.type, string> = {
       boot: 'Simulator booted successfully',
+      clone: 'Simulator cloned successfully',
+      create: 'Simulator created successfully',
+      delete: 'Simulator(s) deleted successfully',
       erase: 'Simulators were erased successfully',
       open: 'Simulator opened successfully',
       'reset-location': 'Location successfully reset to default',

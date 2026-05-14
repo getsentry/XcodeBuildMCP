@@ -1,12 +1,20 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createSessionAwareTool,
+  getSessionAwareToolSchemaShape,
+  getHandlerContext,
+  toInternalSchema,
+} from '../../../utils/typed-tool-factory.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
-const createSimSchema = z.object({
+const baseSchemaObject = z.object({
   name: z.string().min(1).describe('Name for the new simulator (e.g., "iPhone 17 Test")'),
   deviceType: z
     .string()
@@ -22,7 +30,100 @@ const createSimSchema = z.object({
     ),
 });
 
-type CreateSimParams = z.infer<typeof createSimSchema>;
+const internalSchemaObject = z.object({
+  name: z.string().min(1),
+  deviceType: z.string().min(1),
+  runtime: z.string().min(1),
+});
+
+type CreateSimParams = z.infer<typeof internalSchemaObject>;
+type CreateSimResult = SimulatorActionResultDomainResult;
+
+const publicSchemaObject = z.strictObject(
+  baseSchemaObject.omit({
+    name: true,
+    deviceType: true,
+    runtime: true,
+  } as const).shape,
+);
+
+function createCreateSimResult(params: {
+  name: string;
+  deviceType: string;
+  runtime: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): CreateSimResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'create',
+      name: params.name,
+      deviceType: params.deviceType,
+      runtime: params.runtime,
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: CreateSimResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createCreateSimExecutor(
+  executor: CommandExecutor,
+): NonStreamingExecutor<CreateSimParams, CreateSimResult> {
+  return async (params) => {
+    try {
+      const result = await executor(
+        ['xcrun', 'simctl', 'create', params.name, params.deviceType, params.runtime],
+        'Create Simulator',
+        false,
+      );
+
+      if (!result.success) {
+        const diagnosticMessage = result.error ?? 'Unknown error';
+        return createCreateSimResult({
+          name: params.name,
+          deviceType: params.deviceType,
+          runtime: params.runtime,
+          didError: true,
+          error: 'Create simulator failed.',
+          diagnosticMessage,
+        });
+      }
+
+      return createCreateSimResult({
+        name: params.name,
+        deviceType: params.deviceType,
+        runtime: params.runtime,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createCreateSimResult({
+        name: params.name,
+        deviceType: params.deviceType,
+        runtime: params.runtime,
+        didError: true,
+        error: 'Create simulator failed.',
+        diagnosticMessage,
+      });
+    }
+  };
+}
 
 export async function create_simLogic(
   params: CreateSimParams,
@@ -33,45 +134,31 @@ export async function create_simLogic(
     `Creating simulator "${params.name}" (device type: ${params.deviceType}, runtime: ${params.runtime})`,
   );
 
-  const headerEvent = header('Create Simulator', [
-    { label: 'Name', value: params.name },
-    { label: 'Device Type', value: params.deviceType },
-    { label: 'Runtime', value: params.runtime },
-  ]);
-
   const ctx = getHandlerContext();
+  const executeCreateSim = createCreateSimExecutor(executor);
+  const result = await executeCreateSim(params);
+  setStructuredOutput(ctx, result);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const command = ['xcrun', 'simctl', 'create', params.name, params.deviceType, params.runtime];
-      const result = await executor(command, 'Create Simulator', false);
+  if (result.didError) {
+    log('error', `Error creating simulator: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
 
-      if (!result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Create simulator failed: ${result.error}`));
-        return;
-      }
-
-      const newUdid = result.output.trim();
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `Simulator created successfully. New UDID: ${newUdid}`));
-      ctx.nextStepParams = {
-        boot_sim: { simulatorId: newUdid },
-        open_sim: {},
-        install_app_sim: { simulatorId: newUdid, appPath: 'PATH_TO_YOUR_APP' },
-        launch_app_sim: { simulatorId: newUdid, bundleId: 'YOUR_APP_BUNDLE_ID' },
-        list_sims: {},
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Create simulator failed: ${message}`,
-      logMessage: ({ message }) => `Error creating simulator: ${message}`,
-    },
-  );
+  ctx.nextStepParams = {
+    boot_sim: {},
+    open_sim: {},
+    list_sims: {},
+  };
 }
 
-export const schema = createSimSchema.shape;
+export const schema = getSessionAwareToolSchemaShape({
+  sessionAware: publicSchemaObject,
+  legacy: baseSchemaObject,
+});
 
-export const handler = createTypedTool(createSimSchema, create_simLogic, getDefaultCommandExecutor);
+export const handler = createSessionAwareTool<CreateSimParams>({
+  internalSchema: toInternalSchema<CreateSimParams>(internalSchemaObject),
+  logicFunction: create_simLogic,
+  getExecutor: getDefaultCommandExecutor,
+  requirements: [],
+});

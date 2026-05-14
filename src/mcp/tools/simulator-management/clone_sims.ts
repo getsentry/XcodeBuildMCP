@@ -1,12 +1,20 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createSessionAwareTool,
+  getSessionAwareToolSchemaShape,
+  getHandlerContext,
+  toInternalSchema,
+} from '../../../utils/typed-tool-factory.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
-const cloneSimsSchema = z.object({
+const baseSchemaObject = z.object({
   sourceSimulatorId: z.string().uuid().describe('UDID of the simulator to clone'),
   newName: z
     .string()
@@ -14,7 +22,92 @@ const cloneSimsSchema = z.object({
     .describe('Name for the cloned simulator. If omitted, simctl auto-generates one.'),
 });
 
-type CloneSimsParams = z.infer<typeof cloneSimsSchema>;
+const internalSchemaObject = z.object({
+  sourceSimulatorId: z.string().uuid(),
+  newName: z.string().optional(),
+});
+
+type CloneSimsParams = z.infer<typeof internalSchemaObject>;
+type CloneSimsResult = SimulatorActionResultDomainResult;
+
+const publicSchemaObject = z.strictObject(
+  baseSchemaObject.omit({
+    sourceSimulatorId: true,
+    newName: true,
+  } as const).shape,
+);
+
+function createCloneSimsResult(params: {
+  sourceSimulatorId: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): CloneSimsResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'clone',
+      sourceSimulatorId: params.sourceSimulatorId,
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
+    artifacts: {
+      simulatorId: params.sourceSimulatorId,
+    },
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: CloneSimsResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createCloneSimsExecutor(
+  executor: CommandExecutor,
+): NonStreamingExecutor<CloneSimsParams, CloneSimsResult> {
+  return async (params) => {
+    try {
+      const command = ['xcrun', 'simctl', 'clone', params.sourceSimulatorId];
+      if (params.newName) {
+        command.push(params.newName);
+      }
+
+      const result = await executor(command, 'Clone Simulator', false);
+
+      if (!result.success) {
+        const diagnosticMessage = result.error ?? 'Unknown error';
+        return createCloneSimsResult({
+          sourceSimulatorId: params.sourceSimulatorId,
+          didError: true,
+          error: 'Clone simulator failed.',
+          diagnosticMessage,
+        });
+      }
+
+      return createCloneSimsResult({
+        sourceSimulatorId: params.sourceSimulatorId,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createCloneSimsResult({
+        sourceSimulatorId: params.sourceSimulatorId,
+        didError: true,
+        error: 'Clone simulator failed.',
+        diagnosticMessage,
+      });
+    }
+  };
+}
 
 export async function clone_simsLogic(
   params: CloneSimsParams,
@@ -25,48 +118,31 @@ export async function clone_simsLogic(
     `Cloning simulator ${params.sourceSimulatorId}${params.newName ? ` as "${params.newName}"` : ''}`,
   );
 
-  const headerEvent = header('Clone Simulator', [
-    { label: 'Source', value: params.sourceSimulatorId },
-    ...(params.newName ? [{ label: 'New Name', value: params.newName }] : []),
-  ]);
-
   const ctx = getHandlerContext();
+  const executeCloneSims = createCloneSimsExecutor(executor);
+  const result = await executeCloneSims(params);
+  setStructuredOutput(ctx, result);
 
-  return withErrorHandling(
-    ctx,
-    async () => {
-      const command = ['xcrun', 'simctl', 'clone', params.sourceSimulatorId];
-      if (params.newName) {
-        command.push(params.newName);
-      }
+  if (result.didError) {
+    log('error', `Error cloning simulator: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
 
-      const result = await executor(command, 'Clone Simulator', false);
-
-      if (!result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Clone simulator failed: ${result.error}`));
-        return;
-      }
-
-      const newUdid = result.output.trim();
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('success', `Simulator cloned successfully. New UDID: ${newUdid}`));
-      ctx.nextStepParams = {
-        boot_sim: { simulatorId: newUdid },
-        open_sim: {},
-        install_app_sim: { simulatorId: newUdid, appPath: 'PATH_TO_YOUR_APP' },
-        launch_app_sim: { simulatorId: newUdid, bundleId: 'YOUR_APP_BUNDLE_ID' },
-        list_sims: {},
-      };
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Clone simulator failed: ${message}`,
-      logMessage: ({ message }) => `Error cloning simulator: ${message}`,
-    },
-  );
+  ctx.nextStepParams = {
+    boot_sim: { simulatorId: params.sourceSimulatorId },
+    open_sim: {},
+    list_sims: {},
+  };
 }
 
-export const schema = cloneSimsSchema.shape;
+export const schema = getSessionAwareToolSchemaShape({
+  sessionAware: publicSchemaObject,
+  legacy: baseSchemaObject,
+});
 
-export const handler = createTypedTool(cloneSimsSchema, clone_simsLogic, getDefaultCommandExecutor);
+export const handler = createSessionAwareTool<CloneSimsParams>({
+  internalSchema: toInternalSchema<CloneSimsParams>(internalSchemaObject),
+  logicFunction: clone_simsLogic,
+  getExecutor: getDefaultCommandExecutor,
+  requirements: [],
+});

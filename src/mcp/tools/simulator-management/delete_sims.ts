@@ -1,12 +1,20 @@
 import * as z from 'zod';
+import type { ToolHandlerContext } from '../../../rendering/types.ts';
+import type { SimulatorActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import { log } from '../../../utils/logging/index.ts';
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
-import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
-import { withErrorHandling } from '../../../utils/tool-error-handling.ts';
-import { header, section, statusLine } from '../../../utils/tool-event-builders.ts';
+import {
+  createSessionAwareTool,
+  getSessionAwareToolSchemaShape,
+  getHandlerContext,
+  toInternalSchema,
+} from '../../../utils/typed-tool-factory.ts';
+import { toErrorMessage } from '../../../utils/errors.ts';
+import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
-const deleteSimsSchema = z.object({
+const baseSchemaObject = z.object({
   target: z
     .string()
     .min(1)
@@ -19,27 +27,58 @@ const deleteSimsSchema = z.object({
     .describe('Shutdown the simulator before deleting. Useful for booted simulators.'),
 });
 
-type DeleteSimsParams = z.infer<typeof deleteSimsSchema>;
+const internalSchemaObject = z.object({
+  target: z.string().min(1),
+  shutdownFirst: z.boolean().optional(),
+});
 
-export async function delete_simsLogic(
-  params: DeleteSimsParams,
+type DeleteSimsParams = z.infer<typeof internalSchemaObject>;
+type DeleteSimsResult = SimulatorActionResultDomainResult;
+
+const publicSchemaObject = z.strictObject(
+  baseSchemaObject.omit({
+    target: true,
+    shutdownFirst: true,
+  } as const).shape,
+);
+
+function createDeleteSimsResult(params: {
+  target: string;
+  didError: boolean;
+  error?: string;
+  diagnosticMessage?: string;
+}): DeleteSimsResult {
+  return {
+    kind: 'simulator-action-result',
+    didError: params.didError,
+    error: params.error ?? null,
+    summary: {
+      status: params.didError ? 'FAILED' : 'SUCCEEDED',
+    },
+    action: {
+      type: 'delete',
+      target: params.target,
+    },
+    ...(params.diagnosticMessage
+      ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
+      : {}),
+  };
+}
+
+function setStructuredOutput(ctx: ToolHandlerContext, result: DeleteSimsResult): void {
+  ctx.structuredOutput = {
+    result,
+    schema: 'xcodebuildmcp.output.simulator-action-result',
+    schemaVersion: '1',
+  };
+}
+
+export function createDeleteSimsExecutor(
   executor: CommandExecutor,
-): Promise<void> {
-  const target = params.target;
-  const headerEvent = header('Delete Simulator', [
-    { label: 'Target', value: target },
-    ...(params.shutdownFirst ? [{ label: 'Shutdown First', value: 'true' }] : []),
-  ]);
-
-  const ctx = getHandlerContext();
-
-  return withErrorHandling(
-    ctx,
-    async () => {
-      log(
-        'info',
-        `Deleting simulator(s) ${target}${params.shutdownFirst ? ' (shutdownFirst=true)' : ''}`,
-      );
+): NonStreamingExecutor<DeleteSimsParams, DeleteSimsResult> {
+  return async (params) => {
+    try {
+      const target = params.target;
 
       if (params.shutdownFirst && target !== 'all' && target !== 'unavailable') {
         try {
@@ -60,42 +99,67 @@ export async function delete_simsLogic(
         true,
         undefined,
       );
-      if (result.success) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('success', 'Simulator(s) deleted successfully'));
-        ctx.nextStepParams = {
-          list_sims: {},
-        };
-        return;
+
+      if (!result.success) {
+        const diagnosticMessage = result.error ?? 'Unknown error';
+        return createDeleteSimsResult({
+          target,
+          didError: true,
+          error: 'Failed to delete simulator(s).',
+          diagnosticMessage,
+        });
       }
 
-      const errText = result.error ?? 'Unknown error';
-      if (/Unable to delete.*Booted/i.test(errText) && !params.shutdownFirst) {
-        ctx.emit(headerEvent);
-        ctx.emit(statusLine('error', `Failed to delete simulator: ${errText}`));
-        ctx.emit(
-          section('Hint', [
-            `The simulator appears to be Booted. Re-run delete_sims with { target: '${target}', shutdownFirst: true } to shut it down before deleting.`,
-          ]),
-        );
-        return;
-      }
-
-      ctx.emit(headerEvent);
-      ctx.emit(statusLine('error', `Failed to delete simulator: ${errText}`));
-    },
-    {
-      header: headerEvent,
-      errorMessage: ({ message }) => `Failed to delete simulator: ${message}`,
-      logMessage: ({ message }) => `Error deleting simulators: ${message}`,
-    },
-  );
+      return createDeleteSimsResult({
+        target,
+        didError: false,
+      });
+    } catch (error) {
+      const diagnosticMessage = toErrorMessage(error);
+      return createDeleteSimsResult({
+        target: params.target,
+        didError: true,
+        error: 'Failed to delete simulator(s).',
+        diagnosticMessage,
+      });
+    }
+  };
 }
 
-export const schema = deleteSimsSchema.shape;
+export async function delete_simsLogic(
+  params: DeleteSimsParams,
+  executor: CommandExecutor,
+): Promise<void> {
+  const target = params.target;
 
-export const handler = createTypedTool(
-  deleteSimsSchema,
-  delete_simsLogic,
-  getDefaultCommandExecutor,
-);
+  log(
+    'info',
+    `Deleting simulator(s) ${target}${params.shutdownFirst ? ' (shutdownFirst=true)' : ''}`,
+  );
+
+  const ctx = getHandlerContext();
+  const executeDeleteSims = createDeleteSimsExecutor(executor);
+  const result = await executeDeleteSims(params);
+  setStructuredOutput(ctx, result);
+
+  if (result.didError) {
+    log('error', `Error deleting simulators: ${result.error ?? 'Unknown error'}`);
+    return;
+  }
+
+  ctx.nextStepParams = {
+    list_sims: {},
+  };
+}
+
+export const schema = getSessionAwareToolSchemaShape({
+  sessionAware: publicSchemaObject,
+  legacy: baseSchemaObject,
+});
+
+export const handler = createSessionAwareTool<DeleteSimsParams>({
+  internalSchema: toInternalSchema<DeleteSimsParams>(internalSchemaObject),
+  logicFunction: delete_simsLogic,
+  getExecutor: getDefaultCommandExecutor,
+  requirements: [],
+});
