@@ -4,6 +4,9 @@ names:
   mcp: create_sim
   cli: create
 description: Create a new simulator.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Create Simulator
   readOnlyHint: false

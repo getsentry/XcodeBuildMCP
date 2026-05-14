@@ -4,6 +4,9 @@ names:
   mcp: clone_sims
   cli: clone
 description: Clone an existing simulator.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Clone Simulator
   readOnlyHint: false

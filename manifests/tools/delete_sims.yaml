@@ -4,6 +4,9 @@ names:
   mcp: delete_sims
   cli: delete
 description: Delete simulators by UDID, all simulators, or unavailable simulators.
+outputSchema:
+  schema: xcodebuildmcp.output.simulator-action-result
+  version: "1"
 annotations:
   title: Delete Simulators
   readOnlyHint: false
