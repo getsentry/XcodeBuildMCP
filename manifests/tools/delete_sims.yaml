@@ -1,0 +1,16 @@
+id: delete_sims
+module: mcp/tools/simulator-management/delete_sims
+names:
+  mcp: delete_sims
+  cli: delete
+description: Delete simulators by UDID, all simulators, or unavailable simulators.
+annotations:
+  title: Delete Simulators
+  readOnlyHint: false
+  destructiveHint: true
+  openWorldHint: false
+nextSteps:
+  - label: List remaining simulators
+    toolId: list_sims
+    priority: 1
+    when: success

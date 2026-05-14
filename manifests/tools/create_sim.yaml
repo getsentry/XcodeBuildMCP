@@ -1,0 +1,22 @@
+id: create_sim
+module: mcp/tools/simulator-management/create_sim
+names:
+  mcp: create_sim
+  cli: create
+description: Create a new simulator.
+annotations:
+  title: Create Simulator
+  readOnlyHint: false
+  destructiveHint: false
+  openWorldHint: false
+nextSteps:
+  - label: List simulators to see the new device
+    toolId: list_sims
+    priority: 1
+    when: success
+  - label: Boot the new simulator
+    toolId: boot_sim
+    params:
+      simulatorId: NEW_UDID
+    priority: 2
+    when: success
