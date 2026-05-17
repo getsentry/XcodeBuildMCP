@@ -120,7 +120,6 @@ actions = ["opened", "synchronize", "reopened"]
 [[skills]]
 name = "xcodebuildmcp-snapshot-fixture-review"
 paths = [
-  "src/snapshot-tests/__fixtures__/**",
   "src/snapshot-tests/contracts.ts",
   "src/snapshot-tests/fixture-io.ts",
   "src/snapshot-tests/__tests__/fixture-io.test.ts",
