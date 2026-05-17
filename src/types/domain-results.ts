@@ -232,7 +232,17 @@ export interface CaptureUiHierarchyPayload {
   type: 'ui-hierarchy';
   uiHierarchy: AccessibilityNode[];
 }
-export type CapturePayload = CaptureImagePayload | CaptureUiHierarchyPayload;
+export interface CaptureVideoRecordingPayload {
+  type: 'video-recording';
+  state: 'started' | 'stopped';
+  fps?: number;
+  outputFile?: string;
+  sessionId?: string;
+}
+export type CapturePayload =
+  | CaptureImagePayload
+  | CaptureUiHierarchyPayload
+  | CaptureVideoRecordingPayload;
 export interface DebugFileLineBreakpoint {
   kind: 'file-line';
   file: string;

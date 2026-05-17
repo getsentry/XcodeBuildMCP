@@ -73,6 +73,14 @@ function isBuildSettingsEntry(value: Record<string, unknown>, path: string[]): b
   );
 }
 
+function normalizeBuildSettingsEntryKey(key: string): string {
+  if (key.startsWith('SDK_DIR_')) {
+    return 'SDK_DIR_<SDK_NAME>';
+  }
+
+  return key;
+}
+
 function normalizeBuildSettingsEntryValue(key: string, value: string): string {
   if (key === 'SDKROOT' || key === 'SDK_DIR' || key.startsWith('SDK_DIR_')) {
     return '<SDK_PATH>';
@@ -197,9 +205,11 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   if (isRecord(value)) {
     const normalizedEntries = Object.entries(value).map(([entryKey, entryValue]) => [
       entryKey,
-      isBuildSettingsEntry(value, path) && entryKey === 'value'
-        ? normalizeBuildSettingsEntryValue(String(value.key), String(value.value))
-        : normalizeValue(entryValue, [...path, entryKey]),
+      isBuildSettingsEntry(value, path) && entryKey === 'key'
+        ? normalizeBuildSettingsEntryKey(String(entryValue))
+        : isBuildSettingsEntry(value, path) && entryKey === 'value'
+          ? normalizeBuildSettingsEntryValue(String(value.key), String(value.value))
+          : normalizeValue(entryValue, [...path, entryKey]),
     ]);
 
     return Object.fromEntries(normalizedEntries);

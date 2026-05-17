@@ -35,7 +35,7 @@
       },
       {
         "key": "ALTERNATE_GROUP",
-        "value": "<GROUP>"
+        "value": "staff"
       },
       {
         "key": "ALTERNATE_MODE",
@@ -43,7 +43,7 @@
       },
       {
         "key": "ALTERNATE_OWNER",
-        "value": "<USER>"
+        "value": "cameroncooke"
       },
       {
         "key": "ALTERNATIVE_DISTRIBUTION_WEB",
@@ -123,11 +123,11 @@
       },
       {
         "key": "ASSETCATALOG_FILTER_FOR_DEVICE_MODEL",
-        "value": "<DEVICE_MODEL>"
+        "value": "MacFamily20,1"
       },
       {
         "key": "ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION",
-        "value": "<OS_VERSION>"
+        "value": "26.3"
       },
       {
         "key": "ASSETCATALOG_FILTER_FOR_THINNING_DEVICE_CONFIGURATION",
@@ -215,11 +215,11 @@
       },
       {
         "key": "CACHE_ROOT",
-        "value": "<XCODE_CACHE_ROOT>"
+        "value": "/var/folders/_t/2njffz894t57qpp76v1sw__h0000gn/C/com.apple.DeveloperTools/26.4-17E192/Xcode"
       },
       {
         "key": "CCHROOT",
-        "value": "<XCODE_CACHE_ROOT>"
+        "value": "/var/folders/_t/2njffz894t57qpp76v1sw__h0000gn/C/com.apple.DeveloperTools/26.4-17E192/Xcode"
       },
       {
         "key": "CHMOD",
@@ -467,7 +467,7 @@
       },
       {
         "key": "CORRESPONDING_SIMULATOR_PLATFORM_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneSimulator.platform"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform"
       },
       {
         "key": "CORRESPONDING_SIMULATOR_PLATFORM_NAME",
@@ -475,11 +475,11 @@
       },
       {
         "key": "CORRESPONDING_SIMULATOR_SDK_DIR",
-        "value": "<SDK_PATH>"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk"
       },
       {
         "key": "CORRESPONDING_SIMULATOR_SDK_NAME",
-        "value": "<SDK_NAME>"
+        "value": "iphonesimulator26.4"
       },
       {
         "key": "CP",
@@ -567,39 +567,39 @@
       },
       {
         "key": "DEVELOPER_APPLICATIONS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications"
       },
       {
         "key": "DEVELOPER_BIN_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/usr/bin"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/usr/bin"
       },
       {
         "key": "DEVELOPER_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer"
       },
       {
         "key": "DEVELOPER_FRAMEWORKS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Library/Frameworks"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Library/Frameworks"
       },
       {
         "key": "DEVELOPER_FRAMEWORKS_DIR_QUOTED",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Library/Frameworks"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Library/Frameworks"
       },
       {
         "key": "DEVELOPER_LIBRARY_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Library"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Library"
       },
       {
         "key": "DEVELOPER_SDK_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
       },
       {
         "key": "DEVELOPER_TOOLS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Tools"
       },
       {
         "key": "DEVELOPER_USR_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/usr"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/usr"
       },
       {
         "key": "DEVELOPMENT_LANGUAGE",
@@ -635,7 +635,7 @@
       },
       {
         "key": "DT_TOOLCHAIN_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain"
       },
       {
         "key": "DUMP_DEPENDENCIES",
@@ -1011,11 +1011,11 @@
       },
       {
         "key": "GID",
-        "value": "<GID>"
+        "value": "20"
       },
       {
         "key": "GROUP",
-        "value": "<GROUP>"
+        "value": "staff"
       },
       {
         "key": "HEADERMAP_INCLUDES_FLAT_ENTRIES_FOR_TARGET_BEING_BUILT",
@@ -1147,7 +1147,7 @@
       },
       {
         "key": "INSTALL_GROUP",
-        "value": "<GROUP>"
+        "value": "staff"
       },
       {
         "key": "INSTALL_MODE_FLAG",
@@ -1155,7 +1155,7 @@
       },
       {
         "key": "INSTALL_OWNER",
-        "value": "<USER>"
+        "value": "cameroncooke"
       },
       {
         "key": "INSTALL_PATH",
@@ -1287,7 +1287,7 @@
       },
       {
         "key": "LEGACY_DEVELOPER_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/PlugIns/Xcode3Core.ideplugin/Contents/SharedSupport/Developer"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/PlugIns/Xcode3Core.ideplugin/Contents/SharedSupport/Developer"
       },
       {
         "key": "LEX",
@@ -1399,19 +1399,19 @@
       },
       {
         "key": "MAC_OS_X_PRODUCT_BUILD_VERSION",
-        "value": "<SDK_BUILD_VERSION>"
+        "value": "25D2128"
       },
       {
         "key": "MAC_OS_X_VERSION_ACTUAL",
-        "value": "<SDK_VERSION>"
+        "value": "260301"
       },
       {
         "key": "MAC_OS_X_VERSION_MAJOR",
-        "value": "<SDK_VERSION>"
+        "value": "260000"
       },
       {
         "key": "MAC_OS_X_VERSION_MINOR",
-        "value": "<SDK_VERSION>"
+        "value": "260300"
       },
       {
         "key": "MAKE_MERGEABLE",
@@ -1515,7 +1515,7 @@
       },
       {
         "key": "PATH_PREFIXES_EXCLUDED_FROM_HEADER_DEPENDENCIES",
-        "value": "/usr/include /usr/local/include /System/Library/Frameworks /System/Library/PrivateFrameworks /Applications/Xcode-<VERSION>.app/Contents/Developer/Headers /Applications/Xcode-<VERSION>.app/Contents/Developer/SDKs /Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms"
+        "value": "/usr/include /usr/local/include /System/Library/Frameworks /System/Library/PrivateFrameworks /Applications/Xcode-26.4.0.app/Contents/Developer/Headers /Applications/Xcode-26.4.0.app/Contents/Developer/SDKs /Applications/Xcode-26.4.0.app/Contents/Developer/Platforms"
       },
       {
         "key": "PBDEVELOPMENTPLIST_PATH",
@@ -1543,31 +1543,31 @@
       },
       {
         "key": "PLATFORM_DEVELOPER_APPLICATIONS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Applications"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Applications"
       },
       {
         "key": "PLATFORM_DEVELOPER_BIN_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin"
       },
       {
         "key": "PLATFORM_DEVELOPER_LIBRARY_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Library"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Library"
       },
       {
         "key": "PLATFORM_DEVELOPER_SDK_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs"
       },
       {
         "key": "PLATFORM_DEVELOPER_TOOLS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/Tools"
       },
       {
         "key": "PLATFORM_DEVELOPER_USR_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr"
       },
       {
         "key": "PLATFORM_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform"
       },
       {
         "key": "PLATFORM_DISPLAY_NAME",
@@ -1587,7 +1587,7 @@
       },
       {
         "key": "PLATFORM_PRODUCT_BUILD_VERSION",
-        "value": "<SDK_BUILD_VERSION>"
+        "value": "23E237"
       },
       {
         "key": "PLATFORM_REQUIRES_SWIFT_AUTOLINK_EXTRACT",
@@ -1802,24 +1802,24 @@
         "value": "<SDK_PATH>"
       },
       {
-        "key": "SDK_DIR_iphoneos",
+        "key": "SDK_DIR_<SDK_NAME>",
         "value": "<SDK_PATH>"
       },
       {
-        "key": "SDK_DIR_iphoneos26_4",
+        "key": "SDK_DIR_<SDK_NAME>",
         "value": "<SDK_PATH>"
       },
       {
         "key": "SDK_NAME",
-        "value": "<SDK_NAME>"
+        "value": "iphoneos26.4"
       },
       {
         "key": "SDK_NAMES",
-        "value": "<SDK_NAME>"
+        "value": "iphoneos26.4"
       },
       {
         "key": "SDK_PRODUCT_BUILD_VERSION",
-        "value": "<SDK_BUILD_VERSION>"
+        "value": "23E237"
       },
       {
         "key": "SDK_STAT_CACHE_DIR",
@@ -1831,23 +1831,23 @@
       },
       {
         "key": "SDK_STAT_CACHE_PATH",
-        "value": "<SDK_STAT_CACHE_PATH>"
+        "value": "<HOME>/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos26.4-23E237-c1e9a37d8fcda5dee89abd67dc927a23.sdkstatcache"
       },
       {
         "key": "SDK_VERSION",
-        "value": "<SDK_VERSION>"
+        "value": "26.4"
       },
       {
         "key": "SDK_VERSION_ACTUAL",
-        "value": "<SDK_VERSION>"
+        "value": "260400"
       },
       {
         "key": "SDK_VERSION_MAJOR",
-        "value": "<SDK_VERSION>"
+        "value": "260000"
       },
       {
         "key": "SDK_VERSION_MINOR",
-        "value": "<SDK_VERSION>"
+        "value": "260400"
       },
       {
         "key": "SED",
@@ -2039,59 +2039,59 @@
       },
       {
         "key": "SYSTEM_DEVELOPER_APPS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications"
       },
       {
         "key": "SYSTEM_DEVELOPER_BIN_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/usr/bin"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/usr/bin"
       },
       {
         "key": "SYSTEM_DEVELOPER_DEMOS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications/Utilities/Built Examples"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Utilities/Built Examples"
       },
       {
         "key": "SYSTEM_DEVELOPER_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer"
       },
       {
         "key": "SYSTEM_DEVELOPER_DOC_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/ADC Reference Library"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/ADC Reference Library"
       },
       {
         "key": "SYSTEM_DEVELOPER_GRAPHICS_TOOLS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications/Graphics Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Graphics Tools"
       },
       {
         "key": "SYSTEM_DEVELOPER_JAVA_TOOLS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications/Java Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Java Tools"
       },
       {
         "key": "SYSTEM_DEVELOPER_PERFORMANCE_TOOLS_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications/Performance Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Performance Tools"
       },
       {
         "key": "SYSTEM_DEVELOPER_RELEASENOTES_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/ADC Reference Library/releasenotes"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/ADC Reference Library/releasenotes"
       },
       {
         "key": "SYSTEM_DEVELOPER_TOOLS",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Tools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Tools"
       },
       {
         "key": "SYSTEM_DEVELOPER_TOOLS_DOC_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/ADC Reference Library/documentation/DeveloperTools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/ADC Reference Library/documentation/DeveloperTools"
       },
       {
         "key": "SYSTEM_DEVELOPER_TOOLS_RELEASENOTES_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/ADC Reference Library/releasenotes/DeveloperTools"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/ADC Reference Library/releasenotes/DeveloperTools"
       },
       {
         "key": "SYSTEM_DEVELOPER_USR_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/usr"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/usr"
       },
       {
         "key": "SYSTEM_DEVELOPER_UTILITIES_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications/Utilities"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Applications/Utilities"
       },
       {
         "key": "SYSTEM_DEXT_INSTALL_PATH",
@@ -2163,11 +2163,11 @@
       },
       {
         "key": "TARGET_DEVICE_MODEL",
-        "value": "<DEVICE_MODEL>"
+        "value": "Mac16,8"
       },
       {
         "key": "TARGET_DEVICE_OS_VERSION",
-        "value": "<OS_VERSION>"
+        "value": "26.3.1"
       },
       {
         "key": "TARGET_DEVICE_PLATFORM_NAME",
@@ -2207,7 +2207,7 @@
       },
       {
         "key": "TEST_LIBRARY_SEARCH_PATHS",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib"
       },
       {
         "key": "TOOLCHAINS",
@@ -2215,7 +2215,7 @@
       },
       {
         "key": "TOOLCHAIN_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain"
       },
       {
         "key": "TREAT_MISSING_BASELINES_AS_TEST_FAILURES",
@@ -2231,7 +2231,7 @@
       },
       {
         "key": "UID",
-        "value": "<UID>"
+        "value": "501"
       },
       {
         "key": "UNINSTALLED_PRODUCTS_DIR",
@@ -2255,7 +2255,7 @@
       },
       {
         "key": "USER",
-        "value": "<USER>"
+        "value": "cameroncooke"
       },
       {
         "key": "USER_APPS_DIR",
@@ -2299,7 +2299,7 @@
       },
       {
         "key": "VERSION_INFO_BUILDER",
-        "value": "<USER>"
+        "value": "cameroncooke"
       },
       {
         "key": "VERSION_INFO_FILE",
@@ -2335,7 +2335,7 @@
       },
       {
         "key": "XCODE_APP_SUPPORT_DIR",
-        "value": "/Applications/Xcode-<VERSION>.app/Contents/Developer/Library/Xcode"
+        "value": "/Applications/Xcode-26.4.0.app/Contents/Developer/Library/Xcode"
       },
       {
         "key": "XCODE_PRODUCT_BUILD_VERSION",

@@ -193,6 +193,34 @@ describe('structured output schema bundling', () => {
     ).toBe(true);
   });
 
+  it('accepts video recording capture payloads in the bumped capture contract', () => {
+    const schema = getMcpOutputSchema({
+      schema: 'xcodebuildmcp.output.capture-result',
+      version: '2',
+    });
+    const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+    const validate = ajv.compile(schema);
+
+    expect(
+      validate({
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'A-SIMULATOR-ID' },
+          capture: {
+            type: 'video-recording',
+            state: 'started',
+            fps: 30,
+            sessionId: 'recording-session',
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('accepts normal and minimal request-bearing envelopes in the bumped contracts', () => {
     const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
     const cases = [

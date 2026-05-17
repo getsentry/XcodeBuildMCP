@@ -203,6 +203,35 @@
                 "type",
                 "uiHierarchy"
               ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "video-recording"
+                },
+                "state": {
+                  "enum": [
+                    "started",
+                    "stopped"
+                  ]
+                },
+                "fps": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "outputFile": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "state"
+              ]
             }
           ]
         },

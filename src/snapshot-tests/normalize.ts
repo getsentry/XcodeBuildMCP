@@ -227,6 +227,10 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(BUILD_SETTINGS_GROUP_REGEX, '$1<GROUP>');
   normalized = normalized.replace(BUILD_SETTINGS_GID_REGEX, '$1<GID>');
   normalized = normalized.replace(SDK_PATH_REGEX, '$1<SDK_PATH>');
+  normalized = normalized.replace(
+    /^(\s*)SDK_DIR_[A-Za-z0-9_]+ = <SDK_PATH>$/gm,
+    '$1SDK_DIR_<SDK_NAME> = <SDK_PATH>',
+  );
   normalized = normalized.replace(SDK_NAME_REGEX, '$1<SDK_NAME>');
   normalized = normalized.replace(SDK_BUILD_VERSION_REGEX, '$1<SDK_BUILD_VERSION>');
   normalized = normalized.replace(SDK_STAT_CACHE_PATH_REGEX, '$1<SDK_STAT_CACHE_PATH>');
