@@ -203,14 +203,18 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   }
 
   if (isRecord(value)) {
-    const normalizedEntries = Object.entries(value).map(([entryKey, entryValue]) => [
-      entryKey,
-      isBuildSettingsEntry(value, path) && entryKey === 'key'
-        ? normalizeBuildSettingsEntryKey(String(entryValue))
-        : isBuildSettingsEntry(value, path) && entryKey === 'value'
-          ? normalizeBuildSettingsEntryValue(String(value.key), String(value.value))
-          : normalizeValue(entryValue, [...path, entryKey]),
-    ]);
+    const isBuildSetting = isBuildSettingsEntry(value, path);
+    const normalizedEntries = Object.entries(value).map(([entryKey, entryValue]) => {
+      if (isBuildSetting && entryKey === 'key') {
+        return [entryKey, normalizeBuildSettingsEntryKey(String(entryValue))];
+      }
+
+      if (isBuildSetting && entryKey === 'value') {
+        return [entryKey, normalizeBuildSettingsEntryValue(String(value.key), String(value.value))];
+      }
+
+      return [entryKey, normalizeValue(entryValue, [...path, entryKey])];
+    });
 
     return Object.fromEntries(normalizedEntries);
   }

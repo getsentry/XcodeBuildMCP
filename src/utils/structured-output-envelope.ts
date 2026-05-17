@@ -56,11 +56,7 @@ export function toStructuredEnvelope<TResult extends ToolDomainResult>(
   options: StructuredEnvelopeOptions = {},
 ): StructuredOutputEnvelope<DomainResultData<TResult>> {
   const { nextSteps, nextStepRuntime = 'cli', outputStyle = 'normal' } = options;
-  const { didError, error } = result;
-  const data: Partial<TResult> = { ...result };
-  delete data.kind;
-  delete data.didError;
-  delete data.error;
+  const { kind: _kind, didError, error, ...data } = result;
   const serializedNextSteps = serializeNextSteps(nextSteps, {
     runtime: nextStepRuntime,
   });

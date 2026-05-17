@@ -26,34 +26,23 @@ export function processToolResponse(response: ToolResponse, runtime: RuntimeKind
 
   const nextStepsSection = renderNextStepsSection(nextSteps, runtime);
   const processedContent = [...response.content];
-  const lastIndex = processedContent.length - 1;
-  const lastItem = lastIndex >= 0 ? processedContent[lastIndex] : undefined;
+  let textItemIndex = -1;
 
-  if (lastItem?.type === 'text') {
-    processedContent[lastIndex] = {
-      ...lastItem,
-      text: lastItem.text + '\n\n' + nextStepsSection,
+  for (let index = processedContent.length - 1; index >= 0; index -= 1) {
+    if (processedContent[index]?.type === 'text') {
+      textItemIndex = index;
+      break;
+    }
+  }
+
+  if (textItemIndex >= 0) {
+    const textItem = processedContent[textItemIndex];
+    processedContent[textItemIndex] = {
+      ...textItem,
+      text: textItem.text + '\n\n' + nextStepsSection,
     };
   } else {
-    let textItemIndex = -1;
-    for (let index = processedContent.length - 1; index >= 0; index -= 1) {
-      if (processedContent[index]?.type === 'text') {
-        textItemIndex = index;
-        break;
-      }
-    }
-
-    if (textItemIndex >= 0) {
-      const textItem = processedContent[textItemIndex];
-      if (textItem?.type === 'text') {
-        processedContent[textItemIndex] = {
-          ...textItem,
-          text: textItem.text + '\n\n' + nextStepsSection,
-        };
-      }
-    } else if (nextStepsSection) {
-      processedContent.push({ type: 'text', text: nextStepsSection.trim() });
-    }
+    processedContent.push({ type: 'text', text: nextStepsSection.trim() });
   }
 
   return { ...rest, content: processedContent };
