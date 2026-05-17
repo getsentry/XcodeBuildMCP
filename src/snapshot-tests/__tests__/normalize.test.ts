@@ -24,6 +24,7 @@ describe('normalizeSnapshotOutput', () => {
           '      MAC_OS_X_PRODUCT_BUILD_VERSION = 25D2128',
           '      MAC_OS_X_VERSION_ACTUAL = 260301',
           '      PLATFORM_DEVELOPER_APPLICATIONS_DIR = /Applications/Xcode-26.4.0.app/Contents/Developer/Applications',
+          '      XCODE_APP_SUPPORT_DIR = /Applications/Xcode.app/Contents/Developer/Library/Xcode',
         ].join('\n') + '\n',
       ),
     ).toBe(
@@ -38,6 +39,7 @@ describe('normalizeSnapshotOutput', () => {
         '      MAC_OS_X_PRODUCT_BUILD_VERSION = <SDK_BUILD_VERSION>',
         '      MAC_OS_X_VERSION_ACTUAL = <SDK_VERSION>',
         '      PLATFORM_DEVELOPER_APPLICATIONS_DIR = /Applications/Xcode-<VERSION>.app/Contents/Developer/Applications',
+        '      XCODE_APP_SUPPORT_DIR = /Applications/Xcode-<VERSION>.app/Contents/Developer/Library/Xcode',
       ].join('\n') + '\n',
     );
   });

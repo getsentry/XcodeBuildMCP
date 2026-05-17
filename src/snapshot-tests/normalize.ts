@@ -45,7 +45,7 @@ const TARGET_DEVICE_MODEL_REGEX =
 const TARGET_DEVICE_OS_VERSION_REGEX =
   /((?:TARGET_DEVICE_OS_VERSION|ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION) = ).+$/gm;
 const DEVICE_OS_VERSION_LINE_REGEX = /(\bOS: )\d+(?:\.\d+)*(?:\s*\([^)]*\))?/g;
-const XCODE_APPLICATION_PATH_REGEX = /\/Applications\/Xcode[^/\s]+\.app/g;
+const XCODE_APPLICATION_PATH_REGEX = /\/Applications\/Xcode(?:[^/\s]+)?\.app/g;
 const APPLE_SDK_BUNDLE_REGEX =
   /\b(?:iPhoneOS|iPhoneSimulator|AppleTVOS|AppleTVSimulator|WatchOS|WatchSimulator|XROS|XRSimulator|MacOSX)\d+(?:\.\d+)*\.sdk/g;
 const XCODE_CACHE_ROOT_REGEX = /((?:CACHE_ROOT|CCHROOT) = ).+$/gm;
