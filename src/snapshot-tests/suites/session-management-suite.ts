@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   isJsonSnapshotRuntime,
   isMcpSnapshotRuntime,
@@ -126,6 +126,13 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
       describe('mcp-only extras', () => {
         beforeEach(async () => {
           await harness.invoke('session-management', 'clear-defaults', { all: true });
+        });
+
+        afterEach(async () => {
+          await harness.invoke('session-management', 'use-defaults-profile', {
+            global: true,
+            persist: true,
+          });
         });
 
         it('session-show-defaults -- empty', async () => {

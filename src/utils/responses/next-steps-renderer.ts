@@ -37,10 +37,12 @@ export function processToolResponse(response: ToolResponse, runtime: RuntimeKind
 
   if (textItemIndex >= 0) {
     const textItem = processedContent[textItemIndex];
-    processedContent[textItemIndex] = {
-      ...textItem,
-      text: textItem.text + '\n\n' + nextStepsSection,
-    };
+    if (textItem?.type === 'text') {
+      processedContent[textItemIndex] = {
+        ...textItem,
+        text: textItem.text + '\n\n' + nextStepsSection,
+      };
+    }
   } else {
     processedContent.push({ type: 'text', text: nextStepsSection.trim() });
   }
