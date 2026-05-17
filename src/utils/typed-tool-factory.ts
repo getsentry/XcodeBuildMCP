@@ -65,16 +65,8 @@ function isMcpRuntimeForTestResult(): boolean {
   return process.env.XCODEBUILDMCP_RUNTIME === 'mcp';
 }
 
-function outputStyleForTestResult(): OutputStyle {
-  return isMcpRuntimeForTestResult() ? 'minimal' : 'normal';
-}
-
-function nextStepsRuntimeForTestResult(): 'cli' | 'mcp' {
-  return isMcpRuntimeForTestResult() ? 'mcp' : 'cli';
-}
-
 function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {
-  const outputStyle = outputStyleForTestResult();
+  const outputStyle: OutputStyle = isMcpRuntimeForTestResult() ? 'minimal' : 'normal';
   const text = renderCliTextTranscript({
     items: [],
     structuredOutput: session.getStructuredOutput?.(),
@@ -130,7 +122,7 @@ function createValidatedHandler<TParams, TContext>(
           session!.setStructuredOutput?.(ctx.structuredOutput);
         }
         if (ctx.nextSteps && ctx.nextSteps.length > 0) {
-          session!.setNextSteps?.([...ctx.nextSteps], nextStepsRuntimeForTestResult());
+          session!.setNextSteps?.([...ctx.nextSteps], isMcpRuntimeForTestResult() ? 'mcp' : 'cli');
         }
         return sessionToTestResult(session!);
       }
@@ -279,7 +271,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
           session!.setStructuredOutput?.(ctx.structuredOutput);
         }
         if (ctx.nextSteps && ctx.nextSteps.length > 0) {
-          session!.setNextSteps?.([...ctx.nextSteps], nextStepsRuntimeForTestResult());
+          session!.setNextSteps?.([...ctx.nextSteps], isMcpRuntimeForTestResult() ? 'mcp' : 'cli');
         }
         return sessionToTestResult(session!);
       }
