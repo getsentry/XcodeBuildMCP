@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCliJsonSnapshotErrorState } from '../harness.ts';
+import { assertCliSnapshotProcessResult, resolveCliJsonSnapshotErrorState } from '../harness.ts';
 import { resolveMcpSnapshotErrorState } from '../mcp-harness.ts';
 import type { StructuredOutputEnvelope } from '../../types/structured-output.ts';
 
@@ -16,6 +16,42 @@ const errorEnvelope: StructuredOutputEnvelope<null> = {
   didError: true,
   error: 'Failed',
 };
+
+describe('CLI snapshot process result guard', () => {
+  it('accepts completed domain invocations without process stderr', () => {
+    expect(() =>
+      assertCliSnapshotProcessResult(
+        { error: undefined, signal: null, status: 1, stderr: '' },
+        'tool',
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects process stderr so domain snapshots cannot hide user-visible noise', () => {
+    expect(() =>
+      assertCliSnapshotProcessResult(
+        { error: undefined, signal: null, status: 0, stderr: 'warning\n' },
+        'tool',
+      ),
+    ).toThrow('CLI process emitted unexpected stderr for tool:\nwarning');
+  });
+
+  it('rejects failed process execution before snapshot matching', () => {
+    expect(() =>
+      assertCliSnapshotProcessResult(
+        { error: new Error('spawn failed'), signal: null, status: null, stderr: '' },
+        'tool',
+      ),
+    ).toThrow('CLI process failed for tool: spawn failed');
+
+    expect(() =>
+      assertCliSnapshotProcessResult(
+        { error: undefined, signal: 'SIGTERM', status: null, stderr: '' },
+        'tool',
+      ),
+    ).toThrow('CLI process for tool was terminated by signal SIGTERM.');
+  });
+});
 
 describe('JSON snapshot harness error state', () => {
   it('uses CLI process status and envelope.didError when they agree', () => {

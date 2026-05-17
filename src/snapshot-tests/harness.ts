@@ -56,6 +56,34 @@ function runSnapshotCli(
   });
 }
 
+function readProcessOutput(output: string | Buffer | null | undefined): string {
+  return typeof output === 'string' ? output : (output?.toString('utf8') ?? '');
+}
+
+export function assertCliSnapshotProcessResult(
+  result: Pick<ReturnType<typeof spawnSync>, 'error' | 'signal' | 'status' | 'stderr'>,
+  label: string,
+): void {
+  if (result.error) {
+    throw new Error(`CLI process failed for ${label}: ${result.error.message}`);
+  }
+
+  if (result.signal) {
+    throw new Error(`CLI process for ${label} was terminated by signal ${result.signal}.`);
+  }
+
+  if (result.status === null) {
+    throw new Error(
+      `CLI process exit status was null for ${label}; the process may have timed out or been killed by a signal.`,
+    );
+  }
+
+  const stderr = readProcessOutput(result.stderr).trim();
+  if (stderr.length > 0) {
+    throw new Error(`CLI process emitted unexpected stderr for ${label}:\n${stderr}`);
+  }
+}
+
 function parseStructuredEnvelope(
   stdout: string,
   label: string,
@@ -107,9 +135,10 @@ export async function createSnapshotHarness(
       throw new Error(`Tool '${cliToolName}' in workflow '${workflow}' is not CLI-available`);
     }
 
+    const label = `${workflow}/${cliToolName}`;
     const result = runSnapshotCli(workflow, cliToolName, args, 'text', options);
-    const stdout =
-      typeof result.stdout === 'string' ? result.stdout : (result.stdout?.toString('utf8') ?? '');
+    assertCliSnapshotProcessResult(result, label);
+    const stdout = readProcessOutput(result.stdout);
 
     return {
       text: normalizeSnapshotOutput(stdout),
@@ -141,19 +170,16 @@ export async function createCliJsonSnapshotHarness(
       throw new Error(`Tool '${cliToolName}' in workflow '${workflow}' is not CLI-available`);
     }
 
+    const label = `${workflow}/${cliToolName}`;
     const result = runSnapshotCli(workflow, cliToolName, args, 'json', options);
-    const stdout =
-      typeof result.stdout === 'string' ? result.stdout : (result.stdout?.toString('utf8') ?? '');
-    const envelope = parseStructuredEnvelope(stdout, `${workflow}/${cliToolName}`);
+    assertCliSnapshotProcessResult(result, label);
+    const stdout = readProcessOutput(result.stdout);
+    const envelope = parseStructuredEnvelope(stdout, label);
 
     return {
       text: formatStructuredEnvelopeFixture(envelope),
       rawText: stdout,
-      isError: resolveCliJsonSnapshotErrorState(
-        result.status,
-        envelope,
-        `${workflow}/${cliToolName}`,
-      ),
+      isError: resolveCliJsonSnapshotErrorState(result.status, envelope, label),
       structuredEnvelope: envelope,
     };
   }
