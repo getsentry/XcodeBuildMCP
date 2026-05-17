@@ -159,6 +159,9 @@ paths = [
   "xcodebuildmcp.com/app/docs/_content/testing.mdx",
   "xcodebuildmcp.com/app/docs/_content/contributing.mdx",
 ]
+ignorePaths = [
+  "src/snapshot-tests/__fixtures__/**",
+]
 
 [[skills.triggers]]
 type = "pull_request"
@@ -187,6 +190,9 @@ actions = ["opened", "synchronize", "reopened"]
 name = "wrdn-pii"
 remote = "getsentry/warden-skills"
 paths = ["**/*"]
+ignorePaths = [
+  "src/snapshot-tests/__fixtures__/**",
+]
 
 [[skills.triggers]]
 type = "pull_request"
