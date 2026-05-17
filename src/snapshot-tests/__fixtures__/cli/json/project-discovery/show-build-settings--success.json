@@ -1399,19 +1399,19 @@
       },
       {
         "key": "MAC_OS_X_PRODUCT_BUILD_VERSION",
-        "value": "25D2128"
+        "value": "<SDK_BUILD_VERSION>"
       },
       {
         "key": "MAC_OS_X_VERSION_ACTUAL",
-        "value": "260301"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "MAC_OS_X_VERSION_MAJOR",
-        "value": "260000"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "MAC_OS_X_VERSION_MINOR",
-        "value": "260300"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "MAKE_MERGEABLE",

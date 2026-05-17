@@ -16,12 +16,7 @@
         {
           "AXFrame": "{{0, 0}, {402, 874}}",
           "AXUniqueId": null,
-          "frame": {
-            "y": 0,
-            "x": 0,
-            "width": 402,
-            "height": 874
-          },
+          "frame": { "x": 0, "y": 0, "width": 402, "height": 874 },
           "role_description": "application",
           "AXLabel": "Calculator",
           "content_required": false,
@@ -36,12 +31,7 @@
             {
               "AXFrame": "{{344, 250.5}, {34, 67}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 250.5,
-                "x": 344,
-                "width": 34,
-                "height": 67
-              },
+              "frame": { "x": 344, "y": 250.5, "width": 34, "height": 67 },
               "role_description": "text",
               "AXLabel": "0",
               "content_required": false,
@@ -59,12 +49,7 @@
             {
               "AXFrame": "{{19.5, 357.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 357.5,
-                "x": 19.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 19.5, "y": 357.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "C",
               "content_required": false,
@@ -82,12 +67,7 @@
             {
               "AXFrame": "{{113.2, 357.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 357.5,
-                "x": 113.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 113.2, "y": 357.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "±",
               "content_required": false,
@@ -105,12 +85,7 @@
             {
               "AXFrame": "{{206.5, 357.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 357.5,
-                "x": 206.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 206.5, "y": 357.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "%",
               "content_required": false,
@@ -128,12 +103,7 @@
             {
               "AXFrame": "{{300.2, 357.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 357.5,
-                "x": 300.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 300.2, "y": 357.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "÷",
               "content_required": false,
@@ -151,12 +121,7 @@
             {
               "AXFrame": "{{19.5, 449.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 449.5,
-                "x": 19.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 19.5, "y": 449.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "7",
               "content_required": false,
@@ -174,12 +139,7 @@
             {
               "AXFrame": "{{113.2, 449.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 449.5,
-                "x": 113.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 113.2, "y": 449.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "8",
               "content_required": false,
@@ -197,12 +157,7 @@
             {
               "AXFrame": "{{206.5, 449.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 449.5,
-                "x": 206.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 206.5, "y": 449.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "9",
               "content_required": false,
@@ -220,12 +175,7 @@
             {
               "AXFrame": "{{300.2, 449.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 449.5,
-                "x": 300.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 300.2, "y": 449.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "×",
               "content_required": false,
@@ -243,12 +193,7 @@
             {
               "AXFrame": "{{19.5, 541.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 541.5,
-                "x": 19.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 19.5, "y": 541.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "4",
               "content_required": false,
@@ -266,12 +211,7 @@
             {
               "AXFrame": "{{113.2, 541.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 541.5,
-                "x": 113.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 113.2, "y": 541.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "5",
               "content_required": false,
@@ -289,12 +229,7 @@
             {
               "AXFrame": "{{206.5, 541.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 541.5,
-                "x": 206.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 206.5, "y": 541.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "6",
               "content_required": false,
@@ -312,12 +247,7 @@
             {
               "AXFrame": "{{300.2, 541.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 541.5,
-                "x": 300.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 300.2, "y": 541.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "-",
               "content_required": false,
@@ -335,12 +265,7 @@
             {
               "AXFrame": "{{19.5, 633.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 633.5,
-                "x": 19.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 19.5, "y": 633.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "1",
               "content_required": false,
@@ -358,12 +283,7 @@
             {
               "AXFrame": "{{113.2, 633.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 633.5,
-                "x": 113.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 113.2, "y": 633.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "2",
               "content_required": false,
@@ -381,12 +301,7 @@
             {
               "AXFrame": "{{206.5, 633.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 633.5,
-                "x": 206.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 206.5, "y": 633.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": "3",
               "content_required": false,
@@ -404,12 +319,7 @@
             {
               "AXFrame": "{{300.2, 633.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 633.5,
-                "x": 300.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 300.2, "y": 633.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "+",
               "content_required": false,
@@ -427,12 +337,7 @@
             {
               "AXFrame": "{{113.2, 725.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 725.5,
-                "x": 113.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 113.2, "y": 725.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "0",
               "content_required": false,
@@ -450,12 +355,7 @@
             {
               "AXFrame": "{{206.5, 725.5}, {82.7, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 725.5,
-                "x": 206.5,
-                "width": 82.7,
-                "height": 81
-              },
+              "frame": { "x": 206.5, "y": 725.5, "width": 82.7, "height": 81 },
               "role_description": "button",
               "AXLabel": ".",
               "content_required": false,
@@ -473,12 +373,7 @@
             {
               "AXFrame": "{{300.2, 725.5}, {82.3, 81}}",
               "AXUniqueId": null,
-              "frame": {
-                "y": 725.5,
-                "x": 300.2,
-                "width": 82.3,
-                "height": 81
-              },
+              "frame": { "x": 300.2, "y": 725.5, "width": 82.3, "height": 81 },
               "role_description": "button",
               "AXLabel": "=",
               "content_required": false,

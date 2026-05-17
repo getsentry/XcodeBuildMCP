@@ -105,6 +105,7 @@ function normalizeBuildSettingsEntryValue(key: string, value: string): string {
       return '<SDK_NAME>';
     case 'PLATFORM_PRODUCT_BUILD_VERSION':
     case 'SDK_PRODUCT_BUILD_VERSION':
+    case 'MAC_OS_X_PRODUCT_BUILD_VERSION':
       return '<SDK_BUILD_VERSION>';
     case 'SDK_STAT_CACHE_PATH':
       return '<SDK_STAT_CACHE_PATH>';
@@ -112,6 +113,9 @@ function normalizeBuildSettingsEntryValue(key: string, value: string): string {
     case 'SDK_VERSION_ACTUAL':
     case 'SDK_VERSION_MAJOR':
     case 'SDK_VERSION_MINOR':
+    case 'MAC_OS_X_VERSION_ACTUAL':
+    case 'MAC_OS_X_VERSION_MAJOR':
+    case 'MAC_OS_X_VERSION_MINOR':
       return '<SDK_VERSION>';
     case 'TARGET_DEVICE_MODEL':
     case 'ASSETCATALOG_FILTER_FOR_DEVICE_MODEL':
@@ -236,8 +240,8 @@ export function normalizeStructuredEnvelope(
 
 function compactFrameObjects(json: string): string {
   return json.replace(
-    /"frame": \{\n\s+"x": (\d+(?:\.\d+)?),\n\s+"y": (\d+(?:\.\d+)?),\n\s+"width": (\d+(?:\.\d+)?),\n\s+"height": (\d+(?:\.\d+)?)\n\s+\}/g,
-    '"frame": { "x": $1, "y": $2, "width": $3, "height": $4 }',
+    /"frame": \{\n\s+"y": (\d+(?:\.\d+)?),\n\s+"x": (\d+(?:\.\d+)?),\n\s+"width": (\d+(?:\.\d+)?),\n\s+"height": (\d+(?:\.\d+)?)\n\s+\}/g,
+    '"frame": { "x": $2, "y": $1, "width": $3, "height": $4 }',
   );
 }
 

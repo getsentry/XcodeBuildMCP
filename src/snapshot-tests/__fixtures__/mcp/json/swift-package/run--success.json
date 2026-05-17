@@ -36,5 +36,8 @@
       "warnings": [],
       "errors": []
     }
-  }
+  },
+  "nextSteps": [
+    "Stop Swift package run: swift_package_stop()"
+  ]
 }

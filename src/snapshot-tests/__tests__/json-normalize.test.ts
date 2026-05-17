@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StructuredOutputEnvelope } from '../../types/structured-output.ts';
-import { normalizeStructuredEnvelope } from '../json-normalize.ts';
+import { formatStructuredEnvelopeFixture, normalizeStructuredEnvelope } from '../json-normalize.ts';
 
 describe('normalizeStructuredEnvelope', () => {
   it('keeps only failing test cases for failed result snapshots', () => {
@@ -131,6 +131,8 @@ describe('normalizeStructuredEnvelope', () => {
           { key: 'SDK_NAME', value: 'iphoneos26.4' },
           { key: 'SDK_VERSION_ACTUAL', value: '260400' },
           { key: 'SDK_PRODUCT_BUILD_VERSION', value: '23E237' },
+          { key: 'MAC_OS_X_VERSION_ACTUAL', value: '260301' },
+          { key: 'MAC_OS_X_PRODUCT_BUILD_VERSION', value: '25D2128' },
           {
             key: 'PLATFORM_DEVELOPER_APPLICATIONS_DIR',
             value: '/Applications/Xcode-26.4.0.app/Contents/Developer/Applications',
@@ -161,6 +163,8 @@ describe('normalizeStructuredEnvelope', () => {
           { key: 'SDK_NAME', value: '<SDK_NAME>' },
           { key: 'SDK_VERSION_ACTUAL', value: '<SDK_VERSION>' },
           { key: 'SDK_PRODUCT_BUILD_VERSION', value: '<SDK_BUILD_VERSION>' },
+          { key: 'MAC_OS_X_VERSION_ACTUAL', value: '<SDK_VERSION>' },
+          { key: 'MAC_OS_X_PRODUCT_BUILD_VERSION', value: '<SDK_BUILD_VERSION>' },
           {
             key: 'PLATFORM_DEVELOPER_APPLICATIONS_DIR',
             value: '/Applications/Xcode-<VERSION>.app/Contents/Developer/Applications',
@@ -169,6 +173,22 @@ describe('normalizeStructuredEnvelope', () => {
         ],
       },
     });
+  });
+
+  it('compacts frame objects emitted with y before x', () => {
+    const envelope: StructuredOutputEnvelope<unknown> = {
+      schema: 'xcodebuildmcp.output.ui-snapshot',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: {
+        frame: { y: 2, x: 1, width: 3, height: 4 },
+      },
+    };
+
+    expect(formatStructuredEnvelopeFixture(envelope)).toContain(
+      '"frame": { "x": 1, "y": 2, "width": 3, "height": 4 }',
+    );
   });
 
   it('normalizes volatile build settings PATH entry values without dropping the entry', () => {
