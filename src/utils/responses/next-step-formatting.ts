@@ -10,7 +10,8 @@ export interface FormatNextStepOptions {
 const SHELL_SAFE_UNQUOTED_ARG = /^[A-Za-z0-9_@%+=:,./~-]+$/;
 
 function resolveLabel(step: NextStep): string {
-  if (step.label?.trim()) return step.label;
+  const label = step.label?.trim();
+  if (label) return label;
   if (step.tool) return step.tool;
   if (step.cliTool) return step.cliTool;
   return 'Next action';
@@ -76,11 +77,12 @@ export function formatNextStep(step: NextStep, options: FormatNextStepOptions): 
   const formatted =
     options.runtime === 'cli' ? formatNextStepForCli(step) : formatNextStepForMcp(step);
 
-  if (!step.label || formatted === step.label) {
+  const label = resolveLabel(step);
+  if (!step.label?.trim() || formatted === label) {
     return formatted;
   }
 
-  return `${step.label}: ${formatted}`;
+  return `${label}: ${formatted}`;
 }
 
 export function serializeNextSteps(

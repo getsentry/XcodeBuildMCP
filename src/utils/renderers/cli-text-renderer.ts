@@ -1,3 +1,4 @@
+import type { RuntimeKind } from '../../runtime/types.ts';
 import type { NextStep } from '../../types/common.ts';
 import type { StructuredToolOutput } from '../../rendering/types.ts';
 import type { FilePathRenderStyle } from '../runtime-config-types.ts';
@@ -86,7 +87,7 @@ export interface CliTextTranscriptInput {
   items?: readonly AnyFragment[];
   structuredOutput?: StructuredToolOutput;
   nextSteps?: readonly NextStep[];
-  nextStepsRuntime?: 'cli' | 'daemon' | 'mcp';
+  nextStepsRuntime?: RuntimeKind;
   suppressWarnings?: boolean;
   showTestTiming?: boolean;
   filePathRenderStyle?: FilePathRenderStyle;
@@ -127,7 +128,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
   let sawIncomingSummaryEvent = false;
   let sawIncomingNonSummaryEvent = false;
   let nextSteps: readonly NextStep[] = [];
-  let nextStepsRuntime: 'cli' | 'daemon' | 'mcp' | undefined;
+  let nextStepsRuntime: RuntimeKind | undefined;
   let sawProgressNextSteps = false;
   let lastRenderedTestProgressKey: string | null = null;
   let pendingStreamedSummary: SummaryTextBlock | null = null;
@@ -424,7 +425,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       structuredOutput = output;
     },
 
-    setNextSteps(steps: readonly NextStep[], runtime: 'cli' | 'daemon' | 'mcp'): void {
+    setNextSteps(steps: readonly NextStep[], runtime: RuntimeKind): void {
       nextSteps = [...steps];
       nextStepsRuntime = runtime;
     },

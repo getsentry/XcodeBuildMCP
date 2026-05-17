@@ -5,10 +5,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
 }
 
+function normalizeBaseString(value: string): string {
+  const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
+  return normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
+}
+
 function normalizeString(value: string, key?: string, path: string[] = []): string {
   const parentKey = path.at(-2);
-  const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
-  let result = normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
+  let result = normalizeBaseString(value);
 
   if (parentKey === 'stderr') {
     result = result.replace(/^\[\d+\/\d+\] /, '[<STEP>] ');
@@ -131,10 +135,8 @@ function normalizeBuildSettingsEntryValue(key: string, value: string): string {
     case 'TARGET_DEVICE_OS_VERSION':
     case 'ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION':
       return '<OS_VERSION>';
-    default: {
-      const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
-      return normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
-    }
+    default:
+      return normalizeBaseString(value);
   }
 }
 
@@ -252,10 +254,13 @@ export function normalizeStructuredEnvelope(
   ) as StructuredOutputEnvelope<unknown>;
 }
 
+const FRAME_OBJECT_REGEX =
+  /"frame": \{\n\s+"y": (?<y>\d+(?:\.\d+)?),\n\s+"x": (?<x>\d+(?:\.\d+)?),\n\s+"width": (?<width>\d+(?:\.\d+)?),\n\s+"height": (?<height>\d+(?:\.\d+)?)\n\s+\}/g;
+
 function compactFrameObjects(json: string): string {
   return json.replace(
-    /"frame": \{\n\s+"y": (\d+(?:\.\d+)?),\n\s+"x": (\d+(?:\.\d+)?),\n\s+"width": (\d+(?:\.\d+)?),\n\s+"height": (\d+(?:\.\d+)?)\n\s+\}/g,
-    '"frame": { "x": $2, "y": $1, "width": $3, "height": $4 }',
+    FRAME_OBJECT_REGEX,
+    '"frame": { "x": $<x>, "y": $<y>, "width": $<width>, "height": $<height> }',
   );
 }
 

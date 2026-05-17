@@ -54,6 +54,7 @@ const BUILD_SETTINGS_GROUP_REGEX = /^(\s*(?:ALTERNATE_GROUP|GROUP|INSTALL_GROUP)
 const BUILD_SETTINGS_GID_REGEX = /^(\s*GID = )\d+$/gm;
 const SDK_PATH_REGEX =
   /^(\s*(?:CORRESPONDING_SIMULATOR_SDK_DIR|SDKROOT|SDK_DIR(?:_[A-Za-z0-9_]+)?) = ).+$/gm;
+const SDK_DIR_PLACEHOLDER_KEY_REGEX = /^(\s*)SDK_DIR_[A-Za-z0-9_]+ = <SDK_PATH>$/gm;
 const SDK_NAME_REGEX = /^(\s*(?:CORRESPONDING_SIMULATOR_SDK_NAME|SDK_NAMES?) = ).+$/gm;
 const SDK_BUILD_VERSION_REGEX =
   /^(\s*(?:PLATFORM_PRODUCT_BUILD_VERSION|SDK_PRODUCT_BUILD_VERSION|MAC_OS_X_PRODUCT_BUILD_VERSION) = ).+$/gm;
@@ -230,7 +231,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(BUILD_SETTINGS_GID_REGEX, '$1<GID>');
   normalized = normalized.replace(SDK_PATH_REGEX, '$1<SDK_PATH>');
   normalized = normalized.replace(
-    /^(\s*)SDK_DIR_[A-Za-z0-9_]+ = <SDK_PATH>$/gm,
+    SDK_DIR_PLACEHOLDER_KEY_REGEX,
     '$1SDK_DIR_<SDK_NAME> = <SDK_PATH>',
   );
   normalized = normalized.replace(SDK_NAME_REGEX, '$1<SDK_NAME>');

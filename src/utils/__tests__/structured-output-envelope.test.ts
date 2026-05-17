@@ -71,6 +71,33 @@ describe('toStructuredEnvelope', () => {
     ).toEqual(expectedEnvelope);
   });
 
+  it('does not serialize next steps on error envelopes because the error schema has no nextSteps field', () => {
+    const result: BuildResultDomainResult = {
+      kind: 'build-result',
+      didError: true,
+      error: 'Build failed',
+    };
+
+    expect(
+      toStructuredEnvelope(result, 'xcodebuildmcp.output.error', '1', {
+        nextSteps: [
+          {
+            label: 'Retry build',
+            cliTool: 'build',
+            workflow: 'project',
+            params: { scheme: 'CalculatorApp' },
+          },
+        ],
+      }),
+    ).toEqual({
+      schema: 'xcodebuildmcp.output.error',
+      schemaVersion: '1',
+      didError: true,
+      error: 'Build failed',
+      data: null,
+    });
+  });
+
   it('serializes next steps as rendered CLI command lines by default sorted by priority', () => {
     const result: DeviceListDomainResult = {
       kind: 'device-list',

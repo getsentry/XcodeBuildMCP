@@ -94,11 +94,11 @@ export function resolveMcpSnapshotErrorState(
   const didTransportError = transportDidError ?? false;
   if (envelopeDidError !== undefined && didTransportError !== envelopeDidError) {
     throw new Error(
-      `MCP result.isError (${didTransportError}) disagrees with structuredContent.didError (${envelopeDidError}) for ${label}.`,
+      `MCP result.isError (${String(transportDidError)}) disagrees with structuredContent.didError (${envelopeDidError}) for ${label}.`,
     );
   }
 
-  return didTransportError || envelopeDidError === true;
+  return didTransportError;
 }
 
 export async function createMcpSnapshotHarness(

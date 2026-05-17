@@ -57,9 +57,12 @@ export function toStructuredEnvelope<TResult extends ToolDomainResult>(
 ): StructuredOutputEnvelope<DomainResultData<TResult>> {
   const { nextSteps, nextStepRuntime = 'cli', outputStyle = 'normal' } = options;
   const { kind: _kind, didError, error, ...data } = result;
-  const serializedNextSteps = serializeNextSteps(nextSteps, {
-    runtime: nextStepRuntime,
-  });
+  const serializedNextSteps =
+    schema === 'xcodebuildmcp.output.error'
+      ? undefined
+      : serializeNextSteps(nextSteps, {
+          runtime: nextStepRuntime,
+        });
 
   const envelope: StructuredOutputEnvelope<DomainResultData<TResult>> = {
     schema,

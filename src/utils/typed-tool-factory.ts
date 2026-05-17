@@ -61,12 +61,16 @@ function setValidationErrorOutput(ctx: ToolHandlerContext, message: string, code
   });
 }
 
+function isMcpRuntimeForTestResult(): boolean {
+  return process.env.XCODEBUILDMCP_RUNTIME === 'mcp';
+}
+
 function outputStyleForTestResult(): OutputStyle {
-  return process.env.XCODEBUILDMCP_RUNTIME === 'mcp' ? 'minimal' : 'normal';
+  return isMcpRuntimeForTestResult() ? 'minimal' : 'normal';
 }
 
 function nextStepsRuntimeForTestResult(): 'cli' | 'mcp' {
-  return process.env.XCODEBUILDMCP_RUNTIME === 'mcp' ? 'mcp' : 'cli';
+  return isMcpRuntimeForTestResult() ? 'mcp' : 'cli';
 }
 
 function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {

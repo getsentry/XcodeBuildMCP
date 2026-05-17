@@ -73,6 +73,12 @@ export function resolveCliJsonSnapshotErrorState(
   envelope: NonNullable<SnapshotResult['structuredEnvelope']>,
   label: string,
 ): boolean {
+  if (status === null) {
+    throw new Error(
+      `CLI process exit status was null for ${label}; the process may have timed out or been killed by a signal.`,
+    );
+  }
+
   const processDidError = status !== 0;
   if (processDidError !== envelope.didError) {
     throw new Error(
@@ -80,7 +86,7 @@ export function resolveCliJsonSnapshotErrorState(
     );
   }
 
-  return processDidError || envelope.didError;
+  return processDidError;
 }
 
 export async function createSnapshotHarness(

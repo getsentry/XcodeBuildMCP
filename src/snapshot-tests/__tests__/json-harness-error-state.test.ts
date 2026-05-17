@@ -23,6 +23,12 @@ describe('JSON snapshot harness error state', () => {
     expect(resolveCliJsonSnapshotErrorState(1, errorEnvelope, 'tool')).toBe(true);
   });
 
+  it('rejects null CLI process status', () => {
+    expect(() => resolveCliJsonSnapshotErrorState(null, successEnvelope, 'tool')).toThrow(
+      'CLI process exit status was null for tool; the process may have timed out or been killed by a signal.',
+    );
+  });
+
   it('rejects CLI process status and envelope.didError disagreement', () => {
     expect(() => resolveCliJsonSnapshotErrorState(1, successEnvelope, 'tool')).toThrow(
       'CLI process exit status (1) disagrees with envelope.didError (false)',
@@ -43,6 +49,9 @@ describe('JSON snapshot harness error state', () => {
     );
     expect(() => resolveMcpSnapshotErrorState(false, true, 'tool')).toThrow(
       'MCP result.isError (false) disagrees with structuredContent.didError (true)',
+    );
+    expect(() => resolveMcpSnapshotErrorState(undefined, true, 'tool')).toThrow(
+      'MCP result.isError (undefined) disagrees with structuredContent.didError (true)',
     );
   });
 });

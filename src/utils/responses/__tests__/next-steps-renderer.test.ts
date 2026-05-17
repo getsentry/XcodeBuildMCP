@@ -185,6 +185,20 @@ describe('next-steps-renderer', () => {
       expect(result).toBe('Open the Simulator app: open_sim()');
     });
 
+    it('trims label whitespace before rendering command steps', () => {
+      const step: NextStep = {
+        tool: 'boot_sim',
+        cliTool: 'boot',
+        workflow: 'simulator',
+        label: '  Boot simulator  ',
+        params: { simulatorId: 'SIM-1' },
+      };
+
+      expect(renderNextStep(step, 'cli')).toBe(
+        'Boot simulator: xcodebuildmcp simulator boot --simulator-id SIM-1',
+      );
+    });
+
     it('should render label-only step as plain text', () => {
       const step: NextStep = {
         label: 'Verify layout visually before continuing',
