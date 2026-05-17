@@ -5,7 +5,7 @@ import {
   createNoopExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
-import { runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { runToolLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, swift_package_runLogic } from '../swift_package_run.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 
@@ -299,7 +299,7 @@ describe('swift_package_run plugin', () => {
 
   describe('Response Logic Testing', () => {
     it('should return validation error for missing packagePath', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const text = result.content.map((c) => c.text).join('\n');

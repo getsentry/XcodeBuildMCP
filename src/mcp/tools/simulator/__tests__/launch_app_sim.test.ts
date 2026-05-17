@@ -4,7 +4,7 @@ import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, launch_app_simLogic, type SimulatorLauncher } from '../launch_app_sim.ts';
 import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 function createMockLauncher(overrides?: Partial<LaunchWithLoggingResult>): SimulatorLauncher {
   return async (_uuid, _bundleId, _executor, _opts?) => ({
@@ -48,7 +48,7 @@ describe('launch_app_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulator identifier when not provided', async () => {
-      const result = await handler({ bundleId: 'io.sentry.testapp' });
+      const result = await callHandler(handler, { bundleId: 'io.sentry.testapp' });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -59,7 +59,7 @@ describe('launch_app_sim tool', () => {
     it('should require bundleId when simulatorId default exists', async () => {
       sessionStore.setDefaults({ simulatorId: 'SIM-UUID' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -67,7 +67,7 @@ describe('launch_app_sim tool', () => {
     });
 
     it('should reject when both simulatorId and simulatorName provided explicitly', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'SIM-UUID',
         simulatorName: 'iPhone 17',
         bundleId: 'io.sentry.testapp',

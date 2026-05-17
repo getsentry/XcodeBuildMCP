@@ -8,7 +8,7 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, key_sequenceLogic } from '../key_sequence.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Key Sequence Tool', () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('Key Sequence Tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({ keyCodes: [40] });
+      const result = await callHandler(handler, { keyCodes: [40] });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -55,7 +55,7 @@ describe('Key Sequence Tool', () => {
     it('should surface validation errors once simulator defaults exist', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({ keyCodes: [] });
+      const result = await callHandler(handler, { keyCodes: [] });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -226,7 +226,7 @@ describe('Key Sequence Tool', () => {
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should surface session default requirement when simulatorId is missing', async () => {
-      const result = await handler({ keyCodes: [40] });
+      const result = await callHandler(handler, { keyCodes: [40] });
 
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('Missing required session defaults');

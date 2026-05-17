@@ -2,7 +2,7 @@
  * Tests for the createTypedTool factory
  */
 
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { createTypedTool } from '../typed-tool-factory.ts';
 import type { ToolHandler } from '../typed-tool-factory.ts';
@@ -61,17 +61,6 @@ function invokeAndCollect(
     };
   });
 }
-
-const originalRuntime = process.env.XCODEBUILDMCP_RUNTIME;
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  if (originalRuntime === undefined) {
-    delete process.env.XCODEBUILDMCP_RUNTIME;
-  } else {
-    process.env.XCODEBUILDMCP_RUNTIME = originalRuntime;
-  }
-});
 
 describe('createTypedTool', () => {
   describe('Type Safety and Validation', () => {
@@ -159,36 +148,6 @@ describe('createTypedTool', () => {
       await expect(invokeAndCollect(handler, { requiredParam: 'valid' })).rejects.toThrow(
         'Unexpected error',
       );
-    });
-  });
-
-  describe('Next Steps', () => {
-    it('uses MCP next-step syntax for runtime-driven test responses', async () => {
-      const mockExecutor = createMockExecutor({ success: true, output: 'test' });
-
-      async function nextStepLogic(): Promise<void> {
-        const ctx = getHandlerContext();
-        ctx.nextSteps = [
-          {
-            label: 'Boot simulator',
-            tool: 'boot_sim',
-            cliTool: 'boot-sim',
-            workflow: 'simulator',
-            params: { simulatorId: 'SIM-1' },
-          },
-        ];
-      }
-
-      vi.stubEnv('XCODEBUILDMCP_RUNTIME', 'mcp');
-      const handler = createTypedTool(testSchema, nextStepLogic, () => mockExecutor);
-
-      const result = await handler({ requiredParam: 'valid' });
-
-      expect(result.content[0]?.type).toBe('text');
-      expect(result.content[0]?.text).toContain(
-        'Boot simulator: boot_sim({ simulatorId: "SIM-1" })',
-      );
-      expect(result.content[0]?.text).not.toContain('xcodebuildmcp simulator boot-sim');
     });
   });
 

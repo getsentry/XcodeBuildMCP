@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import { schema, handler, record_sim_videoLogic } from '../record_sim_video.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
-import { createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { createMockToolHandlerContext, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 const DUMMY_EXECUTOR: any = (async () => ({ success: true })) as any; // CommandExecutor stub
 const VALID_SIM_ID = '00000000-0000-0000-0000-000000000000';
@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe('record_sim_video tool - validation', () => {
   it('errors when start and stop are both true (mutually exclusive)', async () => {
-    const res = await handler({
+    const res = await callHandler(handler, {
       simulatorId: VALID_SIM_ID,
       start: true,
       stop: true,
@@ -25,7 +25,7 @@ describe('record_sim_video tool - validation', () => {
   });
 
   it('errors when stop=true but outputFile is missing', async () => {
-    const res = await handler({
+    const res = await callHandler(handler, {
       simulatorId: VALID_SIM_ID,
       stop: true,
     } as any);

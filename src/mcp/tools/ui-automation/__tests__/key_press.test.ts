@@ -9,7 +9,7 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, key_pressLogic } from '../key_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 function createDefaultMockAxeHelpers() {
   return {
@@ -50,7 +50,7 @@ describe('Key Press Tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({ keyCode: 40 });
+      const result = await callHandler(handler, { keyCode: 40 });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -62,7 +62,7 @@ describe('Key Press Tool', () => {
     it('should surface validation errors once simulator default exists', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;

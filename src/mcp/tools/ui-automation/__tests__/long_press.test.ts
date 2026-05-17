@@ -4,7 +4,7 @@ import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-exe
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, long_pressLogic } from '../long_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Long Press Plugin', () => {
   beforeEach(() => {
@@ -72,7 +72,7 @@ describe('Long Press Plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default', async () => {
-      const result = await handler({ x: 100, y: 200, duration: 1500 });
+      const result = await callHandler(handler, { x: 100, y: 200, duration: 1500 });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -84,7 +84,7 @@ describe('Long Press Plugin', () => {
     it('should surface validation errors once simulator default exists', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({ x: 100, y: 200, duration: 0 });
+      const result = await callHandler(handler, { x: 100, y: 200, duration: 0 });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;

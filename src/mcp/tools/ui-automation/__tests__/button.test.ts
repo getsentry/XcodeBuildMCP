@@ -8,7 +8,7 @@ import {
 import { schema, handler, buttonLogic } from '../button.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Button Plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -186,7 +186,7 @@ describe('Button Plugin', () => {
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should surface session default requirement when simulatorId is missing', async () => {
-      const result = await handler({ buttonType: 'home' });
+      const result = await callHandler(handler, { buttonType: 'home' });
 
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('Missing required session defaults');
@@ -194,7 +194,7 @@ describe('Button Plugin', () => {
     });
 
     it('should return error for missing buttonType', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: '12345678-1234-4234-8234-123456789012',
       });
 
@@ -206,7 +206,7 @@ describe('Button Plugin', () => {
     });
 
     it('should return error for invalid simulatorId format', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'invalid-uuid-format',
         buttonType: 'home',
       });
@@ -217,7 +217,7 @@ describe('Button Plugin', () => {
     });
 
     it('should return error for invalid buttonType', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: '12345678-1234-4234-8234-123456789012',
         buttonType: 'invalid-button',
       });
@@ -227,7 +227,7 @@ describe('Button Plugin', () => {
     });
 
     it('should return error for negative duration', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: '12345678-1234-4234-8234-123456789012',
         buttonType: 'home',
         duration: -1,

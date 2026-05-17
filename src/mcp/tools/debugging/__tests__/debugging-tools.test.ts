@@ -50,7 +50,12 @@ import {
   handler as variablesHandler,
   debug_variablesLogic,
 } from '../debug_variables.ts';
-import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  allText,
+  runLogic,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 
 function createMockBackend(overrides: Partial<DebuggerBackend> = {}): DebuggerBackend {
   return {
@@ -125,7 +130,7 @@ describe('debug_attach_sim', () => {
 
   describe('Handler Requirements', () => {
     it('should return error when no session defaults for simulator', async () => {
-      const result = await attachHandler({
+      const result = await callHandler(attachHandler, {
         bundleId: 'com.test.app',
       });
 
@@ -143,7 +148,7 @@ describe('debug_attach_sim', () => {
         bundleId: 'com.default.app',
       });
 
-      const result = await attachHandler({ pid: 1234 });
+      const result = await callHandler(attachHandler, { pid: 1234 });
 
       expect(result.isError).toBeFalsy();
       const text = result.content[0].text;
@@ -155,7 +160,7 @@ describe('debug_attach_sim', () => {
       __setTestDebuggerToolContextOverride(createTestContext());
       sessionStore.setDefaults({ simulatorId: 'test-sim-uuid' });
 
-      const result = await attachHandler({
+      const result = await callHandler(attachHandler, {
         pid: 1234,
         bundleId: 'com.test.app',
       });

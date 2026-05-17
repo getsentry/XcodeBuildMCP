@@ -10,7 +10,7 @@ import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { SystemError } from '../../../../utils/errors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, screenshotLogic } from '../../ui-automation/screenshot.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('screenshot plugin', () => {
   beforeEach(() => {
@@ -310,7 +310,7 @@ describe('screenshot plugin', () => {
     });
 
     it('should handle missing simulatorId via handler', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;

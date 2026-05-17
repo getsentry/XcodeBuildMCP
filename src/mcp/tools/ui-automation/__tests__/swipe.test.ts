@@ -6,7 +6,7 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 
 import { schema, handler, type AxeHelpers, swipeLogic, type SwipeParams } from '../swipe.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 function createMockAxeHelpers(): AxeHelpers {
   return {
@@ -289,7 +289,7 @@ describe('Swipe Tool', () => {
 
   describe('Handler Behavior', () => {
     it('should return error for missing simulatorId via handler', async () => {
-      const result = await handler({ x1: 100, y1: 200, x2: 300, y2: 400 });
+      const result = await callHandler(handler, { x1: 100, y1: 200, x2: 300, y2: 400 });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].type).toBe('text');
@@ -301,7 +301,7 @@ describe('Swipe Tool', () => {
     it('should return validation error for missing x1 once simulator default exists', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         y1: 200,
         x2: 300,
         y2: 400,

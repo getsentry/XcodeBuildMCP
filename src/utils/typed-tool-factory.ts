@@ -1,36 +1,14 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as z from 'zod';
 import type { ToolHandlerContext } from '../rendering/types.ts';
-import { createRenderSession } from '../rendering/render.ts';
-import { getConfig } from './config-store.ts';
-import { resolveFilePathRenderStyle } from './file-path-render-style.ts';
-import { renderCliTextTranscript } from './renderers/cli-text-renderer.ts';
 import type { CommandExecutor } from './execution/index.ts';
-import type { OutputStyle } from '../types/common.ts';
 import { setStructuredErrorOutput } from './structured-error.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
 import { mergeSessionDefaultArgs, type ExclusiveParameterGroup } from './session-default-args.ts';
 
-/**
- * Result returned by tool handlers when invoked without a ToolHandlerContext
- * (i.e. in test mode). Provides a ToolResponse-compatible shape.
- */
-export interface ToolTestResult {
-  content: Array<{ type: 'text'; text: string }>;
-  isError?: boolean;
-}
-
-/**
- * Overloaded handler type for tools.
- * - With ToolHandlerContext: returns void (production / MCP path)
- * - Without context: returns ToolTestResult (test path)
- */
-export interface ToolHandler {
-  (args: Record<string, unknown>, ctx: ToolHandlerContext): Promise<void>;
-  (args: Record<string, unknown>): Promise<ToolTestResult>;
-}
+export type ToolHandler = (args: Record<string, unknown>, ctx: ToolHandlerContext) => Promise<void>;
 
 export const handlerContextStorage = new AsyncLocalStorage<ToolHandlerContext>();
 
@@ -61,35 +39,6 @@ function setValidationErrorOutput(ctx: ToolHandlerContext, message: string, code
   });
 }
 
-function isMcpRuntimeForTestResult(): boolean {
-  return process.env.XCODEBUILDMCP_RUNTIME === 'mcp';
-}
-
-function sessionToTestResult(session: ReturnType<typeof createRenderSession>): ToolTestResult {
-  const outputStyle: OutputStyle = isMcpRuntimeForTestResult() ? 'minimal' : 'normal';
-  const text = renderCliTextTranscript({
-    items: [],
-    structuredOutput: session.getStructuredOutput?.(),
-    nextSteps: session.getNextSteps?.(),
-    nextStepsRuntime: session.getNextStepsRuntime?.(),
-    includeHeaderDetails: outputStyle !== 'minimal',
-    filePathRenderStyle: resolveFilePathRenderStyle({
-      configured: getConfig().filePathRenderStyle,
-      outputStyle,
-    }),
-  });
-
-  const content: Array<{ type: 'text'; text: string }> = [];
-  if (text) {
-    content.push({ type: 'text' as const, text });
-  }
-
-  return {
-    content,
-    isError: session.isError() || undefined,
-  };
-}
-
 function createValidatedHandler<TParams, TContext>(
   schema: z.ZodType<TParams, unknown>,
   logicFunction: (params: TParams, context: TContext) => Promise<void>,
@@ -97,35 +46,17 @@ function createValidatedHandler<TParams, TContext>(
 ): ToolHandler {
   const impl = async (
     args: Record<string, unknown>,
-    providedContext?: TContext | ToolHandlerContext,
-  ): Promise<ToolTestResult | void> => {
+    providedContext: TContext | ToolHandlerContext,
+  ): Promise<void> => {
     const hasProvidedHandlerContext = isToolHandlerContext(providedContext);
-    const session = hasProvidedHandlerContext ? null : createRenderSession('text');
     const ctx: ToolHandlerContext = hasProvidedHandlerContext
       ? providedContext
-      : {
-          emit: (fragment) => {
-            session!.emit(fragment);
-          },
-          attach: (image) => {
-            session!.attach(image);
-          },
-        };
-    const context =
-      providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();
+      : getHandlerContext();
+    const context = hasProvidedHandlerContext ? getContext() : providedContext;
 
     try {
       const validatedParams = schema.parse(args);
       await handlerContextStorage.run(ctx, () => logicFunction(validatedParams, context));
-      if (!hasProvidedHandlerContext) {
-        if (ctx.structuredOutput) {
-          session!.setStructuredOutput?.(ctx.structuredOutput);
-        }
-        if (ctx.nextSteps && ctx.nextSteps.length > 0) {
-          session!.setNextSteps?.([...ctx.nextSteps], isMcpRuntimeForTestResult() ? 'mcp' : 'cli');
-        }
-        return sessionToTestResult(session!);
-      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         const details = `Invalid parameters:\n${formatZodIssues(error)}`;
@@ -134,12 +65,6 @@ function createValidatedHandler<TParams, TContext>(
           `Parameter validation failed: ${details}`,
           'PARAMETER_VALIDATION_FAILED',
         );
-        if (!hasProvidedHandlerContext) {
-          if (ctx.structuredOutput) {
-            session!.setStructuredOutput?.(ctx.structuredOutput);
-          }
-          return sessionToTestResult(session!);
-        }
         return;
       }
 
@@ -248,34 +173,13 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
 
   const impl = async (
     rawArgs: Record<string, unknown>,
-    providedContext?: TContext | ToolHandlerContext,
-  ): Promise<ToolTestResult | void> => {
+    providedContext: TContext | ToolHandlerContext,
+  ): Promise<void> => {
     const hasProvidedHandlerContext = isToolHandlerContext(providedContext);
-    const session = hasProvidedHandlerContext ? null : createRenderSession('text');
     const ctx: ToolHandlerContext = hasProvidedHandlerContext
       ? providedContext
-      : {
-          emit: (fragment) => {
-            session!.emit(fragment);
-          },
-          attach: (image) => {
-            session!.attach(image);
-          },
-        };
-    const context =
-      providedContext !== undefined && !hasProvidedHandlerContext ? providedContext : getContext();
-
-    const finalize = (): ToolTestResult | void => {
-      if (!hasProvidedHandlerContext) {
-        if (ctx.structuredOutput) {
-          session!.setStructuredOutput?.(ctx.structuredOutput);
-        }
-        if (ctx.nextSteps && ctx.nextSteps.length > 0) {
-          session!.setNextSteps?.([...ctx.nextSteps], isMcpRuntimeForTestResult() ? 'mcp' : 'cli');
-        }
-        return sessionToTestResult(session!);
-      }
-    };
+      : getHandlerContext();
+    const context = hasProvidedHandlerContext ? getContext() : providedContext;
 
     try {
       const sanitizedArgs: Record<string, unknown> = {};
@@ -293,7 +197,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
             `Parameter validation failed: Invalid parameters:\nMutually exclusive parameters provided: ${provided.join(', ')}. Provide only one.`,
             'MUTUALLY_EXCLUSIVE_PARAMETERS',
           );
-          return finalize();
+          return;
         }
       }
 
@@ -317,7 +221,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
               optOutEnabled: isSessionDefaultsOptOutEnabled(),
             });
             setValidationErrorOutput(ctx, `${title}: ${body}`, 'MISSING_REQUIRED_PARAMETERS');
-            return finalize();
+            return;
           }
         } else if ('oneOf' in req) {
           const satisfied = req.oneOf.some((k) => merged[k] != null);
@@ -332,14 +236,13 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
               optOutEnabled: isSessionDefaultsOptOutEnabled(),
             });
             setValidationErrorOutput(ctx, `${title}: ${body}`, 'MISSING_REQUIRED_PARAMETERS');
-            return finalize();
+            return;
           }
         }
       }
 
       const validated = internalSchema.parse(merged);
       await handlerContextStorage.run(ctx, () => logicFunction(validated, context));
-      return finalize();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const details = `Invalid parameters:\n${formatZodIssues(error)}`;
@@ -348,7 +251,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
           `Parameter validation failed: ${details}`,
           'PARAMETER_VALIDATION_FAILED',
         );
-        return finalize();
+        return;
       }
       throw error;
     }

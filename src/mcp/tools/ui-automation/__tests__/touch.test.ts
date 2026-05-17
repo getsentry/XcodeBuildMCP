@@ -4,7 +4,7 @@ import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-exe
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, touchLogic } from '../touch.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Touch Plugin', () => {
   beforeEach(() => {
@@ -73,7 +73,7 @@ describe('Touch Plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
         y: 200,
         down: true,
@@ -89,7 +89,7 @@ describe('Touch Plugin', () => {
     it('should surface parameter validation errors when defaults exist', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         y: 200,
         down: true,
       });

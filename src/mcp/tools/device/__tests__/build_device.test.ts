@@ -2,16 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
-import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  expectPendingBuildResponse,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, buildDeviceLogic } from '../build_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import type { CommandExecutor } from '../../../../utils/execution/index.ts';
-
-const runHandlerWithExecutor = handler as unknown as (
-  args: Record<string, unknown>,
-  executor: CommandExecutor,
-) => Promise<{ isError?: boolean }>;
-
 function createSpyExecutor(): {
   commandCalls: Array<{ args: string[]; logPrefix?: string }>;
   executor: ReturnType<typeof createMockExecutor>;
@@ -58,7 +55,7 @@ describe('build_device plugin', () => {
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
       });
 
@@ -68,7 +65,7 @@ describe('build_device plugin', () => {
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/MyProject.xcodeproj',
         workspacePath: '/path/to/MyProject.xcworkspace',
         scheme: 'MyScheme',
@@ -82,7 +79,7 @@ describe('build_device plugin', () => {
 
   describe('Parameter Validation (via Handler)', () => {
     it('should return Zod validation error for missing scheme', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/MyProject.xcodeproj',
       });
 
@@ -92,7 +89,7 @@ describe('build_device plugin', () => {
     });
 
     it('should return Zod validation error for invalid parameter types', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: 123, // Should be string
         scheme: 'MyScheme',
       });
@@ -220,26 +217,18 @@ describe('build_device plugin', () => {
         scheme: 'MyScheme',
       });
 
-      const result = await runHandlerWithExecutor({ platform: 'tvOS' }, spy.executor);
+      const { result } = await runToolLogic(() =>
+        buildDeviceLogic(
+          {
+            projectPath: '/path/to/MyProject.xcodeproj',
+            scheme: 'MyScheme',
+            platform: 'tvOS',
+          },
+          spy.executor,
+        ),
+      );
 
-      expect(result.isError).toBeUndefined();
-      expect(spy.commandCalls).toHaveLength(1);
-      expect(spy.commandCalls[0].args).toContain('generic/platform=tvOS');
-      expect(spy.commandCalls[0].logPrefix).toBe('tvOS Device Build');
-    });
-
-    it('should normalize simulator session platforms for device builds', async () => {
-      const spy = createSpyExecutor();
-
-      sessionStore.setDefaults({
-        projectPath: '/path/to/MyProject.xcodeproj',
-        scheme: 'MyScheme',
-        platform: 'tvOS Simulator',
-      });
-
-      const result = await runHandlerWithExecutor({}, spy.executor);
-
-      expect(result.isError).toBeUndefined();
+      expect(result.isError()).toBe(false);
       expect(spy.commandCalls).toHaveLength(1);
       expect(spy.commandCalls[0].args).toContain('generic/platform=tvOS');
       expect(spy.commandCalls[0].logPrefix).toBe('tvOS Device Build');

@@ -5,7 +5,7 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 
 import { schema, handler, type AxeHelpers, tapLogic } from '../tap.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 function createMockAxeHelpers(): AxeHelpers {
   return {
@@ -453,7 +453,7 @@ describe('Tap Plugin', () => {
 
   describe('Plugin Handler Validation', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
         y: 200,
       });
@@ -468,7 +468,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for missing x coordinate', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         y: 200,
       });
 
@@ -481,7 +481,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for missing y coordinate', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
       });
 
@@ -494,7 +494,7 @@ describe('Tap Plugin', () => {
     it('should return validation error when both id and label are provided without coordinates', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         id: 'loginButton',
         label: 'Log in',
       });
@@ -508,7 +508,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for non-integer x coordinate', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 3.14,
         y: 200,
       });
@@ -522,7 +522,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for non-integer y coordinate', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
         y: 3.14,
       });
@@ -536,7 +536,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for negative preDelay', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
         y: 200,
         preDelay: -1,
@@ -551,7 +551,7 @@ describe('Tap Plugin', () => {
     it('should return validation error for negative postDelay', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         x: 100,
         y: 200,
         postDelay: -1,

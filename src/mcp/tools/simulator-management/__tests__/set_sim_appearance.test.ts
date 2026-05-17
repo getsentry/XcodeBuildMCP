@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { schema, handler, set_sim_appearanceLogic } from '../set_sim_appearance.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 import {
   createMockCommandResponse,
@@ -71,7 +71,7 @@ describe('set_sim_appearance plugin', () => {
     });
 
     it('should surface session default requirement when simulatorId is missing', async () => {
-      const result = await handler({ mode: 'dark' });
+      const result = await callHandler(handler, { mode: 'dark' });
 
       const message = result.content?.[0]?.text ?? '';
       expect(message).toContain('Missing required session defaults');

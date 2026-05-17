@@ -9,7 +9,7 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { schema, handler, install_app_simLogic } from '../install_app_sim.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('install_app_sim tool', () => {
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('install_app_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId when not provided', async () => {
-      const result = await handler({ appPath: '/path/to/app.app' });
+      const result = await callHandler(handler, { appPath: '/path/to/app.app' });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -48,7 +48,7 @@ describe('install_app_sim tool', () => {
     it('should validate appPath when simulatorId default exists', async () => {
       sessionStore.setDefaults({ simulatorId: 'SIM-UUID' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Parameter validation failed');

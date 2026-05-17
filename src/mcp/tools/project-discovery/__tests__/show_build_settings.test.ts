@@ -8,7 +8,7 @@ import {
   createShowBuildSettingsExecutor,
 } from '../show_build_settings.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('show_build_settings plugin', () => {
   beforeEach(() => {
@@ -150,7 +150,7 @@ Build settings for action build and target MyApp:
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
       });
 
@@ -160,7 +160,7 @@ Build settings for action build and target MyApp:
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/project.xcodeproj',
         workspacePath: '/path/workspace.xcworkspace',
         scheme: 'MyScheme',
@@ -173,7 +173,7 @@ Build settings for action build and target MyApp:
 
   describe('Session requirement handling', () => {
     it('should require scheme when not provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/MyProject.xcodeproj',
       } as never);
 
@@ -185,7 +185,7 @@ Build settings for action build and target MyApp:
     it('should surface project/workspace requirement even with scheme default', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');

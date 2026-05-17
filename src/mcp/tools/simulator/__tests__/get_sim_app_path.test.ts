@@ -12,7 +12,7 @@ import {
 } from '../get_sim_app_path.ts';
 import type { CommandExecutor } from '../../../../utils/CommandExecutor.ts';
 import { XcodePlatform } from '../../../../types/common.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('get_sim_app_path tool', () => {
   beforeEach(() => {
@@ -38,7 +38,7 @@ describe('get_sim_app_path tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme when not provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         platform: XcodePlatform.iOSSimulator,
       });
 
@@ -49,7 +49,7 @@ describe('get_sim_app_path tool', () => {
     it('should require project or workspace when scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         platform: XcodePlatform.iOSSimulator,
       });
 
@@ -63,7 +63,7 @@ describe('get_sim_app_path tool', () => {
         projectPath: '/path/to/project.xcodeproj',
       });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         platform: XcodePlatform.iOSSimulator,
       });
 
@@ -74,7 +74,7 @@ describe('get_sim_app_path tool', () => {
     it('should error when both projectPath and workspacePath provided explicitly', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         platform: XcodePlatform.iOSSimulator,
         projectPath: '/path/project.xcodeproj',
         workspacePath: '/path/workspace.xcworkspace',
@@ -92,7 +92,7 @@ describe('get_sim_app_path tool', () => {
         workspacePath: '/path/to/workspace.xcworkspace',
       });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         platform: XcodePlatform.iOSSimulator,
         simulatorId: 'SIM-UUID',
         simulatorName: 'iPhone 17',

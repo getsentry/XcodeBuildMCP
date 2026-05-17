@@ -4,7 +4,7 @@ import { createMockExecutor, createNoopExecutor } from '../../../../test-utils/m
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { schema, handler, snapshot_uiLogic } from '../snapshot_ui.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Snapshot UI Plugin', () => {
   describe('Export Field Validation (Literal)', () => {
@@ -27,7 +27,7 @@ describe('Snapshot UI Plugin', () => {
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('should surface session default requirement when simulatorId is missing', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('Missing required session defaults');
@@ -36,7 +36,7 @@ describe('Snapshot UI Plugin', () => {
 
     it('should handle invalid simulatorId format via schema validation', async () => {
       // Test the actual handler with invalid UUID format
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'invalid-uuid-format',
       });
 

@@ -12,7 +12,7 @@ import {
   createListSchemesExecutor,
 } from '../list_schemes.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('list_schemes plugin', () => {
   beforeEach(() => {
@@ -322,7 +322,7 @@ describe('list_schemes plugin', () => {
     });
 
     it('should handle validation when testing with missing projectPath via plugin handler', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -331,14 +331,14 @@ describe('list_schemes plugin', () => {
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
       expect(result.content[0].text).toContain('Provide a project or workspace');
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
       });
@@ -347,7 +347,7 @@ describe('list_schemes plugin', () => {
     });
 
     it('should handle empty strings as undefined', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '',
         workspacePath: '',
       });

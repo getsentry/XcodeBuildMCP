@@ -7,7 +7,7 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('clean (unified) tool', () => {
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('clean (unified) tool', () => {
   });
 
   it('handler validation: error when neither projectPath nor workspacePath provided', async () => {
-    const result = await handler({});
+    const result = await callHandler(handler, {});
     expect(result.isError).toBe(true);
     const text = String(result.content?.[0]?.text ?? '');
     expect(text).toContain('Missing required session defaults');
@@ -42,7 +42,7 @@ describe('clean (unified) tool', () => {
   });
 
   it('handler validation: error when both projectPath and workspacePath provided', async () => {
-    const result = await handler({
+    const result = await callHandler(handler, {
       projectPath: '/p.xcodeproj',
       workspacePath: '/w.xcworkspace',
     });
@@ -88,7 +88,7 @@ describe('clean (unified) tool', () => {
   });
 
   it('handler validation: requires scheme when workspacePath is provided', async () => {
-    const result = await handler({ workspacePath: '/w.xcworkspace' });
+    const result = await callHandler(handler, { workspacePath: '/w.xcworkspace' });
     expect(result.isError).toBe(true);
     const text = String(result.content?.[0]?.text ?? '');
     expect(text).toContain('Parameter validation failed');
@@ -161,7 +161,7 @@ describe('clean (unified) tool', () => {
   });
 
   it('handler validation: rejects invalid platform values', async () => {
-    const result = await handler({
+    const result = await callHandler(handler, {
       projectPath: '/p.xcodeproj',
       scheme: 'App',
       platform: 'InvalidPlatform',

@@ -6,7 +6,7 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, boot_simLogic } from '../boot_sim.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('boot_sim tool', () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('boot_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId when not provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;

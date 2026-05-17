@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-executors.ts';
-import { runToolLogic, type MockToolHandlerResult } from '../../../../test-utils/test-helpers.ts';
+import {
+  runToolLogic,
+  type MockToolHandlerResult,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, buildRunMacOSLogic } from '../build_run_macos.ts';
 
@@ -45,7 +49,7 @@ describe('build_run_macos', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme before executing', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('scheme is required');
@@ -54,7 +58,7 @@ describe('build_run_macos', () => {
     it('should require project or workspace once scheme is set', async () => {
       sessionStore.setDefaults({ scheme: 'MyApp' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -63,7 +67,7 @@ describe('build_run_macos', () => {
     it('should fail when both project and workspace provided explicitly', async () => {
       sessionStore.setDefaults({ scheme: 'MyApp' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
       });

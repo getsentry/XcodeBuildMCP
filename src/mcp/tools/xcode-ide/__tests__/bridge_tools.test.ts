@@ -36,14 +36,14 @@ import {
   xcodeToolsBridgeDisconnectLogic,
 } from '../xcode_tools_bridge_disconnect.ts';
 import { handler as listHandler, xcodeIdeListToolsLogic } from '../xcode_ide_list_tools.ts';
-import { handler as callHandler, xcodeIdeCallToolLogic } from '../xcode_ide_call_tool.ts';
+import { handler as ideCallToolHandler, xcodeIdeCallToolLogic } from '../xcode_ide_call_tool.ts';
 import { getServer } from '../../../../server/server-state.ts';
 import { shutdownXcodeToolsBridge } from '../../../../integrations/xcode-tools-bridge/index.ts';
 import {
   buildXcodeToolsBridgeStatus,
   getMcpBridgeAvailability,
 } from '../../../../integrations/xcode-tools-bridge/core.ts';
-import { allText, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runToolLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 import { setXcodeBuildMCPAppDirOverrideForTests } from '../../../../utils/log-paths.ts';
 import { setRuntimeInstanceForTests } from '../../../../utils/runtime-instance.ts';
 
@@ -108,7 +108,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('status handler returns bridge status without MCP server instance', async () => {
-    const result = await statusHandler({});
+    const result = await callHandler(statusHandler, {});
     const text = allText(result);
     expect(text).toContain('Bridge Status');
     expect(text).toContain('"bridgeAvailable": true');
@@ -116,7 +116,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('sync handler uses direct bridge client when MCP server is not initialized', async () => {
-    const result = await syncHandler({});
+    const result = await callHandler(syncHandler, {});
     const text = allText(result);
     expect(text).toContain('Bridge Sync');
     expect(text).toContain('"total": 2');
@@ -126,7 +126,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('disconnect handler succeeds without MCP server instance', async () => {
-    const result = await disconnectHandler({});
+    const result = await callHandler(disconnectHandler, {});
     const text = allText(result);
     expect(text).toContain('Bridge Disconnect');
     expect(text).toContain('"connected": false');
@@ -134,7 +134,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('list handler returns bridge tools without MCP server instance', async () => {
-    const result = await listHandler({ refresh: true });
+    const result = await callHandler(listHandler, { refresh: true });
     const text = allText(result);
     expect(text).toContain('Xcode IDE List Tools');
     expect(text).toContain('Found 2 tool(s). Raw response saved to artifact.');
@@ -147,8 +147,8 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('list handler can return cached bridge tools without reconnecting', async () => {
-    const refreshed = await listHandler({ refresh: true });
-    const cached = await listHandler({ refresh: false });
+    const refreshed = await callHandler(listHandler, { refresh: true });
+    const cached = await callHandler(listHandler, { refresh: false });
 
     expect(allText(refreshed)).toContain('Found 2 tool(s). Raw response saved to artifact.');
     expect(allText(cached)).toContain('Found 2 tool(s). Raw response saved to artifact.');
@@ -158,9 +158,9 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('list handler defaults to refresh only when cache is empty', async () => {
-    const initial = await listHandler({});
-    const cached = await listHandler({});
-    const forced = await listHandler({ refresh: true });
+    const initial = await callHandler(listHandler, {});
+    const cached = await callHandler(listHandler, {});
+    const forced = await callHandler(listHandler, { refresh: true });
 
     expect(allText(initial)).toContain('Found 2 tool(s). Raw response saved to artifact.');
     expect(allText(cached)).toContain('Found 2 tool(s). Raw response saved to artifact.');
@@ -171,7 +171,10 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   });
 
   it('call handler forwards remote tool calls and writes a raw response artifact', async () => {
-    const result = await callHandler({ remoteTool: 'toolA', arguments: { foo: 'bar' } });
+    const result = await callHandler(ideCallToolHandler, {
+      remoteTool: 'toolA',
+      arguments: { foo: 'bar' },
+    });
     const text = allText(result);
     const artifactDir = join(
       tempAppDir,
@@ -213,7 +216,10 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
       isError: false,
     });
 
-    const result = await callHandler({ remoteTool: 'toolA', arguments: { foo: 'bar' } });
+    const result = await callHandler(ideCallToolHandler, {
+      remoteTool: 'toolA',
+      arguments: { foo: 'bar' },
+    });
     const text = allText(result);
 
     expect(result.isError).toBe(true);

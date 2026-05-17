@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, install_app_deviceLogic } from '../install_app_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('install_app_device plugin', () => {
   beforeEach(() => {
@@ -12,7 +12,7 @@ describe('install_app_device plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require deviceId when session defaults are missing', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         appPath: '/path/to/test.app',
       });
 

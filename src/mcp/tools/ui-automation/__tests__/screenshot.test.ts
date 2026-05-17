@@ -14,7 +14,7 @@ import {
   detectLandscapeMode,
   rotateImage,
 } from '../screenshot.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('Screenshot Plugin', () => {
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe('Screenshot Plugin', () => {
 
   describe('Plugin Handler Validation', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -52,7 +52,7 @@ describe('Screenshot Plugin', () => {
     });
 
     it('should validate inline simulatorId overrides', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'invalid-uuid',
       });
 

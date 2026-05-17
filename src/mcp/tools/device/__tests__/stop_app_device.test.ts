@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, stop_app_deviceLogic } from '../stop_app_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('stop_app_device plugin', () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('stop_app_device plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require deviceId when not provided', async () => {
-      const result = await handler({ processId: 12345 });
+      const result = await callHandler(handler, { processId: 12345 });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('deviceId is required');

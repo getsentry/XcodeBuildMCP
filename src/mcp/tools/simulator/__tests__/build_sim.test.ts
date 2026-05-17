@@ -5,7 +5,11 @@ import {
   createMockExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
-import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  expectPendingBuildResponse,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 
 import { schema, handler, build_simLogic } from '../build_sim.ts';
@@ -44,7 +48,7 @@ describe('build_sim tool', () => {
 
   describe('Parameter Validation', () => {
     it('should handle missing both projectPath and workspacePath', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
         simulatorName: 'iPhone 17',
       });
@@ -55,7 +59,7 @@ describe('build_sim tool', () => {
     });
 
     it('should handle both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace',
         scheme: 'MyScheme',
@@ -85,7 +89,7 @@ describe('build_sim tool', () => {
     });
 
     it('should handle missing scheme parameter', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         workspacePath: '/path/to/workspace',
         simulatorName: 'iPhone 17',
       });
@@ -111,7 +115,7 @@ describe('build_sim tool', () => {
     });
 
     it('should handle missing both simulatorId and simulatorName', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         workspacePath: '/path/to/workspace',
         scheme: 'MyScheme',
       });
@@ -124,7 +128,7 @@ describe('build_sim tool', () => {
     it('should handle both simulatorId and simulatorName provided', async () => {
       const mockExecutor = createMockExecutor({ success: true, output: 'Build succeeded' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         workspacePath: '/path/to/workspace',
         scheme: 'MyScheme',
         simulatorId: 'ABC-123',

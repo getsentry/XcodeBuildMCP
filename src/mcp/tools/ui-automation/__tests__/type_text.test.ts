@@ -8,7 +8,7 @@ import {
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, type_textLogic } from '../type_text.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 // Mock axe helpers for dependency injection
 function createMockAxeHelpers(
@@ -75,7 +75,7 @@ describe('Type Text Tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default', async () => {
-      const result = await handler({ text: 'Hello' });
+      const result = await callHandler(handler, { text: 'Hello' });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -87,7 +87,7 @@ describe('Type Text Tool', () => {
     it('should surface validation errors when defaults exist', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 import {
   schema,
@@ -123,7 +123,7 @@ describe('swift_package_stop plugin', () => {
     });
 
     it('returns validation error from handler', async () => {
-      const result = await handler({ pid: 'bad' });
+      const result = await callHandler(handler, { pid: 'bad' });
 
       expect(result.isError).toBe(true);
       const text = allText(result);
