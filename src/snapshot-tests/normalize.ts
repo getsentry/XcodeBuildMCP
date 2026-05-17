@@ -24,6 +24,7 @@ const THREAD_ID_REGEX = /Thread \d{5,}/g;
 const HEX_ADDRESS_REGEX = /0x[0-9a-fA-F]{8,}/g;
 
 const LLDB_FRAME_OFFSET_REGEX = /(`[^`\n]+):(\d+)$/gm;
+const LLDB_BREAKPOINT_BYTE_OFFSET_REGEX = /\+ \d+ at /g;
 const LLDB_SYS_FRAME_FUNC_REGEX =
   /(frame #\d+: )\S+( at (?:\/usr\/lib\/|\/Library\/Developer\/CoreSimulator\/)[^`\n]*`)[^:\n]+(:<OFFSET>)/gm;
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
@@ -204,6 +205,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
   normalized = normalized.replace(LLDB_FRAME_OFFSET_REGEX, '$1:<OFFSET>');
+  normalized = normalized.replace(LLDB_BREAKPOINT_BYTE_OFFSET_REGEX, '+ <OFFSET> at ');
   normalized = normalized.replace(LLDB_SYS_FRAME_FUNC_REGEX, '$1<FUNC>$2<FUNC>$3');
   normalized = normalized.replace(LLDB_FRAME_NUMBER_REGEX, '  frame #<N>:');
   normalized = normalized.replace(LLDB_BREAKPOINT_LOCATIONS_REGEX, 'locations = <LOCATIONS>');

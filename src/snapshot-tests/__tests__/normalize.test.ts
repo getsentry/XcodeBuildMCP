@@ -44,6 +44,16 @@ describe('normalizeSnapshotOutput', () => {
     );
   });
 
+  it('normalizes LLDB breakpoint byte offsets', () => {
+    expect(
+      normalizeSnapshotOutput(
+        '  1.1: where = App.debug.dylib`ContentView.body.getter + 1428 at ContentView.swift:42:31, address = 0x123456789, unresolved, hit count = 0\n',
+      ),
+    ).toBe(
+      '  1.1: where = App.debug.dylib`ContentView.body.getter + <OFFSET> at ContentView.swift:42:31, address = <ADDR>, unresolved, hit count = 0\n',
+    );
+  });
+
   it('normalizes process identifiers in string output', () => {
     expect(normalizeSnapshotOutput('appName: PID 123456\nkill: 123456: No such process\n')).toBe(
       'appName: PID <PID>\nkill: <PID>: No such process\n',

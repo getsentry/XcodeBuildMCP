@@ -431,13 +431,12 @@ async function enumerateAndRegisterTools(
         continue;
       }
 
-      desiredToolNames.add(toolManifest.names.mcp);
-
       const toolModule = await tryImportToolModule(toolManifest, moduleCache);
       if (!toolModule) {
         continue;
       }
 
+      desiredToolNames.add(toolManifest.names.mcp);
       catalogTools.push(toCatalogTool(toolManifest, workflow, toolModule));
       registerToolFromManifest(toolManifest, toolModule);
     }
