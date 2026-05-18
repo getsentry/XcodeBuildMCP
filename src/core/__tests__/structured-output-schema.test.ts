@@ -25,6 +25,14 @@ function expectStandaloneCompile(schema: JsonObject): void {
   expect(() => ajv.compile(schema)).not.toThrow();
 }
 
+function stripRegistrationResourceEnvelope(schema: JsonObject): JsonObject {
+  const stripped = JSON.parse(JSON.stringify(schema)) as JsonObject;
+  delete stripped.$schema;
+  delete stripped.$id;
+  delete stripped.$defs;
+  return stripped;
+}
+
 describe('structured output schema bundling', () => {
   beforeEach(() => {
     __resetMcpOutputSchemaCacheForTests();
@@ -119,10 +127,20 @@ describe('structured output schema bundling', () => {
       $id: 'https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.simulator-list/1.registration.schema.json',
       type: 'object',
       oneOf: [
-        getMcpOutputSchema(ref),
-        getMcpOutputSchema({ schema: 'xcodebuildmcp.output.error', version: '1' }),
+        stripRegistrationResourceEnvelope(getMcpOutputSchema(ref)),
+        stripRegistrationResourceEnvelope(
+          getMcpOutputSchema({ schema: 'xcodebuildmcp.output.error', version: '1' }),
+        ),
       ],
+      $defs: {
+        ...((getMcpOutputSchema(ref).$defs as JsonObject) ?? {}),
+        ...((getMcpOutputSchema({ schema: 'xcodebuildmcp.output.error', version: '1' })
+          .$defs as JsonObject) ?? {}),
+      },
     });
+    expect((jsonSchema.oneOf as JsonObject[])[0].$defs).toBeUndefined();
+    expect((jsonSchema.oneOf as JsonObject[])[0].$id).toBeUndefined();
+    expect((jsonSchema.$defs as JsonObject).errorConsistency).toBeDefined();
     expectNoExternalCommonRefs(jsonSchema);
     expectStandaloneCompile(jsonSchema);
   });

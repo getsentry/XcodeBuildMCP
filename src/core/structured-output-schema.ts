@@ -203,6 +203,26 @@ function bundleSchema(rootSchema: JsonObject, commonSchema: JsonObject): JsonObj
   return bundled;
 }
 
+function inlineRegistrationSchemaResource(schema: JsonObject): {
+  schema: JsonObject;
+  defs: JsonObject;
+} {
+  const inlinedSchema = cloneJson(schema);
+  const defsCandidate = inlinedSchema.$defs === undefined ? {} : cloneJson(inlinedSchema.$defs);
+  if (!isRecord(defsCandidate)) {
+    throw new Error('Structured output registration $defs must be an object when present.');
+  }
+
+  delete inlinedSchema.$schema;
+  delete inlinedSchema.$id;
+  delete inlinedSchema.$defs;
+
+  return {
+    schema: inlinedSchema,
+    defs: defsCandidate,
+  };
+}
+
 export function getMcpOutputSchema(ref: StructuredOutputSchemaRef): JsonObject {
   assertSchemaRef(ref);
   const cacheKey = `${ref.schema}@${ref.version}`;
@@ -226,13 +246,30 @@ function getMcpOutputSchemaForRegistrationJson(ref: StructuredOutputSchemaRef): 
   if (ref.schema === STRUCTURED_ERROR_SCHEMA_REF.schema) {
     return toolSchema;
   }
+  const errorSchema = getMcpOutputSchema(STRUCTURED_ERROR_SCHEMA_REF);
+  const toolResource = inlineRegistrationSchemaResource(toolSchema);
+  const errorResource = inlineRegistrationSchemaResource(errorSchema);
+  const defs: JsonObject = {};
 
-  return {
+  for (const [name, definition] of Object.entries(toolResource.defs)) {
+    mergeDefinition(defs, name, definition);
+  }
+  for (const [name, definition] of Object.entries(errorResource.defs)) {
+    mergeDefinition(defs, name, definition);
+  }
+
+  const registrationSchema: JsonObject = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: `https://xcodebuildmcp.com/schemas/structured-output/${ref.schema}/${ref.version}.registration.schema.json`,
     type: 'object',
-    oneOf: [toolSchema, getMcpOutputSchema(STRUCTURED_ERROR_SCHEMA_REF)],
+    oneOf: [toolResource.schema, errorResource.schema],
   };
+
+  if (Object.keys(defs).length > 0) {
+    registrationSchema.$defs = defs;
+  }
+
+  return registrationSchema;
 }
 
 export function getMcpOutputSchemaForRegistration(ref: StructuredOutputSchemaRef): McpOutputSchema {
