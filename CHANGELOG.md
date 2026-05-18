@@ -8,6 +8,7 @@
 - Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.
 - Added `batch` for executing multiple AXe UI automation steps in one simulator session.
 - Added `wait_for_ui` for polling rs/1 runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
+- Added structured rs/1 element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions. Validated the flow with a source-built AXe binary and the full Weather/Safari Claude Code task, with no raw-string batch attempts.
 
 ### Fixed
 
@@ -52,6 +53,10 @@
 - Fixed runtime snapshot tips so compact output names all target-ref action tools, including `long_press` and `touch`.
 - Clarified key press and key sequence tool descriptions so agents know key codes are AXe/macOS virtual key codes and should prefer `type_text` for text entry.
 - Clarified `wait_for_ui` timeout recovery hints so agents know selector fields match exact values and should use `textContains` for partial visible text.
+- Fixed UI action success next steps so agents are prompted to refresh runtime snapshots before reusing element refs after actions such as swipes.
+- Fixed `snapshot_ui` next-step guidance so state-changing controls such as segmented units and switches remain available in targets without being promoted as generic tap or batch suggestions.
+- Fixed `snapshot_ui` tap next-step priority so content-rich cards are suggested before navigation controls like Settings.
+- Fixed successful UI action results so they include a fresh runtime snapshot and actionable next steps, reducing follow-up refresh calls after taps, typing, swipes, and batches.
 
 ## [2.5.2]
 
@@ -688,5 +693,4 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-
 
