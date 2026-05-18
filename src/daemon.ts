@@ -223,7 +223,7 @@ async function main(): Promise<void> {
     const xcodeIdeWorkflowEnabled = daemonWorkflows.includes('xcode-ide');
     const axeBinary = resolveAxeBinary();
     const axeAvailable = axeBinary !== null;
-    const axeSource: 'env' | 'bundled' | 'path' | 'unavailable' =
+    const axeSource: 'env' | 'source' | 'bundled' | 'path' | 'unavailable' =
       axeBinary?.source ?? 'unavailable';
     const xcodemakeAvailable = isXcodemakeBinaryAvailable();
     const xcodemakeEnabled = isXcodemakeEnabled();

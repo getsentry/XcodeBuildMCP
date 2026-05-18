@@ -70,6 +70,31 @@
       },
       "required": ["ref", "frame", "actions"]
     },
+    "compactRuntimeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "runtime-snapshot" },
+        "rs": { "const": "1" },
+        "screenHash": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0 },
+        "count": { "type": "integer", "minimum": 0 },
+        "targets": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scroll": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "text": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "udid": { "type": "string" }
+      },
+      "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
+    },
     "direction": {
       "enum": ["up", "down", "left", "right"]
     },
@@ -231,6 +256,7 @@
         "diagnostics": {
           "$ref": "https://xcodebuildmcp.com/schemas/structured-output/_defs/common.schema.json#/$defs/basicDiagnostics"
         },
+        "capture": { "$ref": "#/$defs/compactRuntimeSnapshot" },
         "uiError": { "$ref": "#/$defs/recoverableUiError" }
       },
       "required": ["summary", "action", "artifacts"]

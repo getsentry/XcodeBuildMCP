@@ -1,4 +1,5 @@
 import type { RenderHints, ToolHandlerContext } from '../../../../rendering/types.ts';
+import type { NextStep } from '../../../../types/common.ts';
 import type {
   BasicDiagnostics,
   CapturePayload,
@@ -14,6 +15,7 @@ import type {
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { createBasicDiagnostics } from '../../../../utils/diagnostics.ts';
 import { AxeError, DependencyError, SystemError } from '../../../../utils/errors.ts';
+import { createRuntimeSnapshotNextSteps } from './runtime-next-steps.ts';
 
 const UI_ACTION_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
 const CAPTURE_SCHEMA = 'xcodebuildmcp.output.capture-result';
@@ -35,6 +37,20 @@ function compact(values: Array<string | null | undefined>): string[] {
   return values.filter((value): value is string => typeof value === 'string' && value.length > 0);
 }
 
+function createUiActionSuccessNextSteps(result: UiActionResultDomainResult): NextStep[] {
+  if (result.didError) {
+    return [];
+  }
+
+  return [
+    {
+      label: 'Refresh after UI action',
+      tool: 'snapshot_ui',
+      params: { simulatorId: result.artifacts.simulatorId },
+    },
+  ];
+}
+
 export function createUiAutomationRecoverableError(params: {
   code: UiAutomationRecoverableErrorCode;
   message: string;
@@ -53,7 +69,7 @@ export function createUiActionSuccessResult(
   action: UiAction,
   simulatorId: string,
   warnings: Array<string | null | undefined> = [],
-  options: { uiError?: UiAutomationRecoverableError } = {},
+  options: { capture?: CapturePayload; uiError?: UiAutomationRecoverableError } = {},
 ): UiActionResultDomainResult {
   return {
     kind: 'ui-action-result',
@@ -62,6 +78,7 @@ export function createUiActionSuccessResult(
     summary: { status: 'SUCCEEDED' },
     action,
     artifacts: { simulatorId },
+    ...(options.capture ? { capture: options.capture } : {}),
     diagnostics: createDiagnostics(compact(warnings), []),
     ...(options.uiError ? { uiError: options.uiError } : {}),
   };
@@ -193,6 +210,16 @@ export function setUiActionStructuredOutput(
     schema: UI_ACTION_SCHEMA,
     schemaVersion: '2',
   };
+  if (result.capture && 'type' in result.capture && result.capture.type === 'runtime-snapshot') {
+    ctx.nextSteps = createRuntimeSnapshotNextSteps({
+      simulatorId: result.artifacts.simulatorId,
+      runtimeSnapshot: result.capture,
+      includeRefreshAndWait: false,
+    });
+    return;
+  }
+
+  ctx.nextSteps = createUiActionSuccessNextSteps(result);
 }
 
 export function setCaptureStructuredOutput(

@@ -101,6 +101,37 @@ function missingFromMerged(
   return keys.filter((k) => merged[k] == null);
 }
 
+function getObjectSchemaKeys(schema: z.ZodType<unknown>): Set<string> | null {
+  if (typeof schema !== 'object' || schema === null || !('shape' in schema)) {
+    return null;
+  }
+
+  const shape = (schema as { shape?: unknown }).shape;
+  if (typeof shape !== 'object' || shape === null) {
+    return null;
+  }
+
+  return new Set(Object.keys(shape));
+}
+
+function filterSessionDefaultsForSchema(
+  defaults: SessionDefaults,
+  schema: z.ZodType<unknown>,
+): Record<string, unknown> {
+  const schemaKeys = getObjectSchemaKeys(schema);
+  if (!schemaKeys) {
+    return defaults;
+  }
+
+  const filteredDefaults: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(defaults)) {
+    if (schemaKeys.has(key)) {
+      filteredDefaults[key] = value;
+    }
+  }
+  return filteredDefaults;
+}
+
 function formatRequirementError(opts: {
   message: string;
   setHint?: string;
@@ -201,7 +232,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
         }
       }
 
-      const sessionDefaults = sessionStore.getAll();
+      const sessionDefaults = filterSessionDefaultsForSchema(sessionStore.getAll(), internalSchema);
       const merged = mergeSessionDefaultArgs({
         defaults: sessionDefaults,
         explicitArgs: sanitizedArgs,

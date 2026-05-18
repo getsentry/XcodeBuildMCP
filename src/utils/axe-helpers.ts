@@ -5,14 +5,14 @@
  * Prefers bundled AXe when present, but allows env and PATH fallback.
  */
 
-import { accessSync, constants, existsSync } from 'fs';
+import { accessSync, constants, existsSync, readdirSync, statSync } from 'fs';
 import { delimiter, join, resolve } from 'path';
 import type { CommandExecutor } from './execution/index.ts';
 import { getDefaultCommandExecutor } from './execution/index.ts';
 import { getConfig } from './config-store.ts';
 import { getBundledAxePath, getBundledFrameworksDir } from '../core/resource-root.ts';
 
-export type AxeBinarySource = 'env' | 'bundled' | 'path';
+export type AxeBinarySource = 'env' | 'source' | 'bundled' | 'path';
 
 export type AxeBinary = {
   path: string;
@@ -33,6 +33,50 @@ function resolveAxePathFromConfig(): string | null {
   if (!value) return null;
   const resolved = resolve(value);
   return isExecutable(resolved) ? resolved : null;
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function getAxeSourceBuildCandidates(sourcePath: string): string[] {
+  const candidates = [join(sourcePath, '.build', 'release', 'axe')];
+  const swiftBuildDir = join(sourcePath, '.build');
+
+  if (isDirectory(swiftBuildDir)) {
+    for (const entry of readdirSync(swiftBuildDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.endsWith('-apple-macosx')) {
+        candidates.push(join(swiftBuildDir, entry.name, 'release', 'axe'));
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function resolveAxePathFromSourceConfig(): string | null {
+  const value = getConfig().axeSourcePath;
+  if (!value) return null;
+
+  const sourcePath = resolve(value);
+  if (!isDirectory(sourcePath)) {
+    throw new Error(`Configured axeSourcePath does not exist or is not a directory: ${sourcePath}`);
+  }
+
+  const candidates = getAxeSourceBuildCandidates(sourcePath);
+  for (const candidate of candidates) {
+    if (isExecutable(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Configured axeSourcePath does not contain an executable release AXe build. Expected one of: ${candidates.join(', ')}`,
+  );
 }
 
 function resolveBundledAxePath(): string | null {
@@ -64,6 +108,11 @@ export function resolveAxeBinary(): AxeBinary | null {
   const configPath = resolveAxePathFromConfig();
   if (configPath) {
     return { path: configPath, source: 'env' };
+  }
+
+  const sourcePath = resolveAxePathFromSourceConfig();
+  if (sourcePath) {
+    return { path: sourcePath, source: 'source' };
   }
 
   const bundledPath = resolveBundledAxePath();
@@ -118,6 +167,7 @@ export function areAxeToolsAvailable(): boolean {
 export const AXE_NOT_AVAILABLE_MESSAGE =
   'AXe tool not found. UI automation features are not available.\n\n' +
   'Install AXe (brew tap cameroncooke/axe && brew install axe) or set XCODEBUILDMCP_AXE_PATH.\n' +
+  'For local source validation, set XCODEBUILDMCP_AXE_SOURCE_PATH to an AXe checkout with a release build.\n' +
   'Ensure bundled artifacts are included or PATH is configured.';
 
 /**

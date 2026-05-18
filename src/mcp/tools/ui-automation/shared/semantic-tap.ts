@@ -118,6 +118,15 @@ export function createSemanticTapCommand(
   };
 }
 
+export function createSemanticTapBatchSteps(command: SemanticTapCommand): string[] {
+  if (command.coordinateArgs[0] !== 'touch') {
+    return [command.coordinateArgs.join(' ')];
+  }
+
+  const baseArgs = command.coordinateArgs.filter((arg) => arg !== '--down' && arg !== '--up');
+  return [`${baseArgs.join(' ')} --down`, `${baseArgs.join(' ')} --up`];
+}
+
 export async function executeSemanticTapWithAmbiguityFallback(params: {
   command: SemanticTapCommand;
   simulatorId: string;

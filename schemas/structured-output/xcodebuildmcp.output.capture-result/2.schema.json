@@ -129,6 +129,10 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "text": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "udid": { "type": "string" }
       },
       "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
@@ -157,6 +161,18 @@
         "udid": { "type": "string" }
       },
       "required": ["type", "rs", "screenHash", "seq", "unchanged", "udid"]
+    },
+    "videoRecordingCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "video-recording" },
+        "state": { "enum": ["started", "stopped"] },
+        "fps": { "type": "number" },
+        "outputFile": { "type": "string" },
+        "sessionId": { "type": "string" }
+      },
+      "required": ["type", "state"]
     },
     "waitPredicate": {
       "enum": ["exists", "gone", "enabled", "focused", "textContains", "settled"]
@@ -243,6 +259,7 @@
             },
             { "$ref": "#/$defs/runtimeSnapshot" },
             { "$ref": "#/$defs/compactRuntimeSnapshot" },
+            { "$ref": "#/$defs/videoRecordingCapture" },
             { "$ref": "#/$defs/runtimeSnapshotUnchanged" },
             { "$ref": "#/$defs/compactRuntimeSnapshotUnchanged" }
           ]

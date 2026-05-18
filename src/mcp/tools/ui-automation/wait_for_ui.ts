@@ -21,7 +21,7 @@ import type {
 } from '../../../types/ui-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import { clearRuntimeSnapshot, recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import { recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import {
   parseRuntimeSnapshotResponse,
   RuntimeSnapshotParseError,
@@ -106,6 +106,7 @@ const waitForUiSchema = z.strictObject(waitForUiSchemaShape).superRefine((value,
   if (
     value.predicate !== 'settled' &&
     value.predicate !== 'textContains' &&
+    !(value.predicate === 'gone' && value.text !== undefined) &&
     !hasSelectorFields(value)
   ) {
     ctx.addIssue({
@@ -123,11 +124,15 @@ const waitForUiSchema = z.strictObject(waitForUiSchemaShape).superRefine((value,
     });
   }
 
-  if (value.predicate !== 'textContains' && value.text !== undefined) {
+  if (
+    value.predicate !== 'textContains' &&
+    value.predicate !== 'gone' &&
+    value.text !== undefined
+  ) {
     ctx.addIssue({
       code: 'custom',
       path: ['text'],
-      message: 'text is only supported for textContains waits',
+      message: 'text is only supported for textContains and gone waits',
     });
   }
 });
@@ -185,7 +190,7 @@ export function createWaitForUiExecutor(
       }
     }
 
-    if (predicate !== 'settled' && predicate !== 'textContains' && !selector) {
+    if (predicate !== 'settled' && predicate !== 'textContains' && !selector && !text) {
       const message = `${predicate} waits require at least one selector field.`;
       return createCaptureFailureResult(simulatorId, message, {
         uiError: {
@@ -203,8 +208,14 @@ export function createWaitForUiExecutor(
       toolName,
     });
     if (guard.blockedMessage) {
-      clearRuntimeSnapshot(simulatorId);
-      return createCaptureFailureResult(simulatorId, guard.blockedMessage);
+      return createCaptureFailureResult(simulatorId, guard.blockedMessage, {
+        uiError: {
+          code: 'ACTION_FAILED',
+          message: guard.blockedMessage,
+          recoveryHint:
+            'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
+        },
+      });
     }
 
     let latestSnapshot: RuntimeSnapshotRecord | null = null;
@@ -241,7 +252,16 @@ export function createWaitForUiExecutor(
               })
             : predicate === 'textContains' && !selector
               ? evaluateTextContainsPredicate({ snapshot, text: text! })
-              : evaluateElementPredicate({ predicate, selector: selector!, snapshot, text });
+              : predicate === 'gone' && !selector && text
+                ? (() => {
+                    const textMatch = evaluateTextContainsPredicate({ snapshot, text });
+                    return {
+                      matched: (textMatch.candidates ?? []).length === 0,
+                      candidates: textMatch.candidates ?? [],
+                      uiError: undefined,
+                    };
+                  })()
+                : evaluateElementPredicate({ predicate, selector: selector!, snapshot, text });
 
         if (typeof matched === 'boolean') {
           if (matched) {
@@ -302,7 +322,6 @@ export function createWaitForUiExecutor(
       });
     }
 
-    clearRuntimeSnapshot(simulatorId);
     if (lastParseError) {
       const message = 'Failed to parse runtime UI snapshot while waiting for UI.';
       return createCaptureFailureResult(simulatorId, message, {

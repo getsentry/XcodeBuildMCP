@@ -12,7 +12,9 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
-import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { createSemanticTapBatchSteps, createSemanticTapCommand } from './shared/semantic-tap.ts';
+import { captureRuntimeSnapshotAfterAction } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -24,17 +26,30 @@ import {
   shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
-const batchSchema = z.object({
+const batchStepSchema = z.strictObject({
+  action: z.literal('tap'),
+  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
+  preDelay: z
+    .number()
+    .min(0, { message: 'Pre-delay must be non-negative' })
+    .max(10, { message: 'Pre-delay must be at most 10 seconds' })
+    .optional()
+    .describe('Seconds before this step. Omit for switch elementRefs.'),
+  postDelay: z
+    .number()
+    .min(0, { message: 'Post-delay must be non-negative' })
+    .max(10, { message: 'Post-delay must be at most 10 seconds' })
+    .optional()
+    .describe('Seconds after this step. Omit for switch elementRefs.'),
+});
+
+const batchSchema = z.strictObject({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
   steps: z
-    .array(z.string().min(1, { message: 'steps must not contain empty values' }))
+    .array(batchStepSchema)
     .min(1, { message: 'At least one batch step is required' })
     .max(100, { message: 'At most 100 batch steps are supported' }),
   axCache: z.enum(['perBatch', 'perStep', 'none']).optional(),
-  typeSubmission: z.enum(['chunked', 'composite']).optional(),
-  typeChunkSize: z.number().int().min(1).optional(),
-  tapStyle: z.enum(['automatic', 'simulator', 'physical']).optional(),
-  continueOnError: z.boolean().optional(),
   waitTimeout: z.number().min(0, { message: 'waitTimeout must be non-negative' }).optional(),
   pollInterval: z.number().positive({ message: 'pollInterval must be greater than 0' }).optional(),
 });
@@ -44,25 +59,38 @@ type BatchResult = UiActionResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
 
-function buildBatchCommandArgs(params: BatchParams): string[] {
+function compactBatchElementValue(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+function isSafeSameScreenBatchElement(element: {
+  role?: string;
+  state?: { selected?: boolean };
+  value?: string;
+}): boolean {
+  const value = compactBatchElementValue(element.value);
+  const isAlreadyActive =
+    element.state?.selected === true || value === 'selected' || value === '1' || value === 'on';
+  if (isAlreadyActive || element.role === 'tab') {
+    return false;
+  }
+
+  return (
+    element.role === 'switch' ||
+    element.state?.selected === false ||
+    value === 'not selected' ||
+    value === '0' ||
+    value === 'off'
+  );
+}
+
+function buildBatchCommandArgs(params: BatchParams, resolvedSteps: readonly string[]): string[] {
   const commandArgs = ['batch'];
-  for (const step of params.steps) {
+  for (const step of resolvedSteps) {
     commandArgs.push('--step', step);
   }
   if (params.axCache !== undefined) {
     commandArgs.push('--ax-cache', params.axCache);
-  }
-  if (params.typeSubmission !== undefined) {
-    commandArgs.push('--type-submission', params.typeSubmission);
-  }
-  if (params.typeChunkSize !== undefined) {
-    commandArgs.push('--type-chunk-size', String(params.typeChunkSize));
-  }
-  if (params.tapStyle !== undefined) {
-    commandArgs.push('--tap-style', params.tapStyle);
-  }
-  if (params.continueOnError === true) {
-    commandArgs.push('--continue-on-error');
   }
   if (params.waitTimeout !== undefined) {
     commandArgs.push('--wait-timeout', String(params.waitTimeout));
@@ -71,6 +99,70 @@ function buildBatchCommandArgs(params: BatchParams): string[] {
     commandArgs.push('--poll-interval', String(params.pollInterval));
   }
   return commandArgs;
+}
+
+function resolveBatchSteps(
+  params: BatchParams,
+): { ok: true; steps: string[]; preserveSnapshot: boolean } | { ok: false; result: BatchResult } {
+  const resolvedSteps: string[] = [];
+  let preserveSnapshot = true;
+
+  for (const step of params.steps) {
+    const resolution = resolveElementRef(params.simulatorId, step.elementRef, 'tap');
+    if (!resolution.ok) {
+      return {
+        ok: false,
+        result: createUiActionFailureResult(
+          { type: 'batch' as const, stepCount: params.steps.length },
+          params.simulatorId,
+          resolution.error.message,
+          { uiError: resolution.error },
+        ),
+      };
+    }
+
+    const usesTouchActivation = resolution.element.publicElement.role === 'switch';
+    preserveSnapshot &&= isSafeSameScreenBatchElement(resolution.element.publicElement);
+    if (usesTouchActivation && (step.preDelay !== undefined || step.postDelay !== undefined)) {
+      const message =
+        'preDelay and postDelay are not supported for switch elementRefs because switches execute as touch down/up batch steps.';
+      return {
+        ok: false,
+        result: createUiActionFailureResult(
+          { type: 'batch' as const, stepCount: params.steps.length },
+          params.simulatorId,
+          message,
+          {
+            uiError: {
+              code: 'ACTION_FAILED',
+              message,
+              recoveryHint:
+                'Remove preDelay/postDelay from switch steps, or wait between separate batch calls.',
+              elementRef: step.elementRef,
+            },
+          },
+        ),
+      };
+    }
+
+    const extraArgs: string[] = [];
+    if (step.preDelay !== undefined) {
+      extraArgs.push('--pre-delay', String(step.preDelay));
+    }
+    if (step.postDelay !== undefined) {
+      extraArgs.push('--post-delay', String(step.postDelay));
+    }
+
+    const tapCommand = createSemanticTapCommand(
+      resolution.element,
+      step.elementRef,
+      extraArgs,
+      resolution.snapshot.elements,
+    );
+    resolvedSteps.push(...createSemanticTapBatchSteps(tapCommand));
+  }
+
+  return { ok: true, steps: resolvedSteps, preserveSnapshot };
 }
 
 export function createBatchExecutor(
@@ -92,14 +184,26 @@ export function createBatchExecutor(
       return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const commandArgs = buildBatchCommandArgs(params);
+    const resolvedSteps = resolveBatchSteps(params);
+    if (!resolvedSteps.ok) {
+      return resolvedSteps.result;
+    }
+
+    const commandArgs = buildBatchCommandArgs(params, resolvedSteps.steps);
     log('info', `${LOG_PREFIX}/${toolName}: Starting ${steps.length} step batch on ${simulatorId}`);
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'batch', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
+      if (!resolvedSteps.preserveSnapshot) {
+        clearRuntimeSnapshot(simulatorId);
+      }
+      const capture = await captureRuntimeSnapshotAfterAction({
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], { capture });
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);

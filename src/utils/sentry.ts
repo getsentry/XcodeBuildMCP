@@ -31,7 +31,7 @@ export interface SentryRuntimeContext {
   uiDebuggerGuardMode?: string;
   xcodeIdeWorkflowEnabled?: boolean;
   axeAvailable?: boolean;
-  axeSource?: 'env' | 'bundled' | 'path' | 'unavailable';
+  axeSource?: 'env' | 'source' | 'bundled' | 'path' | 'unavailable';
   axeVersion?: string;
   xcodeDeveloperDir?: string;
   xcodebuildPath?: string;

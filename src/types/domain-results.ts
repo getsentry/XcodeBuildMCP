@@ -641,6 +641,7 @@ export type UiActionResultDomainResult = ToolDomainResultBase & {
   summary: StatusSummary;
   action: UiAction;
   artifacts: { simulatorId: string };
+  capture?: CapturePayload;
   diagnostics?: BasicDiagnostics;
   uiError?: UiAutomationRecoverableError;
 };

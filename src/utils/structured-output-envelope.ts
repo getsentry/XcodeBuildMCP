@@ -32,6 +32,7 @@ type RuntimeSnapshotCompactCapture = {
   count: number;
   targets: string[];
   scroll: string[];
+  text?: string[];
   udid: string;
 };
 
@@ -152,8 +153,24 @@ function sortRuntimeTargetsForDisplay(elements: RuntimeElementV1[]): RuntimeElem
     .map((element, index) => ({ element, index }))
     .sort((left, right) => {
       const priorityDelta =
-        getRuntimeTargetDisplayPriority(left.element) - getRuntimeTargetDisplayPriority(right.element);
+        getRuntimeTargetDisplayPriority(left.element) -
+        getRuntimeTargetDisplayPriority(right.element);
       return priorityDelta === 0 ? left.index - right.index : priorityDelta;
+    })
+    .map(({ element }) => element);
+}
+
+function sortRuntimeTextForDisplay(elements: RuntimeElementV1[]): RuntimeElementV1[] {
+  return elements
+    .map((element, index) => ({ element, index }))
+    .sort((left, right) => {
+      const yDelta = left.element.frame.y - right.element.frame.y;
+      if (yDelta !== 0) {
+        return yDelta;
+      }
+
+      const xDelta = left.element.frame.x - right.element.frame.x;
+      return xDelta === 0 ? left.index - right.index : xDelta;
     })
     .map(({ element }) => element);
 }
@@ -178,6 +195,15 @@ function primaryRuntimeElementAction(element: RuntimeElementV1): RuntimeActionNa
   );
 }
 
+function isRuntimeTextSummaryElement(element: RuntimeElementV1): boolean {
+  return (
+    element.role === 'text' &&
+    element.state?.visible !== false &&
+    (compactRuntimeSnapshotText(element.label).length > 0 ||
+      compactRuntimeSnapshotText(element.value).length > 0)
+  );
+}
+
 function toRuntimeSnapshotCompactCapture(
   snapshot: RuntimeSnapshotV1,
 ): RuntimeSnapshotCompactCapture {
@@ -199,6 +225,9 @@ function toRuntimeSnapshotCompactCapture(
         !element.actions.includes('typeText'),
     )
     .map((element) => compactRuntimeElementRow(element, 'swipe'));
+  const text = sortRuntimeTextForDisplay(snapshot.elements.filter(isRuntimeTextSummaryElement))
+    .slice(0, 64)
+    .map((element) => compactRuntimeElementRow(element, 'text'));
 
   return {
     type: 'runtime-snapshot',
@@ -208,6 +237,7 @@ function toRuntimeSnapshotCompactCapture(
     count: snapshot.elements.length,
     targets,
     scroll,
+    ...(text.length > 0 ? { text } : {}),
     udid: snapshot.simulatorId,
   };
 }
@@ -262,7 +292,10 @@ function toRuntimeSnapshotUnchangedCompactCapture(
   };
 }
 
-function projectRuntimeSnapshotData<TData>(data: TData, options: StructuredEnvelopeOptions): unknown {
+function projectRuntimeSnapshotData<TData>(
+  data: TData,
+  options: StructuredEnvelopeOptions,
+): unknown {
   if (options.runtimeSnapshot === 'full' || typeof data !== 'object' || data === null) {
     return data;
   }

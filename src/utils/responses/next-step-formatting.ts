@@ -1,5 +1,5 @@
 import type { RuntimeKind } from '../../runtime/types.ts';
-import type { NextStep } from '../../types/common.ts';
+import type { NextStep, NextStepParamValue } from '../../types/common.ts';
 import { toKebabCase } from '../../runtime/naming.ts';
 import { shellEscapeArg } from '../shell-escape.ts';
 
@@ -23,6 +23,17 @@ function formatCliArg(value: string): string {
     : shellEscapeArg(value);
 }
 
+function hasComplexCliParamValue(value: NextStepParamValue): boolean {
+  return typeof value === 'object' && value !== null;
+}
+
+function formatCliParamValue(value: Exclude<NextStepParamValue, boolean>): string {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return formatCliArg(String(value));
+  }
+  return shellEscapeArg(JSON.stringify(value));
+}
+
 function formatNextStepForCli(step: NextStep): string {
   const commandName = step.cliTool ?? (step.tool ? toKebabCase(step.tool) : undefined);
   if (!commandName) {
@@ -35,22 +46,31 @@ function formatNextStepForCli(step: NextStep): string {
   }
   parts.push(commandName);
 
-  for (const [key, value] of Object.entries(step.params ?? {})) {
+  const params = step.params ?? {};
+  if (Object.values(params).some(hasComplexCliParamValue)) {
+    parts.push('--json', formatCliParamValue(params));
+    return parts.join(' ');
+  }
+
+  for (const [key, value] of Object.entries(params)) {
     const flagName = toKebabCase(key);
     if (typeof value === 'boolean') {
       if (value) {
         parts.push(`--${flagName}`);
       }
     } else {
-      parts.push(`--${flagName}`, formatCliArg(String(value)));
+      parts.push(`--${flagName}`, formatCliParamValue(value));
     }
   }
 
   return parts.join(' ');
 }
 
-function formatMcpValue(value: string | number | boolean): string {
+function formatMcpValue(value: NextStepParamValue): string {
   if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'object' && value !== null) {
     return JSON.stringify(value);
   }
   return String(value);

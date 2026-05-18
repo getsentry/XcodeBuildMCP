@@ -19,6 +19,7 @@ export const runtimeConfigFileSchema = z
     dapLogEvents: z.boolean().optional(),
     launchJsonWaitMs: z.number().int().nonnegative().optional(),
     axePath: z.string().optional(),
+    axeSourcePath: z.string().optional(),
     iosTemplatePath: z.string().optional(),
     iosTemplateVersion: z.string().optional(),
     macosTemplatePath: z.string().optional(),

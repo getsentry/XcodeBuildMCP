@@ -222,7 +222,7 @@ function ambiguousSelectorError(
     code: 'TARGET_AMBIGUOUS',
     message: 'The wait selector matched multiple runtime UI elements.',
     recoveryHint:
-      'Provide a more specific selector, or refresh with snapshot_ui and choose a stable elementRef.',
+      'Retry with the intended candidate elementRef from this result, or narrow the selector with role, label, value, or identifier. Refresh with snapshot_ui only if the refs are stale.',
     ...(selector.sourceElementRef ? { elementRef: selector.sourceElementRef } : {}),
     candidates,
   };
@@ -278,7 +278,10 @@ export function evaluateElementPredicate(params: {
   }
 
   if (predicate === 'gone') {
-    return { matched: candidates.length === 0, candidates };
+    const goneCandidates = text
+      ? candidates.filter((candidate) => elementTextContains(candidate, text))
+      : candidates;
+    return { matched: goneCandidates.length === 0, candidates: goneCandidates };
   }
 
   if (predicate === 'textContains') {

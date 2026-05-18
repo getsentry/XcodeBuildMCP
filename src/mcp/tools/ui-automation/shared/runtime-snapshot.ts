@@ -256,7 +256,7 @@ function normalizeNode(input: NormalizedNodeInput, index: number): RuntimeSnapsh
   const role = deriveRole(node);
   const label = readText(node, ['AXLabel', 'title', 'help', 'label']);
   const value = readText(node, ['AXValue', 'value']);
-  const identifier = readText(node, ['AXUniqueId', 'identifier', 'id']);
+  const identifier = readText(node, ['AXUniqueId', 'AXIdentifier', 'identifier', 'id']);
   const enabled = node.enabled !== false;
   const customActions = normalizeCustomActions(node.custom_actions);
   const actions = deriveActions({
@@ -448,6 +448,42 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
       publicElement.actions.push('swipeWithin');
     }
   }
+
+  pruneGenericFallbackSwipeTargets(elements);
+}
+
+function isUnidentifiedOtherSwipeTarget(element: RuntimeSnapshotElementRecord): boolean {
+  const publicElement = element.publicElement;
+  return (
+    publicElement.role === 'other' &&
+    publicElement.actions.includes('swipeWithin') &&
+    !publicElement.label &&
+    !publicElement.value &&
+    !publicElement.identifier
+  );
+}
+
+function isPreferredSwipeTarget(element: RuntimeSnapshotElementRecord): boolean {
+  const publicElement = element.publicElement;
+  if (!publicElement.actions.includes('swipeWithin')) {
+    return false;
+  }
+  return !isUnidentifiedOtherSwipeTarget(element);
+}
+
+function pruneGenericFallbackSwipeTargets(elements: RuntimeSnapshotElementRecord[]): void {
+  if (!elements.some(isPreferredSwipeTarget)) {
+    return;
+  }
+
+  for (const element of elements) {
+    if (!isUnidentifiedOtherSwipeTarget(element)) {
+      continue;
+    }
+    element.publicElement.actions = element.publicElement.actions.filter(
+      (action) => action !== 'swipeWithin',
+    );
+  }
 }
 
 function flattenHierarchy(roots: AccessibilityNode[]): NormalizedNodeInput[] {
@@ -494,17 +530,27 @@ export function extractAccessibilityHierarchy(responseText: string): Accessibili
     throw new RuntimeSnapshotParseError(`AXe describe-ui returned invalid JSON: ${message}`);
   }
 
-  if (Array.isArray(parsed)) {
-    return parsed as AccessibilityNode[];
+  const hierarchy = (() => {
+    if (Array.isArray(parsed)) {
+      return parsed as AccessibilityNode[];
+    }
+
+    if (isRecord(parsed) && Array.isArray(parsed.elements)) {
+      return parsed.elements as AccessibilityNode[];
+    }
+
+    throw new RuntimeSnapshotParseError(
+      'AXe describe-ui did not return an accessibility element array.',
+    );
+  })();
+
+  if (hierarchy.length === 0) {
+    throw new RuntimeSnapshotParseError(
+      'AXe describe-ui returned an empty accessibility element array.',
+    );
   }
 
-  if (isRecord(parsed) && Array.isArray(parsed.elements)) {
-    return parsed.elements as AccessibilityNode[];
-  }
-
-  throw new RuntimeSnapshotParseError(
-    'AXe describe-ui did not return an accessibility element array.',
-  );
+  return hierarchy;
 }
 
 export function createRuntimeSnapshotRecord(params: {
