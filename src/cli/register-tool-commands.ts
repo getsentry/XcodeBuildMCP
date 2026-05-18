@@ -298,7 +298,6 @@ function registerToolSubcommand(
       const outputStyle: OutputStyle = argv.style === 'minimal' ? 'minimal' : 'normal';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
-      const style = argv.style as string | undefined;
       const filePathRenderStyle = argv.filePathRenderStyle as FilePathRenderStyle | undefined;
       const verboseOutput = argv.verbose === true;
 
@@ -409,7 +408,7 @@ function registerToolSubcommand(
           runtime: 'cli',
           outputStyle,
           filePathRenderStyle,
-          includeNextSteps: style !== 'minimal',
+          includeNextSteps: outputStyle !== 'minimal',
         });
         const writeJsonlFragment =
           outputFormat === 'jsonl'
