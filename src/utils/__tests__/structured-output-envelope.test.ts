@@ -95,6 +95,14 @@ describe('toStructuredEnvelope', () => {
             frame: { x: 12, y: 81, width: 178, height: 33 },
             actions: ['tap', 'longPress', 'touch'],
           },
+          {
+            ref: 'e3',
+            role: 'text',
+            label: '10.7 mm',
+            frame: { x: 24, y: 140, width: 80, height: 24 },
+            state: { visible: true },
+            actions: ['longPress', 'touch'],
+          },
         ],
         actions: [
           { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
@@ -116,9 +124,10 @@ describe('toStructuredEnvelope', () => {
           rs: '1',
           screenHash: 'screen-one',
           seq: 1,
-          count: 2,
+          count: 3,
           targets: ['e2|tap|button|San Francisco||weather.locationButton'],
           scroll: ['e1|swipe|application|Weather||'],
+          text: ['e3|text|text|10.7 mm||'],
           udid: 'SIMULATOR-1',
         },
         waitMatch: {

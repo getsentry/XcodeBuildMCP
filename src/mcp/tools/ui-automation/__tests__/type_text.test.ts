@@ -14,6 +14,10 @@ import {
   simulatorId,
 } from './ui-action-test-helpers.ts';
 
+function actionCommands(calls: Array<{ command: string[] }>): string[][] {
+  return calls.map((call) => call.command).filter((command) => command[1] !== 'describe-ui');
+}
+
 async function runTypeText(
   params: Parameters<typeof type_textLogic>[0],
   executor = createTrackingExecutor().executor,
@@ -70,7 +74,7 @@ describe('Type Text Tool', () => {
         didError: false,
         action: { type: 'type-text', elementRef: 'e1', textLength: 16 },
       });
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -102,7 +106,7 @@ describe('Type Text Tool', () => {
         didError: false,
         action: { type: 'type-text', elementRef: 'e1', textLength: text.length },
       });
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -168,7 +172,7 @@ describe('Type Text Tool', () => {
       const result = await runTypeText({ simulatorId, elementRef: 'e2', text: 'London' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -205,7 +209,7 @@ describe('Type Text Tool', () => {
       const result = await runTypeText({ simulatorId, elementRef: 'e2', text: 'London' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         ['/mocked/axe/path', 'tap', '-x', '130', '-y', '220', '--udid', simulatorId],
         ['/mocked/axe/path', 'type', 'London', '--udid', simulatorId],
       ]);
@@ -220,16 +224,19 @@ describe('Type Text Tool', () => {
           AXUniqueId: 'locationSearchField',
         }),
       ]);
-      const { calls, executor } = createSequencedExecutor([
-        { success: false, error: 'Multiple 2 accessibility elements matched selector' },
-        { success: true, output: 'focused by coordinate' },
-        { success: true, output: 'typed' },
-      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          { success: false, error: 'Multiple 2 accessibility elements matched selector' },
+          { success: true, output: 'focused by coordinate' },
+          { success: true, output: 'typed' },
+        ],
+        { describeUiAfterSequence: true },
+      );
 
       const result = await runTypeText({ simulatorId, elementRef: 'e1', text: 'London' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -256,14 +263,18 @@ describe('Type Text Tool', () => {
           AXLabel: 'Search for a city',
         }),
       ]);
-      const { calls, executor } = createSequencedExecutor([
-        {
-          success: false,
-          error: "No accessibility element matched --label 'Search for a city'. No tap performed.",
-        },
-        { success: true, output: 'focused by coordinate' },
-        { success: true, output: 'typed' },
-      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "No accessibility element matched --label 'Search for a city'. No tap performed.",
+          },
+          { success: true, output: 'focused by coordinate' },
+          { success: true, output: 'typed' },
+        ],
+        { describeUiAfterSequence: true },
+      );
 
       const result = await runTypeText(
         { simulatorId, elementRef: 'e1', text: 'Portland' },
@@ -271,7 +282,7 @@ describe('Type Text Tool', () => {
       );
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -304,7 +315,7 @@ describe('Type Text Tool', () => {
         executor,
       );
 
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -342,7 +353,7 @@ describe('Type Text Tool', () => {
 
       await runTypeText({ simulatorId, elementRef: 'e1', text: 'Hello' }, executor);
 
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
         ['/mocked/axe/path', 'type', 'Hello', '--udid', simulatorId],
       ]);

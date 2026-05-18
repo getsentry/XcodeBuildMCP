@@ -20,6 +20,8 @@ import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state
 import { createNode, recordSnapshot } from './ui-action-test-helpers.ts';
 
 const simulatorId = '12345678-1234-4234-8234-123456789012';
+const runtimeSnapshotOutput =
+  '{"elements":[{"type":"Button","role":"AXButton","frame":{"x":100,"y":200,"width":50,"height":30},"enabled":true,"children":[],"custom_actions":[]}]}';
 
 function createMockAxeHelpers() {
   return {
@@ -91,7 +93,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode({ type: 'ScrollView', role: 'AXScrollArea' })]);
           return swipeLogic(
             { simulatorId, withinElementRef: 'e1', direction: 'up' },
-            createMockExecutor({ success: true }),
+            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
             axeHelpers,
           );
         },
@@ -103,7 +105,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode()]);
           return tapLogic(
             { simulatorId, elementRef: 'e1' },
-            createMockExecutor({ success: true }),
+            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
             axeHelpers,
           );
         },
@@ -127,7 +129,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
           return type_textLogic(
             { simulatorId, elementRef: 'e1', text: 'Hello' },
-            createMockExecutor({ success: true }),
+            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
             axeHelpers,
           );
         },

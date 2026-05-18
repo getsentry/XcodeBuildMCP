@@ -130,6 +130,27 @@ describe('next-steps-renderer', () => {
       );
     });
 
+    it('should format complex CLI params through json', () => {
+      const step: NextStep = {
+        tool: 'batch',
+        cliTool: 'batch',
+        workflow: 'ui-automation',
+        label: 'Batch same-screen taps',
+        params: {
+          simulatorId: 'ABC123',
+          steps: [
+            { action: 'tap', elementRef: 'e1' },
+            { action: 'tap', elementRef: 'e2' },
+          ],
+        },
+      };
+
+      const result = renderNextStep(step, 'cli');
+      expect(result).toBe(
+        'Batch same-screen taps: xcodebuildmcp ui-automation batch --json \'{"simulatorId":"ABC123","steps":[{"action":"tap","elementRef":"e1"},{"action":"tap","elementRef":"e2"}]}\'',
+      );
+    });
+
     it('should format step for MCP with no params', () => {
       const step: NextStep = {
         tool: 'open_sim',
@@ -173,6 +194,25 @@ describe('next-steps-renderer', () => {
 
       const result = renderNextStep(step, 'mcp');
       expect(result).toBe('Do something: some_tool({ verbose: true })');
+    });
+
+    it('should format complex MCP params as JSON instead of object string coercions', () => {
+      const step: NextStep = {
+        tool: 'batch',
+        label: 'Batch same-screen taps',
+        params: {
+          simulatorId: 'ABC123',
+          steps: [
+            { action: 'tap', elementRef: 'e1' },
+            { action: 'tap', elementRef: 'e2' },
+          ],
+        },
+      };
+
+      const result = renderNextStep(step, 'mcp');
+      expect(result).toBe(
+        'Batch same-screen taps: batch({ simulatorId: "ABC123", steps: [{"action":"tap","elementRef":"e1"},{"action":"tap","elementRef":"e2"}] })',
+      );
     });
 
     it('should handle daemon runtime same as MCP', () => {

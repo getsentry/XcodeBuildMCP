@@ -704,8 +704,8 @@ describe('DefaultToolInvoker next steps post-processing', () => {
     const response = await invokeAndFinalize(invoker, 'snapshot-ui', {}, { runtime: 'cli' });
 
     const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
-    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id "123"');
-    expect(text).not.toContain('xcodebuildmcp simulator screenshot --simulator-id "123"');
+    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id 123');
+    expect(text).not.toContain('xcodebuildmcp simulator screenshot --simulator-id 123');
   });
 
   it('injects manifest template next steps from dynamic nextStepParams when response omits nextSteps', async () => {

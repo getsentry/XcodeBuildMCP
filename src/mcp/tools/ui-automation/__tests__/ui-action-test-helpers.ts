@@ -35,6 +35,14 @@ export function createTrackingExecutor(): {
   const calls: CapturedCommandCall[] = [];
   const executor: CommandExecutor = async (command, logPrefix, useShell, opts) => {
     calls.push({ command, logPrefix, useShell, opts });
+    if (command[1] === 'describe-ui') {
+      return {
+        success: true,
+        output: JSON.stringify({ elements: [createNode()] }),
+        error: undefined,
+        process: mockProcess,
+      };
+    }
     return { success: true, output: 'ok', error: undefined, process: mockProcess };
   };
 
@@ -47,6 +55,7 @@ export function createFailingExecutor(error: string): CommandExecutor {
 
 export function createSequencedExecutor(
   results: Array<{ success: boolean; output?: string; error?: string }>,
+  options: { describeUiAfterSequence?: boolean } = {},
 ): {
   calls: CapturedCommandCall[];
   executor: CommandExecutor;
@@ -55,6 +64,14 @@ export function createSequencedExecutor(
   let index = 0;
   const executor: CommandExecutor = async (command, logPrefix, useShell, opts) => {
     calls.push({ command, logPrefix, useShell, opts });
+    if (options.describeUiAfterSequence === true && command[1] === 'describe-ui') {
+      return {
+        success: true,
+        output: JSON.stringify({ elements: [createNode()] }),
+        error: undefined,
+        process: mockProcess,
+      };
+    }
     const result = results[index] ?? results.at(-1) ?? { success: true };
     index += 1;
     return {

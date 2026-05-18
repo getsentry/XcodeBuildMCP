@@ -18,6 +18,10 @@ import {
   simulatorId,
 } from './ui-action-test-helpers.ts';
 
+function actionCommands(calls: Array<{ command: string[] }>): string[][] {
+  return calls.map((call) => call.command).filter((command) => command[1] !== 'describe-ui');
+}
+
 async function runTap(
   params: Parameters<typeof tapLogic>[0],
   executor = createTrackingExecutor().executor,
@@ -63,7 +67,7 @@ describe('Tap Plugin', () => {
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result).toMatchObject({ didError: false, action: { type: 'tap', elementRef: 'e1' } });
-      expect(calls).toHaveLength(1);
+      expect(actionCommands(calls)).toHaveLength(1);
       expect(calls[0]).toEqual({
         command: [
           '/mocked/axe/path',
@@ -81,14 +85,14 @@ describe('Tap Plugin', () => {
       });
     });
 
-    it('clears the cached runtime snapshot after a successful tap', async () => {
+    it('preserves the cached runtime snapshot after a successful tap', async () => {
       recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
       const { executor } = createTrackingExecutor();
 
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
     it('includes element type when tapping a referenced element with a shared identifier', async () => {
@@ -112,7 +116,7 @@ describe('Tap Plugin', () => {
       const result = await runTap({ simulatorId, elementRef: 'e2' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -148,7 +152,7 @@ describe('Tap Plugin', () => {
       const result = await runTap({ simulatorId, elementRef: 'e2' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         ['/mocked/axe/path', 'tap', '-x', '325', '-y', '440', '--udid', simulatorId],
       ]);
     });
@@ -162,15 +166,18 @@ describe('Tap Plugin', () => {
           AXUniqueId: 'shared-action',
         }),
       ]);
-      const { calls, executor } = createSequencedExecutor([
-        { success: false, error: 'Multiple accessibility elements matched selector' },
-        { success: true, output: 'tapped by coordinate' },
-      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          { success: false, error: 'Multiple accessibility elements matched selector' },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
+      );
 
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -195,19 +202,22 @@ describe('Tap Plugin', () => {
           AXLabel: 'Clear search',
         }),
       ]);
-      const { calls, executor } = createSequencedExecutor([
-        {
-          success: false,
-          error:
-            "Multiple (2) accessibility elements matched --id 'weather.locationsSheet'. No tap performed.",
-        },
-        { success: true, output: 'tapped by coordinate' },
-      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "Multiple (2) accessibility elements matched --id 'weather.locationsSheet'. No tap performed.",
+          },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
+      );
 
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -233,19 +243,22 @@ describe('Tap Plugin', () => {
           AXLabel: 'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°',
         }),
       ]);
-      const { calls, executor } = createSequencedExecutor([
-        {
-          success: false,
-          error:
-            "No accessibility element matched --label 'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°'. No tap performed.",
-        },
-        { success: true, output: 'tapped by coordinate' },
-      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "No accessibility element matched --label 'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°'. No tap performed.",
+          },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
+      );
 
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result.didError).toBe(false);
-      expect(calls.map((call) => call.command)).toEqual([
+      expect(actionCommands(calls)).toEqual([
         [
           '/mocked/axe/path',
           'tap',
@@ -277,8 +290,8 @@ describe('Tap Plugin', () => {
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
       expect(result.didError).toBe(true);
-      expect(calls).toHaveLength(1);
-      expect(calls[0]?.command).toEqual([
+      expect(actionCommands(calls)).toHaveLength(1);
+      expect(actionCommands(calls)[0]).toEqual([
         '/mocked/axe/path',
         'tap',
         '--id',
@@ -298,8 +311,8 @@ describe('Tap Plugin', () => {
 
       await runTap({ simulatorId, elementRef: 'e1', preDelay: 0.25, postDelay: 0.5 }, executor);
 
-      expect(calls).toHaveLength(1);
-      expect(calls[0]?.command).toEqual([
+      expect(actionCommands(calls)).toHaveLength(1);
+      expect(actionCommands(calls)[0]).toEqual([
         '/mocked/axe/path',
         'tap',
         '-x',

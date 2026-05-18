@@ -301,5 +301,31 @@ describe('Swipe Tool', () => {
       expect(result.uiError).not.toHaveProperty('withinElementRef');
       expect(getRuntimeSnapshot(simulatorId)).toBeNull();
     });
+
+    it('suggests the next action from the post-swipe runtime snapshot', async () => {
+      recordSnapshot([createNode({ type: 'ScrollView', role: 'AXScrollArea' })]);
+      const { ctx, run } = createMockToolHandlerContext();
+
+      await run(() =>
+        swipeLogic(
+          { simulatorId, withinElementRef: 'e1', direction: 'up' },
+          createTrackingExecutor().executor,
+          createMockAxeHelpers(),
+        ),
+      );
+
+      const result = ctx.structuredOutput?.result as UiActionResultDomainResult;
+      expect(result.capture).toMatchObject({
+        type: 'runtime-snapshot',
+        simulatorId,
+      });
+      expect(ctx.nextSteps).toEqual([
+        {
+          label: 'Tap an elementRef',
+          tool: 'tap',
+          params: { simulatorId, elementRef: 'e1' },
+        },
+      ]);
+    });
   });
 });

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
 import type { CaptureResultDomainResult } from '../../../../types/domain-results.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
+import type { DebuggerBackend } from '../../../../utils/debugger/backends/DebuggerBackend.ts';
+import { DebuggerManager } from '../../../../utils/debugger/debugger-manager.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
 import {
@@ -35,6 +37,26 @@ function createTiming(startMs = 0): {
     },
     getNow: () => nowMs,
   };
+}
+
+async function createStoppedDebuggerManager(): Promise<DebuggerManager> {
+  const backend: DebuggerBackend = {
+    kind: 'lldb-cli',
+    attach: async () => {},
+    detach: async () => {},
+    runCommand: async () => '',
+    resume: async () => {},
+    addBreakpoint: async (spec) => ({ id: 1, spec, rawOutput: '' }),
+    removeBreakpoint: async () => '',
+    getStack: async () => '',
+    getVariables: async () => '',
+    getExecutionState: async () => ({ status: 'stopped', reason: 'breakpoint' }),
+    dispose: async () => {},
+  };
+  const manager = new DebuggerManager({ backendFactory: async () => backend });
+  const session = await manager.createSession({ simulatorId, pid: 12345 });
+  manager.setCurrentSession(session.id);
+  return manager;
 }
 
 async function runWaitForUi(
@@ -116,16 +138,22 @@ describe('Wait for UI Plugin', () => {
       expect(result.content[0].text).toContain('textContains waits require text');
     });
 
-    it('rejects text on non-textContains predicates instead of ignoring it', async () => {
-      const result = await callHandler(handler, {
-        simulatorId,
-        predicate: 'gone',
-        role: 'text',
-        text: 'Loading',
-      });
+    it('allows text on gone waits for loading messages', async () => {
+      const { executor } = createSequencedExecutor([
+        { success: true, output: hierarchyJson([createNode({ AXLabel: 'Ready' })]) },
+      ]);
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('text is only supported for textContains waits');
+      const { ctx, run } = createMockToolHandlerContext();
+      await run(() =>
+        (
+          handler as unknown as (
+            args: Record<string, unknown>,
+            executor: CommandExecutor,
+          ) => Promise<void>
+        )({ simulatorId, predicate: 'gone', text: 'Loading', timeoutMs: 0 }, executor),
+      );
+
+      expect(ctx.structuredOutput?.result.didError).toBe(false);
     });
 
     it('rejects unknown fields instead of silently broadening wait selectors', async () => {
@@ -138,6 +166,32 @@ describe('Wait for UI Plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Unrecognized key: "selector"');
+    });
+
+    it('ignores unrelated project session defaults before strict validation', async () => {
+      sessionStore.setDefaults({
+        simulatorId,
+        projectPath: '/tmp/App.xcodeproj',
+        scheme: 'App',
+        simulatorName: 'iPhone 17 Pro',
+        simulatorPlatform: 'iOS Simulator',
+      });
+      const { calls, executor } = createSequencedExecutor([
+        { success: true, output: hierarchyJson([createNode({ AXLabel: 'Ready' })]) },
+      ]);
+
+      const { ctx, run } = createMockToolHandlerContext();
+      await run(() =>
+        (
+          handler as unknown as (
+            args: Record<string, unknown>,
+            executor: CommandExecutor,
+          ) => Promise<void>
+        )({ predicate: 'textContains', text: 'Ready', timeoutMs: 0 }, executor),
+      );
+
+      expect(ctx.structuredOutput?.result.didError).toBe(false);
+      expect(calls[0]?.command.slice(1)).toEqual(['describe-ui', '--udid', simulatorId]);
     });
   });
 
@@ -328,6 +382,80 @@ describe('Wait for UI Plugin', () => {
 
     expect(result.didError).toBe(false);
     expect(result.waitMatch).toEqual({ predicate: 'gone', matches: [] });
+  });
+
+  it('succeeds for selector-free gone when no element contains text', async () => {
+    const { executor } = createSequencedExecutor([
+      { success: true, output: hierarchyJson([createNode({ AXLabel: 'Ready' })]) },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', text: 'Loading weather', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(false);
+    expect(result.waitMatch).toEqual({ predicate: 'gone', matches: [] });
+  });
+
+  it('times out for selector-free gone while an element contains text', async () => {
+    const { executor } = createSequencedExecutor([
+      { success: true, output: hierarchyJson([createNode({ AXLabel: 'Loading weather...' })]) },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', text: 'Loading weather', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(true);
+    expect(result.uiError).toMatchObject({
+      code: 'WAIT_TIMEOUT',
+      candidates: [expect.objectContaining({ label: 'Loading weather...' })],
+    });
+  });
+
+  it('succeeds for gone when selector matches remain but none contain text', async () => {
+    const { executor } = createSequencedExecutor([
+      {
+        success: true,
+        output: hierarchyJson([
+          createNode({ AXLabel: 'Loading weather...', role: 'AXStaticText', type: 'StaticText' }),
+          createNode({ AXLabel: 'Ready', role: 'AXStaticText', type: 'StaticText' }),
+        ]),
+      },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', role: 'text', text: 'Searching weather', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(false);
+    expect(result.waitMatch).toEqual({ predicate: 'gone', matches: [] });
+  });
+
+  it('times out for gone when selector matches contain text', async () => {
+    const { executor } = createSequencedExecutor([
+      {
+        success: true,
+        output: hierarchyJson([
+          createNode({ AXLabel: 'Loading weather...', role: 'AXStaticText', type: 'StaticText' }),
+          createNode({ AXLabel: 'Ready', role: 'AXStaticText', type: 'StaticText' }),
+        ]),
+      },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', role: 'text', text: 'Loading weather', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(true);
+    expect(result.uiError).toMatchObject({
+      code: 'WAIT_TIMEOUT',
+      candidates: [expect.objectContaining({ label: 'Loading weather...' })],
+    });
   });
 
   it('returns TARGET_AMBIGUOUS when focused selector matches multiple elements', async () => {
@@ -652,8 +780,9 @@ describe('Wait for UI Plugin', () => {
     });
   });
 
-  it('clears the runtime store when every poll returns unparsable UI', async () => {
+  it('preserves the runtime store when every poll returns unparsable UI', async () => {
     recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], 0);
+    const previousSnapshot = getRuntimeSnapshot(simulatorId, 0);
     const { executor } = createSequencedExecutor([{ success: true, output: 'not json' }]);
 
     const result = await runWaitForUi(
@@ -662,8 +791,63 @@ describe('Wait for UI Plugin', () => {
     );
 
     expect(result.didError).toBe(true);
+    expect(result.uiError).toEqual(
+      expect.objectContaining({
+        code: 'SNAPSHOT_PARSE_FAILED',
+        recoveryHint: 'Retry after the app is fully launched and responsive.',
+      }),
+    );
+    expect(getRuntimeSnapshot(simulatorId, 0)).toBe(previousSnapshot);
+  });
+
+  it('preserves the runtime store when every poll returns an empty UI payload', async () => {
+    recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], 0);
+    const previousSnapshot = getRuntimeSnapshot(simulatorId, 0);
+    const { executor } = createSequencedExecutor([{ success: true, output: '[]' }]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'settled', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(true);
     expect(result.uiError?.code).toBe('SNAPSHOT_PARSE_FAILED');
-    expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+    expect(getRuntimeSnapshot(simulatorId, 0)).toBe(previousSnapshot);
+  });
+
+  it('preserves the runtime store when the debugger guard blocks before polling', async () => {
+    recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], 0);
+    const previousSnapshot = getRuntimeSnapshot(simulatorId, 0);
+    const stoppedDebugger = await createStoppedDebuggerManager();
+    const guardedExecutor: CommandExecutor = async () => {
+      throw new Error('AXe should not run when debugger guard blocks');
+    };
+
+    try {
+      const { ctx, run } = createMockToolHandlerContext();
+      await run(() =>
+        wait_for_uiLogic(
+          { simulatorId, predicate: 'settled', timeoutMs: 0 },
+          guardedExecutor,
+          createMockAxeHelpers(),
+          stoppedDebugger,
+          createTiming().timing,
+        ),
+      );
+
+      const result = ctx.structuredOutput?.result as CaptureResultDomainResult;
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toEqual(
+        expect.objectContaining({
+          code: 'ACTION_FAILED',
+          recoveryHint:
+            'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
+        }),
+      );
+      expect(getRuntimeSnapshot(simulatorId, 0)).toBe(previousSnapshot);
+    } finally {
+      await stoppedDebugger.disposeAll();
+    }
   });
 
   it('waits until runtime snapshot element signatures remain settled', async () => {

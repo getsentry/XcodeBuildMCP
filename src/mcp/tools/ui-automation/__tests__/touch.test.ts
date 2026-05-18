@@ -203,7 +203,12 @@ describe('Touch Plugin', () => {
 
   describe('Handler Behavior', () => {
     it('rejects delay unless both down and up are true before AXe runs', async () => {
-      const result = await callHandler(handler, { simulatorId, elementRef: 'e1', down: true, delay: 1 });
+      const result = await callHandler(handler, {
+        simulatorId,
+        elementRef: 'e1',
+        down: true,
+        delay: 1,
+      });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain(

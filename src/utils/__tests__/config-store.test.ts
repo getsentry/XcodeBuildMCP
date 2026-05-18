@@ -56,6 +56,7 @@ describe('config-store', () => {
       XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE: 'warn',
       XCODEBUILDMCP_DEBUGGER_BACKEND: 'lldb',
       XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list',
+      XCODEBUILDMCP_AXE_SOURCE_PATH: '/Volumes/Developer/AXe',
     };
 
     await initConfigStore({ cwd, fs: createFs(), env });
@@ -71,6 +72,7 @@ describe('config-store', () => {
     expect(config.uiDebuggerGuardMode).toBe('warn');
     expect(config.debuggerBackend).toBe('lldb-cli');
     expect(config.filePathRenderStyle).toBe('list');
+    expect(config.axeSourcePath).toBe('/Volumes/Developer/AXe');
   });
 
   it('prefers overrides over config file values and config over env', async () => {
@@ -79,18 +81,25 @@ describe('config-store', () => {
       'debug: false',
       'dapRequestTimeoutMs: 4000',
       'filePathRenderStyle: tree',
+      'axeSourcePath: /file/AXe',
       '',
     ].join('\n');
     const env = {
       XCODEBUILDMCP_DEBUG: 'true',
       XCODEBUILDMCP_DAP_REQUEST_TIMEOUT_MS: '999',
       XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list',
+      XCODEBUILDMCP_AXE_SOURCE_PATH: '/env/AXe',
     };
 
     await initConfigStore({
       cwd,
       fs: createFs(yaml),
-      overrides: { debug: true, dapRequestTimeoutMs: 12345, filePathRenderStyle: 'list' },
+      overrides: {
+        debug: true,
+        dapRequestTimeoutMs: 12345,
+        filePathRenderStyle: 'list',
+        axeSourcePath: '/override/AXe',
+      },
       env,
     });
 
@@ -98,15 +107,25 @@ describe('config-store', () => {
     expect(config.debug).toBe(true);
     expect(config.dapRequestTimeoutMs).toBe(12345);
     expect(config.filePathRenderStyle).toBe('list');
+    expect(config.axeSourcePath).toBe('/override/AXe');
   });
 
-  it('uses filePathRenderStyle from config before env when no override is provided', async () => {
-    const yaml = ['schemaVersion: 1', 'filePathRenderStyle: tree', ''].join('\n');
-    const env = { XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list' };
+  it('uses file config before env when no override is provided', async () => {
+    const yaml = [
+      'schemaVersion: 1',
+      'filePathRenderStyle: tree',
+      'axeSourcePath: /file/AXe',
+      '',
+    ].join('\n');
+    const env = {
+      XCODEBUILDMCP_FILE_PATH_RENDER_STYLE: 'list',
+      XCODEBUILDMCP_AXE_SOURCE_PATH: '/env/AXe',
+    };
 
     await initConfigStore({ cwd, fs: createFs(yaml), env });
 
     expect(getConfig().filePathRenderStyle).toBe('tree');
+    expect(getConfig().axeSourcePath).toBe('/file/AXe');
   });
 
   it('reads sentryDisabled from config file', async () => {

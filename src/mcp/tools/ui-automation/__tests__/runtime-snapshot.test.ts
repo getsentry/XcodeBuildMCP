@@ -81,6 +81,18 @@ describe('runtime snapshot normalization', () => {
     expect(snapshot.elementsByRef.get('e2')?.rawNode).toBe(child);
   });
 
+  it('reads AXIdentifier as a stable runtime element identifier', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [createNode({ AXIdentifier: 'weather.detailsButton' })],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({ identifier: 'weather.detailsButton' }),
+    );
+  });
+
   it('derives deterministic screen hashes from normalized UI content', () => {
     const uiHierarchy = [createNode({ AXLabel: 'Continue' }), createNode({ AXLabel: 'Cancel' })];
 
@@ -107,9 +119,15 @@ describe('runtime snapshot normalization', () => {
     expect(hierarchy[0]?.AXLabel).toBe('Continue');
   });
 
-  it('throws typed parse errors for invalid describe-ui responses', () => {
+  it('throws typed parse errors for invalid or empty describe-ui responses', () => {
     expect(() => extractAccessibilityHierarchy('not json')).toThrow(RuntimeSnapshotParseError);
     expect(() => extractAccessibilityHierarchy(JSON.stringify({ value: [] }))).toThrow(
+      RuntimeSnapshotParseError,
+    );
+    expect(() => extractAccessibilityHierarchy(JSON.stringify([]))).toThrow(
+      RuntimeSnapshotParseError,
+    );
+    expect(() => extractAccessibilityHierarchy(JSON.stringify({ elements: [] }))).toThrow(
       RuntimeSnapshotParseError,
     );
   });
@@ -486,6 +504,90 @@ describe('runtime snapshot normalization', () => {
       expect.objectContaining({
         role: 'other',
         label: 'Scrollable panel',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
+  it('keeps an unlabeled other swipe target as fallback when no better scroll ref exists', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          AXLabel: undefined,
+          AXValue: undefined,
+          AXUniqueId: undefined,
+          frame: { x: 0, y: 0, width: 200, height: 200 },
+          children: [
+            createNode({
+              type: 'StaticText',
+              role: 'AXStaticText',
+              AXLabel: 'Overflow',
+              frame: { x: 10, y: 260, width: 100, height: 20 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'other',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
+  it('removes unlabeled other swipe targets when better scroll refs exist', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          children: [
+            createNode({
+              type: 'Other',
+              role: 'AXGroup',
+              AXLabel: undefined,
+              AXValue: undefined,
+              AXUniqueId: undefined,
+              frame: { x: 0, y: 0, width: 300, height: 300 },
+              children: [
+                createNode({
+                  type: 'StaticText',
+                  role: 'AXStaticText',
+                  AXLabel: 'Generic overflow',
+                  frame: { x: 10, y: 360, width: 120, height: 20 },
+                }),
+              ],
+            }),
+            createNode({
+              type: 'ScrollView',
+              role: 'AXScrollArea',
+              AXIdentifier: 'weather.locationsSheet',
+              frame: { x: 0, y: 400, width: 390, height: 300 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[1]).toEqual(
+      expect.objectContaining({
+        role: 'other',
+        actions: expect.not.arrayContaining(['swipeWithin']),
+      }),
+    );
+    expect(snapshot.payload.elements[3]).toEqual(
+      expect.objectContaining({
+        role: 'scroll-view',
+        identifier: 'weather.locationsSheet',
         actions: expect.arrayContaining(['swipeWithin']),
       }),
     );
