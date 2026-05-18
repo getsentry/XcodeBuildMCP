@@ -265,7 +265,7 @@ export function log(level: string, message: string, context?: LogContext): void 
     });
   }
 
-  if (logFileStream && clientLogLevel !== 'none') {
+  if (logFileStream && shouldLog(level)) {
     try {
       logFileStream.write(`${logMessage}\n`);
     } catch {
