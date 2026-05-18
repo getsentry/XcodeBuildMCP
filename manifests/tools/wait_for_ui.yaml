@@ -9,18 +9,6 @@ outputSchema:
   version: '2'
 routing:
   stateful: true
-nextSteps:
-  - label: Refresh runtime snapshot
-    toolId: snapshot_ui
-    params:
-      simulatorId: SIMULATOR_UUID
-    when: success
-  - label: Wait again
-    toolId: wait_for_ui
-    params:
-      simulatorId: SIMULATOR_UUID
-      predicate: settled
-    when: success
 annotations:
   title: Wait for UI
   readOnlyHint: true
