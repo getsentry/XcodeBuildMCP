@@ -95,6 +95,15 @@
       },
       "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
     },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"]
+    },
     "direction": {
       "enum": ["up", "down", "left", "right"]
     },
@@ -158,12 +167,41 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
+                "type": { "const": "tap" },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+              },
+              "required": ["type", "x", "y"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
                 "type": { "const": "swipe" },
                 "withinElementRef": { "type": "string" },
                 "direction": { "$ref": "#/$defs/direction" },
                 "durationSeconds": { "type": "number", "minimum": 0 }
               },
               "required": ["type", "withinElementRef", "direction"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "swipe" },
+                "from": { "$ref": "#/$defs/point" },
+                "to": { "$ref": "#/$defs/point" },
+                "durationSeconds": { "type": "number", "minimum": 0 }
+              },
+              "required": ["type", "from", "to"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "swipe" }
+              },
+              "required": ["type"]
             },
             {
               "type": "object",
@@ -179,11 +217,41 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
+                "type": { "const": "touch" },
+                "event": { "type": "string" },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+              },
+              "required": ["type", "x", "y"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "touch" }
+              },
+              "required": ["type"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
                 "type": { "const": "long-press" },
                 "elementRef": { "type": "string" },
                 "durationMs": { "type": "integer", "minimum": 0 }
               },
               "required": ["type", "elementRef", "durationMs"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "long-press" },
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "durationMs": { "type": "integer", "minimum": 0 }
+              },
+              "required": ["type", "x", "y", "durationMs"]
             },
             {
               "type": "object",
@@ -212,6 +280,15 @@
                 "textLength": { "type": "integer", "minimum": 0 }
               },
               "required": ["type", "elementRef"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "type-text" },
+                "textLength": { "type": "integer", "minimum": 0 }
+              },
+              "required": ["type"]
             },
             {
               "type": "object",

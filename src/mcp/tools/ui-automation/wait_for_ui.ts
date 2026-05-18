@@ -360,10 +360,12 @@ export async function wait_for_uiLogic(
 
   setCaptureStructuredOutput(ctx, result, { headerTitle: 'Wait for UI' });
 
-  ctx.nextStepParams = {
-    snapshot_ui: { simulatorId: params.simulatorId },
-    wait_for_ui: { simulatorId: params.simulatorId, predicate: 'settled' },
-  };
+  if (!result.didError) {
+    ctx.nextStepParams = {
+      snapshot_ui: { simulatorId: params.simulatorId },
+      wait_for_ui: { simulatorId: params.simulatorId, predicate: 'settled' },
+    };
+  }
 }
 
 const publicSchemaObject = z.strictObject(

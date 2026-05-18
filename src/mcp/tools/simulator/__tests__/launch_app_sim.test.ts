@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import {
-  createMockCommandResponse,
-  createMockExecutor,
-} from '../../../../test-utils/mock-executors.ts';
+import { createMockCommandResponse } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, launch_app_simLogic, type SimulatorLauncher } from '../launch_app_sim.ts';
 import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.ts';

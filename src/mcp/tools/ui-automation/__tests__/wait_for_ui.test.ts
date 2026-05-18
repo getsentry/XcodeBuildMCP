@@ -217,6 +217,26 @@ describe('Wait for UI Plugin', () => {
     });
   });
 
+  it('does not suggest follow-up steps when the wait fails', async () => {
+    const { executor } = createSequencedExecutor([
+      { success: true, output: hierarchyJson([createNode({ AXLabel: 'Loading' })]) },
+    ]);
+    const { result, ctx, run } = createMockToolHandlerContext();
+
+    await run(() =>
+      wait_for_uiLogic(
+        { simulatorId, predicate: 'textContains', text: 'Ready', timeoutMs: 0 },
+        executor,
+        createMockAxeHelpers(),
+        undefined,
+        createTiming().timing,
+      ),
+    );
+
+    expect(ctx.structuredOutput?.result.didError).toBe(true);
+    expect(result.nextStepParams).toBeUndefined();
+  });
+
   it('converts elementRef to identifier before polling', async () => {
     recordSnapshot([createNode({ AXUniqueId: 'continue-button', AXLabel: 'Continue' })], 0);
     const { calls, executor } = createSequencedExecutor([

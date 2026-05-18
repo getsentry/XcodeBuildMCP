@@ -20,6 +20,21 @@
       },
       "required": ["x", "y", "width", "height"]
     },
+    "uiHierarchyNode": {
+      "type": "object"
+    },
+    "uiHierarchyCapture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "ui-hierarchy" },
+        "uiHierarchy": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uiHierarchyNode" }
+        }
+      },
+      "required": ["type", "uiHierarchy"]
+    },
     "runtimeActionName": {
       "enum": ["tap", "typeText", "longPress", "touch", "swipeWithin"]
     },
@@ -257,6 +272,7 @@
               },
               "required": ["format", "width", "height"]
             },
+            { "$ref": "#/$defs/uiHierarchyCapture" },
             { "$ref": "#/$defs/runtimeSnapshot" },
             { "$ref": "#/$defs/compactRuntimeSnapshot" },
             { "$ref": "#/$defs/videoRecordingCapture" },
