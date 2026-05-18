@@ -183,7 +183,7 @@
       "properties": {
         "type": { "const": "video-recording" },
         "state": { "enum": ["started", "stopped"] },
-        "fps": { "type": "number" },
+        "fps": { "type": "integer", "minimum": 1 },
         "outputFile": { "type": "string" },
         "sessionId": { "type": "string" }
       },
