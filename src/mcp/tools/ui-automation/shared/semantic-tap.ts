@@ -118,6 +118,14 @@ export function createSemanticTapCommand(
   };
 }
 
+function readAxeCommandName(args: readonly string[]): string {
+  const commandName = args[0];
+  if (!commandName) {
+    throw new Error('Semantic tap command has no AXe command name.');
+  }
+  return commandName;
+}
+
 export function createSemanticTapBatchSteps(command: SemanticTapCommand): string[] {
   if (command.coordinateArgs[0] !== 'touch') {
     return [command.coordinateArgs.join(' ')];
@@ -136,12 +144,24 @@ export async function executeSemanticTapWithAmbiguityFallback(params: {
   const { command, simulatorId, executor, axeHelpers } = params;
 
   try {
-    await executeAxeCommand(command.primaryArgs, simulatorId, 'tap', executor, axeHelpers);
+    await executeAxeCommand(
+      command.primaryArgs,
+      simulatorId,
+      readAxeCommandName(command.primaryArgs),
+      executor,
+      axeHelpers,
+    );
   } catch (error) {
     if (!command.selectorArgs || !isRecoverableAxeSelectorError(error)) {
       throw error;
     }
 
-    await executeAxeCommand(command.coordinateArgs, simulatorId, 'tap', executor, axeHelpers);
+    await executeAxeCommand(
+      command.coordinateArgs,
+      simulatorId,
+      readAxeCommandName(command.coordinateArgs),
+      executor,
+      axeHelpers,
+    );
   }
 }

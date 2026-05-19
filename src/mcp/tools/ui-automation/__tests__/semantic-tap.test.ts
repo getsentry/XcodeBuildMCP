@@ -91,6 +91,44 @@ describe('semantic tap helpers', () => {
     ]);
   });
 
+  it('uses the executed command name for switch touch commands', async () => {
+    const [element] = createElements([
+      createNode({
+        type: 'Switch',
+        role: 'AXSwitch',
+        AXLabel: 'Alerts',
+        frame: { x: 10, y: 20, width: 200, height: 40 },
+      }),
+    ]);
+    const command = createSemanticTapCommand(element!, 'e1');
+    const { calls, executor } = createSequencedExecutor([{ success: true, output: 'ok' }]);
+
+    await executeSemanticTapWithAmbiguityFallback({
+      command,
+      simulatorId,
+      executor,
+      axeHelpers: createMockAxeHelpers(),
+    });
+
+    expect(calls[0]).toEqual(
+      expect.objectContaining({
+        command: [
+          '/mocked/axe/path',
+          'touch',
+          '-x',
+          '158',
+          '-y',
+          '40',
+          '--down',
+          '--up',
+          '--udid',
+          simulatorId,
+        ],
+        logPrefix: '[AXe]: touch',
+      }),
+    );
+  });
+
   it('retries recoverable selector failures with coordinates', async () => {
     const [element] = createElements([
       createNode({ AXUniqueId: 'continue.button', AXLabel: 'Continue' }),
@@ -112,6 +150,7 @@ describe('semantic tap helpers', () => {
       ['tap', '--id', 'continue.button', '--element-type', 'Button'],
       ['tap', '-x', '60', '-y', '40'],
     ]);
+    expect(calls.map((call) => call.logPrefix)).toEqual(['[AXe]: tap', '[AXe]: tap']);
   });
 
   it('does not retry unrecoverable selector failures', async () => {
