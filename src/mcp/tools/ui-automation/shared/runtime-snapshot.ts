@@ -407,6 +407,7 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
     const { publicElement, metadata } = element;
     if (
       !isContainerRole(publicElement.role) ||
+      publicElement.state?.visible === false ||
       !isVisible(publicElement.frame) ||
       !isLargeEnoughInferredScrollContainer(publicElement.role, publicElement.frame)
     ) {

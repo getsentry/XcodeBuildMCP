@@ -85,6 +85,7 @@ describe('ui automation non-streaming tools', () => {
             axeHelpers,
           );
         },
+        expectedText: 'Long press on elementRef e1 for 1500ms simulated successfully.',
       },
       {
         name: 'swipe',
@@ -97,6 +98,7 @@ describe('ui automation non-streaming tools', () => {
             axeHelpers,
           );
         },
+        expectedText: 'Swipe up within elementRef e1 simulated successfully.',
       },
       {
         name: 'tap',
@@ -109,6 +111,7 @@ describe('ui automation non-streaming tools', () => {
             axeHelpers,
           );
         },
+        expectedText: 'Tap on elementRef e1 simulated successfully.',
       },
       {
         name: 'touch',
@@ -121,6 +124,7 @@ describe('ui automation non-streaming tools', () => {
             axeHelpers,
           );
         },
+        expectedText: 'Touch event (touch down) on elementRef e1 executed successfully.',
       },
       {
         name: 'type_text',
@@ -141,11 +145,7 @@ describe('ui automation non-streaming tools', () => {
       const { result } = await runToolLogic(testCase.run);
       expect(result.events, `${testCase.name} should not emit progress events`).toEqual([]);
       expect(result.isError()).toBe(false);
-      if (testCase.expectedText) {
-        expect(result.text()).toContain(testCase.expectedText);
-      } else {
-        expect(result.text().trim().length).toBeGreaterThan(0);
-      }
+      expect(result.text()).toContain(testCase.expectedText);
     }
   });
 

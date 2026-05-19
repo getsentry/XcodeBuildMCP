@@ -316,6 +316,50 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
+  it('does not re-add swipeWithin to offscreen containers', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          AXLabel: 'Offscreen panel',
+          frame: { x: 0, y: 900, width: 300, height: 200 },
+          children: [
+            createNode({
+              type: 'StaticText',
+              role: 'AXStaticText',
+              AXLabel: 'Overflowing child',
+              frame: { x: 10, y: 1160, width: 100, height: 20 },
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[1]).toEqual(
+      expect.objectContaining({
+        role: 'other',
+        label: 'Offscreen panel',
+        state: expect.objectContaining({ visible: false }),
+        actions: [],
+      }),
+    );
+    expect(snapshot.payload.actions).not.toContainEqual({
+      action: 'swipeWithin',
+      elementRef: 'e2',
+      label: 'Offscreen panel',
+    });
+  });
+
   it('removes point-based actions from clipped elements with offscreen activation points', () => {
     const root = createNode({
       type: 'Application',
