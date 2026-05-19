@@ -3,7 +3,7 @@ module: mcp/tools/ui-automation/swipe
 names:
   mcp: swipe
   cli: swipe
-description: Swipe within a scrollable UI element using an element reference from the latest runtime snapshot.
+description: Swipe within a scrollable UI element using a visible element reference from the current UI.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"
