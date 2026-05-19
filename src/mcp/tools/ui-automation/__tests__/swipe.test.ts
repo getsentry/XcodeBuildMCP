@@ -93,7 +93,13 @@ describe('Swipe Tool', () => {
 
       expect(result).toMatchObject({
         didError: false,
-        action: { type: 'swipe', withinElementRef: 'e1', direction: 'up' },
+        action: {
+          type: 'swipe',
+          withinElementRef: 'e1',
+          direction: 'up',
+          from: { x: 100, y: 340 },
+          to: { x: 100, y: 60 },
+        },
       });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
@@ -138,6 +144,8 @@ describe('Swipe Tool', () => {
         type: 'swipe',
         withinElementRef: 'e1',
         direction: 'right',
+        from: { x: 30, y: 200 },
+        to: { x: 170, y: 200 },
         durationSeconds: 2,
       });
       expect(calls[0]?.command).toEqual([

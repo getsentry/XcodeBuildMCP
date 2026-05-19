@@ -58,7 +58,7 @@ describe('Long Press Plugin', () => {
 
       expect(result).toMatchObject({
         didError: false,
-        action: { type: 'long-press', elementRef: 'e1', durationMs: 1500 },
+        action: { type: 'long-press', elementRef: 'e1', durationMs: 1500, x: 60, y: 40 },
         capture: { type: 'runtime-snapshot', simulatorId },
       });
       expect(calls[0]?.command).toEqual([
@@ -87,8 +87,18 @@ describe('Long Press Plugin', () => {
       ]);
       const { calls, executor } = createTrackingExecutor();
 
-      await runLongPress({ simulatorId, elementRef: 'e1', duration: 1000 }, executor);
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1000 },
+        executor,
+      );
 
+      expect(result.action).toMatchObject({
+        type: 'long-press',
+        elementRef: 'e1',
+        durationMs: 1000,
+        x: 307,
+        y: 903,
+      });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'touch',

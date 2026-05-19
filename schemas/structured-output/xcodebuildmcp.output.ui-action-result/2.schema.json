@@ -160,7 +160,9 @@
               "additionalProperties": false,
               "properties": {
                 "type": { "const": "tap" },
-                "elementRef": { "type": "string" }
+                "elementRef": { "type": "string" },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
               },
               "required": ["type", "elementRef"]
             },
@@ -181,6 +183,8 @@
                 "type": { "const": "swipe" },
                 "withinElementRef": { "type": "string" },
                 "direction": { "$ref": "#/$defs/direction" },
+                "from": { "$ref": "#/$defs/point" },
+                "to": { "$ref": "#/$defs/point" },
                 "durationSeconds": { "type": "number", "minimum": 0 }
               },
               "required": ["type", "withinElementRef", "direction"]
@@ -210,7 +214,9 @@
               "properties": {
                 "type": { "const": "touch" },
                 "elementRef": { "type": "string" },
-                "event": { "type": "string" }
+                "event": { "type": "string" },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
               },
               "required": ["type", "elementRef"]
             },
@@ -239,7 +245,9 @@
               "properties": {
                 "type": { "const": "long-press" },
                 "elementRef": { "type": "string" },
-                "durationMs": { "type": "integer", "minimum": 0 }
+                "durationMs": { "type": "integer", "minimum": 0 },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
               },
               "required": ["type", "elementRef", "durationMs"]
             },

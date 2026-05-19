@@ -12,6 +12,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { defaultAxeHelpers } from './shared/axe-command.ts';
 import {
   createSemanticTapCommand,
@@ -69,14 +70,21 @@ export function createTapExecutor(
   return async (params) => {
     const toolName = 'tap';
     const { simulatorId, elementRef, preDelay, postDelay } = params;
-    const action = { type: 'tap' as const, elementRef };
+    const unresolvedAction = { type: 'tap' as const, elementRef };
 
     const resolution = resolveElementRef(simulatorId, elementRef, 'tap');
     if (!resolution.ok) {
-      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
       });
     }
+
+    const activationPoint = getRuntimeElementActivationPoint(resolution.element);
+    const action = {
+      ...unresolvedAction,
+      x: activationPoint.x,
+      y: activationPoint.y,
+    };
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,

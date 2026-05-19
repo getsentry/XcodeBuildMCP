@@ -60,14 +60,17 @@ export function createLongPressExecutor(
   return async (params) => {
     const toolName = 'long_press';
     const { simulatorId, elementRef, duration } = params;
-    const action = { type: 'long-press' as const, elementRef, durationMs: duration };
+    const unresolvedAction = { type: 'long-press' as const, elementRef, durationMs: duration };
 
     const resolution = resolveElementRef(simulatorId, elementRef, 'longPress');
     if (!resolution.ok) {
-      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
       });
     }
+
+    const center = getRuntimeElementActivationPoint(resolution.element);
+    const action = { ...unresolvedAction, x: center.x, y: center.y };
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,
@@ -78,7 +81,6 @@ export function createLongPressExecutor(
       return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const center = getRuntimeElementActivationPoint(resolution.element);
     const delayInSeconds = duration / 1000;
     const commandArgs = [
       'touch',

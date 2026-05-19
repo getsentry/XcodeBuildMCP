@@ -358,22 +358,30 @@ export interface TestSelectionInfo {
 export interface UiActionTap {
   type: 'tap';
   elementRef: string;
+  x?: number;
+  y?: number;
 }
 export interface UiActionSwipe {
   type: 'swipe';
   withinElementRef: string;
   direction: 'up' | 'down' | 'left' | 'right';
+  from?: Point;
+  to?: Point;
   durationSeconds?: number;
 }
 export interface UiActionTouch {
   type: 'touch';
   elementRef: string;
   event?: string;
+  x?: number;
+  y?: number;
 }
 export interface UiActionLongPress {
   type: 'long-press';
   elementRef: string;
   durationMs: number;
+  x?: number;
+  y?: number;
 }
 export interface UiActionButton {
   type: 'button';

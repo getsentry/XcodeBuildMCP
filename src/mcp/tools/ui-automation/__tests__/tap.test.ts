@@ -66,7 +66,10 @@ describe('Tap Plugin', () => {
 
       const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      expect(result).toMatchObject({ didError: false, action: { type: 'tap', elementRef: 'e1' } });
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'tap', elementRef: 'e1', x: 60, y: 40 },
+      });
       expect(actionCommands(calls)).toHaveLength(1);
       expect(calls[0]).toEqual({
         command: [
@@ -380,8 +383,9 @@ describe('Tap Plugin', () => {
       ]);
       const { calls, executor } = createTrackingExecutor();
 
-      await runTap({ simulatorId, elementRef: 'e1' }, executor);
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
+      expect(result.action).toMatchObject({ type: 'tap', elementRef: 'e1', x: 307, y: 903 });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'touch',

@@ -76,7 +76,7 @@ export function createTouchExecutor(
     const { simulatorId, elementRef, down, up, delay } = params;
     const actionText =
       down && up ? 'touch down+up' : down ? 'touch down' : up ? 'touch up' : undefined;
-    const action = {
+    const unresolvedAction = {
       type: 'touch' as const,
       elementRef,
       ...(actionText ? { event: actionText } : {}),
@@ -84,7 +84,7 @@ export function createTouchExecutor(
 
     if (!down && !up) {
       return createUiActionFailureResult(
-        action,
+        unresolvedAction,
         simulatorId,
         'At least one of "down" or "up" must be true',
       );
@@ -92,10 +92,13 @@ export function createTouchExecutor(
 
     const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
     if (!resolution.ok) {
-      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
       });
     }
+
+    const center = getRuntimeElementActivationPoint(resolution.element);
+    const action = { ...unresolvedAction, x: center.x, y: center.y };
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,
@@ -106,7 +109,6 @@ export function createTouchExecutor(
       return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
     }
 
-    const center = getRuntimeElementActivationPoint(resolution.element);
     const commandArgs = ['touch', '-x', String(center.x), '-y', String(center.y)];
     if (down) {
       commandArgs.push('--down');

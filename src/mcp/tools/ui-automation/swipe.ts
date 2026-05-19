@@ -74,7 +74,7 @@ export function createSwipeExecutor(
     const toolName = 'swipe';
     const { simulatorId, withinElementRef, direction, duration, distance, preDelay, postDelay } =
       params;
-    const action = {
+    const unresolvedAction = {
       type: 'swipe' as const,
       withinElementRef,
       direction,
@@ -83,7 +83,7 @@ export function createSwipeExecutor(
 
     const resolution = resolveElementRef(simulatorId, withinElementRef, 'swipeWithin');
     if (!resolution.ok) {
-      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
       });
     }
@@ -95,8 +95,16 @@ export function createSwipeExecutor(
         message: points.message,
         elementRef: withinElementRef,
       });
-      return createUiActionFailureResult(action, simulatorId, points.message, { uiError });
+      return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
+        uiError,
+      });
     }
+
+    const action = {
+      ...unresolvedAction,
+      from: points.from,
+      to: points.to,
+    };
 
     const guard = await guardUiAutomationAgainstStoppedDebugger({
       debugger: debuggerManager,

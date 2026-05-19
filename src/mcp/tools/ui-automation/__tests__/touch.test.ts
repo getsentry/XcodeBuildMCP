@@ -61,7 +61,7 @@ describe('Touch Plugin', () => {
 
       expect(result).toMatchObject({
         didError: false,
-        action: { type: 'touch', elementRef: 'e1', event: 'touch down' },
+        action: { type: 'touch', elementRef: 'e1', event: 'touch down', x: 60, y: 40 },
       });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
@@ -80,8 +80,15 @@ describe('Touch Plugin', () => {
       recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
       const { calls, executor } = createTrackingExecutor();
 
-      await runTouch({ simulatorId, elementRef: 'e1', up: true }, executor);
+      const result = await runTouch({ simulatorId, elementRef: 'e1', up: true }, executor);
 
+      expect(result.action).toMatchObject({
+        type: 'touch',
+        elementRef: 'e1',
+        event: 'touch up',
+        x: 60,
+        y: 40,
+      });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'touch',
@@ -127,8 +134,18 @@ describe('Touch Plugin', () => {
       ]);
       const { calls, executor } = createTrackingExecutor();
 
-      await runTouch({ simulatorId, elementRef: 'e1', down: true, up: true }, executor);
+      const result = await runTouch(
+        { simulatorId, elementRef: 'e1', down: true, up: true },
+        executor,
+      );
 
+      expect(result.action).toMatchObject({
+        type: 'touch',
+        elementRef: 'e1',
+        event: 'touch down+up',
+        x: 307,
+        y: 903,
+      });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'touch',
