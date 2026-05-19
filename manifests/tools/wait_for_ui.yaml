@@ -14,3 +14,12 @@ annotations:
   readOnlyHint: true
   destructiveHint: false
   openWorldHint: false
+nextSteps:
+  - label: Capture a fresh runtime UI snapshot
+    toolId: snapshot_ui
+    priority: 1
+    when: success
+  - label: Wait until the UI is settled
+    toolId: wait_for_ui
+    priority: 2
+    when: success
