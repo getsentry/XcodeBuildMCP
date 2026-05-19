@@ -232,6 +232,21 @@ describe('Batch UI Automation Tool', () => {
       expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
+    it('does not preserve snapshots for inactive non-switch elements', async () => {
+      recordSnapshot([createNode({ AXValue: 'not selected' })]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runBatch(
+        { simulatorId, steps: [{ action: 'tap', elementRef: 'e1' }] },
+        executor,
+      );
+
+      expect(result.didError).toBe(false);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(true);
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
+    });
+
     it('pre-resolves all refs and fails before execution if any ref is invalid', async () => {
       recordSnapshot([createNode()]);
       const { calls, executor } = createTrackingExecutor();

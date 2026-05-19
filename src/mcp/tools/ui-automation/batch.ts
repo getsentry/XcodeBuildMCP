@@ -76,8 +76,11 @@ function isSafeSameScreenBatchElement(element: {
     return false;
   }
 
+  if (element.role !== 'switch') {
+    return false;
+  }
+
   return (
-    element.role === 'switch' ||
     element.state?.selected === false ||
     value === 'not selected' ||
     value === '0' ||
