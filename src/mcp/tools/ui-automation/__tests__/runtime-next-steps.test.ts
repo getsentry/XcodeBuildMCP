@@ -105,6 +105,40 @@ describe('runtime snapshot next steps', () => {
     });
   });
 
+  it('keeps unselected tabs available as screen-changing tap suggestions', () => {
+    recordSnapshot([
+      createNode({
+        type: 'Tab',
+        role: 'AXTab',
+        AXLabel: 'Current',
+        AXValue: 'selected',
+        AXSelected: true,
+      }),
+      createNode({
+        type: 'Tab',
+        role: 'AXTab',
+        AXLabel: 'Search',
+        AXValue: 'not selected',
+        AXSelected: false,
+      }),
+    ]);
+
+    const snapshot = currentRuntimeSnapshot();
+    const searchTabRef = snapshot.elements.find((element) => element.label === 'Search')?.ref;
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Tap an elementRef',
+      tool: 'tap',
+      params: { simulatorId, elementRef: searchTabRef },
+    });
+  });
+
   it('uses hierarchy depth only as a foreground-root tie breaker', () => {
     recordSnapshot([
       nestNode(

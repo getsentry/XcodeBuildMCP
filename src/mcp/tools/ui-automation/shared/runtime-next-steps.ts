@@ -84,12 +84,14 @@ function isStateChangingTapNextStepElement(element: {
   value?: string;
 }): boolean {
   const value = compactTapNextStepText(element.value).toLowerCase();
+  const hasSelectionState =
+    element.state?.selected === true ||
+    value === 'selected' ||
+    (element.role !== 'tab' && (element.state?.selected === false || value === 'not selected'));
+
   return (
     element.role === 'switch' ||
-    element.state?.selected === true ||
-    element.state?.selected === false ||
-    value === 'selected' ||
-    value === 'not selected' ||
+    hasSelectionState ||
     value === '0' ||
     value === '1' ||
     value === 'off' ||
