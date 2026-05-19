@@ -41,6 +41,8 @@ describe('ui automation non-streaming tools', () => {
             { simulatorId, buttonType: 'home' },
             createMockExecutor({ success: true }),
             axeHelpers,
+            undefined,
+            0,
           ),
         expectedText: "Hardware button 'home' pressed successfully.",
       },
