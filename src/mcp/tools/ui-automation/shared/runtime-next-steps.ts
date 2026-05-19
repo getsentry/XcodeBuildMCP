@@ -89,14 +89,10 @@ function isStateChangingTapNextStepElement(element: {
     value === 'selected' ||
     (element.role !== 'tab' && (element.state?.selected === false || value === 'not selected'));
 
-  return (
-    element.role === 'switch' ||
-    hasSelectionState ||
-    value === '0' ||
-    value === '1' ||
-    value === 'off' ||
-    value === 'on'
-  );
+  const hasToggleValue =
+    element.role !== 'tab' && (value === '0' || value === '1' || value === 'off' || value === 'on');
+
+  return element.role === 'switch' || hasSelectionState || hasToggleValue;
 }
 
 /**

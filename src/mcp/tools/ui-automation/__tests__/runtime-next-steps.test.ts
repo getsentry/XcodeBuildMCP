@@ -118,7 +118,7 @@ describe('runtime snapshot next steps', () => {
         type: 'Tab',
         role: 'AXTab',
         AXLabel: 'Search',
-        AXValue: 'not selected',
+        AXValue: '0',
         AXSelected: false,
       }),
     ]);
