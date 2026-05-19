@@ -239,7 +239,29 @@ describe('Snapshot UI Plugin', () => {
         seq: 2,
       });
       expect(getRuntimeSnapshot('12345678-1234-4234-8234-123456789012')?.seq).toBe(2);
-      expect(second.ctx.nextSteps?.find((step) => step.tool === 'tap')).toBeUndefined();
+      expect(second.ctx.nextSteps).toEqual([
+        {
+          label: 'Refresh after layout changes',
+          tool: 'snapshot_ui',
+          params: { simulatorId: '12345678-1234-4234-8234-123456789012' },
+        },
+        {
+          label: 'Wait for UI to settle',
+          tool: 'wait_for_ui',
+          params: {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            predicate: 'settled',
+          },
+        },
+        {
+          label: 'Tap an elementRef',
+          tool: 'tap',
+          params: {
+            simulatorId: '12345678-1234-4234-8234-123456789012',
+            elementRef: 'e1',
+          },
+        },
+      ]);
     });
 
     it('should return full runtime snapshot when sinceScreenHash differs from the current screen hash', async () => {

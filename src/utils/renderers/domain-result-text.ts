@@ -1249,16 +1249,24 @@ function sortRuntimeTargetsForDisplay(elements: RuntimeElementV1[]): RuntimeElem
     .map(({ element }) => element);
 }
 
+function getPrimaryRuntimeElementAction(element: RuntimeElementV1, action?: string): string {
+  if (action) {
+    return action;
+  }
+  if (element.actions.includes('typeText')) {
+    return 'typeText';
+  }
+  if (element.actions.includes('tap')) {
+    return 'tap';
+  }
+  if (element.actions.includes('swipeWithin')) {
+    return 'swipe';
+  }
+  return 'none';
+}
+
 function formatRuntimeElementLine(element: RuntimeElementV1, action?: string): string {
-  const primaryAction =
-    action ??
-    (element.actions.includes('typeText')
-      ? 'typeText'
-      : element.actions.includes('tap')
-        ? 'tap'
-        : element.actions.includes('swipeWithin')
-          ? 'swipe'
-          : 'none');
+  const primaryAction = getPrimaryRuntimeElementAction(element, action);
   return [
     element.ref,
     primaryAction,
@@ -1466,17 +1474,14 @@ function createCaptureResultItems(
   if (result.didError) {
     items.push(...createStandardDiagnosticSections(result.diagnostics));
     items.push(...createUiErrorItems(result.uiError));
-    items.push(
-      createStatus(
-        'error',
-        result.error ??
-          (isUiHierarchy
-            ? isRuntimeSnapshot
-              ? 'Failed to get runtime UI snapshot.'
-              : 'Failed to get accessibility hierarchy.'
-            : 'Failed to capture screenshot.'),
-      ),
-    );
+    let fallbackError = 'Failed to capture screenshot.';
+    if (isRuntimeSnapshot) {
+      fallbackError = 'Failed to get runtime UI snapshot.';
+    } else if (isUiHierarchy) {
+      fallbackError = 'Failed to get accessibility hierarchy.';
+    }
+
+    items.push(createStatus('error', result.error ?? fallbackError));
     return items;
   }
 

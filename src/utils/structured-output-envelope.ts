@@ -46,6 +46,9 @@ type RuntimeSnapshotUnchangedCompactCapture = {
 };
 
 const MINIMAL_DATA_PRUNE_KEYS = ['request'] as const;
+const COMPACT_RUNTIME_TARGET_LIMIT = 64;
+const COMPACT_RUNTIME_SCROLL_LIMIT = 32;
+const COMPACT_RUNTIME_TEXT_LIMIT = 64;
 const HIDDEN_RUNTIME_TARGET_LABELS = new Set(['sheet grabber']);
 const LOW_PRIORITY_RUNTIME_TARGET_LABELS = new Set([
   'sheet grabber',
@@ -213,10 +216,12 @@ function toRuntimeSnapshotCompactCapture(
         !isHiddenRuntimeTarget(element) &&
         (element.actions.includes('tap') || element.actions.includes('typeText')),
     ),
-  ).map((element) => {
-    const action = element.actions.includes('typeText') ? 'typeText' : 'tap';
-    return compactRuntimeElementRow(element, action);
-  });
+  )
+    .slice(0, COMPACT_RUNTIME_TARGET_LIMIT)
+    .map((element) => {
+      const action = element.actions.includes('typeText') ? 'typeText' : 'tap';
+      return compactRuntimeElementRow(element, action);
+    });
   const scroll = snapshot.elements
     .filter(
       (element) =>
@@ -224,9 +229,10 @@ function toRuntimeSnapshotCompactCapture(
         !element.actions.includes('tap') &&
         !element.actions.includes('typeText'),
     )
+    .slice(0, COMPACT_RUNTIME_SCROLL_LIMIT)
     .map((element) => compactRuntimeElementRow(element, 'swipe'));
   const text = sortRuntimeTextForDisplay(snapshot.elements.filter(isRuntimeTextSummaryElement))
-    .slice(0, 64)
+    .slice(0, COMPACT_RUNTIME_TEXT_LIMIT)
     .map((element) => compactRuntimeElementRow(element, 'text'));
 
   return {
@@ -301,17 +307,19 @@ function projectRuntimeSnapshotData<TData>(
   }
 
   const dataWithCapture = data as TData & { capture?: unknown };
-  const projectedData = isRuntimeSnapshotCapture(dataWithCapture.capture)
-    ? {
-        ...dataWithCapture,
-        capture: toRuntimeSnapshotCompactCapture(dataWithCapture.capture),
-      }
-    : isRuntimeSnapshotUnchangedCapture(dataWithCapture.capture)
-      ? {
-          ...dataWithCapture,
-          capture: toRuntimeSnapshotUnchangedCompactCapture(dataWithCapture.capture),
-        }
-      : dataWithCapture;
+  let projectedData: typeof dataWithCapture = dataWithCapture;
+
+  if (isRuntimeSnapshotCapture(dataWithCapture.capture)) {
+    projectedData = {
+      ...dataWithCapture,
+      capture: toRuntimeSnapshotCompactCapture(dataWithCapture.capture),
+    };
+  } else if (isRuntimeSnapshotUnchangedCapture(dataWithCapture.capture)) {
+    projectedData = {
+      ...dataWithCapture,
+      capture: toRuntimeSnapshotUnchangedCompactCapture(dataWithCapture.capture),
+    };
+  }
 
   const dataWithRuntimeRows = projectedData as typeof projectedData & {
     uiError?: { candidates?: unknown[] };

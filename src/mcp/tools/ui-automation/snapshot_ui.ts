@@ -11,11 +11,12 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import { getRuntimeSnapshot, recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
+import type { RuntimeSnapshotV1 } from '../../../types/ui-snapshot.ts';
 import { createRuntimeSnapshotNextSteps } from './shared/runtime-next-steps.ts';
 import {
   createCaptureFailureResult,
@@ -137,17 +138,21 @@ export async function snapshot_uiLogic(
 
   setCaptureStructuredOutput(ctx, result);
 
-  if (
-    !result.didError &&
-    result.capture &&
-    'type' in result.capture &&
-    result.capture.type === 'runtime-snapshot'
-  ) {
-    ctx.nextSteps = createRuntimeSnapshotNextSteps({
-      simulatorId: params.simulatorId,
-      runtimeSnapshot: result.capture,
-      includeRefreshAndWait: true,
-    });
+  if (!result.didError && result.capture && 'type' in result.capture) {
+    let runtimeSnapshot: RuntimeSnapshotV1 | undefined;
+    if (result.capture.type === 'runtime-snapshot') {
+      runtimeSnapshot = result.capture;
+    } else if (result.capture.type === 'runtime-snapshot-unchanged') {
+      runtimeSnapshot = getRuntimeSnapshot(params.simulatorId)?.payload;
+    }
+
+    if (runtimeSnapshot) {
+      ctx.nextSteps = createRuntimeSnapshotNextSteps({
+        simulatorId: params.simulatorId,
+        runtimeSnapshot,
+        includeRefreshAndWait: true,
+      });
+    }
   }
 }
 

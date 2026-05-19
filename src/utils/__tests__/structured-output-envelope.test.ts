@@ -138,6 +138,58 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
+  it('caps compact runtime snapshot rows by category', () => {
+    const targets = Array.from({ length: 80 }, (_, index) => ({
+      ref: `e${index + 1}`,
+      role: 'button' as const,
+      label: `Target ${index + 1}`,
+      frame: { x: 0, y: index, width: 100, height: 40 },
+      actions: ['tap' as const],
+    }));
+    const scroll = Array.from({ length: 40 }, (_, index) => ({
+      ref: `e${index + 81}`,
+      role: 'scroll-view' as const,
+      label: `Scroll ${index + 1}`,
+      frame: { x: 0, y: index, width: 390, height: 600 },
+      actions: ['swipeWithin' as const],
+    }));
+    const text = Array.from({ length: 70 }, (_, index) => ({
+      ref: `e${index + 121}`,
+      role: 'text' as const,
+      label: `Text ${index + 1}`,
+      frame: { x: 0, y: index, width: 100, height: 20 },
+      state: { visible: true },
+      actions: ['touch' as const],
+    }));
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'large-screen',
+        seq: 4,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [...targets, ...scroll, ...text],
+        actions: [],
+      },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as {
+      capture: { targets: string[]; scroll: string[]; text?: string[] };
+    };
+
+    expect(data.capture.targets).toHaveLength(64);
+    expect(data.capture.scroll).toHaveLength(32);
+    expect(data.capture.text).toHaveLength(64);
+  });
+
   it('compacts unchanged runtime snapshot captures by default', () => {
     const result: CaptureResultDomainResult = {
       kind: 'capture-result',
