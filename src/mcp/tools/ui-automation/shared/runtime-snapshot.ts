@@ -533,21 +533,17 @@ export function extractAccessibilityHierarchy(responseText: string): Accessibili
     throw new RuntimeSnapshotParseError(`AXe describe-ui returned invalid JSON: ${message}`);
   }
 
-  const hierarchy = (() => {
-    if (Array.isArray(parsed)) {
-      return parsed as AccessibilityNode[];
-    }
+  if (Array.isArray(parsed)) {
+    return parsed as AccessibilityNode[];
+  }
 
-    if (isRecord(parsed) && Array.isArray(parsed.elements)) {
-      return parsed.elements as AccessibilityNode[];
-    }
+  if (isRecord(parsed) && Array.isArray(parsed.elements)) {
+    return parsed.elements as AccessibilityNode[];
+  }
 
-    throw new RuntimeSnapshotParseError(
-      'AXe describe-ui did not return an accessibility element array.',
-    );
-  })();
-
-  return hierarchy;
+  throw new RuntimeSnapshotParseError(
+    'AXe describe-ui did not return an accessibility element array.',
+  );
 }
 
 export function createRuntimeSnapshotRecord(params: {
@@ -728,18 +724,21 @@ export function getRuntimeElementSwipePoints(
   const top = Math.round(frame.y + verticalInset);
   const bottom = Math.round(frame.y + frame.height - verticalInset);
 
-  const points = ((): { from: Point; to: Point } => {
-    switch (direction) {
-      case 'up':
-        return { from: { x: center.x, y: bottom }, to: { x: center.x, y: top } };
-      case 'down':
-        return { from: { x: center.x, y: top }, to: { x: center.x, y: bottom } };
-      case 'left':
-        return { from: { x: right, y: center.y }, to: { x: left, y: center.y } };
-      case 'right':
-        return { from: { x: left, y: center.y }, to: { x: right, y: center.y } };
-    }
-  })();
+  let points: { from: Point; to: Point };
+  switch (direction) {
+    case 'up':
+      points = { from: { x: center.x, y: bottom }, to: { x: center.x, y: top } };
+      break;
+    case 'down':
+      points = { from: { x: center.x, y: top }, to: { x: center.x, y: bottom } };
+      break;
+    case 'left':
+      points = { from: { x: right, y: center.y }, to: { x: left, y: center.y } };
+      break;
+    case 'right':
+      points = { from: { x: left, y: center.y }, to: { x: right, y: center.y } };
+      break;
+  }
 
   if (isDegenerateSwipe(points.from, points.to)) {
     return {

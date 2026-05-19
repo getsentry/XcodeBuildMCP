@@ -2376,7 +2376,7 @@ function createSpecialCaseItems(
           break;
         }
         case 'touch':
-          successMessage = `Touch event (${result.action.event}) on elementRef ${result.action.elementRef} executed successfully.`;
+          successMessage = `Touch event (${result.action.event ?? 'touch'}) on elementRef ${result.action.elementRef} executed successfully.`;
           break;
         case 'long-press':
           successMessage = `Long press on elementRef ${result.action.elementRef} for ${result.action.durationMs}ms simulated successfully.`;

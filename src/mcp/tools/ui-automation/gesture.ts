@@ -67,13 +67,13 @@ const gestureSchema = z.object({
     ),
   duration: z
     .number()
-    .positive({ message: 'Duration must be greater than 0 seconds' })
+    .min(0, { message: 'Duration must be non-negative' })
     .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('Duration of the gesture in seconds.'),
   delta: z
     .number()
-    .positive({ message: 'Delta must be greater than 0' })
+    .min(0, { message: 'Delta must be non-negative' })
     .max(200, { message: 'Delta must be at most 200' })
     .optional()
     .describe('Distance to move in pixels.'),
