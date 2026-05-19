@@ -361,6 +361,151 @@ describe('Snapshot UI Plugin', () => {
       ]);
     });
 
+    it('should include scroll guidance for generic containers with scroll-view identifiers', async () => {
+      const uiHierarchy = JSON.stringify({
+        elements: [
+          {
+            type: 'Other',
+            role: 'AXGroup',
+            AXIdentifier: 'app.mainScrollView',
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            children: [
+              {
+                type: 'StaticText',
+                role: 'AXStaticText',
+                AXLabel: 'Visible content',
+                frame: { x: 20, y: 160, width: 140, height: 24 },
+              },
+            ],
+          },
+          {
+            type: 'Button',
+            role: 'AXButton',
+            AXLabel: 'Settings',
+            AXIdentifier: 'app.settingsButton',
+            frame: { x: 320, y: 40, width: 44, height: 44 },
+          },
+        ],
+      });
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: uiHierarchy,
+        error: undefined,
+        process: { pid: 12345 },
+      });
+      const mockAxeHelpers = {
+        getAxePath: () => '/usr/local/bin/axe',
+        getBundledAxeEnvironment: () => ({}),
+      };
+
+      __resetRuntimeSnapshotStoreForTests();
+      const { ctx, run } = createMockToolHandlerContext();
+      await run(() =>
+        snapshot_uiLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012' },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
+      );
+
+      const capture =
+        ctx.structuredOutput?.result.kind === 'capture-result'
+          ? ctx.structuredOutput.result.capture
+          : undefined;
+      const scrollElement =
+        capture && 'type' in capture && capture.type === 'runtime-snapshot'
+          ? capture.elements[0]
+          : undefined;
+      expect(scrollElement).toEqual(
+        expect.objectContaining({
+          role: 'scroll-view',
+          identifier: 'app.mainScrollView',
+          actions: expect.arrayContaining(['swipeWithin']),
+        }),
+      );
+      expect(ctx.nextSteps?.find((step) => step.tool === 'swipe')?.params).toEqual({
+        simulatorId: '12345678-1234-4234-8234-123456789012',
+        withinElementRef: 'e1',
+        direction: 'up',
+        distance: 0.5,
+      });
+    });
+
+    it('should include root viewport scroll guidance for semantic vertical overflow', async () => {
+      const uiHierarchy = JSON.stringify({
+        elements: [
+          {
+            type: 'Application',
+            role: 'AXApplication',
+            AXLabel: 'Example',
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            children: [
+              {
+                type: 'Button',
+                role: 'AXButton',
+                AXLabel: 'Settings',
+                frame: { x: 320, y: 40, width: 44, height: 44 },
+              },
+              {
+                type: 'StaticText',
+                role: 'AXStaticText',
+                AXLabel: 'Additional details below',
+                frame: { x: 40, y: 920, width: 220, height: 24 },
+              },
+            ],
+          },
+        ],
+      });
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: uiHierarchy,
+        error: undefined,
+        process: { pid: 12345 },
+      });
+      const mockAxeHelpers = {
+        getAxePath: () => '/usr/local/bin/axe',
+        getBundledAxeEnvironment: () => ({}),
+      };
+
+      __resetRuntimeSnapshotStoreForTests();
+      const { ctx, run } = createMockToolHandlerContext();
+      await run(() =>
+        snapshot_uiLogic(
+          { simulatorId: '12345678-1234-4234-8234-123456789012' },
+          mockExecutor,
+          mockAxeHelpers,
+        ),
+      );
+
+      const capture =
+        ctx.structuredOutput?.result.kind === 'capture-result'
+          ? ctx.structuredOutput.result.capture
+          : undefined;
+      const rootElement =
+        capture && 'type' in capture && capture.type === 'runtime-snapshot'
+          ? capture.elements[0]
+          : undefined;
+      expect(rootElement).toEqual(
+        expect.objectContaining({
+          role: 'application',
+          actions: expect.arrayContaining(['swipeWithin']),
+        }),
+      );
+      expect(ctx.nextSteps?.find((step) => step.tool === 'swipe')?.params).toEqual({
+        simulatorId: '12345678-1234-4234-8234-123456789012',
+        withinElementRef: 'e1',
+        direction: 'up',
+        distance: 0.5,
+      });
+      expect(ctx.nextSteps?.map((step) => step.tool)).toEqual([
+        'snapshot_ui',
+        'wait_for_ui',
+        'swipe',
+        'tap',
+      ]);
+      expect(ctx.nextSteps?.some((step) => step.tool === 'screenshot')).toBe(false);
+    });
+
     it('should include scroll guidance before screenshots when scrollable content is present', async () => {
       const uiHierarchy = JSON.stringify({
         elements: [

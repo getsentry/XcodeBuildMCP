@@ -100,7 +100,14 @@ function readFrame(node: AccessibilityNode): Frame {
   );
 }
 
-function deriveRole(node: AccessibilityNode): RuntimeElementRoleV1 | undefined {
+function hasScrollSemanticIdentifier(identifier: string | undefined): boolean {
+  return /(?:^|[._-])scroll(?:view|[-_.]view)?(?:$|[._-])|scrollView/i.test(identifier ?? '');
+}
+
+function deriveRole(
+  node: AccessibilityNode,
+  identifier: string | undefined,
+): RuntimeElementRoleV1 | undefined {
   const roleText = [node.role, node.type, node.subrole, node.role_description]
     .map((value) => normalizeText(value)?.toLowerCase())
     .filter((value): value is string => value !== undefined)
@@ -124,6 +131,9 @@ function deriveRole(node: AccessibilityNode): RuntimeElementRoleV1 | undefined {
   if (/cell|row/.test(roleText)) return 'cell';
   if (/scroll/.test(roleText)) return 'scroll-view';
   if (/table|list|outline|collection/.test(roleText)) return 'list';
+  if (hasScrollSemanticIdentifier(identifier) && /group|other|view|container/.test(roleText)) {
+    return 'scroll-view';
+  }
   if (/(^|\b|ax)tab(\b|group|$)/.test(roleText)) return 'tab';
   return 'other';
 }
@@ -253,10 +263,10 @@ function normalizeNode(input: NormalizedNodeInput, index: number): RuntimeSnapsh
   const { node, path, depth } = input;
   const ref = `e${index + 1}`;
   const frame = readFrame(node);
-  const role = deriveRole(node);
   const label = readText(node, ['AXLabel', 'title', 'help', 'label']);
   const value = readText(node, ['AXValue', 'value']);
   const identifier = readText(node, ['AXUniqueId', 'AXIdentifier', 'identifier', 'id']);
+  const role = deriveRole(node, identifier);
   const enabled = node.enabled !== false;
   const customActions = normalizeCustomActions(node.custom_actions);
   const actions = deriveActions({
@@ -324,6 +334,62 @@ function frameOverflowsContainer(frame: Frame, containerFrame: Frame): boolean {
     frame.x + frame.width > containerFrame.x + containerFrame.width + tolerance ||
     frame.y + frame.height > containerFrame.y + containerFrame.height + tolerance
   );
+}
+
+function frameVerticallyOverflowsContainer(frame: Frame, containerFrame: Frame): boolean {
+  const tolerance = 8;
+  return (
+    frame.y < containerFrame.y - tolerance ||
+    frame.y + frame.height > containerFrame.y + containerFrame.height + tolerance
+  );
+}
+
+function hasPublicSemanticIdentity(element: RuntimeElementV1): boolean {
+  return (
+    element.label !== undefined ||
+    element.value !== undefined ||
+    (element.identifier !== undefined && !isGenericInternalIdentifier(element.identifier))
+  );
+}
+
+function isTopLevelViewportElement(element: RuntimeSnapshotElementRecord): boolean {
+  const { role } = element.publicElement;
+  return (role === 'application' || role === 'window') && !element.metadata.path.includes('.');
+}
+
+function hasSemanticVerticalOverflowingDescendant(
+  element: RuntimeSnapshotElementRecord,
+  elements: RuntimeSnapshotElementRecord[],
+): boolean {
+  return elements.some((candidate) => {
+    if (
+      candidate === element ||
+      !isDescendantPath(element.metadata.path, candidate.metadata.path)
+    ) {
+      return false;
+    }
+    return (
+      hasPublicSemanticIdentity(candidate.publicElement) &&
+      isVisible(candidate.publicElement.frame) &&
+      frameVerticallyOverflowsContainer(candidate.publicElement.frame, element.publicElement.frame)
+    );
+  });
+}
+
+function hasPreferredDescendantSwipeTarget(
+  element: RuntimeSnapshotElementRecord,
+  elements: RuntimeSnapshotElementRecord[],
+): boolean {
+  return elements.some(
+    (candidate) =>
+      candidate !== element &&
+      isDescendantPath(element.metadata.path, candidate.metadata.path) &&
+      isPreferredSwipeTarget(candidate),
+  );
+}
+
+function createViewportSwipeFrame(viewportFrame: Frame): Frame {
+  return normalizeFrame(viewportFrame);
 }
 
 function isSheetGrabberElement(element: RuntimeSnapshotElementRecord): boolean {
@@ -450,6 +516,23 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
     ) {
       publicElement.actions.push('swipeWithin');
     }
+  }
+
+  for (const element of elements) {
+    const { publicElement, metadata } = element;
+    if (
+      !isTopLevelViewportElement(element) ||
+      publicElement.state?.visible === false ||
+      !isVisible(publicElement.frame) ||
+      publicElement.actions.includes('swipeWithin') ||
+      hasPreferredDescendantSwipeTarget(element, elements) ||
+      !hasSemanticVerticalOverflowingDescendant(element, elements)
+    ) {
+      continue;
+    }
+
+    publicElement.actions.push('swipeWithin');
+    metadata.swipeFrame = createViewportSwipeFrame(publicElement.frame);
   }
 
   pruneGenericFallbackSwipeTargets(elements);

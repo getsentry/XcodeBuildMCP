@@ -182,18 +182,24 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
-  it('does not infer swipeWithin on top-level applications with overflowing descendants', () => {
+  it('infers swipeWithin on top-level application roots with semantic vertical overflow', () => {
     const root = createNode({
       type: 'Application',
       role: 'AXApplication',
-      AXLabel: 'Weather',
+      AXLabel: 'Example',
       frame: { x: 0, y: 0, width: 390, height: 844 },
       children: [
         createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Settings',
+          frame: { x: 320, y: 40, width: 44, height: 44 },
+        }),
+        createNode({
           type: 'StaticText',
           role: 'AXStaticText',
-          AXLabel: 'Updated just now',
-          frame: { x: 140, y: 1200, width: 120, height: 20 },
+          AXLabel: 'Details available below',
+          frame: { x: 40, y: 920, width: 220, height: 24 },
         }),
       ],
     });
@@ -208,29 +214,34 @@ describe('runtime snapshot normalization', () => {
       expect.objectContaining({
         ref: 'e1',
         role: 'application',
-        label: 'Weather',
-        actions: [],
+        label: 'Example',
+        actions: ['swipeWithin'],
       }),
     );
-    expect(snapshot.payload.actions).not.toContainEqual({
+    expect(snapshot.payload.actions).toContainEqual({
       action: 'swipeWithin',
       elementRef: 'e1',
-      label: 'Weather',
+      label: 'Example',
+    });
+    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up')).toEqual({
+      ok: true,
+      from: { x: 195, y: 717 },
+      to: { x: 195, y: 127 },
     });
   });
 
-  it('does not infer swipeWithin on top-level windows with overflowing descendants', () => {
+  it('infers swipeWithin on top-level windows with semantic vertical overflow', () => {
     const root = createNode({
       type: 'Window',
       role: 'AXWindow',
-      AXLabel: 'Weather',
+      AXLabel: 'Example',
       frame: { x: 0, y: 0, width: 390, height: 844 },
       children: [
         createNode({
           type: 'StaticText',
           role: 'AXStaticText',
-          AXLabel: 'Updated just now',
-          frame: { x: 140, y: 1200, width: 120, height: 20 },
+          AXLabel: 'More content below',
+          frame: { x: 140, y: 920, width: 160, height: 24 },
         }),
       ],
     });
@@ -245,8 +256,8 @@ describe('runtime snapshot normalization', () => {
       expect.objectContaining({
         ref: 'e1',
         role: 'window',
-        label: 'Weather',
-        actions: [],
+        label: 'Example',
+        actions: ['swipeWithin'],
       }),
     );
   });
@@ -273,6 +284,70 @@ describe('runtime snapshot normalization', () => {
     });
 
     expect(snapshot.payload.elements[0]?.actions).toEqual([]);
+  });
+
+  it('does not infer root viewport swipeWithin from anonymous geometry-only overflow', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          AXLabel: undefined,
+          AXValue: undefined,
+          AXIdentifier: undefined,
+          frame: { x: 20, y: 920, width: 240, height: 80 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]?.actions).toEqual([]);
+  });
+
+  it('does not infer root viewport swipeWithin when a better descendant scroll target exists', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Example',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          AXIdentifier: 'app.contentPanel',
+          frame: { x: 0, y: 100, width: 390, height: 600 },
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'Additional details below',
+          frame: { x: 40, y: 920, width: 220, height: 24 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]?.actions).not.toContain('swipeWithin');
+    expect(snapshot.payload.elements[1]).toEqual(
+      expect.objectContaining({
+        role: 'scroll-view',
+        identifier: 'app.contentPanel',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
   });
 
   it('keeps sheet hosts swipeable when the current visible sheet content fits', () => {
@@ -615,6 +690,38 @@ describe('runtime snapshot normalization', () => {
       expect.objectContaining({
         role: 'other',
         label: 'Scrollable panel',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
+  it('classifies generic containers with scroll-view identifiers as scroll views', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          AXIdentifier: 'app.mainScrollView',
+          AXLabel: undefined,
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          children: [
+            createNode({
+              type: 'StaticText',
+              role: 'AXStaticText',
+              AXLabel: 'Visible child',
+              frame: { x: 20, y: 120, width: 120, height: 20 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'scroll-view',
+        identifier: 'app.mainScrollView',
         actions: expect.arrayContaining(['swipeWithin']),
       }),
     );

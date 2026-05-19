@@ -132,7 +132,10 @@ function isScrollableNextStepElement(element: {
   actions: readonly string[];
   role?: string;
 }): boolean {
-  return element.actions.includes('swipeWithin') && element.role === 'scroll-view';
+  return (
+    element.actions.includes('swipeWithin') &&
+    (element.role === 'scroll-view' || element.role === 'application' || element.role === 'window')
+  );
 }
 
 /**
