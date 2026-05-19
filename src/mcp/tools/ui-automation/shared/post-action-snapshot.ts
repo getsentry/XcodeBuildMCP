@@ -53,7 +53,7 @@ export async function captureRuntimeSnapshotAfterActionSafely(params: {
     return {
       warning: `${message} ${POST_ACTION_SNAPSHOT_RECOVERY_HINT}`,
       uiError: {
-        code: isParseFailure ? 'SNAPSHOT_PARSE_FAILED' : 'ACTION_FAILED',
+        code: isParseFailure ? 'SNAPSHOT_PARSE_FAILED' : 'SNAPSHOT_CAPTURE_FAILED',
         message: `${message} ${detail}`,
         recoveryHint: POST_ACTION_SNAPSHOT_RECOVERY_HINT,
       },

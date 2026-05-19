@@ -116,6 +116,7 @@ function deriveRole(node: AccessibilityNode): RuntimeElementRoleV1 | undefined {
   ) {
     return 'text-field';
   }
+  if (/menu/.test(roleText)) return 'menu';
   if (/statictext|text/.test(roleText)) return 'text';
   if (/image/.test(roleText)) return 'image';
   if (/switch|checkbox|check box/.test(roleText)) return 'switch';
@@ -124,7 +125,6 @@ function deriveRole(node: AccessibilityNode): RuntimeElementRoleV1 | undefined {
   if (/scroll/.test(roleText)) return 'scroll-view';
   if (/table|list|outline|collection/.test(roleText)) return 'list';
   if (/(^|\b|ax)tab(\b|group|$)/.test(roleText)) return 'tab';
-  if (/menu/.test(roleText)) return 'menu';
   return 'other';
 }
 

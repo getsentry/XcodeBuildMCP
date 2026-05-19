@@ -256,6 +256,11 @@ describe('Batch UI Automation Tool', () => {
       );
 
       expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
+      });
+      expect(result.diagnostics?.errors?.[0]?.message).toBe('step failed');
       expect(getRuntimeSnapshot(simulatorId)).toBeNull();
     });
 

@@ -94,6 +94,28 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
+  it('classifies context menu items as menu controls instead of text', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'MenuItem',
+          role: 'AXMenuItem',
+          role_description: 'context menu item',
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'menu',
+        actions: expect.arrayContaining(['longPress', 'touch']),
+      }),
+    );
+    expect(snapshot.payload.elements[0]?.actions).not.toContain('tap');
+  });
+
   it('derives deterministic screen hashes from normalized UI content', () => {
     const uiHierarchy = [createNode({ AXLabel: 'Continue' }), createNode({ AXLabel: 'Cancel' })];
 

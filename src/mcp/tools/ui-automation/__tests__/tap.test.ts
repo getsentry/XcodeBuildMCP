@@ -117,6 +117,25 @@ describe('Tap Plugin', () => {
       expect(actionCommands(calls)).toHaveLength(1);
     });
 
+    it('reports post-action snapshot capture failures without failing the tap action', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { executor } = createSequencedExecutor([
+        { success: true, output: 'tap succeeded' },
+        { success: false, error: 'describe-ui failed' },
+      ]);
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(result.uiError).toMatchObject({
+        code: 'SNAPSHOT_CAPTURE_FAILED',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
+      });
+      expect(result.error).toBeNull();
+      expect(result.capture).toBeUndefined();
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+    });
+
     it('includes element type when tapping a referenced element with a shared identifier', async () => {
       recordSnapshot([
         createNode({

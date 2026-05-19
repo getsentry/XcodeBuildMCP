@@ -22,15 +22,12 @@ function snapshotMissingError(): UiAutomationRecoverableError {
   };
 }
 
-function snapshotExpiredError(
-  snapshot: RuntimeSnapshotRecord,
-  nowMs: number,
-): UiAutomationRecoverableError {
+function snapshotExpiredError(snapshotAgeMs: number): UiAutomationRecoverableError {
   return {
     code: 'SNAPSHOT_EXPIRED',
     message: 'The runtime UI snapshot for this simulator has expired.',
     recoveryHint: 'Run snapshot_ui again and retry with a current elementRef.',
-    snapshotAgeMs: snapshotAgeMs(snapshot, nowMs),
+    snapshotAgeMs,
   };
 }
 
@@ -83,17 +80,20 @@ export function resolveElementRef(
   requiredAction: RuntimeActionNameV1,
   nowMs = Date.now(),
 ): RuntimeElementResolution {
-  const snapshot = runtimeSnapshots.get(simulatorId) ?? null;
-  if (!snapshot) {
+  const lookup = getRuntimeSnapshotLookup(simulatorId, nowMs);
+  if (lookup.status === 'missing') {
     return { ok: false, error: snapshotMissingError() };
   }
 
-  const ageMs = snapshotAgeMs(snapshot, nowMs);
-  if (nowMs > snapshot.expiresAtMs) {
-    runtimeSnapshots.delete(simulatorId);
-    return { ok: false, error: snapshotExpiredError(snapshot, nowMs) };
+  if (lookup.status === 'expired') {
+    return { ok: false, error: snapshotExpiredError(lookup.snapshotAgeMs ?? 0) };
   }
 
+  const snapshot = lookup.snapshot;
+  if (!snapshot) {
+    throw new Error('Runtime snapshot lookup returned an available status without a snapshot.');
+  }
+  const ageMs = lookup.snapshotAgeMs ?? 0;
   const element = snapshot.elementsByRef.get(elementRef);
   if (!element) {
     return {

@@ -21,6 +21,7 @@ import type { UiActionResultDomainResult } from '../../../types/domain-results.t
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
+  createUiAutomationRecoverableError,
   mapAxeCommandError,
   setUiActionStructuredOutput,
   shouldInvalidateRuntimeSnapshotAfterActionError,
@@ -206,7 +207,13 @@ export function createBatchExecutor(
         axeFailureMessage: () => `Failed to execute AXe batch with ${steps.length} steps.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message);
+      return createUiActionFailureResult(action, simulatorId, failure.message, {
+        details: failure.diagnostics?.errors.map((entry) => entry.message),
+        uiError: createUiAutomationRecoverableError({
+          code: 'ACTION_FAILED',
+          message: failure.message,
+        }),
+      });
     }
 
     const captureResult = await captureRuntimeSnapshotAfterActionSafely({
