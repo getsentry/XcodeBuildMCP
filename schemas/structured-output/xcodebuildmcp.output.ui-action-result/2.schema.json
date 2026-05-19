@@ -116,6 +116,7 @@
             "SNAPSHOT_MISSING",
             "SNAPSHOT_EXPIRED",
             "SNAPSHOT_PARSE_FAILED",
+            "SNAPSHOT_CAPTURE_FAILED",
             "ELEMENT_REF_NOT_FOUND",
             "TARGET_NOT_FOUND",
             "TARGET_AMBIGUOUS",
