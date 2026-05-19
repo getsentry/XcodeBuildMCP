@@ -95,6 +95,28 @@ describe('Tap Plugin', () => {
       expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
+    it('reports post-action snapshot parse failures without failing the tap action', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { calls, executor } = createSequencedExecutor([
+        { success: true, output: 'tap succeeded' },
+        { success: true, output: 'not json' },
+      ]);
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(result.uiError).toMatchObject({
+        code: 'SNAPSHOT_PARSE_FAILED',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
+      });
+      expect(result.diagnostics?.warnings?.[0]?.message).toContain(
+        'UI action succeeded, but the refreshed runtime snapshot could not be parsed.',
+      );
+      expect(result.capture).toBeUndefined();
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+      expect(actionCommands(calls)).toHaveLength(1);
+    });
+
     it('includes element type when tapping a referenced element with a shared identifier', async () => {
       recordSnapshot([
         createNode({

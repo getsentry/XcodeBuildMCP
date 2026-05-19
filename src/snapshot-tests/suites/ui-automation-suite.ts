@@ -229,6 +229,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('type-text', () => {
       it('error - target not actionable', async () => {
+        snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
         const { text, isError } = await harness.invoke('ui-automation', 'type-text', {

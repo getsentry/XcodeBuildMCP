@@ -23,7 +23,7 @@ import {
   createSemanticTapCommand,
   executeSemanticTapWithAmbiguityFallback,
 } from './shared/semantic-tap.ts';
-import { captureRuntimeSnapshotAfterAction } from './shared/post-action-snapshot.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -154,13 +154,7 @@ export function createTypeTextExecutor(
       }
       await executeAxeCommand(typeCommandArgs, simulatorId, 'type', executor, axeHelpers);
       clearRuntimeSnapshot(simulatorId);
-      const capture = await captureRuntimeSnapshotAfterAction({
-        simulatorId,
-        executor,
-        axeHelpers,
-      });
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], { capture });
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);
@@ -177,6 +171,21 @@ export function createTypeTextExecutor(
         }),
       });
     }
+
+    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers,
+    });
+    return createUiActionSuccessResult(
+      action,
+      simulatorId,
+      [guard.warningText, captureResult.warning],
+      {
+        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+      },
+    );
   };
 }
 

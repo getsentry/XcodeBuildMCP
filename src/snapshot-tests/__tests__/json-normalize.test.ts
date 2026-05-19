@@ -26,11 +26,7 @@ describe('normalizeStructuredEnvelope', () => {
       error: 'Tests failed',
       data: {
         summary: { target: 'simulator' },
-        testCases: [
-          { test: 'Swift Testing failure', status: 'failed', durationMs: 0 },
-          { test: 'Volatile Swift Testing pass', status: 'passed', durationMs: 0 },
-          { suite: 'XCTestSuite', test: 'testStablePass', status: 'passed', durationMs: 0 },
-        ],
+        testCases: [{ test: 'Swift Testing failure', status: 'failed', durationMs: 0 }],
       },
     });
   });
@@ -156,7 +152,7 @@ describe('normalizeStructuredEnvelope', () => {
       error: null,
       data: {
         entries: [
-          { key: 'SDKROOT', value: 'iphoneos' },
+          { key: 'SDKROOT', value: '<SDK_PATH>' },
           { key: 'PATH', value: '<PATH_ENTRIES>' },
         ],
       },

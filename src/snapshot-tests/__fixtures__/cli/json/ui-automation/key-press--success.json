@@ -14,5 +14,8 @@
     "artifacts": {
       "simulatorId": "<UUID>"
     }
-  }
+  },
+  "nextSteps": [
+    "Refresh after UI action: xcodebuildmcp ui-automation snapshot-ui --simulator-id <UUID>"
+  ]
 }

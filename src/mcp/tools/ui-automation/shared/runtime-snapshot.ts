@@ -120,10 +120,10 @@ function deriveRole(node: AccessibilityNode): RuntimeElementRoleV1 | undefined {
   if (/image/.test(roleText)) return 'image';
   if (/switch|checkbox|check box/.test(roleText)) return 'switch';
   if (/slider/.test(roleText)) return 'slider';
-  if (/tab/.test(roleText)) return 'tab';
   if (/cell|row/.test(roleText)) return 'cell';
   if (/scroll/.test(roleText)) return 'scroll-view';
   if (/table|list|outline|collection/.test(roleText)) return 'list';
+  if (/(^|\b|ax)tab(\b|group|$)/.test(roleText)) return 'tab';
   if (/menu/.test(roleText)) return 'menu';
   return 'other';
 }

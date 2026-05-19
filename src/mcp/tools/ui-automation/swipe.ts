@@ -20,7 +20,7 @@ import {
 import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
 import { getRuntimeElementSwipePoints } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
-import { captureRuntimeSnapshotAfterAction } from './shared/post-action-snapshot.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -140,13 +140,7 @@ export function createSwipeExecutor(
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
       clearRuntimeSnapshot(simulatorId);
-      const capture = await captureRuntimeSnapshotAfterAction({
-        simulatorId,
-        executor,
-        axeHelpers,
-      });
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], { capture });
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);
@@ -165,6 +159,21 @@ export function createSwipeExecutor(
         }),
       });
     }
+
+    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers,
+    });
+    return createUiActionSuccessResult(
+      action,
+      simulatorId,
+      [guard.warningText, captureResult.warning],
+      {
+        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+      },
+    );
   };
 }
 

@@ -14,7 +14,7 @@ import {
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
 import { createSemanticTapBatchSteps, createSemanticTapCommand } from './shared/semantic-tap.ts';
-import { captureRuntimeSnapshotAfterAction } from './shared/post-action-snapshot.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -197,13 +197,7 @@ export function createBatchExecutor(
       if (!resolvedSteps.preserveSnapshot) {
         clearRuntimeSnapshot(simulatorId);
       }
-      const capture = await captureRuntimeSnapshotAfterAction({
-        simulatorId,
-        executor,
-        axeHelpers,
-      });
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], { capture });
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);
@@ -214,6 +208,21 @@ export function createBatchExecutor(
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message);
     }
+
+    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers,
+    });
+    return createUiActionSuccessResult(
+      action,
+      simulatorId,
+      [guard.warningText, captureResult.warning],
+      {
+        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+      },
+    );
   };
 }
 

@@ -6,7 +6,9 @@ names:
 description: Press one hardware key using an AXe HID key code. Prefer type_text for text entry. Common values include 40 Return/Enter, 42 Backspace, 43 Tab, and 44 Space.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
-  version: "2"
+  version: '2'
+routing:
+  stateful: true
 annotations:
   title: Key Press
   readOnlyHint: true

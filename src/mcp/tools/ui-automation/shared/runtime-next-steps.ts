@@ -234,19 +234,21 @@ function findActiveForegroundRoot(
 ): RuntimeSnapshotElementRecord | null {
   const records = [...recordsByRef.values()];
   const indexByRef = new Map(records.map((record, index) => [record.publicElement.ref, index]));
-  const descendantsByRoot = new Map(
-    records.map((root) => [
-      root,
-      records.filter((candidate) => isForegroundCandidateForRoot(root, candidate)),
-    ]),
-  );
+  const scoreByRef = new Map<string, number>();
 
   function foregroundScore(record: RuntimeSnapshotElementRecord): number {
+    const cachedScore = scoreByRef.get(record.publicElement.ref);
+    if (cachedScore !== undefined) {
+      return cachedScore;
+    }
     if (!isScrollableNextStepElement(record.publicElement)) {
+      scoreByRef.set(record.publicElement.ref, 0);
       return 0;
     }
 
-    const descendants = descendantsByRoot.get(record) ?? [];
+    const descendants = records.filter((candidate) =>
+      isForegroundCandidateForRoot(record, candidate),
+    );
     const hasDismissControl = descendants.some((candidate) =>
       FOREGROUND_DISMISS_TAP_NEXT_STEP_LABELS.has(
         compactTapNextStepText(candidate.publicElement.label).toLowerCase(),
@@ -260,16 +262,18 @@ function findActiveForegroundRoot(
     );
 
     if (!hasDismissControl && !hasTextEntry && !hasStateControls) {
+      scoreByRef.set(record.publicElement.ref, 0);
       return 0;
     }
 
-    return (
+    const score =
       (hasDismissControl ? 100 : 0) +
       (hasTextEntry ? 60 : 0) +
       (hasStateControls ? 30 : 0) +
       record.metadata.depth +
-      (indexByRef.get(record.publicElement.ref) ?? 0) / 1000
-    );
+      (indexByRef.get(record.publicElement.ref) ?? 0) / 1000;
+    scoreByRef.set(record.publicElement.ref, score);
+    return score;
   }
 
   return records.reduce<RuntimeSnapshotElementRecord | null>((best, candidate) => {
@@ -346,7 +350,12 @@ export function createRuntimeSnapshotNextSteps(params: {
     })
     .map(({ element }) => element);
   const tapElement = tapElements[0] ?? null;
-  const batchElements: typeof tapElements = [];
+  const batchElements = tapElements.filter(
+    (element) =>
+      !isContentRichTapNextStepElement(element) &&
+      !isScreenChangingTapNextStepElement(element) &&
+      !isLowPriorityTapNextStepElement(element.label),
+  );
   const scrollElement = nextStepElements.find(isScrollableNextStepElement) ?? null;
   const scrollNextStep: NextStep | null = scrollElement
     ? {
