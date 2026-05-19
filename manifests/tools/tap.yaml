@@ -3,7 +3,7 @@ module: mcp/tools/ui-automation/tap
 names:
   mcp: tap
   cli: tap
-description: Tap one elementRef from the latest snapshot_ui or wait_for_ui output. Other same-screen refs may remain usable after success; refresh after navigation, scrolling, sheet changes, or obvious layout changes.
+description: Tap one elementRef from the latest snapshot_ui or wait_for_ui output. For multiple same-screen taps or visible switch toggles with no intermediate assertion, prefer batch. Other same-screen refs may remain usable after success; refresh after navigation, scrolling, sheet changes, or obvious layout changes.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: '2'

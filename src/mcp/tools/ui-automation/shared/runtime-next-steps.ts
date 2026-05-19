@@ -319,6 +319,8 @@ function filterToForegroundElements(
  *   is no useful tap, batch, or scroll action to try.
  * - Tap examples skip text fields, hidden controls, and state-changing controls to avoid destructive
  *   generic suggestions.
+ * - Batch examples include multiple visible switches because settings screens often require several
+ *   same-screen toggles and batch is the efficient, app-agnostic primitive for that workflow.
  * - Scroll examples currently use the first scrollable element left after foreground filtering.
  * - Refresh/wait examples are included for fresh snapshot captures, but not after every action.
  */
@@ -348,12 +350,19 @@ export function createRuntimeSnapshotNextSteps(params: {
     })
     .map(({ element }) => element);
   const tapElement = tapElements[0] ?? null;
-  const batchElements = tapElements.filter(
+  const sameScreenBatchElements = tapElements.filter(
     (element) =>
       !isContentRichTapNextStepElement(element) &&
       !isScreenChangingTapNextStepElement(element) &&
       !isLowPriorityTapNextStepElement(element.label),
   );
+  const switchBatchElements = nextStepElements.filter(
+    (element) => element.role === 'switch' && element.actions.includes('tap'),
+  );
+  const batchElements =
+    switchBatchElements.length >= 2 ? switchBatchElements : sameScreenBatchElements;
+  const batchLabel =
+    switchBatchElements.length >= 2 ? 'Batch visible switch toggles' : 'Batch same-screen taps';
   const scrollElement = nextStepElements.find(isScrollableNextStepElement) ?? null;
   const scrollNextStep: NextStep | null = scrollElement
     ? {
@@ -398,7 +407,7 @@ export function createRuntimeSnapshotNextSteps(params: {
     ...(batchElements.length >= 2
       ? [
           {
-            label: 'Batch same-screen taps',
+            label: batchLabel,
             tool: 'batch',
             params: {
               simulatorId: params.simulatorId,

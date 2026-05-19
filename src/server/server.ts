@@ -42,7 +42,7 @@ Capabilities:
 - macOS workflows: Build, run, and test macOS applications
 - Log capture: Stream and capture logs from simulators and devices
 - LLDB debugging: Attach debugger, set breakpoints, inspect stack traces and variables, execute LLDB commands
-- UI automation: Capture screenshots, inspect view hierarchy with coordinates, perform taps/swipes/gestures, type text, press hardware buttons
+- UI automation: Capture screenshots, inspect runtime UI snapshots, perform taps/swipes/gestures, type text, press hardware buttons, and batch multiple same-screen elementRef taps
 - SwiftPM: Build, run, test, and manage Swift Package Manager projects
 - Project scaffolding: Generate new iOS/macOS project templates
 

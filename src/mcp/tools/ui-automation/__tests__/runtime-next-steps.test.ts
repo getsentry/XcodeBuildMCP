@@ -139,6 +139,58 @@ describe('runtime snapshot next steps', () => {
     });
   });
 
+  it('promotes visible switches as a batch next step', () => {
+    recordSnapshot([
+      createScrollView({
+        AXIdentifier: 'settings.sheet',
+        children: [
+          createNode({
+            type: 'Switch',
+            role: 'AXSwitch',
+            AXLabel: 'Atmospheric animations',
+            AXValue: '1',
+          }),
+          createNode({
+            type: 'Switch',
+            role: 'AXSwitch',
+            AXLabel: 'Severe weather alerts',
+            AXValue: '1',
+          }),
+          createNode({
+            type: 'Switch',
+            role: 'AXSwitch',
+            AXLabel: 'Reduce transparency',
+            AXValue: '0',
+          }),
+        ],
+      }),
+    ]);
+
+    const snapshot = currentRuntimeSnapshot();
+    const switchRefs = snapshot.elements
+      .filter((element) => element.role === 'switch')
+      .map((element) => element.ref);
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Batch visible switch toggles',
+      tool: 'batch',
+      params: {
+        simulatorId,
+        steps: switchRefs.slice(0, 2).map((elementRef) => ({
+          action: 'tap',
+          elementRef,
+        })),
+      },
+    });
+    expect(steps.find((step) => step.tool === 'tap')).toBeUndefined();
+  });
+
   it('uses hierarchy depth only as a foreground-root tie breaker', () => {
     recordSnapshot([
       nestNode(

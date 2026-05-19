@@ -550,7 +550,7 @@ describe('Snapshot UI Plugin', () => {
       ]);
     });
 
-    it('should keep state-changing controls in targets without promoting them as generic next steps', async () => {
+    it('should keep state-changing controls out of generic tap guidance while promoting switch batches', async () => {
       const uiHierarchy = JSON.stringify({
         elements: [
           {
@@ -590,7 +590,17 @@ describe('Snapshot UI Plugin', () => {
         ),
       );
 
-      expect(ctx.nextSteps?.find((step) => step.tool === 'batch')).toBeUndefined();
+      expect(ctx.nextSteps?.find((step) => step.tool === 'batch')).toEqual({
+        label: 'Batch visible switch toggles',
+        tool: 'batch',
+        params: {
+          simulatorId: '12345678-1234-4234-8234-123456789012',
+          steps: [
+            { action: 'tap', elementRef: 'e1' },
+            { action: 'tap', elementRef: 'e2' },
+          ],
+        },
+      });
       expect(ctx.nextSteps?.find((step) => step.tool === 'tap')).toBeUndefined();
 
       const capture =
@@ -603,7 +613,7 @@ describe('Snapshot UI Plugin', () => {
       expect(targets).toContainEqual(expect.objectContaining({ action: 'tap', elementRef: 'e2' }));
     });
 
-    it('should not promote state-changing controls into batch or tap next-step guidance', async () => {
+    it('should promote visible switches into batch while keeping generic tap on content', async () => {
       const uiHierarchy = JSON.stringify({
         elements: [
           {
@@ -673,7 +683,17 @@ describe('Snapshot UI Plugin', () => {
         ),
       );
 
-      expect(ctx.nextSteps?.find((step) => step.tool === 'batch')).toBeUndefined();
+      expect(ctx.nextSteps?.find((step) => step.tool === 'batch')).toEqual({
+        label: 'Batch visible switch toggles',
+        tool: 'batch',
+        params: {
+          simulatorId: '12345678-1234-4234-8234-123456789012',
+          steps: [
+            { action: 'tap', elementRef: 'e3' },
+            { action: 'tap', elementRef: 'e5' },
+          ],
+        },
+      });
       expect(ctx.nextSteps?.find((step) => step.tool === 'tap')?.params).toEqual({
         simulatorId: '12345678-1234-4234-8234-123456789012',
         elementRef: 'e4',
