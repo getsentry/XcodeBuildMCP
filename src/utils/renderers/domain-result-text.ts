@@ -1338,6 +1338,7 @@ function createUiErrorItems(uiError?: UiAutomationRecoverableError): TextRendera
 
   const lines = [
     `Code: ${uiError.code}`,
+    `Message: ${uiError.message}`,
     ...(uiError.elementRef ? [`Element: ${uiError.elementRef}`] : []),
     ...(typeof uiError.timeoutMs === 'number' ? [`Timeout: ${uiError.timeoutMs}ms`] : []),
     `Hint: ${uiError.recoveryHint}`,
