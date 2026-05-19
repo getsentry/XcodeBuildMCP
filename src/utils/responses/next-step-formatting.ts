@@ -67,10 +67,7 @@ function formatNextStepForCli(step: NextStep): string {
 }
 
 function formatMcpValue(value: NextStepParamValue): string {
-  if (typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === 'string' || (typeof value === 'object' && value !== null)) {
     return JSON.stringify(value);
   }
   return String(value);

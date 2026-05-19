@@ -7,8 +7,9 @@
 - Added `nextSteps` hint lines to MCP `structuredContent` and CLI `--output json` envelopes so agents can consume follow-up actions without scraping text. CLI JSON renders shell command lines; MCP structured content renders MCP tool-call hints. Structured result schemas that include `nextSteps` now use schema version 2; existing version 1 schema files remain available for current validators.
 - Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.
 - Added `batch` for executing multiple AXe UI automation steps in one simulator session.
-- Added `wait_for_ui` for polling rs/1 runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
-- Added structured rs/1 element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions.
+- Added `wait_for_ui` for polling runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
+- Added structured element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions.
+- Added a `replaceExisting` option to `type_text` so agents can replace an existing text-field value instead of accidentally appending to it.
 
 ### Fixed
 
@@ -29,7 +30,6 @@
 - Fixed `snapshot_ui` and `wait_for_ui` next steps so they use the resolved simulator ID instead of leaking `SIMULATOR_UUID` placeholders.
 - Fixed the Weather example app so saved-location rows are not reused as search-result rows after editing locations.
 - Fixed the Weather example app's current-location button so it selects the current saved location instead of appearing as a no-op UI automation target.
-- Added a `replaceExisting` option to `type_text` so agents can replace an existing text-field value instead of accidentally appending to it.
 - Fixed `type_text` so AXe-unsupported international/accented characters fail before focusing the field, with a clear recoverable error instead of a generic typing failure.
 - Fixed `snapshot_ui` next-step guidance so the suggested tap ref prefers useful tappable controls over text fields, sheet grabbers, close buttons, and clear-search buttons.
 - Fixed compact runtime snapshot JSON so target ordering matches compact text output and prioritizes useful content targets before low-value sheet chrome.

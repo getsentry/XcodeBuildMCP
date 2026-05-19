@@ -249,7 +249,7 @@ function normalizeXcodeBridgeCallEnvelope(
     return envelope;
   }
 
-  const normalizedEnvelope: StructuredOutputEnvelope<unknown> = {
+  return {
     ...envelope,
     data: {
       ...data,
@@ -257,7 +257,6 @@ function normalizeXcodeBridgeCallEnvelope(
       ...(Object.hasOwn(data, 'structuredContent') ? { structuredContent: {} } : {}),
     },
   };
-  return normalizedEnvelope;
 }
 
 export function normalizeStructuredEnvelope(

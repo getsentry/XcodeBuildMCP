@@ -64,13 +64,37 @@ function hasDuplicateSelectorMatch(params: {
   return matches.length > 1;
 }
 
+function pickSemanticTapSelectorArgs(params: {
+  element: RuntimeSnapshotElementRecord;
+  elements: readonly RuntimeSnapshotElementRecord[];
+  elementTypeArgs: readonly string[];
+  extraArgs: readonly string[];
+}): string[] | null {
+  const { element, elements, elementTypeArgs, extraArgs } = params;
+  const { identifier, label, value } = element.publicElement;
+
+  if (element.publicElement.role === 'switch') return null;
+  if (
+    identifier &&
+    !hasDuplicateSelectorMatch({ element, elements, selector: 'identifier', value: identifier })
+  ) {
+    return ['tap', '--id', identifier, ...elementTypeArgs, ...extraArgs];
+  }
+  if (label && !hasDuplicateSelectorMatch({ element, elements, selector: 'label', value: label })) {
+    return ['tap', '--label', label, ...elementTypeArgs, ...extraArgs];
+  }
+  if (value && !hasDuplicateSelectorMatch({ element, elements, selector: 'value', value })) {
+    return ['tap', '--value', value, ...elementTypeArgs, ...extraArgs];
+  }
+  return null;
+}
+
 export function createSemanticTapCommand(
   element: RuntimeSnapshotElementRecord,
   elementRef: string,
   extraArgs: readonly string[] = [],
   elements: readonly RuntimeSnapshotElementRecord[] = [element],
 ): SemanticTapCommand {
-  const { identifier, label, value } = element.publicElement;
   const activationPoint = getRuntimeElementActivationPoint(element);
   const elementType = axeElementTypeFor(element);
   const elementTypeArgs = elementType ? ['--element-type', elementType] : [];
@@ -87,25 +111,12 @@ export function createSemanticTapCommand(
         ]
       : ['tap', '-x', String(activationPoint.x), '-y', String(activationPoint.y), ...extraArgs];
 
-  const selectorArgs = (() => {
-    if (element.publicElement.role === 'switch') return null;
-    if (
-      identifier &&
-      !hasDuplicateSelectorMatch({ element, elements, selector: 'identifier', value: identifier })
-    ) {
-      return ['tap', '--id', identifier, ...elementTypeArgs, ...extraArgs];
-    }
-    if (
-      label &&
-      !hasDuplicateSelectorMatch({ element, elements, selector: 'label', value: label })
-    ) {
-      return ['tap', '--label', label, ...elementTypeArgs, ...extraArgs];
-    }
-    if (value && !hasDuplicateSelectorMatch({ element, elements, selector: 'value', value })) {
-      return ['tap', '--value', value, ...elementTypeArgs, ...extraArgs];
-    }
-    return null;
-  })();
+  const selectorArgs = pickSemanticTapSelectorArgs({
+    element,
+    elements,
+    elementTypeArgs,
+    extraArgs,
+  });
 
   return {
     selectorArgs,

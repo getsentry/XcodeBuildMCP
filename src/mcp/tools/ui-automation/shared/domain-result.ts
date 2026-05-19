@@ -183,7 +183,7 @@ export function mapAxeCommandError(
   if (error instanceof AxeError) {
     return {
       message: messages.axeFailureMessage(error),
-      diagnostics: createDiagnostics([], compact([error.axeOutput ?? error.message])),
+      diagnostics: createDiagnostics([], compact([error.axeOutput || error.message])),
     };
   }
 

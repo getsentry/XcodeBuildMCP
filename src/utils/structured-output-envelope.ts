@@ -190,12 +190,16 @@ function compactRuntimeElementRow(element: RuntimeElementV1, action: string): st
 }
 
 function primaryRuntimeElementAction(element: RuntimeElementV1): RuntimeActionNameV1 | 'none' {
-  return (
-    (element.actions.includes('typeText') && 'typeText') ||
-    (element.actions.includes('tap') && 'tap') ||
-    (element.actions.includes('swipeWithin') && 'swipeWithin') ||
-    'none'
-  );
+  if (element.actions.includes('typeText')) {
+    return 'typeText';
+  }
+  if (element.actions.includes('tap')) {
+    return 'tap';
+  }
+  if (element.actions.includes('swipeWithin')) {
+    return 'swipeWithin';
+  }
+  return 'none';
 }
 
 function isRuntimeTextSummaryElement(element: RuntimeElementV1): boolean {
