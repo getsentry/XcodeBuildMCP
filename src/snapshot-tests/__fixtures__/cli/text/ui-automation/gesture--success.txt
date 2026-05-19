@@ -4,3 +4,6 @@
    Simulator: <UUID>
 
 ✅ Gesture 'scroll-down' executed successfully.
+
+Next steps:
+1. Refresh after UI action: xcodebuildmcp ui-automation snapshot-ui --simulator-id <UUID>

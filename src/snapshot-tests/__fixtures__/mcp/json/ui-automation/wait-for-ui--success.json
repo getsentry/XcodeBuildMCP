@@ -17,28 +17,37 @@
       "seq": 1,
       "count": 21,
       "targets": [
+        "e7|tap|button|7||",
+        "e8|tap|button|8||",
+        "e9|tap|button|9||",
+        "e11|tap|button|4||",
+        "e12|tap|button|5||",
+        "e13|tap|button|6||",
+        "e15|tap|button|1||",
+        "e16|tap|button|2||",
+        "e17|tap|button|3||",
+        "e19|tap|button|0||",
+        "e20|tap|button|.||",
         "e3|tap|button|C||",
         "e4|tap|button|±||",
         "e5|tap|button|%||",
         "e6|tap|button|÷||",
-        "e7|tap|button|7||",
-        "e8|tap|button|8||",
-        "e9|tap|button|9||",
         "e10|tap|button|×||",
-        "e11|tap|button|4||",
-        "e12|tap|button|5||",
-        "e13|tap|button|6||",
         "e14|tap|button|-||",
-        "e15|tap|button|1||",
-        "e16|tap|button|2||",
-        "e17|tap|button|3||",
         "e18|tap|button|+||",
-        "e19|tap|button|0||",
-        "e20|tap|button|.||",
         "e21|tap|button|=||"
       ],
       "scroll": [],
+      "text": [
+        "e2|text|text|0||"
+      ],
       "udid": "<UUID>"
+    },
+    "waitMatch": {
+      "predicate": "exists",
+      "matches": [
+        "e3|tap|button|C||"
+      ]
     }
   }
 }

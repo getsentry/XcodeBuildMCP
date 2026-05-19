@@ -345,19 +345,21 @@ function findSheetGrabberDescendant(
 }
 
 function createSheetSwipeFrame(containerFrame: Frame, grabberFrame: Frame): Frame {
-  const top = Math.round(
+  const minimumHeight = Math.min(120, Math.max(2, containerFrame.height * 0.3));
+  const bottom = Math.round(containerFrame.y + containerFrame.height * 0.85);
+  const preferredTop = Math.round(
     Math.max(
       grabberFrame.y + grabberFrame.height + 120,
       containerFrame.y + containerFrame.height * 0.35,
     ),
   );
-  const bottom = Math.round(containerFrame.y + containerFrame.height * 0.85);
-  const height = Math.max(2, bottom - top);
+  const top = Math.round(Math.min(preferredTop, bottom - minimumHeight));
+
   return normalizeFrame({
     x: containerFrame.x,
-    y: Math.min(top, bottom - 2),
+    y: top,
     width: containerFrame.width,
-    height,
+    height: bottom - top,
   });
 }
 

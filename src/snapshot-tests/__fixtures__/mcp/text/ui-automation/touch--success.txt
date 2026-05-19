@@ -2,3 +2,6 @@
 👆 Touch
 
 ✅ Touch event (touch down+up) on elementRef e3 executed successfully.
+
+Next steps:
+1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })

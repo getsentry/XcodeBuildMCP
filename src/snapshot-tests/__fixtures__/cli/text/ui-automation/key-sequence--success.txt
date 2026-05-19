@@ -4,3 +4,6 @@
    Simulator: <UUID>
 
 ✅ Key sequence [4,5,6] executed successfully.
+
+Next steps:
+1. Refresh after UI action: xcodebuildmcp ui-automation snapshot-ui --simulator-id <UUID>

@@ -2,3 +2,6 @@
 ⌨️ Key Press
 
 ✅ Key press (code: 4) simulated successfully.
+
+Next steps:
+1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })

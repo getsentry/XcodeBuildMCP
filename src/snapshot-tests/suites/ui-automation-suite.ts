@@ -33,6 +33,21 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
       snapshotCaptured = true;
     }
 
+    async function captureFirstScrollRef(bundleId: string): Promise<string | null> {
+      await harness.invoke('simulator', 'launch-app', {
+        simulatorId: simulatorUdid,
+        bundleId,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+        simulatorId: simulatorUdid,
+      });
+      expect(isError).toBe(false);
+
+      return /\b(e\d+)\|swipe\|/.exec(text)?.[1] ?? null;
+    }
+
     beforeAll(async () => {
       vi.setConfig({ testTimeout: 120_000 });
       simulatorUdid = await ensureSimulatorBooted('iPhone 17 Pro');
@@ -75,6 +90,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('touch', () => {
       it('success', async () => {
+        snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
         const { text, isError } = await harness.invoke('ui-automation', 'touch', {
@@ -101,6 +117,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('long-press', () => {
       it('success', async () => {
+        snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
         const { text, isError } = await harness.invoke('ui-automation', 'long-press', {
@@ -124,6 +141,24 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
     });
 
     describe('swipe', () => {
+      it('success', async () => {
+        if (runtime === 'cli/json') {
+          return;
+        }
+
+        const scrollRef = await captureFirstScrollRef('com.apple.Preferences');
+        expect(scrollRef).not.toBeNull();
+
+        const { text, isError } = await harness.invoke('ui-automation', 'swipe', {
+          simulatorId: simulatorUdid,
+          withinElementRef: scrollRef,
+          direction: 'up',
+        });
+        expect(isError).toBe(false);
+        expectFixture(text, 'swipe--success');
+        snapshotCaptured = false;
+      });
+
       it('error - target not actionable', async () => {
         await refreshRuntimeSnapshot();
 

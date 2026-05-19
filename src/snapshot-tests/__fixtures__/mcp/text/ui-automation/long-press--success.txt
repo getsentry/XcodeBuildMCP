@@ -2,3 +2,6 @@
 👆 Long Press
 
 ✅ Long press on elementRef e3 for 500ms simulated successfully.
+
+Next steps:
+1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })

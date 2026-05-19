@@ -1,0 +1,47 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "swipe",
+      "withinElementRef": "e3",
+      "direction": "up"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "capture": {
+      "type": "runtime-snapshot",
+      "rs": "1",
+      "screenHash": "<SCREEN_HASH>",
+      "seq": 1,
+      "count": 16,
+      "targets": [
+        "e6|tap|button|Home Screen & App Library||com.apple.settings.homeScreen",
+        "e5|tap|button|Camera||com.apple.settings.camera",
+        "e7|tap|button|Search||com.apple.settings.search",
+        "e8|tap|button|StandBy||com.apple.settings.standBy",
+        "e9|tap|button|Screen Time||com.apple.settings.screenTime",
+        "e10|tap|button|Passcode||com.apple.settings.passcodeAndBiometrics",
+        "e11|tap|button|Privacy & Security||com.apple.settings.privacyAndSecurity",
+        "e12|tap|button|Game Center||com.apple.settings.gameCenter",
+        "e13|tap|button|iCloud||com.apple.settings.iCloud",
+        "e14|tap|button|Apps||com.apple.settings.apps",
+        "e15|tap|button|Developer||com.apple.settings.developer"
+      ],
+      "scroll": [
+        "e3|swipe|other|||"
+      ],
+      "udid": "<UUID>"
+    }
+  },
+  "nextSteps": [
+    "Batch same-screen taps: batch({ simulatorId: \"<UUID>\", steps: [{\"action\":\"tap\",\"elementRef\":\"e5\"},{\"action\":\"tap\",\"elementRef\":\"e7\"}] })",
+    "Tap an elementRef: tap({ simulatorId: \"<UUID>\", elementRef: \"e6\" })"
+  ]
+}

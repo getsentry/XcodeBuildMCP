@@ -1,0 +1,10 @@
+
+👆 Swipe
+
+   Simulator: <UUID>
+
+✅ Swipe up within elementRef e3 simulated successfully.
+
+Next steps:
+1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e4"},{"action":"tap","elementRef":"e6"}]}'
+2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e5

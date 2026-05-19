@@ -2,3 +2,6 @@
 👆 Button
 
 ✅ Hardware button 'home' pressed successfully.
+
+Next steps:
+1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })

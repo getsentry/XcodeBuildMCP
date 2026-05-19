@@ -18,5 +18,8 @@
     "artifacts": {
       "simulatorId": "<UUID>"
     }
-  }
+  },
+  "nextSteps": [
+    "Refresh after UI action: snapshot_ui({ simulatorId: \"<UUID>\" })"
+  ]
 }

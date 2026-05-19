@@ -117,6 +117,7 @@ export function createTapExecutor(
         executor,
         axeHelpers,
       });
+      clearRuntimeSnapshot(simulatorId);
       if (usesTouchActivation && postDelay !== undefined) {
         await delayMs(postDelay * 1000);
       }

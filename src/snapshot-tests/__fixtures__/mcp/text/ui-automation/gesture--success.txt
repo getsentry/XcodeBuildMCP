@@ -2,3 +2,6 @@
 👆 Gesture
 
 ✅ Gesture 'scroll-down' executed successfully.
+
+Next steps:
+1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })

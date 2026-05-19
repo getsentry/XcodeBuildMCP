@@ -283,6 +283,36 @@ describe('runtime snapshot normalization', () => {
     });
   });
 
+  it('keeps sheet host swipe frames non-degenerate when the grabber is near the bottom', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Weather',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Sheet Grabber',
+          AXValue: 'Expanded',
+          frame: { x: 157, y: 620, width: 76, height: 5 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up')).toEqual({
+      ok: true,
+      from: { x: 195, y: 693 },
+      to: { x: 195, y: 621 },
+    });
+  });
+
   it('removes actions from elements outside the viewport', () => {
     const root = createNode({
       type: 'Application',

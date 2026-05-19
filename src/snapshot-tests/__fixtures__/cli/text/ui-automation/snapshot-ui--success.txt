@@ -3,36 +3,36 @@
 
    Simulator: <UUID>
 
-Targets (19) — ref|action|role|label|id
-  e3|tap|button|C|
-  e4|tap|button|±|
-  e5|tap|button|%|
-  e6|tap|button|÷|
-  e7|tap|button|7|
-  e8|tap|button|8|
-  e9|tap|button|9|
-  e10|tap|button|×|
-  e11|tap|button|4|
-  e12|tap|button|5|
-  e13|tap|button|6|
-  e14|tap|button|-|
-  e15|tap|button|1|
-  e16|tap|button|2|
-  e17|tap|button|3|
-  e18|tap|button|+|
-  e19|tap|button|0|
-  e20|tap|button|.|
-  e21|tap|button|=|
+Targets (19) — ref|action|role|label|value|id
+  e7|tap|button|7||
+  e8|tap|button|8||
+  e9|tap|button|9||
+  e11|tap|button|4||
+  e12|tap|button|5||
+  e13|tap|button|6||
+  e15|tap|button|1||
+  e16|tap|button|2||
+  e17|tap|button|3||
+  e19|tap|button|0||
+  e20|tap|button|.||
+  e3|tap|button|C||
+  e4|tap|button|±||
+  e5|tap|button|%||
+  e6|tap|button|÷||
+  e10|tap|button|×||
+  e14|tap|button|-||
+  e18|tap|button|+||
+  e21|tap|button|=||
 
 Tips
-  - Use target refs with tap/type_text.
-  - Use scroll refs with swipe.
+  - Use target refs with tap, type_text, long_press, and touch.
+  - Refs are snapshot-specific; after snapshot_ui or wait_for_ui, use refs from the latest output.
   - Use wait_for_ui for text/assertions or changing UI.
 
 ✅ Runtime UI snapshot captured with 21 elements, 19 likely targets, and 0 scroll areas.
 
 Next steps:
-1. Refresh after layout changes: xcodebuildmcp simulator snapshot-ui --simulator-id "<UUID>"
-2. Wait for UI to settle: xcodebuildmcp ui-automation wait-for-ui --simulator-id "SIMULATOR_UUID" --predicate "settled"
-3. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id "<UUID>" --element-ref "e3"
-4. Take screenshot for verification: xcodebuildmcp simulator screenshot --simulator-id "<UUID>"
+1. Refresh after layout changes: xcodebuildmcp ui-automation snapshot-ui --simulator-id <UUID>
+2. Wait for UI to settle: xcodebuildmcp ui-automation wait-for-ui --simulator-id <UUID> --predicate settled
+3. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e7"},{"action":"tap","elementRef":"e8"}]}'
+4. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e7
