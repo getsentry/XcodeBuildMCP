@@ -59,8 +59,8 @@ describe('Long Press Plugin', () => {
       expect(result).toMatchObject({
         didError: false,
         action: { type: 'long-press', elementRef: 'e1', durationMs: 1500 },
+        capture: { type: 'runtime-snapshot', simulatorId },
       });
-      expect(calls).toHaveLength(1);
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'touch',

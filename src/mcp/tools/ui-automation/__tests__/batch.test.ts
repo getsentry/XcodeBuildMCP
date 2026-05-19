@@ -203,16 +203,22 @@ describe('Batch UI Automation Tool', () => {
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: '0' }),
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: 'off' }),
       ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await runBatch({
-        simulatorId,
-        steps: [
-          { action: 'tap', elementRef: 'e1' },
-          { action: 'tap', elementRef: 'e2' },
-        ],
-      });
+      const result = await runBatch(
+        {
+          simulatorId,
+          steps: [
+            { action: 'tap', elementRef: 'e1' },
+            { action: 'tap', elementRef: 'e2' },
+          ],
+        },
+        executor,
+      );
 
       expect(result.didError).toBe(false);
+      expect(result.capture).toBeUndefined();
+      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(false);
       expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 

@@ -216,6 +216,10 @@ export function createBatchExecutor(
       });
     }
 
+    if (resolvedSteps.preserveSnapshot) {
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
+    }
+
     const captureResult = await captureRuntimeSnapshotAfterActionSafely({
       simulatorId,
       executor,

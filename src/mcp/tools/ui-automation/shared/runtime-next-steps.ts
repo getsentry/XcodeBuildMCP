@@ -270,8 +270,8 @@ function findActiveForegroundRoot(
       (hasDismissControl ? 100 : 0) +
       (hasTextEntry ? 60 : 0) +
       (hasStateControls ? 30 : 0) +
-      record.metadata.depth +
-      (indexByRef.get(record.publicElement.ref) ?? 0) / 1000;
+      record.metadata.depth / 1000 +
+      (indexByRef.get(record.publicElement.ref) ?? 0) / 1_000_000;
     scoreByRef.set(record.publicElement.ref, score);
     return score;
   }
