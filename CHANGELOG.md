@@ -8,7 +8,7 @@
 - Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.
 - Added `batch` for executing multiple AXe UI automation steps in one simulator session.
 - Added `wait_for_ui` for polling rs/1 runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
-- Added structured rs/1 element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions. Validated the flow with a source-built AXe binary and the full Weather/Safari Claude Code task, with no raw-string batch attempts.
+- Added structured rs/1 element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions.
 
 ### Fixed
 

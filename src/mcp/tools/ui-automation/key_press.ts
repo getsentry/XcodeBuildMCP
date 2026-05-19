@@ -34,8 +34,7 @@ const keyPressSchema = z.object({
     .describe('HID keycode. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.'),
   duration: z
     .number()
-    .positive({ message: 'Duration must be greater than 0 seconds' })
-    .max(10, { message: 'Duration must be at most 10 seconds' })
+    .min(0, { message: 'Duration must be non-negative' })
     .optional()
     .describe('seconds'),
 });

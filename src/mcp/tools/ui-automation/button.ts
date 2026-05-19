@@ -31,8 +31,7 @@ const buttonSchema = z.object({
     .describe('apple-pay|home|lock|side-button|siri'),
   duration: z
     .number()
-    .positive({ message: 'Duration must be greater than 0 seconds' })
-    .max(10, { message: 'Duration must be at most 10 seconds' })
+    .min(0, { message: 'Duration must be non-negative' })
     .optional()
     .describe('seconds'),
 });

@@ -151,6 +151,11 @@ function defaultSleep(durationMs: number): Promise<void> {
   });
 }
 
+type WaitPredicateEvaluation =
+  | ReturnType<typeof evaluateSettledPredicate>
+  | ReturnType<typeof evaluateTextContainsPredicate>
+  | ReturnType<typeof evaluateElementPredicate>;
+
 function createWaitMatch(
   predicate: WaitForUiParams['predicate'],
   matches: RuntimeElementV1[] | undefined,
@@ -159,6 +164,42 @@ function createWaitMatch(
     return undefined;
   }
   return { predicate, matches };
+}
+
+function evaluateWaitPredicate(args: {
+  predicate: WaitForUiParams['predicate'];
+  selector: ResolvedWaitSelector | null;
+  snapshot: RuntimeSnapshotRecord;
+  text?: string;
+  nowMs: number;
+  settledDurationMs: number;
+  settledTracker: SettledTracker;
+}): WaitPredicateEvaluation {
+  const { predicate, selector, snapshot, text, nowMs, settledDurationMs, settledTracker } = args;
+
+  if (predicate === 'settled') {
+    return evaluateSettledPredicate({
+      snapshot,
+      nowMs,
+      settledDurationMs,
+      tracker: settledTracker,
+    });
+  }
+
+  if (predicate === 'textContains' && !selector) {
+    return evaluateTextContainsPredicate({ snapshot, text: text! });
+  }
+
+  if (predicate === 'gone' && !selector && text) {
+    const textMatch = evaluateTextContainsPredicate({ snapshot, text });
+    return {
+      matched: (textMatch.candidates ?? []).length === 0,
+      candidates: textMatch.candidates ?? [],
+      uiError: undefined,
+    };
+  }
+
+  return evaluateElementPredicate({ predicate, selector: selector!, snapshot, text });
 }
 
 export function createWaitForUiExecutor(
@@ -247,26 +288,15 @@ export function createWaitForUiExecutor(
         lastPollError = null;
         recordRuntimeSnapshot(snapshot);
 
-        const matched =
-          predicate === 'settled'
-            ? evaluateSettledPredicate({
-                snapshot,
-                nowMs,
-                settledDurationMs,
-                tracker: settledTracker,
-              })
-            : predicate === 'textContains' && !selector
-              ? evaluateTextContainsPredicate({ snapshot, text: text! })
-              : predicate === 'gone' && !selector && text
-                ? (() => {
-                    const textMatch = evaluateTextContainsPredicate({ snapshot, text });
-                    return {
-                      matched: (textMatch.candidates ?? []).length === 0,
-                      candidates: textMatch.candidates ?? [],
-                      uiError: undefined,
-                    };
-                  })()
-                : evaluateElementPredicate({ predicate, selector: selector!, snapshot, text });
+        const matched = evaluateWaitPredicate({
+          predicate,
+          selector,
+          snapshot,
+          text,
+          nowMs,
+          settledDurationMs,
+          settledTracker,
+        });
 
         if (typeof matched === 'boolean') {
           if (matched) {

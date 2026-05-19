@@ -1487,12 +1487,12 @@ function createCaptureResultItems(
   }
 
   if (isRuntimeSnapshotUnchanged) {
-    const capture = result.capture as RuntimeSnapshotUnchangedV1;
+    const unchangedCapture = result.capture as RuntimeSnapshotUnchangedV1;
     items.push(
       ...createStandardDiagnosticSections(result.diagnostics),
       createStatus(
         'success',
-        `Runtime UI snapshot unchanged (screenHash: ${capture.screenHash}, seq: ${capture.seq}).`,
+        `Runtime UI snapshot unchanged (screenHash: ${unchangedCapture.screenHash}, seq: ${unchangedCapture.seq}).`,
       ),
     );
     return items;

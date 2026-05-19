@@ -23,8 +23,8 @@ describe('Button Plugin', () => {
       expect(schemaObj.safeParse({ buttonType: 'home', duration: 2.5 }).success).toBe(true);
       expect(schemaObj.safeParse({ buttonType: 'invalid-button' }).success).toBe(false);
       expect(schemaObj.safeParse({ buttonType: 'home', duration: -1 }).success).toBe(false);
-      expect(schemaObj.safeParse({ buttonType: 'home', duration: 0 }).success).toBe(false);
-      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10.1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 0 }).success).toBe(true);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10.1 }).success).toBe(true);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',
@@ -285,7 +285,7 @@ describe('Button Plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('Parameter validation failed');
-      expect(allText(result)).toContain('Duration must be greater than 0 seconds');
+      expect(allText(result)).toContain('Duration must be non-negative');
     });
 
     it('should return success for valid button press', async () => {
