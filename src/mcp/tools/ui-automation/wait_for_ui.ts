@@ -236,7 +236,12 @@ export function createWaitForUiExecutor(
           axeHelpers,
         );
         const nowMs = timing.now();
-        const snapshot = parseRuntimeSnapshotResponse({ simulatorId, responseText, nowMs });
+        const snapshot = parseRuntimeSnapshotResponse({
+          simulatorId,
+          responseText,
+          nowMs,
+          allowEmpty: true,
+        });
         latestSnapshot = snapshot;
         lastParseError = null;
         lastPollError = null;

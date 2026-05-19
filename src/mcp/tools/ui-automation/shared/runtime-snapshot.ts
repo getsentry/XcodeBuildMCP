@@ -547,12 +547,6 @@ export function extractAccessibilityHierarchy(responseText: string): Accessibili
     );
   })();
 
-  if (hierarchy.length === 0) {
-    throw new RuntimeSnapshotParseError(
-      'AXe describe-ui returned an empty accessibility element array.',
-    );
-  }
-
   return hierarchy;
 }
 
@@ -602,10 +596,18 @@ export function parseRuntimeSnapshotResponse(params: {
   simulatorId: string;
   responseText: string;
   nowMs?: number;
+  allowEmpty?: boolean;
 }): RuntimeSnapshotRecord {
+  const uiHierarchy = extractAccessibilityHierarchy(params.responseText);
+  if (uiHierarchy.length === 0 && params.allowEmpty !== true) {
+    throw new RuntimeSnapshotParseError(
+      'AXe describe-ui returned an empty accessibility element array.',
+    );
+  }
+
   return createRuntimeSnapshotRecord({
     simulatorId: params.simulatorId,
-    uiHierarchy: extractAccessibilityHierarchy(params.responseText),
+    uiHierarchy,
     nowMs: params.nowMs,
   });
 }

@@ -820,19 +820,44 @@ describe('Wait for UI Plugin', () => {
     expect(getRuntimeSnapshot(simulatorId, 0)).toBe(previousSnapshot);
   });
 
-  it('preserves the runtime store when every poll returns an empty UI payload', async () => {
+  it('records empty UI payloads and times out with empty candidates', async () => {
     recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], 0);
-    const previousSnapshot = getRuntimeSnapshot(simulatorId, 0);
     const { executor } = createSequencedExecutor([{ success: true, output: '[]' }]);
 
     const result = await runWaitForUi(
-      { simulatorId, predicate: 'settled', timeoutMs: 0 },
+      { simulatorId, predicate: 'exists', label: 'Ready', timeoutMs: 0 },
       executor,
     );
 
     expect(result.didError).toBe(true);
-    expect(result.uiError?.code).toBe('SNAPSHOT_PARSE_FAILED');
-    expect(getRuntimeSnapshot(simulatorId, 0)).toBe(previousSnapshot);
+    expect(result.uiError).toMatchObject({ code: 'WAIT_TIMEOUT', candidates: [] });
+    expect(result.capture).toEqual(
+      expect.objectContaining({
+        type: 'runtime-snapshot',
+        elements: [],
+        actions: [],
+      }),
+    );
+    expect(getRuntimeSnapshot(simulatorId, 0)?.payload).toBe(result.capture);
+  });
+
+  it('succeeds for gone when an empty UI payload has no matching elements', async () => {
+    const { executor } = createSequencedExecutor([{ success: true, output: '{"elements": []}' }]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', label: 'Loading', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(false);
+    expect(result.waitMatch).toEqual({ predicate: 'gone', matches: [] });
+    expect(result.capture).toEqual(
+      expect.objectContaining({
+        type: 'runtime-snapshot',
+        elements: [],
+        actions: [],
+      }),
+    );
   });
 
   it('preserves the runtime store when the debugger guard blocks before polling', async () => {

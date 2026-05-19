@@ -80,7 +80,11 @@ export function createSnapshotUiExecutor(
         axeHelpers,
       );
 
-      const snapshot = parseRuntimeSnapshotResponse({ simulatorId, responseText });
+      const snapshot = parseRuntimeSnapshotResponse({
+        simulatorId,
+        responseText,
+        allowEmpty: true,
+      });
       recordRuntimeSnapshot(snapshot);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
 

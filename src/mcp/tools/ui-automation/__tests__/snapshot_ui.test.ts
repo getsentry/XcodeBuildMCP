@@ -1117,7 +1117,50 @@ describe('Snapshot UI Plugin', () => {
       );
     });
 
-    it('should reject empty AXe payloads without replacing a prior runtime snapshot', async () => {
+    it('should accept empty AXe payloads and replace a prior runtime snapshot', async () => {
+      __resetRuntimeSnapshotStoreForTests();
+      const simulatorId = '12345678-1234-4234-8234-123456789012';
+      const mockAxeHelpers = {
+        getAxePath: () => '/usr/local/bin/axe',
+        getBundledAxeEnvironment: () => ({}),
+      };
+      const seededExecutor = createMockExecutor({
+        success: true,
+        output:
+          '{"elements": [{"type": "Button", "frame": {"x": 1, "y": 2, "width": 3, "height": 4}}]}',
+        error: undefined,
+        process: { pid: 12345 },
+      });
+      await runLogic(() => snapshot_uiLogic({ simulatorId }, seededExecutor, mockAxeHelpers));
+      expect(getRuntimeSnapshot(simulatorId)?.payload.elements).toHaveLength(1);
+
+      for (const output of ['[]', '{"elements": []}']) {
+        const emptyExecutor = createMockExecutor({
+          success: true,
+          output,
+          error: undefined,
+          process: { pid: 12345 },
+        });
+        const { ctx, result, run } = createMockToolHandlerContext();
+        await run(() => snapshot_uiLogic({ simulatorId }, emptyExecutor, mockAxeHelpers));
+
+        expect(result.isError()).toBe(false);
+        const capture =
+          ctx.structuredOutput?.result.kind === 'capture-result'
+            ? ctx.structuredOutput.result.capture
+            : undefined;
+        expect(capture).toEqual(
+          expect.objectContaining({
+            type: 'runtime-snapshot',
+            elements: [],
+            actions: [],
+          }),
+        );
+        expect(getRuntimeSnapshot(simulatorId)?.payload).toBe(capture);
+      }
+    });
+
+    it('should preserve runtime snapshot store when AXe returns a non-array payload', async () => {
       __resetRuntimeSnapshotStoreForTests();
       const simulatorId = '12345678-1234-4234-8234-123456789012';
       const mockAxeHelpers = {
@@ -1133,26 +1176,23 @@ describe('Snapshot UI Plugin', () => {
       });
       await runLogic(() => snapshot_uiLogic({ simulatorId }, seededExecutor, mockAxeHelpers));
       const previousSnapshot = getRuntimeSnapshot(simulatorId);
-      expect(previousSnapshot?.payload.elements).toHaveLength(1);
 
-      for (const output of ['[]', '{"elements": []}', '{}']) {
-        const emptyExecutor = createMockExecutor({
-          success: true,
-          output,
-          error: undefined,
-          process: { pid: 12345 },
-        });
-        const { ctx, result, run } = createMockToolHandlerContext();
-        await run(() => snapshot_uiLogic({ simulatorId }, emptyExecutor, mockAxeHelpers));
+      const invalidExecutor = createMockExecutor({
+        success: true,
+        output: '{}',
+        error: undefined,
+        process: { pid: 12345 },
+      });
+      const { ctx, result, run } = createMockToolHandlerContext();
+      await run(() => snapshot_uiLogic({ simulatorId }, invalidExecutor, mockAxeHelpers));
 
-        expect(result.isError()).toBe(true);
-        expect(
-          ctx.structuredOutput?.result.kind === 'capture-result'
-            ? ctx.structuredOutput.result.uiError?.code
-            : undefined,
-        ).toBe('SNAPSHOT_PARSE_FAILED');
-        expect(getRuntimeSnapshot(simulatorId)).toBe(previousSnapshot);
-      }
+      expect(result.isError()).toBe(true);
+      expect(
+        ctx.structuredOutput?.result.kind === 'capture-result'
+          ? ctx.structuredOutput.result.uiError?.code
+          : undefined,
+      ).toBe('SNAPSHOT_PARSE_FAILED');
+      expect(getRuntimeSnapshot(simulatorId)).toBe(previousSnapshot);
     });
 
     it('should preserve runtime snapshot store when the debugger guard blocks before AXe runs', async () => {

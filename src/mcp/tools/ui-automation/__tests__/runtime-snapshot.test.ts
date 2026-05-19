@@ -4,6 +4,7 @@ import {
   createRuntimeSnapshotRecord,
   extractAccessibilityHierarchy,
   getPrimaryRuntimeElement,
+  parseRuntimeSnapshotResponse,
   getRuntimeElementActivationPoint,
   getRuntimeElementSwipePoints,
   RuntimeSnapshotParseError,
@@ -119,17 +120,31 @@ describe('runtime snapshot normalization', () => {
     expect(hierarchy[0]?.AXLabel).toBe('Continue');
   });
 
-  it('throws typed parse errors for invalid or empty describe-ui responses', () => {
+  it('throws typed parse errors for malformed describe-ui responses', () => {
     expect(() => extractAccessibilityHierarchy('not json')).toThrow(RuntimeSnapshotParseError);
     expect(() => extractAccessibilityHierarchy(JSON.stringify({ value: [] }))).toThrow(
       RuntimeSnapshotParseError,
     );
-    expect(() => extractAccessibilityHierarchy(JSON.stringify([]))).toThrow(
+    expect(() => extractAccessibilityHierarchy(JSON.stringify({}))).toThrow(
       RuntimeSnapshotParseError,
     );
-    expect(() => extractAccessibilityHierarchy(JSON.stringify({ elements: [] }))).toThrow(
+  });
+
+  it('allows empty describe-ui arrays only when the caller opts in', () => {
+    expect(extractAccessibilityHierarchy(JSON.stringify([]))).toEqual([]);
+    expect(extractAccessibilityHierarchy(JSON.stringify({ elements: [] }))).toEqual([]);
+    expect(() => parseRuntimeSnapshotResponse({ simulatorId, responseText: '[]' })).toThrow(
       RuntimeSnapshotParseError,
     );
+
+    const snapshot = parseRuntimeSnapshotResponse({
+      simulatorId,
+      responseText: '{"elements": []}',
+      allowEmpty: true,
+    });
+
+    expect(snapshot.payload.elements).toEqual([]);
+    expect(snapshot.payload.actions).toEqual([]);
   });
 
   it('selects the primary element for semantic next steps', () => {
