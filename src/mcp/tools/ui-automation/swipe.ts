@@ -43,7 +43,12 @@ const swipeSchema = z.object({
     .positive({ message: 'Duration must be greater than 0 seconds' })
     .optional()
     .describe('seconds'),
-  distance: z.number().positive({ message: 'Distance must be greater than 0' }).optional(),
+  distance: z
+    .number()
+    .positive({ message: 'Distance must be greater than 0' })
+    .max(1, { message: 'Distance must be at most 1' })
+    .optional()
+    .describe('Normalized stroke fraction greater than 0 and up to 1'),
   preDelay: z
     .number()
     .min(0, { message: 'Pre-delay must be non-negative' })
@@ -88,7 +93,7 @@ export function createSwipeExecutor(
       });
     }
 
-    const points = getRuntimeElementSwipePoints(resolution.element, direction);
+    const points = getRuntimeElementSwipePoints(resolution.element, direction, distance);
     if (!points.ok) {
       const uiError = createUiAutomationRecoverableError({
         code: 'TARGET_NOT_ACTIONABLE',
@@ -128,9 +133,6 @@ export function createSwipeExecutor(
     ];
     if (duration !== undefined) {
       commandArgs.push('--duration', String(duration));
-    }
-    if (distance !== undefined) {
-      commandArgs.push('--delta', String(distance));
     }
     if (preDelay !== undefined) {
       commandArgs.push('--pre-delay', String(preDelay));

@@ -128,14 +128,93 @@ function getTapNextStepElementPriority(element: {
   return 20;
 }
 
+function hasScrollSemanticIdentity(element: {
+  label?: string;
+  value?: string;
+  identifier?: string;
+}): boolean {
+  return (
+    element.label !== undefined || element.value !== undefined || element.identifier !== undefined
+  );
+}
+
 function isScrollableNextStepElement(element: {
   actions: readonly string[];
   role?: string;
+  label?: string;
+  value?: string;
+  identifier?: string;
 }): boolean {
   return (
     element.actions.includes('swipeWithin') &&
-    (element.role === 'scroll-view' || element.role === 'application' || element.role === 'window')
+    (element.role === 'scroll-view' ||
+      element.role === 'list' ||
+      element.role === 'application' ||
+      element.role === 'window' ||
+      (element.role === 'other' && hasScrollSemanticIdentity(element)))
   );
+}
+
+function getScrollRolePriority(element: RuntimeElementV1): number {
+  switch (element.role) {
+    case 'scroll-view':
+    case 'list':
+      return 0;
+    case 'other':
+      return 1;
+    case 'application':
+    case 'window':
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function getScrollIdentityPriority(element: {
+  label?: string;
+  value?: string;
+  identifier?: string;
+}): number {
+  const identifier = compactTapNextStepText(element.identifier).toLowerCase();
+  if (/(?:^|[._-])(sheet|list|table|panel|drawer|overlay|dialog)(?:$|[._-])/i.test(identifier)) {
+    return 0;
+  }
+  return hasScrollSemanticIdentity(element) ? 1 : 2;
+}
+
+function compareScrollableNextStepCandidates(
+  left: { element: RuntimeElementV1; index: number },
+  right: { element: RuntimeElementV1; index: number },
+  recordsByRef: Map<string, RuntimeSnapshotElementRecord>,
+): number {
+  const roleDelta = getScrollRolePriority(left.element) - getScrollRolePriority(right.element);
+  if (roleDelta !== 0) {
+    return roleDelta;
+  }
+
+  const identityDelta =
+    getScrollIdentityPriority(left.element) - getScrollIdentityPriority(right.element);
+  if (identityDelta !== 0) {
+    return identityDelta;
+  }
+
+  const leftDepth = recordsByRef.get(left.element.ref)?.metadata.depth ?? 0;
+  const rightDepth = recordsByRef.get(right.element.ref)?.metadata.depth ?? 0;
+  if (leftDepth !== rightDepth) {
+    return rightDepth - leftDepth;
+  }
+
+  const leftIsVertical = left.element.frame.height >= left.element.frame.width;
+  const rightIsVertical = right.element.frame.height >= right.element.frame.width;
+  if (leftIsVertical !== rightIsVertical) {
+    return leftIsVertical ? -1 : 1;
+  }
+
+  if (left.element.frame.height !== right.element.frame.height) {
+    return right.element.frame.height - left.element.frame.height;
+  }
+
+  return left.index - right.index;
 }
 
 /**
@@ -267,10 +346,17 @@ function findActiveForegroundRoot(
       return 0;
     }
 
+    const element = record.publicElement;
+    const rolePriority = Math.max(0, 3 - getScrollRolePriority(element));
+    const identityPriority = Math.max(0, 2 - getScrollIdentityPriority(element));
+    const verticalPriority = element.frame.height >= element.frame.width ? 1 : 0;
     const score =
       (hasDismissControl ? 100 : 0) +
       (hasTextEntry ? 60 : 0) +
       (hasStateControls ? 30 : 0) +
+      rolePriority +
+      identityPriority +
+      verticalPriority +
       record.metadata.depth / 1000 +
       (indexByRef.get(record.publicElement.ref) ?? 0) / 1_000_000;
     scoreByRef.set(record.publicElement.ref, score);
@@ -324,7 +410,8 @@ function filterToForegroundElements(
  *   generic suggestions.
  * - Batch examples include multiple visible switches because settings screens often require several
  *   same-screen toggles and batch is the efficient, app-agnostic primitive for that workflow.
- * - Scroll examples currently use the first scrollable element left after foreground filtering.
+ * - Scroll examples prefer real list/scroll-view targets, then semantic inferred containers, with
+ *   application/window root scrolling used last as a fallback.
  * - Refresh/wait examples are included for fresh snapshot captures, but not after every action.
  */
 export function createRuntimeSnapshotNextSteps(params: {
@@ -366,7 +453,12 @@ export function createRuntimeSnapshotNextSteps(params: {
     switchBatchElements.length >= 2 ? switchBatchElements : sameScreenBatchElements;
   const batchLabel =
     switchBatchElements.length >= 2 ? 'Batch visible switch toggles' : 'Batch same-screen taps';
-  const scrollElement = nextStepElements.find(isScrollableNextStepElement) ?? null;
+  const scrollElement =
+    nextStepElements
+      .map((element, index) => ({ element, index }))
+      .filter(({ element }) => isScrollableNextStepElement(element))
+      .sort((left, right) => compareScrollableNextStepCandidates(left, right, recordsByRef))[0]
+      ?.element ?? null;
   const scrollNextStep: NextStep | null = scrollElement
     ? {
         label: 'Scroll visible content',

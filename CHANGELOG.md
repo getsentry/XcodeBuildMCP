@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Fixed `swipe` distance handling so distance is a normalized stroke fraction used for endpoint calculation, and improved sheet/list scroll guidance so real descendant scroll containers are preferred over application/window root fallbacks.
 - Fixed compact runtime snapshots so top-level app and window refs are not advertised as swipe targets just because a generic descendant overflows their frame.
 - Fixed `wait_for_ui` focus waits so elements that do not expose focus state return a typed recoverable error instead of timing out.
 - Fixed invalid `touch` calls so structured output no longer reports a fake touch event when neither `down` nor `up` was requested.

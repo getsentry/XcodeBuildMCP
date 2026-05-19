@@ -105,6 +105,179 @@ describe('runtime snapshot next steps', () => {
     });
   });
 
+  it('prefers an identified sheet list over background scroll views in flattened sheets', () => {
+    recordSnapshot([
+      createNode({
+        type: 'Application',
+        role: 'AXApplication',
+        AXLabel: 'Example',
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        children: [
+          createNode({
+            type: 'ScrollView',
+            role: 'AXScrollArea',
+            frame: { x: 0, y: 110, width: 390, height: 210 },
+            children: [
+              createNode({ AXLabel: 'Now', frame: { x: 20, y: 130, width: 80, height: 40 } }),
+            ],
+          }),
+          createNode({
+            type: 'Table',
+            role: 'AXTable',
+            AXIdentifier: 'example.locationsSheet',
+            frame: { x: 0, y: 360, width: 390, height: 484 },
+            children: [
+              createNode({ AXLabel: 'Close', frame: { x: 320, y: 370, width: 44, height: 44 } }),
+              createNode({
+                type: 'TextField',
+                role: 'AXTextField',
+                AXValue: 'London',
+                frame: { x: 20, y: 430, width: 300, height: 44 },
+              }),
+              createNode({
+                AXLabel: 'London, England, United Kingdom',
+                AXValue: 'saved',
+                frame: { x: 20, y: 500, width: 350, height: 88 },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const snapshot = currentRuntimeSnapshot();
+    const sheetListRef = snapshot.elements.find(
+      (element) => element.identifier === 'example.locationsSheet',
+    )?.ref;
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Scroll visible content',
+      tool: 'swipe',
+      params: {
+        simulatorId,
+        withinElementRef: sheetListRef,
+        direction: 'up',
+        distance: 0.5,
+      },
+    });
+  });
+
+  it('prefers a foreground sheet list over application root sheet scrolling', () => {
+    recordSnapshot([
+      createNode({
+        type: 'Application',
+        role: 'AXApplication',
+        AXLabel: 'Example',
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        children: [
+          createNode({
+            type: 'Button',
+            role: 'AXButton',
+            AXLabel: 'Sheet Grabber',
+            frame: { x: 157, y: 300, width: 76, height: 8 },
+          }),
+          createNode({
+            type: 'Table',
+            role: 'AXTable',
+            AXIdentifier: 'example.sheetList',
+            frame: { x: 0, y: 320, width: 390, height: 524 },
+            children: [
+              createNode({ AXLabel: 'Close', frame: { x: 320, y: 340, width: 44, height: 44 } }),
+              createNode({
+                type: 'TextField',
+                role: 'AXTextField',
+                AXLabel: 'Search',
+                frame: { x: 20, y: 390, width: 300, height: 44 },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const snapshot = currentRuntimeSnapshot();
+    const rootRef = snapshot.elements.find((element) => element.role === 'application')?.ref;
+    const listRef = snapshot.elements.find(
+      (element) => element.identifier === 'example.sheetList',
+    )?.ref;
+
+    expect(rootRef).toBeDefined();
+    expect(listRef).toBeDefined();
+    expect(snapshot.elements.find((element) => element.ref === rootRef)?.actions).not.toContain(
+      'swipeWithin',
+    );
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Scroll visible content',
+      tool: 'swipe',
+      params: {
+        simulatorId,
+        withinElementRef: listRef,
+        direction: 'up',
+        distance: 0.5,
+      },
+    });
+  });
+
+  it('prefers a vertical list over a small horizontal scroll view for upward scroll guidance', () => {
+    recordSnapshot([
+      createNode({
+        type: 'Application',
+        role: 'AXApplication',
+        AXLabel: 'Example',
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        children: [
+          createNode({
+            type: 'ScrollView',
+            role: 'AXScrollArea',
+            AXIdentifier: 'example.horizontalScroller',
+            frame: { x: 20, y: 100, width: 350, height: 120 },
+          }),
+          createNode({
+            type: 'Table',
+            role: 'AXTable',
+            AXIdentifier: 'example.verticalList',
+            frame: { x: 0, y: 240, width: 390, height: 520 },
+          }),
+        ],
+      }),
+    ]);
+
+    const snapshot = currentRuntimeSnapshot();
+    const verticalListRef = snapshot.elements.find(
+      (element) => element.identifier === 'example.verticalList',
+    )?.ref;
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Scroll visible content',
+      tool: 'swipe',
+      params: {
+        simulatorId,
+        withinElementRef: verticalListRef,
+        direction: 'up',
+        distance: 0.5,
+      },
+    });
+  });
+
   it('keeps unselected tabs available as screen-changing tap suggestions', () => {
     recordSnapshot([
       createNode({

@@ -117,3 +117,4 @@ DerivedData
 /.pr-learning
 /repros
 /.xcodebuildmcp
+/out.nosync

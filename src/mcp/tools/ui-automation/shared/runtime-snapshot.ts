@@ -410,16 +410,34 @@ function findSheetGrabberDescendant(
   );
 }
 
-function createSheetSwipeFrame(containerFrame: Frame, grabberFrame: Frame): Frame {
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function createSheetSwipeFrame(
+  containerFrame: Frame,
+  grabberFrame: Frame,
+  descendantFrames: readonly Frame[],
+): Frame {
   const minimumHeight = Math.min(120, Math.max(2, containerFrame.height * 0.3));
-  const bottom = Math.round(containerFrame.y + containerFrame.height * 0.85);
-  const preferredTop = Math.round(
-    Math.max(
-      grabberFrame.y + grabberFrame.height + 120,
-      containerFrame.y + containerFrame.height * 0.35,
-    ),
+  const containerBottom = containerFrame.y + containerFrame.height;
+  const topMargin = Math.min(24, Math.max(8, containerFrame.height * 0.02));
+  const topFloor = grabberFrame.y + grabberFrame.height + topMargin;
+  const defaultTop = Math.max(topFloor, containerFrame.y + containerFrame.height * 0.2);
+  const defaultBottom = containerFrame.y + containerFrame.height * 0.95;
+  const contentFrames = descendantFrames.filter(
+    (frame) =>
+      isVisible(frame) &&
+      framesIntersect(frame, containerFrame) &&
+      frame.y + frame.height / 2 >= topFloor,
   );
-  const top = Math.round(Math.min(preferredTop, bottom - minimumHeight));
+  const contentTop = Math.min(...contentFrames.map((frame) => frame.y));
+  const contentBottom = Math.max(...contentFrames.map((frame) => frame.y + frame.height));
+  const preferredTop = contentFrames.length > 0 ? Math.min(defaultTop, contentTop) : defaultTop;
+  const preferredBottom =
+    contentFrames.length > 0 ? Math.max(defaultBottom, contentBottom) : defaultBottom;
+  const bottom = Math.round(clamp(preferredBottom, topFloor + minimumHeight, containerBottom));
+  const top = Math.round(clamp(preferredTop, topFloor, bottom - minimumHeight));
 
   return normalizeFrame({
     x: containerFrame.x,
@@ -501,10 +519,22 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
         : null;
 
     if (sheetGrabber) {
+      if (hasPreferredDescendantSwipeTarget(element, elements)) {
+        continue;
+      }
+
       publicElement.actions.push('swipeWithin');
       metadata.swipeFrame = createSheetSwipeFrame(
         publicElement.frame,
         sheetGrabber.publicElement.frame,
+        elements
+          .filter(
+            (candidate) =>
+              candidate !== element &&
+              candidate !== sheetGrabber &&
+              isDescendantPath(metadata.path, candidate.metadata.path),
+          )
+          .map((candidate) => candidate.publicElement.frame),
       );
       continue;
     }
@@ -790,6 +820,7 @@ function getRuntimeSwipeCenter(
 export function getRuntimeElementSwipePoints(
   element: RuntimeSnapshotElementRecord,
   direction: RuntimeSwipeDirection,
+  distance = 1,
 ): RuntimeSwipePointResolution {
   const frame = element.metadata.swipeFrame ?? element.publicElement.frame;
   if (frame.width < 2 || frame.height < 2) {
@@ -807,19 +838,37 @@ export function getRuntimeElementSwipePoints(
   const top = Math.round(frame.y + verticalInset);
   const bottom = Math.round(frame.y + frame.height - verticalInset);
 
+  const strokeFraction = clamp(distance, 0, 1);
+  const horizontalCenter = (left + right) / 2;
+  const verticalCenter = (top + bottom) / 2;
+  const horizontalHalfStroke = ((right - left) * strokeFraction) / 2;
+  const verticalHalfStroke = ((bottom - top) * strokeFraction) / 2;
+
   let points: { from: Point; to: Point };
   switch (direction) {
     case 'up':
-      points = { from: { x: center.x, y: bottom }, to: { x: center.x, y: top } };
+      points = {
+        from: { x: center.x, y: Math.round(verticalCenter + verticalHalfStroke) },
+        to: { x: center.x, y: Math.round(verticalCenter - verticalHalfStroke) },
+      };
       break;
     case 'down':
-      points = { from: { x: center.x, y: top }, to: { x: center.x, y: bottom } };
+      points = {
+        from: { x: center.x, y: Math.round(verticalCenter - verticalHalfStroke) },
+        to: { x: center.x, y: Math.round(verticalCenter + verticalHalfStroke) },
+      };
       break;
     case 'left':
-      points = { from: { x: right, y: center.y }, to: { x: left, y: center.y } };
+      points = {
+        from: { x: Math.round(horizontalCenter + horizontalHalfStroke), y: center.y },
+        to: { x: Math.round(horizontalCenter - horizontalHalfStroke), y: center.y },
+      };
       break;
     case 'right':
-      points = { from: { x: left, y: center.y }, to: { x: right, y: center.y } };
+      points = {
+        from: { x: Math.round(horizontalCenter - horizontalHalfStroke), y: center.y },
+        to: { x: Math.round(horizontalCenter + horizontalHalfStroke), y: center.y },
+      };
       break;
   }
 

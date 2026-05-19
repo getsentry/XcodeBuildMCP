@@ -354,7 +354,7 @@ describe('runtime snapshot normalization', () => {
     const root = createNode({
       type: 'Application',
       role: 'AXApplication',
-      AXLabel: 'Weather',
+      AXLabel: 'Example',
       frame: { x: 0, y: 0, width: 402, height: 874 },
       children: [
         createNode({
@@ -384,14 +384,14 @@ describe('runtime snapshot normalization', () => {
       expect.objectContaining({
         ref: 'e1',
         role: 'application',
-        label: 'Weather',
+        label: 'Example',
         actions: ['swipeWithin'],
       }),
     );
     expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'down')).toEqual({
       ok: true,
-      from: { x: 201, y: 372 },
-      to: { x: 201, y: 677 },
+      from: { x: 201, y: 273 },
+      to: { x: 201, y: 732 },
     });
   });
 
@@ -399,7 +399,7 @@ describe('runtime snapshot normalization', () => {
     const root = createNode({
       type: 'Application',
       role: 'AXApplication',
-      AXLabel: 'Weather',
+      AXLabel: 'Example',
       frame: { x: 0, y: 0, width: 390, height: 844 },
       children: [
         createNode({
@@ -420,8 +420,8 @@ describe('runtime snapshot normalization', () => {
 
     expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up')).toEqual({
       ok: true,
-      from: { x: 195, y: 693 },
-      to: { x: 195, y: 621 },
+      from: { x: 195, y: 778 },
+      to: { x: 195, y: 666 },
     });
   });
 
@@ -825,6 +825,31 @@ describe('runtime snapshot normalization', () => {
     });
 
     expect(getRuntimeElementActivationPoint(snapshot.elements[0]!)).toEqual({ x: 307, y: 903 });
+  });
+
+  it('uses normalized distance to shorten swipe strokes within safe endpoints', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          frame: { x: 0, y: 0, width: 200, height: 400 },
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up', 0.5)).toEqual({
+      ok: true,
+      from: { x: 100, y: 270 },
+      to: { x: 100, y: 130 },
+    });
+    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up', 0.8)).toEqual({
+      ok: true,
+      from: { x: 100, y: 312 },
+      to: { x: 100, y: 88 },
+    });
   });
 
   it('keeps full-screen swipe points away from unsafe viewport edges', () => {

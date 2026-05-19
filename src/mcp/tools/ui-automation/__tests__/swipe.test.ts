@@ -57,7 +57,7 @@ describe('Swipe Tool', () => {
           withinElementRef: 'e1',
           direction: 'down',
           duration: 1.5,
-          distance: 10,
+          distance: 0.5,
           preDelay: 0.5,
           postDelay: 0.25,
         }).success,
@@ -67,6 +67,10 @@ describe('Swipe Tool', () => {
       ).toBe(false);
       expect(
         schemaObject.safeParse({ withinElementRef: 'e1', direction: 'down', distance: 0 }).success,
+      ).toBe(false);
+      expect(
+        schemaObject.safeParse({ withinElementRef: 'e1', direction: 'down', distance: 1.1 })
+          .success,
       ).toBe(false);
       expect(
         schemaObject.safeParse({ withinElementRef: 'e1', direction: 'down', preDelay: 10.1 })
@@ -117,7 +121,7 @@ describe('Swipe Tool', () => {
       ]);
     });
 
-    it('preserves optional AXe swipe flags', async () => {
+    it('preserves optional AXe swipe flags without forwarding distance as AXe delta', async () => {
       recordSnapshot([
         createNode({
           type: 'ScrollView',
@@ -133,7 +137,7 @@ describe('Swipe Tool', () => {
           withinElementRef: 'e1',
           direction: 'right',
           duration: 2,
-          distance: 10,
+          distance: 0.5,
           preDelay: 0.5,
           postDelay: 0.25,
         },
@@ -144,29 +148,84 @@ describe('Swipe Tool', () => {
         type: 'swipe',
         withinElementRef: 'e1',
         direction: 'right',
-        from: { x: 30, y: 200 },
-        to: { x: 170, y: 200 },
+        from: { x: 65, y: 200 },
+        to: { x: 135, y: 200 },
         durationSeconds: 2,
       });
       expect(calls[0]?.command).toEqual([
         '/mocked/axe/path',
         'swipe',
         '--start-x',
-        '30',
+        '65',
         '--start-y',
         '200',
         '--end-x',
-        '170',
+        '135',
         '--end-y',
         '200',
         '--duration',
         '2',
-        '--delta',
-        '10',
         '--pre-delay',
         '0.5',
         '--post-delay',
         '0.25',
+        '--udid',
+        simulatorId,
+      ]);
+    });
+
+    it('uses distance as a normalized stroke fraction for endpoint calculation', async () => {
+      const { calls, executor } = createTrackingExecutor();
+
+      recordSnapshot([
+        createNode({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          frame: { x: 0, y: 0, width: 200, height: 400 },
+        }),
+      ]);
+      await runSwipe(
+        { simulatorId, withinElementRef: 'e1', direction: 'up', distance: 0.5 },
+        executor,
+      );
+
+      recordSnapshot([
+        createNode({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          frame: { x: 0, y: 0, width: 200, height: 400 },
+        }),
+      ]);
+      await runSwipe(
+        { simulatorId, withinElementRef: 'e1', direction: 'up', distance: 0.8 },
+        executor,
+      );
+
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
+        'swipe',
+        '--start-x',
+        '100',
+        '--start-y',
+        '270',
+        '--end-x',
+        '100',
+        '--end-y',
+        '130',
+        '--udid',
+        simulatorId,
+      ]);
+      expect(calls[2]?.command).toEqual([
+        '/mocked/axe/path',
+        'swipe',
+        '--start-x',
+        '100',
+        '--start-y',
+        '312',
+        '--end-x',
+        '100',
+        '--end-y',
+        '88',
         '--udid',
         simulatorId,
       ]);
