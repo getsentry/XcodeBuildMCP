@@ -125,10 +125,10 @@ describe('scaffold_ios_project plugin', () => {
   });
 
   describe('Command Generation Tests', () => {
-    it('should generate correct curl command for iOS template download', async () => {
+    it('should fail without running external commands when no local iOS template path is configured', async () => {
       await initConfigStoreForTest({ iosTemplatePath: '' });
 
-      let capturedCommands: string[][] = [];
+      const capturedCommands: string[][] = [];
       const trackingCommandExecutor = createMockExecutor({
         success: true,
         output: 'Command executed successfully',
@@ -150,57 +150,7 @@ describe('scaffold_ios_project plugin', () => {
         ),
       );
 
-      const curlCommand = capturedCommands.find((cmd) => cmd.includes('curl'));
-      expect(curlCommand).toBeDefined();
-      expect(curlCommand).toEqual([
-        'curl',
-        '-L',
-        '-f',
-        '-o',
-        expect.stringMatching(/template\.zip$/),
-        expect.stringMatching(
-          /https:\/\/github\.com\/getsentry\/XcodeBuildMCP-iOS-Template\/releases\/download\/v\d+\.\d+\.\d+\/XcodeBuildMCP-iOS-Template-\d+\.\d+\.\d+\.zip/,
-        ),
-      ]);
-
-      await initConfigStoreForTest({ iosTemplatePath: '/mock/template/path' });
-    });
-
-    it('should generate correct commands when using custom template version', async () => {
-      await initConfigStoreForTest({ iosTemplatePath: '', iosTemplateVersion: 'v2.0.0' });
-
-      let capturedCommands: string[][] = [];
-      const trackingCommandExecutor = createMockExecutor({
-        success: true,
-        output: 'Command executed successfully',
-      });
-      const capturingExecutor = async (command: string[], ...args: any[]) => {
-        capturedCommands.push(command);
-        return trackingCommandExecutor(command, ...args);
-      };
-
-      await runLogic(() =>
-        scaffold_ios_projectLogic(
-          {
-            projectName: 'TestIOSApp',
-            customizeNames: true,
-            outputPath: '/tmp/test-projects',
-          },
-          capturingExecutor,
-          mockFileSystemExecutor,
-        ),
-      );
-
-      const curlCommand = capturedCommands.find((cmd) => cmd.includes('curl'));
-      expect(curlCommand).toBeDefined();
-      expect(curlCommand).toEqual([
-        'curl',
-        '-L',
-        '-f',
-        '-o',
-        expect.stringMatching(/template\.zip$/),
-        'https://github.com/getsentry/XcodeBuildMCP-iOS-Template/releases/download/v2.0.0/XcodeBuildMCP-iOS-Template-2.0.0.zip',
-      ]);
+      expect(capturedCommands).toEqual([]);
 
       await initConfigStoreForTest({ iosTemplatePath: '/mock/template/path' });
     });
@@ -354,14 +304,8 @@ describe('scaffold_ios_project plugin', () => {
       expect(text).toContain('Xcode project files already exist in /tmp/test-projects');
     });
 
-    it('should return error response for template download failure', async () => {
+    it('should return error response when local template path is missing', async () => {
       await initConfigStoreForTest({ iosTemplatePath: '' });
-
-      const failingMockCommandExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'Template download failed',
-      });
 
       const result = await runLogic(() =>
         scaffold_ios_projectLogic(
@@ -370,7 +314,7 @@ describe('scaffold_ios_project plugin', () => {
             customizeNames: true,
             outputPath: '/tmp/test-projects',
           },
-          failingMockCommandExecutor,
+          mockCommandExecutor,
           mockFileSystemExecutor,
         ),
       );
@@ -378,7 +322,7 @@ describe('scaffold_ios_project plugin', () => {
       expect(result.isError).toBe(true);
       const text = allText(result);
       expect(text).toContain('Failed to get template for iOS');
-      expect(text).toContain('Template download failed');
+      expect(text).toContain('No local iOS template path configured');
 
       await initConfigStoreForTest({ iosTemplatePath: '/mock/template/path' });
     });

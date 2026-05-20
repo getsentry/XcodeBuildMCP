@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   createMockFileSystemExecutor,
   createNoopExecutor,
-  createMockExecutor,
   createMockCommandResponse,
 } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, scaffold_macos_projectLogic } from '../scaffold_macos_project.ts';
@@ -48,6 +47,8 @@ const runLogic = async (logic: () => Promise<unknown>) => {
 };
 
 const cwd = '/repo';
+const originalGetTemplatePath = TemplateManager.getTemplatePath;
+const originalCleanup = TemplateManager.cleanup;
 
 async function initConfigStoreForTest(overrides?: RuntimeConfigOverrides): Promise<void> {
   __resetConfigStoreForTests();
@@ -59,13 +60,12 @@ describe('scaffold_macos_project plugin', () => {
   let templateManagerStub: {
     getTemplatePath: (
       platform: string,
-      commandExecutor?: unknown,
-      fileSystemExecutor?: unknown,
+      _commandExecutor?: unknown,
+      _fileSystemExecutor?: unknown,
     ) => Promise<string>;
     cleanup: (path: string) => Promise<void>;
     setError: (error: Error | string | null) => void;
     getCalls: () => string;
-    resetCalls: () => void;
   };
 
   beforeEach(async () => {
@@ -75,8 +75,8 @@ describe('scaffold_macos_project plugin', () => {
     templateManagerStub = {
       getTemplatePath: async (
         platform: string,
-        commandExecutor?: unknown,
-        fileSystemExecutor?: unknown,
+        _commandExecutor?: unknown,
+        _fileSystemExecutor?: unknown,
       ) => {
         templateManagerCall = `getTemplatePath(${platform})`;
         if (templateManagerError) {
@@ -92,9 +92,6 @@ describe('scaffold_macos_project plugin', () => {
         templateManagerError = error;
       },
       getCalls: () => templateManagerCall,
-      resetCalls: () => {
-        templateManagerCall = '';
-      },
     };
 
     mockFileSystemExecutor = createMockFileSystemExecutor({
@@ -115,6 +112,11 @@ describe('scaffold_macos_project plugin', () => {
     await initConfigStoreForTest();
   });
 
+  afterEach(() => {
+    (TemplateManager as any).getTemplatePath = originalGetTemplatePath;
+    (TemplateManager as any).cleanup = originalCleanup;
+  });
+
   describe('Export Field Validation (Literal)', () => {
     it('should have handler as function', () => {
       expect(typeof handler).toBe('function');
@@ -131,47 +133,39 @@ describe('scaffold_macos_project plugin', () => {
   });
 
   describe('Command Generation', () => {
-    it('should generate correct curl command for macOS template download', async () => {
-      const expectedUrl =
-        'https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/';
+    it('should fail without running external commands when no local macOS template path is configured', async () => {
+      const capturedCommands: string[][] = [];
+      const trackingExecutor = async (command: string[]) => {
+        capturedCommands.push(command);
+        return createMockCommandResponse({
+          success: true,
+          output: 'Command successful',
+        });
+      };
 
-      expect(expectedUrl).toContain('XcodeBuildMCP-macOS-Template');
-      expect(expectedUrl).toContain('releases/download');
+      await initConfigStoreForTest({ macosTemplatePath: '' });
+      (TemplateManager as any).getTemplatePath = originalGetTemplatePath;
+      (TemplateManager as any).cleanup = originalCleanup;
 
-      const expectedFilename = 'template.zip';
-      expect(expectedFilename).toMatch(/template\.zip$/);
-
-      const expectedCurlFlags = ['-L', '-f', '-o'];
-      expect(expectedCurlFlags).toContain('-L');
-      expect(expectedCurlFlags).toContain('-f');
-      expect(expectedCurlFlags).toContain('-o');
-    });
-
-    it('should generate correct unzip command for template extraction', async () => {
-      const expectedUnzipCommand = ['unzip', '-q', 'template.zip'];
-
-      expect(expectedUnzipCommand).toContain('-q');
-      expect(expectedUnzipCommand).toContain('template.zip');
-      expect(expectedUnzipCommand[0]).toBe('unzip');
-      expect(expectedUnzipCommand[1]).toBe('-q');
-      expect(expectedUnzipCommand[2]).toMatch(/template\.zip$/);
-    });
-
-    it('should generate correct commands for template with version', async () => {
-      const testVersion = 'v1.0.0';
-      const expectedUrlWithVersion = `https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/${testVersion}/`;
-
-      expect(expectedUrlWithVersion).toContain(testVersion);
-      expect(expectedUrlWithVersion).toContain('XcodeBuildMCP-macOS-Template');
-      expect(expectedUrlWithVersion).toContain('releases/download');
-      expect(testVersion).toMatch(/^v\d+\.\d+\.\d+$/);
-      expect(expectedUrlWithVersion).toBe(
-        `https://github.com/getsentry/XcodeBuildMCP-macOS-Template/releases/download/${testVersion}/`,
+      const result = await runLogic(() =>
+        scaffold_macos_projectLogic(
+          {
+            projectName: 'TestMacApp',
+            customizeNames: true,
+            outputPath: '/tmp/test-projects',
+          },
+          trackingExecutor,
+          mockFileSystemExecutor,
+        ),
       );
+
+      expect(result.isError).toBe(true);
+      expect(allText(result)).toContain('No local macOS template path configured');
+      expect(capturedCommands).toEqual([]);
     });
 
     it('should not generate commands when using local template path', async () => {
-      let capturedCommands: string[][] = [];
+      const capturedCommands: string[][] = [];
       const trackingExecutor = async (command: string[]) => {
         capturedCommands.push(command);
         return createMockCommandResponse({
@@ -186,11 +180,8 @@ describe('scaffold_macos_project plugin', () => {
 
       await initConfigStoreForTest({ macosTemplatePath: '/local/template/path' });
 
-      const { TemplateManager: OriginalTemplateManager } = await import(
-        '../../../../utils/template/index.ts'
-      );
-      (TemplateManager as any).getTemplatePath = OriginalTemplateManager.getTemplatePath;
-      (TemplateManager as any).cleanup = OriginalTemplateManager.cleanup;
+      (TemplateManager as any).getTemplatePath = originalGetTemplatePath;
+      (TemplateManager as any).cleanup = originalCleanup;
 
       await runLogic(() =>
         scaffold_macos_projectLogic(
@@ -210,9 +201,6 @@ describe('scaffold_macos_project plugin', () => {
       expect(capturedCommands).not.toContainEqual(
         expect.arrayContaining(['unzip', expect.anything(), expect.anything()]),
       );
-
-      (TemplateManager as any).getTemplatePath = templateManagerStub.getTemplatePath;
-      (TemplateManager as any).cleanup = templateManagerStub.cleanup;
     });
   });
 

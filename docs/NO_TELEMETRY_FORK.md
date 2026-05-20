@@ -6,6 +6,7 @@ This fork removes XcodeBuildMCP runtime telemetry and unsolicited third-party ne
 - Sentry telemetry removed from runtime behavior.
 - Online upgrade checks disabled.
 - Automatic xcodemake download disabled.
+- Project scaffolding no longer downloads templates; configure local template paths instead.
 
 ## Remaining expected data flow
 - MCP tool and resource results continue to flow to your configured MCP client.
