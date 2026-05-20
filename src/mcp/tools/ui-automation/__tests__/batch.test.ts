@@ -222,6 +222,42 @@ describe('Batch UI Automation Tool', () => {
       expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
+    it('updates preserved switch state after a successful safe same-screen batch', async () => {
+      recordSnapshot([
+        createNode({ type: 'Switch', role: 'AXSwitch', AXValue: '0' }),
+        createNode({ type: 'Switch', role: 'AXSwitch', AXValue: 'off' }),
+        createNode({ type: 'Switch', role: 'AXSwitch', AXValue: 'not selected' }),
+      ]);
+      const { executor } = createTrackingExecutor();
+
+      const result = await runBatch(
+        {
+          simulatorId,
+          steps: [
+            { action: 'tap', elementRef: 'e1' },
+            { action: 'tap', elementRef: 'e2' },
+            { action: 'tap', elementRef: 'e3' },
+          ],
+        },
+        executor,
+      );
+
+      expect(result.didError).toBe(false);
+      const snapshot = getRuntimeSnapshot(simulatorId);
+      expect(snapshot?.payload.elements[0]).toMatchObject({
+        value: '1',
+        state: expect.objectContaining({ selected: true }),
+      });
+      expect(snapshot?.payload.elements[1]).toMatchObject({
+        value: 'on',
+        state: expect.objectContaining({ selected: true }),
+      });
+      expect(snapshot?.payload.elements[2]).toMatchObject({
+        value: 'selected',
+        state: expect.objectContaining({ selected: true }),
+      });
+    });
+
     it('records a fresh runtime snapshot after a successful arbitrary batch', async () => {
       recordSnapshot([createNode()]);
 

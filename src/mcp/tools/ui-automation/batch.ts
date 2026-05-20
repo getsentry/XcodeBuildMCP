@@ -94,6 +94,34 @@ function isSafeSameScreenBatchElement(element: {
   );
 }
 
+function markSwitchValueActivated(value: string | undefined): string | undefined {
+  const compactValue = compactBatchElementValue(value);
+  if (compactValue === '0') {
+    return '1';
+  }
+  if (compactValue === 'off') {
+    return 'on';
+  }
+  if (compactValue === 'not selected') {
+    return 'selected';
+  }
+  return value;
+}
+
+function markSafeBatchSwitchesActivated(params: BatchParams): void {
+  for (const step of params.steps) {
+    const resolution = resolveElementRef(params.simulatorId, step.elementRef, 'tap');
+    if (!resolution.ok || resolution.element.publicElement.role !== 'switch') {
+      continue;
+    }
+
+    const nextState = { ...resolution.element.publicElement.state, selected: true };
+    const nextValue = markSwitchValueActivated(resolution.element.publicElement.value);
+    resolution.element.publicElement.state = nextState;
+    resolution.element.publicElement.value = nextValue;
+  }
+}
+
 function buildBatchCommandArgs(params: BatchParams, resolvedSteps: readonly string[]): string[] {
   const commandArgs = ['batch'];
   for (const step of resolvedSteps) {
@@ -204,7 +232,9 @@ export function createBatchExecutor(
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'batch', executor, axeHelpers);
-      if (!resolvedSteps.preserveSnapshot) {
+      if (resolvedSteps.preserveSnapshot) {
+        markSafeBatchSwitchesActivated(params);
+      } else {
         clearRuntimeSnapshot(simulatorId);
       }
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
