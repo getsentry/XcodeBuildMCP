@@ -87,6 +87,10 @@ const publicSchemaObject = z.strictObject(dragSchema.omit({ simulatorId: true } 
 
 const LOG_PREFIX = '[AXe]';
 
+function usesWithinElementDragPoints(role: string | undefined): boolean {
+  return role === 'application' || role === 'window' || role === 'scroll-view' || role === 'list';
+}
+
 export function createDragExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
@@ -112,14 +116,17 @@ export function createDragExecutor(
     }
 
     const viewportFrame = resolution.snapshot.elements[0]?.publicElement.frame;
-    const points = resolution.element.publicElement.actions.includes('swipeWithin')
-      ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
-      : getRuntimeElementDirectionalDragPoints(
-          resolution.element,
-          direction,
-          distance,
-          viewportFrame,
-        );
+    const { role } = resolution.element.publicElement;
+    const points =
+      resolution.element.publicElement.actions.includes('swipeWithin') &&
+      usesWithinElementDragPoints(role)
+        ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
+        : getRuntimeElementDirectionalDragPoints(
+            resolution.element,
+            direction,
+            distance,
+            viewportFrame,
+          );
     if (!points.ok) {
       const uiError = createUiAutomationRecoverableError({
         code: 'TARGET_NOT_ACTIONABLE',

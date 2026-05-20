@@ -177,6 +177,52 @@ describe('Drag Tool', () => {
         simulatorId,
       ]);
     });
+
+    it('uses directional drag points for cell targets instead of in-cell swipe strokes', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          children: [
+            createNode({
+              type: 'Cell',
+              role: 'AXCell',
+              AXLabel: 'Reorderable row',
+              frame: { x: 20, y: 100, width: 350, height: 80 },
+            }),
+          ],
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runDrag(
+        { simulatorId, elementRef: 'e2', direction: 'up', distance: 0.35 },
+        executor,
+      );
+
+      expect(result.action).toMatchObject({
+        type: 'drag',
+        elementRef: 'e2',
+        direction: 'up',
+        from: { x: 195, y: 140 },
+        to: { x: 195, y: 24 },
+      });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
+        'drag',
+        '--start-x',
+        '195',
+        '--start-y',
+        '140',
+        '--end-x',
+        '195',
+        '--end-y',
+        '24',
+        '--udid',
+        simulatorId,
+      ]);
+    });
   });
 
   describe('Resolution failures', () => {
