@@ -141,11 +141,11 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
     });
 
     describe('swipe', () => {
-      it('success', async () => {
-        if (runtime === 'cli/json') {
-          return;
-        }
+      const swipeSuccessTest = runtime === 'cli/json' ? it.skip : it;
 
+      // CLI JSON has a stale success fixture for the former coordinate-based swipe contract.
+      // Keep this explicit until that runtime is re-baselined instead of silently passing.
+      swipeSuccessTest('success', async () => {
         const scrollRef = await captureFirstScrollRef('com.apple.Preferences');
         expect(scrollRef).not.toBeNull();
 
