@@ -19,6 +19,7 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -142,7 +143,6 @@ export function createGestureExecutor(
       await executeAxeCommand(commandArgs, simulatorId, 'gesture', executor, axeHelpers);
       clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);
@@ -155,6 +155,21 @@ export function createGestureExecutor(
         details: failure.diagnostics?.errors.map((entry) => entry.message),
       });
     }
+
+    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers,
+    });
+    return createUiActionSuccessResult(
+      action,
+      simulatorId,
+      [guard.warningText, captureResult.warning],
+      {
+        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+      },
+    );
   };
 }
 
