@@ -138,6 +138,69 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
+  it('puts suppressed target evidence in a no-ref evidence array, not text rows', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-suppressed',
+        seq: 2,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
+          {
+            ref: 'e1',
+            role: 'button',
+            label: 'Add',
+            frame: { x: 12, y: 81, width: 80, height: 44 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e2',
+            role: 'button',
+            label: 'London, England',
+            value: 'not saved',
+            frame: { x: 20, y: 140, width: 200, height: 72 },
+            state: { visible: true },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e3',
+            role: 'text',
+            label: 'Search results',
+            frame: { x: 20, y: 100, width: 120, height: 24 },
+            state: { visible: true },
+            actions: [],
+          },
+        ],
+        actions: [
+          { action: 'tap', elementRef: 'e1', label: 'Add' },
+          { action: 'tap', elementRef: 'e2', label: 'London, England' },
+        ],
+      },
+    };
+
+    expect(
+      toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2', {
+        runtimeSnapshotSuppressedTargetRefs: ['e2'],
+      }),
+    ).toMatchObject({
+      data: {
+        capture: {
+          targets: ['e1|tap|button|Add||'],
+          text: ['e3|text|text|Search results||'],
+          evidence: ['button|London, England|not saved|'],
+        },
+      },
+    });
+  });
+
   it('caps compact runtime snapshot rows by category', () => {
     const targets = Array.from({ length: 80 }, (_, index) => ({
       ref: `e${index + 1}`,

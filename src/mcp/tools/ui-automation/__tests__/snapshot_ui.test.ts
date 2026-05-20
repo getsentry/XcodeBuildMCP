@@ -553,8 +553,8 @@ describe('Snapshot UI Plugin', () => {
       expect(ctx.nextSteps?.map((step) => step.tool)).toEqual([
         'snapshot_ui',
         'wait_for_ui',
-        'tap',
         'swipe',
+        'tap',
       ]);
     });
 

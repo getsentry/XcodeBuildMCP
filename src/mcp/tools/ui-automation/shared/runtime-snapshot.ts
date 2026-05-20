@@ -414,39 +414,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-function createSheetSwipeFrame(
-  containerFrame: Frame,
-  grabberFrame: Frame,
-  descendantFrames: readonly Frame[],
-): Frame {
-  const minimumHeight = Math.min(120, Math.max(2, containerFrame.height * 0.3));
-  const containerBottom = containerFrame.y + containerFrame.height;
-  const topMargin = Math.min(24, Math.max(8, containerFrame.height * 0.02));
-  const topFloor = grabberFrame.y + grabberFrame.height + topMargin;
-  const defaultTop = Math.max(topFloor, containerFrame.y + containerFrame.height * 0.2);
-  const defaultBottom = containerFrame.y + containerFrame.height * 0.95;
-  const contentFrames = descendantFrames.filter(
-    (frame) =>
-      isVisible(frame) &&
-      framesIntersect(frame, containerFrame) &&
-      frame.y + frame.height / 2 >= topFloor,
-  );
-  const contentTop = Math.min(...contentFrames.map((frame) => frame.y));
-  const contentBottom = Math.max(...contentFrames.map((frame) => frame.y + frame.height));
-  const preferredTop = contentFrames.length > 0 ? Math.min(defaultTop, contentTop) : defaultTop;
-  const preferredBottom =
-    contentFrames.length > 0 ? Math.max(defaultBottom, contentBottom) : defaultBottom;
-  const bottom = Math.round(clamp(preferredBottom, topFloor + minimumHeight, containerBottom));
-  const top = Math.round(clamp(preferredTop, topFloor, bottom - minimumHeight));
-
-  return normalizeFrame({
-    x: containerFrame.x,
-    y: top,
-    width: containerFrame.width,
-    height: bottom - top,
-  });
-}
-
 function findViewportFrame(elements: RuntimeSnapshotElementRecord[]): Frame | null {
   return (
     elements.find(
@@ -503,6 +470,14 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
       continue;
     }
 
+    const sheetGrabber =
+      publicElement.role === 'application' || publicElement.role === 'window'
+        ? findSheetGrabberDescendant(element, elements)
+        : null;
+    if (sheetGrabber) {
+      continue;
+    }
+
     const hasOverflowingDescendant = elements.some((candidate) => {
       if (candidate === element) {
         return false;
@@ -512,32 +487,6 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
         frameOverflowsContainer(candidate.publicElement.frame, publicElement.frame)
       );
     });
-
-    const sheetGrabber =
-      publicElement.role === 'application' || publicElement.role === 'window'
-        ? findSheetGrabberDescendant(element, elements)
-        : null;
-
-    if (sheetGrabber) {
-      if (hasPreferredDescendantSwipeTarget(element, elements)) {
-        continue;
-      }
-
-      publicElement.actions.push('swipeWithin');
-      metadata.swipeFrame = createSheetSwipeFrame(
-        publicElement.frame,
-        sheetGrabber.publicElement.frame,
-        elements
-          .filter(
-            (candidate) =>
-              candidate !== element &&
-              candidate !== sheetGrabber &&
-              isDescendantPath(metadata.path, candidate.metadata.path),
-          )
-          .map((candidate) => candidate.publicElement.frame),
-      );
-      continue;
-    }
 
     if (
       publicElement.role !== 'application' &&
@@ -555,6 +504,7 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
       publicElement.state?.visible === false ||
       !isVisible(publicElement.frame) ||
       publicElement.actions.includes('swipeWithin') ||
+      findSheetGrabberDescendant(element, elements) !== null ||
       hasPreferredDescendantSwipeTarget(element, elements) ||
       !hasSemanticVerticalOverflowingDescendant(element, elements)
     ) {
@@ -880,4 +830,58 @@ export function getRuntimeElementSwipePoints(
   }
 
   return { ok: true, ...points };
+}
+
+export function getRuntimeElementDirectionalDragPoints(
+  element: RuntimeSnapshotElementRecord,
+  direction: RuntimeSwipeDirection,
+  distance = 0.35,
+  viewportFrame?: Frame,
+): RuntimeSwipePointResolution {
+  const { frame } = element.publicElement;
+  if (frame.width < 2 || frame.height < 2) {
+    return {
+      ok: false,
+      message: `Element ref '${element.publicElement.ref}' is too small for a reliable drag.`,
+    };
+  }
+
+  const from = getRuntimeElementActivationPoint(element);
+  const boundingFrame = viewportFrame ?? frame;
+  const edgeInset = 24;
+  const horizontalDistance = Math.max(1, Math.round(boundingFrame.width * clamp(distance, 0, 1)));
+  const verticalDistance = Math.max(1, Math.round(boundingFrame.height * clamp(distance, 0, 1)));
+  const minX = Math.round(boundingFrame.x + Math.min(edgeInset, boundingFrame.width / 2));
+  const maxX = Math.round(
+    boundingFrame.x + boundingFrame.width - Math.min(edgeInset, boundingFrame.width / 2),
+  );
+  const minY = Math.round(boundingFrame.y + Math.min(edgeInset, boundingFrame.height / 2));
+  const maxY = Math.round(
+    boundingFrame.y + boundingFrame.height - Math.min(edgeInset, boundingFrame.height / 2),
+  );
+
+  let to: Point;
+  switch (direction) {
+    case 'up':
+      to = { x: from.x, y: clamp(from.y - verticalDistance, minY, maxY) };
+      break;
+    case 'down':
+      to = { x: from.x, y: clamp(from.y + verticalDistance, minY, maxY) };
+      break;
+    case 'left':
+      to = { x: clamp(from.x - horizontalDistance, minX, maxX), y: from.y };
+      break;
+    case 'right':
+      to = { x: clamp(from.x + horizontalDistance, minX, maxX), y: from.y };
+      break;
+  }
+
+  if (isDegenerateSwipe(from, to)) {
+    return {
+      ok: false,
+      message: `Element ref '${element.publicElement.ref}' does not provide non-degenerate ${direction} drag points.`,
+    };
+  }
+
+  return { ok: true, from, to };
 }

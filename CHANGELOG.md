@@ -10,6 +10,11 @@
 - Added `wait_for_ui` for polling runtime UI snapshots until UI predicates such as existence, enabled state, focus, text, or settled layout are satisfied. `textContains` can also wait on visible text without a selector when the match is unique.
 - Added structured element-ref `batch` tap steps, preserved same-screen refs after successful `tap` and `batch` actions, and improved UI automation guidance and next steps for one-observation interactions.
 - Added a `replaceExisting` option to `type_text` so agents can replace an existing text-field value instead of accidentally appending to it.
+- Added `drag` for element-ref based drag gestures, enabling agents to expand foreground sheets and drag real scroll/list regions without raw coordinate guesses.
+
+### Changed
+
+- Runtime snapshot guidance no longer advertises synthetic sheet swipe targets for foreground sheets. Agents should use real sheet grabber expansion and real descendant scroll/list targets with `drag` instead of inferred app/window-root sheet swipes.
 
 ### Fixed
 

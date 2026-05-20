@@ -91,6 +91,11 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "evidence": {
+          "description": "Non-actionable semantic evidence rows in role|label|value|identifier format. These rows intentionally omit element refs.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "udid": { "type": "string" }
       },
       "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
@@ -207,6 +212,20 @@
                 "type": { "const": "swipe" }
               },
               "required": ["type"]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": { "const": "drag" },
+                "elementRef": { "type": "string" },
+                "direction": { "$ref": "#/$defs/direction" },
+                "from": { "$ref": "#/$defs/point" },
+                "to": { "$ref": "#/$defs/point" },
+                "durationSeconds": { "type": "number", "minimum": 0 },
+                "steps": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["type", "elementRef", "direction"]
             },
             {
               "type": "object",

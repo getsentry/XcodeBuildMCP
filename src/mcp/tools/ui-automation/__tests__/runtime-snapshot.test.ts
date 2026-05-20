@@ -6,6 +6,7 @@ import {
   getPrimaryRuntimeElement,
   parseRuntimeSnapshotResponse,
   getRuntimeElementActivationPoint,
+  getRuntimeElementDirectionalDragPoints,
   getRuntimeElementSwipePoints,
   RuntimeSnapshotParseError,
 } from '../shared/runtime-snapshot.ts';
@@ -350,7 +351,7 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
-  it('keeps sheet hosts swipeable when the current visible sheet content fits', () => {
+  it('does not synthesize a foreground sheet scroll region without a real scroll descendant', () => {
     const root = createNode({
       type: 'Application',
       role: 'AXApplication',
@@ -385,17 +386,188 @@ describe('runtime snapshot normalization', () => {
         ref: 'e1',
         role: 'application',
         label: 'Example',
-        actions: ['swipeWithin'],
+        actions: [],
       }),
     );
-    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'down')).toEqual({
-      ok: true,
-      from: { x: 201, y: 273 },
-      to: { x: 201, y: 732 },
-    });
+    expect(
+      snapshot.payload.elements.find(
+        (element) => element.identifier === 'xcodebuildmcp.inferred.sheet-content',
+      ),
+    ).toBeUndefined();
+    expect(snapshot.payload.actions.some((action) => action.action === 'swipeWithin')).toBe(false);
   });
 
-  it('keeps sheet host swipe frames non-degenerate when the grabber is near the bottom', () => {
+  it('does not synthesize a locations sheet scroll region over tappable rows', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Weather',
+      frame: { x: 0, y: 0, width: 402, height: 874 },
+      children: [
+        createNode({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          AXIdentifier: 'example.backgroundScroll',
+          frame: { x: 0, y: 80, width: 402, height: 260 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Sheet Grabber',
+          frame: { x: 163, y: 57, width: 76, height: 25 },
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'Locations',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 148, y: 104, width: 106, height: 32 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Close',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 330, y: 96, width: 44, height: 44 },
+        }),
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXValue: 'Search for a city, airport, or country',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 20, y: 150, width: 362, height: 44 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Use current location',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 20, y: 218, width: 362, height: 54 },
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'MY LOCATIONS · 7',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 20, y: 292, width: 160, height: 20 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'San Francisco, 1:24 PM · Cloudy',
+          frame: { x: 20, y: 326, width: 362, height: 72 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Portland, 1:24 PM · Light Rain',
+          frame: { x: 20, y: 415, width: 362, height: 72 },
+        }),
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXLabel: 'Body note',
+          frame: { x: 20, y: 600, width: 362, height: 44 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+    expect(
+      snapshot.payload.elements.find(
+        (element) => element.identifier === 'xcodebuildmcp.inferred.sheet-content',
+      ),
+    ).toBeUndefined();
+    expect(snapshot.payload.elements[0]?.actions).not.toContain('swipeWithin');
+    expect(snapshot.payload.elements.find((element) => element.role === 'scroll-view')).toEqual(
+      expect.objectContaining({
+        identifier: 'example.backgroundScroll',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
+  it('does not advertise synthetic scrolling for live-shaped locations sheets', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Weather',
+      frame: { x: 0, y: 0, width: 440, height: 956 },
+      children: [
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Sheet Grabber',
+          frame: { x: 182, y: 360, width: 76, height: 25 },
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'Locations',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 168, y: 408, width: 106, height: 32 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Close',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 374, y: 400, width: 44, height: 44 },
+        }),
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXValue: 'Search for a city, airport, or country',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 20, y: 450, width: 400, height: 44 },
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'MY LOCATIONS · 8',
+          AXIdentifier: 'example.locationsSheet',
+          frame: { x: 20, y: 566, width: 160, height: 20 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'MY LOCATION, San Francisco, 1:24 PM · Mostly Sunny',
+          frame: { x: 20, y: 596, width: 400, height: 72 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Portland, 1:24 PM · Light Rain',
+          frame: { x: 20, y: 686, width: 400, height: 72 },
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          AXLabel: 'Aspen, 2:24 PM · Light Snow',
+          frame: { x: 20, y: 776, width: 400, height: 72 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+    expect(
+      snapshot.payload.elements.find(
+        (element) => element.identifier === 'xcodebuildmcp.inferred.sheet-content',
+      ),
+    ).toBeUndefined();
+    expect(snapshot.payload.elements[0]?.actions).not.toContain('swipeWithin');
+    expect(snapshot.payload.actions.some((action) => action.action === 'swipeWithin')).toBe(false);
+  });
+
+  it('does not synthesize sheet host swipe frames when the grabber is near the bottom', () => {
     const root = createNode({
       type: 'Application',
       role: 'AXApplication',
@@ -418,11 +590,12 @@ describe('runtime snapshot normalization', () => {
       nowMs: 1_000,
     });
 
-    expect(getRuntimeElementSwipePoints(snapshot.elements[0]!, 'up')).toEqual({
-      ok: true,
-      from: { x: 195, y: 778 },
-      to: { x: 195, y: 666 },
-    });
+    expect(snapshot.payload.elements[0]?.actions).toEqual([]);
+    expect(
+      snapshot.payload.elements.find(
+        (element) => element.identifier === 'xcodebuildmcp.inferred.sheet-content',
+      ),
+    ).toBeUndefined();
   });
 
   it('removes actions from elements outside the viewport', () => {
@@ -849,6 +1022,41 @@ describe('runtime snapshot normalization', () => {
       ok: true,
       from: { x: 100, y: 312 },
       to: { x: 100, y: 88 },
+    });
+  });
+
+  it('uses viewport-relative directional drag points for small chrome targets', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 440, height: 956 },
+          children: [
+            createNode({
+              type: 'Button',
+              role: 'AXButton',
+              AXLabel: 'Sheet Grabber',
+              frame: { x: 182, y: 446, width: 76, height: 24 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(
+      getRuntimeElementDirectionalDragPoints(
+        snapshot.elements[1]!,
+        'up',
+        0.35,
+        snapshot.elements[0]!.publicElement.frame,
+      ),
+    ).toEqual({
+      ok: true,
+      from: { x: 220, y: 458 },
+      to: { x: 220, y: 123 },
     });
   });
 

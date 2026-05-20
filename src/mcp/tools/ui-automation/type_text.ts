@@ -53,8 +53,13 @@ function containsUnsupportedAxeTypeText(text: string): boolean {
 
 const typeTextSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
-  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
-  text: z.string().min(1, { message: 'Text cannot be empty' }),
+  elementRef: z
+    .string()
+    .min(1, { message: 'elementRef must be non-empty' })
+    .describe(
+      'Required runtime text-field elementRef from the latest snapshot_ui or wait_for_ui output',
+    ),
+  text: z.string().min(1, { message: 'Text cannot be empty' }).describe('Text to type'),
   replaceExisting: z
     .boolean()
     .optional()

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import type { CaptureResultDomainResult } from '../../../../types/domain-results.ts';
+import type {
+  AccessibilityNode,
+  CaptureResultDomainResult,
+} from '../../../../types/domain-results.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import type { DebuggerBackend } from '../../../../utils/debugger/backends/DebuggerBackend.ts';
 import { DebuggerManager } from '../../../../utils/debugger/debugger-manager.ts';
@@ -9,18 +12,26 @@ import { callHandler, createMockToolHandlerContext } from '../../../../test-util
 import {
   __resetRuntimeSnapshotStoreForTests,
   getRuntimeSnapshot,
+  recordRuntimeSnapshot,
 } from '../shared/snapshot-ui-state.ts';
+import { createRuntimeSnapshotRecord } from '../shared/runtime-snapshot.ts';
 import { handler, schema, wait_for_uiLogic } from '../wait_for_ui.ts';
 import {
   createMockAxeHelpers,
   createNode,
   createSequencedExecutor,
-  recordSnapshot,
-  simulatorId,
 } from './ui-action-test-helpers.ts';
+
+const simulatorId = '12E2CB7E-780E-467B-BE90-2917AB236F77';
 
 function hierarchyJson(nodes: Array<ReturnType<typeof createNode>>): string {
   return JSON.stringify({ elements: nodes });
+}
+
+function recordSnapshot(nodes: AccessibilityNode[], capturedAtMs = Date.now()): void {
+  recordRuntimeSnapshot(
+    createRuntimeSnapshotRecord({ simulatorId, uiHierarchy: nodes, nowMs: capturedAtMs }),
+  );
 }
 
 function createTiming(startMs = 0): {

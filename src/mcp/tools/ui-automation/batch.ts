@@ -29,7 +29,10 @@ import {
 
 const batchStepSchema = z.strictObject({
   action: z.literal('tap'),
-  elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
+  elementRef: z
+    .string()
+    .min(1, { message: 'elementRef must be non-empty' })
+    .describe('Runtime elementRef from the latest snapshot_ui or wait_for_ui output'),
   preDelay: z
     .number()
     .min(0, { message: 'Pre-delay must be non-negative' })
@@ -49,7 +52,10 @@ const batchSchema = z.strictObject({
   steps: z
     .array(batchStepSchema)
     .min(1, { message: 'At least one batch step is required' })
-    .max(100, { message: 'At most 100 batch steps are supported' }),
+    .max(100, { message: 'At most 100 batch steps are supported' })
+    .describe(
+      'Required array of step objects, for example [{"action":"tap","elementRef":"e1"}]. Do not use commands or raw command strings.',
+    ),
   axCache: z.enum(['perBatch', 'perStep', 'none']).optional(),
   waitTimeout: z.number().min(0, { message: 'waitTimeout must be non-negative' }).optional(),
   pollInterval: z.number().positive({ message: 'pollInterval must be greater than 0' }).optional(),

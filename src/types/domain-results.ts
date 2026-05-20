@@ -369,6 +369,15 @@ export interface UiActionSwipe {
   to?: Point;
   durationSeconds?: number;
 }
+export interface UiActionDrag {
+  type: 'drag';
+  elementRef: string;
+  direction: 'up' | 'down' | 'left' | 'right';
+  from?: Point;
+  to?: Point;
+  durationSeconds?: number;
+  steps?: number;
+}
 export interface UiActionTouch {
   type: 'touch';
   elementRef: string;
@@ -411,6 +420,7 @@ export interface UiActionBatch {
 export type UiAction =
   | UiActionTap
   | UiActionSwipe
+  | UiActionDrag
   | UiActionTouch
   | UiActionLongPress
   | UiActionButton

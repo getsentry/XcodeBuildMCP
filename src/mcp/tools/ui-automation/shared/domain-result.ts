@@ -8,6 +8,8 @@ import type {
   UiActionResultDomainResult,
 } from '../../../../types/domain-results.ts';
 import type {
+  RuntimeElementV1,
+  RuntimeSnapshotV1,
   UiAutomationRecoverableError,
   UiAutomationRecoverableErrorCode,
   UiWaitMatch,
@@ -15,12 +17,24 @@ import type {
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { createBasicDiagnostics } from '../../../../utils/diagnostics.ts';
 import { AxeError, DependencyError, SystemError } from '../../../../utils/errors.ts';
-import { createRuntimeSnapshotNextSteps } from './runtime-next-steps.ts';
+import {
+  createRuntimeSnapshotNextSteps,
+  getForegroundCompletionSuppressedRuntimeTargetRefs,
+} from './runtime-next-steps.ts';
+import type {
+  RuntimeSnapshotNextStepActionContext,
+  RuntimeSnapshotNextStepActionTarget,
+} from './runtime-next-steps.ts';
 
 const UI_ACTION_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
 const CAPTURE_SCHEMA = 'xcodebuildmcp.output.capture-result';
 const REFRESH_SNAPSHOT_RECOVERY_HINT =
   'Run snapshot_ui again and retry with a current element reference from the refreshed snapshot.';
+
+const uiActionNextStepContexts = new WeakMap<
+  UiActionResultDomainResult,
+  RuntimeSnapshotNextStepActionContext
+>();
 
 function createDiagnostics(
   warnings: readonly string[] = [],
@@ -51,6 +65,46 @@ function createUiActionSuccessNextSteps(result: UiActionResultDomainResult): Nex
   ];
 }
 
+function getUiActionTargetRef(action: UiAction): string | null {
+  switch (action.type) {
+    case 'tap':
+    case 'touch':
+    case 'long-press':
+    case 'type-text':
+      return action.elementRef;
+    case 'swipe':
+      return action.withinElementRef;
+    case 'drag':
+      return action.elementRef;
+    default:
+      return null;
+  }
+}
+
+function createNextStepActionTarget(
+  element: RuntimeElementV1,
+): RuntimeSnapshotNextStepActionTarget {
+  return {
+    ...(element.label !== undefined ? { label: element.label } : {}),
+    ...(element.value !== undefined ? { value: element.value } : {}),
+    ...(element.identifier !== undefined ? { identifier: element.identifier } : {}),
+    ...(element.role !== undefined ? { role: element.role } : {}),
+    ...(element.state !== undefined ? { state: element.state } : {}),
+  };
+}
+
+function findUiActionTargetElement(
+  action: UiAction,
+  runtimeSnapshot: RuntimeSnapshotV1,
+): RuntimeElementV1 | null {
+  const targetRef = getUiActionTargetRef(action);
+  if (!targetRef) {
+    return null;
+  }
+
+  return runtimeSnapshot.elements.find((element) => element.ref === targetRef) ?? null;
+}
+
 export function createUiAutomationRecoverableError(params: {
   code: UiAutomationRecoverableErrorCode;
   message: string;
@@ -69,9 +123,13 @@ export function createUiActionSuccessResult(
   action: UiAction,
   simulatorId: string,
   warnings: Array<string | null | undefined> = [],
-  options: { capture?: CapturePayload; uiError?: UiAutomationRecoverableError } = {},
+  options: {
+    capture?: CapturePayload;
+    uiError?: UiAutomationRecoverableError;
+    previousRuntimeSnapshot?: RuntimeSnapshotV1;
+  } = {},
 ): UiActionResultDomainResult {
-  return {
+  const result: UiActionResultDomainResult = {
     kind: 'ui-action-result',
     didError: false,
     error: null,
@@ -82,6 +140,19 @@ export function createUiActionSuccessResult(
     diagnostics: createDiagnostics(compact(warnings), []),
     ...(options.uiError ? { uiError: options.uiError } : {}),
   };
+
+  if (options.previousRuntimeSnapshot) {
+    const actionTargetElement = findUiActionTargetElement(action, options.previousRuntimeSnapshot);
+    uiActionNextStepContexts.set(result, {
+      action,
+      previousScreenHash: options.previousRuntimeSnapshot.screenHash,
+      ...(actionTargetElement
+        ? { actionTarget: createNextStepActionTarget(actionTargetElement) }
+        : {}),
+    });
+  }
+
+  return result;
 }
 
 export function createUiActionFailureResult(
@@ -201,24 +272,59 @@ export function mapAxeCommandError(
   };
 }
 
+function mergeRuntimeSnapshotRenderHints(
+  renderHints: RenderHints | undefined,
+  suppressedTargetRefs: readonly string[],
+): RenderHints | undefined {
+  if (suppressedTargetRefs.length === 0) {
+    return renderHints;
+  }
+
+  return {
+    ...renderHints,
+    runtimeSnapshot: {
+      ...renderHints?.runtimeSnapshot,
+      suppressedTargetRefs,
+    },
+  };
+}
+
 export function setUiActionStructuredOutput(
   ctx: ToolHandlerContext,
   result: UiActionResultDomainResult,
 ): void {
+  if (result.capture && 'type' in result.capture && result.capture.type === 'runtime-snapshot') {
+    const actionContext = uiActionNextStepContexts.get(result);
+    const suppressedTargetRefs = getForegroundCompletionSuppressedRuntimeTargetRefs({
+      simulatorId: result.artifacts.simulatorId,
+      runtimeSnapshot: result.capture,
+    });
+    ctx.structuredOutput = {
+      result,
+      schema: UI_ACTION_SCHEMA,
+      schemaVersion: '2',
+      ...(suppressedTargetRefs.length > 0
+        ? {
+            renderHints: {
+              runtimeSnapshot: { suppressedTargetRefs },
+            },
+          }
+        : {}),
+    };
+    ctx.nextSteps = createRuntimeSnapshotNextSteps({
+      simulatorId: result.artifacts.simulatorId,
+      runtimeSnapshot: result.capture,
+      includeRefreshAndWait: false,
+      ...(actionContext ? { actionContext } : {}),
+    });
+    return;
+  }
+
   ctx.structuredOutput = {
     result,
     schema: UI_ACTION_SCHEMA,
     schemaVersion: '2',
   };
-  if (result.capture && 'type' in result.capture && result.capture.type === 'runtime-snapshot') {
-    ctx.nextSteps = createRuntimeSnapshotNextSteps({
-      simulatorId: result.artifacts.simulatorId,
-      runtimeSnapshot: result.capture,
-      includeRefreshAndWait: false,
-    });
-    return;
-  }
-
   ctx.nextSteps = createUiActionSuccessNextSteps(result);
 }
 
@@ -227,10 +333,18 @@ export function setCaptureStructuredOutput(
   result: CaptureResultDomainResult,
   renderHints?: RenderHints,
 ): void {
+  const suppressedTargetRefs =
+    result.capture && 'type' in result.capture && result.capture.type === 'runtime-snapshot'
+      ? getForegroundCompletionSuppressedRuntimeTargetRefs({
+          simulatorId: result.artifacts.simulatorId,
+          runtimeSnapshot: result.capture,
+        })
+      : [];
+  const mergedRenderHints = mergeRuntimeSnapshotRenderHints(renderHints, suppressedTargetRefs);
   ctx.structuredOutput = {
     result,
     schema: CAPTURE_SCHEMA,
     schemaVersion: '2',
-    ...(renderHints ? { renderHints } : {}),
+    ...(mergedRenderHints ? { renderHints: mergedRenderHints } : {}),
   };
 }

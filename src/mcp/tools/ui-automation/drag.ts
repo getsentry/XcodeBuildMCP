@@ -1,7 +1,7 @@
 /**
- * UI Testing Plugin: Swipe
+ * UI Testing Plugin: Drag
  *
- * Swipes within a semantic UI element from the runtime snapshot store.
+ * Drags from a semantic UI element from the runtime snapshot store.
  */
 
 import * as z from 'zod';
@@ -18,7 +18,11 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
-import { getRuntimeElementSwipePoints } from './shared/runtime-snapshot.ts';
+import {
+  getRuntimeElementDirectionalDragPoints,
+  getRuntimeElementCenter,
+  getRuntimeElementSwipePoints,
+} from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -34,10 +38,15 @@ import {
   shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
-const swipeSchema = z.object({
+const dragSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
-  withinElementRef: z.string().min(1, { message: 'withinElementRef must be non-empty' }),
-  direction: z.enum(['up', 'down', 'left', 'right']).describe('up|down|left|right'),
+  elementRef: z
+    .string()
+    .min(1, { message: 'elementRef must be non-empty' })
+    .describe('Runtime elementRef from the latest snapshot_ui or wait_for_ui output'),
+  direction: z
+    .enum(['up', 'down', 'left', 'right'])
+    .describe('Drag direction: up, down, left, or right'),
   duration: z
     .number()
     .positive({ message: 'Duration must be greater than 0 seconds' })
@@ -48,7 +57,15 @@ const swipeSchema = z.object({
     .positive({ message: 'Distance must be greater than 0' })
     .max(1, { message: 'Distance must be at most 1' })
     .optional()
-    .describe('Normalized stroke fraction greater than 0 and up to 1'),
+    .describe(
+      'Normalized drag distance greater than 0 and up to 1 within the resolved element or viewport',
+    ),
+  steps: z
+    .number()
+    .int({ message: 'Steps must be an integer' })
+    .min(1, { message: 'Steps must be at least 1' })
+    .max(1000, { message: 'Steps must be at most 1000' })
+    .optional(),
   preDelay: z
     .number()
     .min(0, { message: 'Pre-delay must be non-negative' })
@@ -63,42 +80,51 @@ const swipeSchema = z.object({
     .describe('seconds'),
 });
 
-export type SwipeParams = z.infer<typeof swipeSchema>;
-type SwipeResult = UiActionResultDomainResult;
+export type DragParams = z.infer<typeof dragSchema>;
+type DragResult = UiActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(swipeSchema.omit({ simulatorId: true } as const).shape);
+const publicSchemaObject = z.strictObject(dragSchema.omit({ simulatorId: true } as const).shape);
 
 const LOG_PREFIX = '[AXe]';
 
-export function createSwipeExecutor(
+export function createDragExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
-): NonStreamingExecutor<SwipeParams, SwipeResult> {
+): NonStreamingExecutor<DragParams, DragResult> {
   return async (params) => {
-    const toolName = 'swipe';
-    const { simulatorId, withinElementRef, direction, duration, distance, preDelay, postDelay } =
+    const toolName = 'drag';
+    const { simulatorId, elementRef, direction, duration, distance, steps, preDelay, postDelay } =
       params;
     const unresolvedAction = {
-      type: 'swipe' as const,
-      withinElementRef,
+      type: 'drag' as const,
+      elementRef,
       direction,
       ...(duration !== undefined ? { durationSeconds: duration } : {}),
+      ...(steps !== undefined ? { steps } : {}),
     };
 
-    const resolution = resolveElementRef(simulatorId, withinElementRef, 'swipeWithin');
+    const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
     if (!resolution.ok) {
       return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
       });
     }
 
-    const points = getRuntimeElementSwipePoints(resolution.element, direction, distance);
+    const viewportFrame = resolution.snapshot.elements[0]?.publicElement.frame;
+    const points = resolution.element.publicElement.actions.includes('swipeWithin')
+      ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
+      : getRuntimeElementDirectionalDragPoints(
+          resolution.element,
+          direction,
+          distance,
+          viewportFrame,
+        );
     if (!points.ok) {
       const uiError = createUiAutomationRecoverableError({
         code: 'TARGET_NOT_ACTIONABLE',
         message: points.message,
-        elementRef: withinElementRef,
+        elementRef,
       });
       return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
         uiError,
@@ -121,7 +147,7 @@ export function createSwipeExecutor(
     }
 
     const commandArgs = [
-      'swipe',
+      'drag',
       '--start-x',
       String(points.from.x),
       '--start-y',
@@ -134,6 +160,9 @@ export function createSwipeExecutor(
     if (duration !== undefined) {
       commandArgs.push('--duration', String(duration));
     }
+    if (steps !== undefined) {
+      commandArgs.push('--steps', String(steps));
+    }
     if (preDelay !== undefined) {
       commandArgs.push('--pre-delay', String(preDelay));
     }
@@ -141,14 +170,15 @@ export function createSwipeExecutor(
       commandArgs.push('--post-delay', String(postDelay));
     }
 
+    const target = getRuntimeElementCenter(resolution.element);
     const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
     log(
       'info',
-      `${LOG_PREFIX}/${toolName}: Starting ${direction} swipe within ${withinElementRef}${optionsText} on ${simulatorId}`,
+      `${LOG_PREFIX}/${toolName}: Starting ${direction} drag from ${elementRef} at (${target.x}, ${target.y})${optionsText} on ${simulatorId}`,
     );
 
     try {
-      await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
+      await executeAxeCommand(commandArgs, simulatorId, 'drag', executor, axeHelpers);
       clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
     } catch (error) {
@@ -156,8 +186,7 @@ export function createSwipeExecutor(
         clearRuntimeSnapshot(simulatorId);
       }
       const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () =>
-          `Failed to simulate ${direction} swipe within ${withinElementRef}.`,
+        axeFailureMessage: () => `Failed to simulate ${direction} drag from ${elementRef}.`,
       });
       log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
       return createUiActionFailureResult(action, simulatorId, failure.message, {
@@ -165,7 +194,7 @@ export function createSwipeExecutor(
         uiError: createUiAutomationRecoverableError({
           code: 'ACTION_FAILED',
           message: failure.message,
-          elementRef: withinElementRef,
+          elementRef,
         }),
       });
     }
@@ -188,28 +217,28 @@ export function createSwipeExecutor(
   };
 }
 
-export async function swipeLogic(
-  params: SwipeParams,
+export async function dragLogic(
+  params: DragParams,
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executeSwipe = createSwipeExecutor(executor, axeHelpers, debuggerManager);
-  const result = await executeSwipe(params);
+  const executeDrag = createDragExecutor(executor, axeHelpers, debuggerManager);
+  const result = await executeDrag(params);
 
   setUiActionStructuredOutput(ctx, result);
 }
 
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,
-  legacy: swipeSchema,
+  legacy: dragSchema,
 });
 
-export const handler = createSessionAwareTool<SwipeParams>({
-  internalSchema: toInternalSchema<SwipeParams>(swipeSchema),
-  logicFunction: (params: SwipeParams, executor: CommandExecutor) =>
-    swipeLogic(params, executor, defaultAxeHelpers),
+export const handler = createSessionAwareTool<DragParams>({
+  internalSchema: toInternalSchema<DragParams>(dragSchema),
+  logicFunction: (params: DragParams, executor: CommandExecutor) =>
+    dragLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['simulatorId'], message: 'simulatorId is required' }],
 });

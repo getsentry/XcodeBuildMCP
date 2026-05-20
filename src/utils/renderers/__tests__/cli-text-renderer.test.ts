@@ -626,6 +626,60 @@ describe('cli-text-renderer', () => {
     expect(output).not.toContain('```json');
   });
 
+  it('renders suppressed runtime evidence without callable refs', () => {
+    const output = renderCliTextTranscript({
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.capture-result',
+        schemaVersion: '2',
+        renderHints: { runtimeSnapshot: { suppressedTargetRefs: ['e2'] } },
+        result: {
+          kind: 'capture-result',
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' },
+          artifacts: { simulatorId: 'SIMULATOR-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            protocol: 'rs/1',
+            simulatorId: 'SIMULATOR-1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            capturedAtMs: 1000,
+            expiresAtMs: 61000,
+            elements: [
+              {
+                ref: 'e1',
+                role: 'button',
+                label: 'Add',
+                frame: { x: 10, y: 20, width: 60, height: 40 },
+                actions: ['tap'],
+              },
+              {
+                ref: 'e2',
+                role: 'button',
+                label: 'London, England',
+                value: 'not saved',
+                frame: { x: 20, y: 80, width: 200, height: 72 },
+                state: { visible: true },
+                actions: ['tap'],
+              },
+            ],
+            actions: [
+              { action: 'tap', elementRef: 'e1', label: 'Add' },
+              { action: 'tap', elementRef: 'e2', label: 'London, England' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(output).toContain('Targets (1) — ref|action|role|label|value|id');
+    expect(output).toContain('e1|tap|button|Add||');
+    expect(output).toContain('Evidence (1) — role|label|value|id');
+    expect(output).toContain('button|London, England|not saved|');
+    expect(output).not.toContain('e2|tap|button|London, England|not saved|');
+  });
+
   it('renders unchanged runtime UI snapshots compactly', () => {
     const output = renderCliTextTranscript({
       structuredOutput: {

@@ -1277,10 +1277,47 @@ function formatRuntimeElementLine(element: RuntimeElementV1, action?: string): s
   ].join('|');
 }
 
-function isLikelyRuntimeTarget(element: RuntimeElementV1): boolean {
+function formatSuppressedRuntimeEvidenceLine(element: RuntimeElementV1): string {
+  return [
+    element.role ?? '',
+    compactRuntimeSnapshotText(element.label),
+    compactRuntimeSnapshotText(element.value),
+    compactRuntimeSnapshotText(element.identifier),
+  ].join('|');
+}
+
+function getSuppressedRuntimeTargetRefs(hints?: RenderHints): Set<string> {
+  return new Set(hints?.runtimeSnapshot?.suppressedTargetRefs ?? []);
+}
+
+function hasRuntimeTextEvidence(element: RuntimeElementV1): boolean {
   return (
+    compactRuntimeSnapshotText(element.label).length > 0 ||
+    compactRuntimeSnapshotText(element.value).length > 0
+  );
+}
+
+function isLikelyRuntimeTarget(
+  element: RuntimeElementV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): boolean {
+  return (
+    !suppressedTargetRefs.has(element.ref) &&
     !isHiddenRuntimeTarget(element) &&
     element.actions.some((action) => action === 'tap' || action === 'typeText')
+  );
+}
+
+function isSuppressedRuntimeTextEvidenceElement(
+  element: RuntimeElementV1,
+  suppressedTargetRefs: ReadonlySet<string>,
+): boolean {
+  return (
+    suppressedTargetRefs.has(element.ref) &&
+    element.state?.visible !== false &&
+    !isHiddenRuntimeTarget(element) &&
+    !isLowPriorityRuntimeTarget(element) &&
+    hasRuntimeTextEvidence(element)
   );
 }
 
@@ -1288,23 +1325,47 @@ function isScrollableRuntimeArea(element: RuntimeElementV1): boolean {
   return element.actions.includes('swipeWithin') && !isLikelyRuntimeTarget(element);
 }
 
-function countLikelyRuntimeTargets(snapshot: RuntimeSnapshotV1): number {
-  return snapshot.elements.filter(isLikelyRuntimeTarget).length;
+function countLikelyRuntimeTargets(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): number {
+  return snapshot.elements.filter((element) => isLikelyRuntimeTarget(element, suppressedTargetRefs))
+    .length;
 }
 
 function countScrollableRuntimeAreas(snapshot: RuntimeSnapshotV1): number {
   return snapshot.elements.filter(isScrollableRuntimeArea).length;
 }
 
-function createRuntimeSnapshotTargetsSection(snapshot: RuntimeSnapshotV1): SectionTextBlock {
+function createRuntimeSnapshotTargetsSection(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): SectionTextBlock {
   const likelyTargets = sortRuntimeTargetsForDisplay(
-    snapshot.elements.filter(isLikelyRuntimeTarget),
+    snapshot.elements.filter((element) => isLikelyRuntimeTarget(element, suppressedTargetRefs)),
   );
   const lines = likelyTargets.map((element) => formatRuntimeElementLine(element));
 
   return createSection(
     `Targets (${likelyTargets.length}) — ref|action|role|label|value|id`,
     lines.length > 0 ? lines : ['(no likely interaction targets found)'],
+  );
+}
+
+function createRuntimeSnapshotEvidenceSection(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string>,
+): SectionTextBlock | null {
+  const evidenceElements = snapshot.elements.filter((element) =>
+    isSuppressedRuntimeTextEvidenceElement(element, suppressedTargetRefs),
+  );
+  if (evidenceElements.length === 0) {
+    return null;
+  }
+
+  return createSection(
+    `Evidence (${evidenceElements.length}) — role|label|value|id`,
+    evidenceElements.map((element) => formatSuppressedRuntimeEvidenceLine(element)),
   );
 }
 
@@ -1500,13 +1561,18 @@ function createCaptureResultItems(
 
   if (isRuntimeSnapshot) {
     const snapshot = result.capture as RuntimeSnapshotV1;
-    const likelyTargetCount = countLikelyRuntimeTargets(snapshot);
+    const suppressedTargetRefs = getSuppressedRuntimeTargetRefs(hints);
+    const likelyTargetCount = countLikelyRuntimeTargets(snapshot, suppressedTargetRefs);
     const scrollAreaCount = countScrollableRuntimeAreas(snapshot);
+    const evidenceSection = createRuntimeSnapshotEvidenceSection(snapshot, suppressedTargetRefs);
     const scrollAreasSection = createRuntimeSnapshotScrollAreasSection(snapshot);
     if (title === 'Wait for UI' && result.waitMatch) {
       items.push(createWaitMatchSection(result.waitMatch));
     }
-    items.push(createRuntimeSnapshotTargetsSection(snapshot));
+    items.push(createRuntimeSnapshotTargetsSection(snapshot, suppressedTargetRefs));
+    if (evidenceSection) {
+      items.push(evidenceSection);
+    }
     if (scrollAreasSection) {
       items.push(scrollAreasSection);
     }
@@ -2340,6 +2406,7 @@ function createSpecialCaseItems(
       const headerTitleMap: Record<typeof result.action.type, string> = {
         tap: 'Tap',
         swipe: 'Swipe',
+        drag: 'Drag',
         touch: 'Touch',
         'long-press': 'Long Press',
         button: 'Button',
@@ -2372,6 +2439,16 @@ function createSpecialCaseItems(
               : '';
           successMessage =
             `Swipe ${result.action.direction} within elementRef ${result.action.withinElementRef}` +
+            `${durationText} simulated successfully.`;
+          break;
+        }
+        case 'drag': {
+          const durationText =
+            typeof result.action.durationSeconds === 'number'
+              ? ` duration=${result.action.durationSeconds}s`
+              : '';
+          successMessage =
+            `Drag ${result.action.direction} from elementRef ${result.action.elementRef}` +
             `${durationText} simulated successfully.`;
           break;
         }

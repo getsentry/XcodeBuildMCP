@@ -1,4 +1,5 @@
 import type { NextStep } from '../../../../types/common.ts';
+import type { UiAction } from '../../../../types/domain-results.ts';
 import type {
   RuntimeElementV1,
   RuntimeSnapshotElementRecord,
@@ -37,6 +38,30 @@ const SCREEN_CHANGING_TAP_NEXT_STEP_LABELS = new Set([
 ]);
 
 const FOREGROUND_DISMISS_TAP_NEXT_STEP_LABELS = new Set(['back', 'cancel', 'close', 'done']);
+const COMPLETION_ACTION_TAP_NEXT_STEP_LABELS = new Set(['add', 'save']);
+const SHEET_EXPANDED_VALUE_PATTERN = /\b(?:expanded|full(?:\s+screen)?)\b/i;
+const INCOMPLETE_STATE_NEXT_STEP_TEXT = new Set([
+  'not added',
+  'not saved',
+  'not selected',
+  'unadded',
+  'unsaved',
+  'unselected',
+]);
+
+export interface RuntimeSnapshotNextStepActionTarget {
+  label?: string;
+  value?: string;
+  identifier?: string;
+  role?: string;
+  state?: { selected?: boolean };
+}
+
+export interface RuntimeSnapshotNextStepActionContext {
+  action: UiAction;
+  previousScreenHash: string;
+  actionTarget?: RuntimeSnapshotNextStepActionTarget;
+}
 
 function compactTapNextStepText(value: string | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
@@ -278,7 +303,10 @@ function findStoredSnapshotRecords(params: {
   simulatorId: string;
   runtimeSnapshot: RuntimeSnapshotV1;
 }): Map<string, RuntimeSnapshotElementRecord> {
-  const storedSnapshot = getRuntimeSnapshot(params.simulatorId);
+  const storedSnapshot = getRuntimeSnapshot(
+    params.simulatorId,
+    params.runtimeSnapshot.capturedAtMs,
+  );
   if (
     storedSnapshot?.payload.screenHash !== params.runtimeSnapshot.screenHash ||
     storedSnapshot.payload.seq !== params.runtimeSnapshot.seq
@@ -293,8 +321,9 @@ function findStoredSnapshotRecords(params: {
  * Finds the most likely active foreground scroll container.
  *
  * Business rules:
- * - Only scrollable elements can become foreground roots because next-step filtering is currently
- *   used to choose better tap/scroll guidance around scrollable panels, sheets, and detail views.
+ * - Scrollable elements can become foreground roots. A top-level root with a sheet grabber
+ *   descendant can also become the root so flattened sheet controls are not assigned to background
+ *   scroll views by geometry overlap.
  * - A foreground root must contain at least one generic foreground cue:
  *   - dismiss/navigation-out control: back, cancel, close, done
  *   - text-entry control
@@ -309,6 +338,35 @@ function findStoredSnapshotRecords(params: {
  * - This does not yet rank competing foreground scroll views by identifier specificity or visible
  *   area. After filtering, scroll selection still chooses the first remaining scrollable element.
  */
+function findSheetGrabberDescendant(
+  root: RuntimeSnapshotElementRecord,
+  records: readonly RuntimeSnapshotElementRecord[],
+): RuntimeSnapshotElementRecord | null {
+  return (
+    records.find(
+      (candidate) =>
+        candidate !== root &&
+        compactTapNextStepText(candidate.publicElement.label).toLowerCase() === 'sheet grabber' &&
+        isSameOrDescendantPath(root.metadata.path, candidate.metadata.path),
+    ) ?? null
+  );
+}
+
+function isExpandableSheetGrabber(element: RuntimeElementV1): boolean {
+  if (compactTapNextStepText(element.label).toLowerCase() !== 'sheet grabber') {
+    return false;
+  }
+  const value = compactTapNextStepText(element.value);
+  return value.length > 0 && !SHEET_EXPANDED_VALUE_PATTERN.test(value);
+}
+
+function isExpandedSheetGrabber(element: RuntimeElementV1): boolean {
+  return (
+    compactTapNextStepText(element.label).toLowerCase() === 'sheet grabber' &&
+    SHEET_EXPANDED_VALUE_PATTERN.test(compactTapNextStepText(element.value))
+  );
+}
+
 function findActiveForegroundRoot(
   recordsByRef: Map<string, RuntimeSnapshotElementRecord>,
 ): RuntimeSnapshotElementRecord | null {
@@ -321,7 +379,8 @@ function findActiveForegroundRoot(
     if (cachedScore !== undefined) {
       return cachedScore;
     }
-    if (!isScrollableNextStepElement(record.publicElement)) {
+    const hasSheetGrabberDescendant = findSheetGrabberDescendant(record, records) !== null;
+    if (!isScrollableNextStepElement(record.publicElement) && !hasSheetGrabberDescendant) {
       scoreByRef.set(record.publicElement.ref, 0);
       return 0;
     }
@@ -351,6 +410,7 @@ function findActiveForegroundRoot(
     const identityPriority = Math.max(0, 2 - getScrollIdentityPriority(element));
     const verticalPriority = element.frame.height >= element.frame.width ? 1 : 0;
     const score =
+      (hasSheetGrabberDescendant ? 200 : 0) +
       (hasDismissControl ? 100 : 0) +
       (hasTextEntry ? 60 : 0) +
       (hasStateControls ? 30 : 0) +
@@ -384,19 +444,88 @@ function findActiveForegroundRoot(
  * - If no foreground root is detected, keep all elements rather than guessing; conservative output
  *   is better than hiding valid controls.
  */
+function findSheetForegroundStartIndex(
+  foregroundRoot: RuntimeSnapshotElementRecord,
+  records: readonly RuntimeSnapshotElementRecord[],
+  indexByRef: Map<string, number>,
+): number | null {
+  const grabber = findSheetGrabberDescendant(foregroundRoot, records);
+  return grabber ? (indexByRef.get(grabber.publicElement.ref) ?? null) : null;
+}
+
 function filterToForegroundElements(
   elements: RuntimeElementV1[],
   recordsByRef: Map<string, RuntimeSnapshotElementRecord>,
+  foregroundRoot: RuntimeSnapshotElementRecord | null,
 ): RuntimeElementV1[] {
-  const foregroundRoot = findActiveForegroundRoot(recordsByRef);
   if (!foregroundRoot) {
     return elements;
   }
 
+  const records = [...recordsByRef.values()];
+  const indexByRef = new Map(records.map((record, index) => [record.publicElement.ref, index]));
+  const sheetForegroundStartIndex = findSheetForegroundStartIndex(
+    foregroundRoot,
+    records,
+    indexByRef,
+  );
+
   return elements.filter((element) => {
     const record = recordsByRef.get(element.ref);
-    return record && isForegroundCandidateForRoot(foregroundRoot, record);
+    if (!record || !isForegroundCandidateForRoot(foregroundRoot, record)) {
+      return false;
+    }
+
+    const recordIndex = indexByRef.get(record.publicElement.ref) ?? -1;
+    return sheetForegroundStartIndex === null || recordIndex >= sheetForegroundStartIndex;
   });
+}
+
+function getRepeatedNoOpActionRef(params: {
+  runtimeSnapshot: RuntimeSnapshotV1;
+  actionContext?: RuntimeSnapshotNextStepActionContext;
+}): { tool: 'tap' | 'swipe' | 'drag'; ref: string } | null {
+  if (params.actionContext?.previousScreenHash !== params.runtimeSnapshot.screenHash) {
+    return null;
+  }
+
+  switch (params.actionContext.action.type) {
+    case 'tap':
+      return { tool: 'tap', ref: params.actionContext.action.elementRef };
+    case 'swipe':
+      return { tool: 'swipe', ref: params.actionContext.action.withinElementRef };
+    case 'drag':
+      return { tool: 'drag', ref: params.actionContext.action.elementRef };
+    default:
+      return null;
+  }
+}
+
+function hasIncompleteStateSignal(element: { label?: string; value?: string }): boolean {
+  const label = compactTapNextStepText(element.label).toLowerCase();
+  const value = compactTapNextStepText(element.value).toLowerCase();
+  return INCOMPLETE_STATE_NEXT_STEP_TEXT.has(label) || INCOMPLETE_STATE_NEXT_STEP_TEXT.has(value);
+}
+
+function findForegroundIncompleteCompletionTapElement(
+  elements: readonly RuntimeElementV1[],
+  repeatedNoOpAction: { tool: 'tap' | 'swipe' | 'drag'; ref: string } | null,
+): RuntimeElementV1 | null {
+  if (!elements.some(hasIncompleteStateSignal)) {
+    return null;
+  }
+
+  return (
+    elements.find(
+      (element) =>
+        element.actions.includes('tap') &&
+        !element.actions.includes('typeText') &&
+        !(repeatedNoOpAction?.tool === 'tap' && repeatedNoOpAction.ref === element.ref) &&
+        COMPLETION_ACTION_TAP_NEXT_STEP_LABELS.has(
+          compactTapNextStepText(element.label).toLowerCase(),
+        ),
+    ) ?? null
+  );
 }
 
 /**
@@ -410,26 +539,69 @@ function filterToForegroundElements(
  *   generic suggestions.
  * - Batch examples include multiple visible switches because settings screens often require several
  *   same-screen toggles and batch is the efficient, app-agnostic primitive for that workflow.
- * - Scroll examples prefer real list/scroll-view targets, then semantic inferred containers, with
+ * - Scroll examples prefer real list/scroll-view targets, then semantic containers, with
  *   application/window root scrolling used last as a fallback.
  * - Refresh/wait examples are included for fresh snapshot captures, but not after every action.
  */
+export function getForegroundCompletionSuppressedRuntimeTargetRefs(params: {
+  simulatorId: string;
+  runtimeSnapshot: RuntimeSnapshotV1;
+}): string[] {
+  const recordsByRef = findStoredSnapshotRecords(params);
+  const foregroundRoot = findActiveForegroundRoot(recordsByRef);
+  if (!foregroundRoot) {
+    return [];
+  }
+
+  const foregroundElements = filterToForegroundElements(
+    params.runtimeSnapshot.elements,
+    recordsByRef,
+    foregroundRoot,
+  );
+  const completionActionElement = findForegroundIncompleteCompletionTapElement(
+    foregroundElements,
+    null,
+  );
+  if (completionActionElement) {
+    return foregroundElements
+      .filter(
+        (element) =>
+          element.ref !== completionActionElement.ref && hasIncompleteStateSignal(element),
+      )
+      .map((element) => element.ref);
+  }
+
+  return [];
+}
+
 export function createRuntimeSnapshotNextSteps(params: {
   simulatorId: string;
   runtimeSnapshot: RuntimeSnapshotV1;
   includeRefreshAndWait: boolean;
+  actionContext?: RuntimeSnapshotNextStepActionContext;
 }): NextStep[] {
   const recordsByRef = findStoredSnapshotRecords(params);
+  const foregroundRoot = findActiveForegroundRoot(recordsByRef);
+  const records = [...recordsByRef.values()];
+  const foregroundSheetGrabber =
+    foregroundRoot !== null ? findSheetGrabberDescendant(foregroundRoot, records) : null;
   const nextStepElements = filterToForegroundElements(
     params.runtimeSnapshot.elements,
     recordsByRef,
+    foregroundRoot,
   );
+  const repeatedNoOpAction = getRepeatedNoOpActionRef(params);
+  const foregroundIncompleteCompletionTapElement =
+    foregroundRoot !== null
+      ? findForegroundIncompleteCompletionTapElement(nextStepElements, repeatedNoOpAction)
+      : null;
   const tapElements = nextStepElements
     .map((element, index) => ({ element, index }))
     .filter(
       ({ element }) =>
         element.actions.includes('tap') &&
         !element.actions.includes('typeText') &&
+        !(repeatedNoOpAction?.tool === 'tap' && repeatedNoOpAction.ref === element.ref) &&
         !isHiddenTapNextStepElement(element.label) &&
         !isStateChangingTapNextStepElement(element),
     )
@@ -439,7 +611,7 @@ export function createRuntimeSnapshotNextSteps(params: {
       return priorityDelta === 0 ? left.index - right.index : priorityDelta;
     })
     .map(({ element }) => element);
-  const tapElement = tapElements[0] ?? null;
+  const tapElement = foregroundIncompleteCompletionTapElement ?? tapElements[0] ?? null;
   const sameScreenBatchElements = tapElements.filter(
     (element) =>
       !isContentRichTapNextStepElement(element) &&
@@ -449,35 +621,95 @@ export function createRuntimeSnapshotNextSteps(params: {
   const switchBatchElements = nextStepElements.filter(
     (element) => element.role === 'switch' && element.actions.includes('tap'),
   );
-  const batchElements =
-    switchBatchElements.length >= 2 ? switchBatchElements : sameScreenBatchElements;
+  let batchElements = sameScreenBatchElements;
+  if (switchBatchElements.length >= 2) {
+    batchElements = switchBatchElements;
+  }
   const batchLabel =
     switchBatchElements.length >= 2 ? 'Batch visible switch toggles' : 'Batch same-screen taps';
   const scrollElement =
     nextStepElements
       .map((element, index) => ({ element, index }))
-      .filter(({ element }) => isScrollableNextStepElement(element))
+      .filter(
+        ({ element }) =>
+          isScrollableNextStepElement(element) &&
+          !(
+            (repeatedNoOpAction?.tool === 'swipe' || repeatedNoOpAction?.tool === 'drag') &&
+            repeatedNoOpAction.ref === element.ref
+          ),
+      )
       .sort((left, right) => compareScrollableNextStepCandidates(left, right, recordsByRef))[0]
       ?.element ?? null;
+  const expandSheetNextStep: NextStep | null =
+    foregroundSheetGrabber &&
+    isExpandableSheetGrabber(foregroundSheetGrabber.publicElement) &&
+    !(
+      repeatedNoOpAction?.tool === 'drag' &&
+      repeatedNoOpAction.ref === foregroundSheetGrabber.publicElement.ref
+    )
+      ? {
+          label: 'Expand foreground sheet',
+          tool: 'drag',
+          params: {
+            simulatorId: params.simulatorId,
+            elementRef: foregroundSheetGrabber.publicElement.ref,
+            direction: 'up',
+            distance: 0.35,
+            duration: 0.8,
+            steps: 80,
+            postDelay: 0.8,
+          },
+        }
+      : null;
+  const shouldDragSheetScroll =
+    expandSheetNextStep === null &&
+    foregroundSheetGrabber !== null &&
+    isExpandedSheetGrabber(foregroundSheetGrabber.publicElement) &&
+    scrollElement !== null &&
+    scrollElement.role !== 'application' &&
+    scrollElement.role !== 'window';
   const scrollNextStep: NextStep | null = scrollElement
-    ? {
-        label: 'Scroll visible content',
-        tool: 'swipe',
-        params: {
-          simulatorId: params.simulatorId,
-          withinElementRef: scrollElement.ref,
-          direction: 'up',
-          distance: 0.5,
-        },
-      }
+    ? shouldDragSheetScroll
+      ? {
+          label: 'Drag visible sheet content',
+          tool: 'drag',
+          params: {
+            simulatorId: params.simulatorId,
+            elementRef: scrollElement.ref,
+            direction: 'up',
+            distance: 0.7,
+            duration: 0.8,
+            steps: 80,
+            postDelay: 0.5,
+          },
+        }
+      : {
+          label: 'Scroll visible content',
+          tool: 'swipe',
+          params: {
+            simulatorId: params.simulatorId,
+            withinElementRef: scrollElement.ref,
+            direction: 'up',
+            distance: 0.5,
+          },
+        }
     : null;
   const shouldPrioritizeScroll =
     scrollNextStep !== null &&
     tapElement !== null &&
-    !batchElements.length &&
-    isScreenChangingTapNextStepElement(tapElement);
+    expandSheetNextStep === null &&
+    (shouldDragSheetScroll ||
+      (batchElements.length < 2 &&
+        (isScreenChangingTapNextStepElement(tapElement) ||
+          (!isContentRichTapNextStepElement(tapElement) &&
+            !isLowPriorityTapNextStepElement(tapElement.label)))));
+  const shouldShowBatch =
+    batchElements.length >= 2 && expandSheetNextStep === null && !shouldDragSheetScroll;
   const hasUsefulRuntimeGuidance =
-    batchElements.length >= 2 || scrollNextStep !== null || tapElement !== null;
+    shouldShowBatch ||
+    expandSheetNextStep !== null ||
+    scrollNextStep !== null ||
+    tapElement !== null;
   const screenshotNextStep: NextStep = {
     label: 'Take screenshot for verification',
     tool: 'screenshot',
@@ -499,7 +731,7 @@ export function createRuntimeSnapshotNextSteps(params: {
           },
         ]
       : []),
-    ...(batchElements.length >= 2
+    ...(shouldShowBatch
       ? [
           {
             label: batchLabel,
@@ -514,6 +746,7 @@ export function createRuntimeSnapshotNextSteps(params: {
           },
         ]
       : []),
+    ...(expandSheetNextStep ? [expandSheetNextStep] : []),
     ...(scrollNextStep && shouldPrioritizeScroll ? [scrollNextStep] : []),
     ...(tapElement
       ? [

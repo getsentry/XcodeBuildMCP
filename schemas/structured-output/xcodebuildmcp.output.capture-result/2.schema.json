@@ -148,6 +148,11 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "evidence": {
+          "description": "Non-actionable semantic evidence rows in role|label|value|identifier format. These rows intentionally omit element refs.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "udid": { "type": "string" }
       },
       "required": ["type", "rs", "screenHash", "seq", "count", "targets", "scroll", "udid"]
