@@ -746,6 +746,23 @@ function isDegenerateSwipe(from: Point, to: Point): boolean {
   return from.x === to.x && from.y === to.y;
 }
 
+function preservesRequestedDirection(
+  direction: RuntimeSwipeDirection,
+  from: Point,
+  to: Point,
+): boolean {
+  switch (direction) {
+    case 'up':
+      return to.y < from.y;
+    case 'down':
+      return to.y > from.y;
+    case 'left':
+      return to.x < from.x;
+    case 'right':
+      return to.x > from.x;
+  }
+}
+
 function getFrameCenter(frame: Frame): Point {
   return {
     x: Math.round(frame.x + frame.width / 2),
@@ -882,6 +899,13 @@ export function getRuntimeElementDirectionalDragPoints(
     return {
       ok: false,
       message: `Element ref '${element.publicElement.ref}' does not provide non-degenerate ${direction} drag points.`,
+    };
+  }
+
+  if (!preservesRequestedDirection(direction, from, to)) {
+    return {
+      ok: false,
+      message: `Element ref '${element.publicElement.ref}' cannot provide ${direction} drag points that preserve the requested direction within the viewport.`,
     };
   }
 

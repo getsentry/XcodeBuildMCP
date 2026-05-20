@@ -1085,6 +1085,51 @@ describe('runtime snapshot normalization', () => {
     });
   });
 
+  it('rejects directional drag points that reverse after viewport clamping', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          children: [
+            createNode({
+              type: 'Button',
+              role: 'AXButton',
+              AXLabel: 'Top edge control',
+              frame: { x: 40, y: 0, width: 80, height: 20 },
+            }),
+            createNode({
+              type: 'Button',
+              role: 'AXButton',
+              AXLabel: 'Left edge control',
+              frame: { x: 0, y: 100, width: 20, height: 80 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(
+      getRuntimeElementDirectionalDragPoints(
+        snapshot.elements[1]!,
+        'up',
+        0.35,
+        snapshot.elements[0]!.publicElement.frame,
+      ),
+    ).toMatchObject({ ok: false, message: expect.stringContaining('requested direction') });
+    expect(
+      getRuntimeElementDirectionalDragPoints(
+        snapshot.elements[2]!,
+        'left',
+        0.35,
+        snapshot.elements[0]!.publicElement.frame,
+      ),
+    ).toMatchObject({ ok: false, message: expect.stringContaining('requested direction') });
+  });
+
   it('keeps full-screen swipe points away from unsafe viewport edges', () => {
     const snapshot = createRuntimeSnapshotRecord({
       simulatorId,
