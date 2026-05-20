@@ -119,7 +119,9 @@ function deriveRole(
   if (/button/.test(roleText)) return 'button';
   if (/keyboard|key/.test(roleText)) return 'keyboard-key';
   if (
-    /textfield|text field|searchfield|search field|securetext|textarea|combo box/.test(roleText)
+    /textfield|text field|searchfield|search field|securetext|textarea|textview|text view|combo box/.test(
+      roleText,
+    )
   ) {
     return 'text-field';
   }

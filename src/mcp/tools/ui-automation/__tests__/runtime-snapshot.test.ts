@@ -95,6 +95,31 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
+  it('classifies text views as text-entry controls', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'XCUIElementTypeTextView',
+          role: 'XCUIElementTypeTextView',
+          AXLabel: 'Notes',
+          AXValue: 'Draft',
+          frame: { x: 20, y: 80, width: 240, height: 120 },
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'text-field',
+        label: 'Notes',
+        value: 'Draft',
+        actions: expect.arrayContaining(['tap', 'typeText']),
+      }),
+    );
+  });
+
   it('classifies context menu items as menu controls instead of text', () => {
     const snapshot = createRuntimeSnapshotRecord({
       simulatorId,
