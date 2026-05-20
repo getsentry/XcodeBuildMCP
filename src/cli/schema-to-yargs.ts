@@ -13,7 +13,8 @@ function coerceNumberArray(value: unknown): number[] {
     String(entry)
       .split(',')
       .map((item) => item.trim())
-      .map((item) => (item === '' ? Number.NaN : Number(item))),
+      .filter((item) => item !== '')
+      .map((item) => Number(item)),
   );
 }
 

@@ -37,6 +37,6 @@ describe('schemaToYargsOptions', () => {
     expect(coerce?.('23,18,14')).toEqual([23, 18, 14]);
     expect(coerce?.('23, 18, 14')).toEqual([23, 18, 14]);
     expect(coerce?.(['23', '18,14'])).toEqual([23, 18, 14]);
-    expect(coerce?.('23,')).toEqual([23, Number.NaN]);
+    expect(coerce?.('23,')).toEqual([23]);
   });
 });
