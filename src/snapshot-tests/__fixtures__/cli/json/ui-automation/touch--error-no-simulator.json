@@ -2,24 +2,23 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "2",
   "didError": true,
-  "error": "Failed to execute touch event.",
+  "error": "No runtime UI snapshot is available for this simulator.",
   "data": {
     "summary": {
       "status": "FAILED"
     },
     "action": {
-      "type": "touch"
+      "type": "touch",
+      "elementRef": "e3",
+      "event": "touch down+up"
     },
     "artifacts": {
       "simulatorId": "<UUID>"
     },
-    "diagnostics": {
-      "warnings": [],
-      "errors": [
-        {
-          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
-        }
-      ]
+    "uiError": {
+      "code": "SNAPSHOT_MISSING",
+      "message": "No runtime UI snapshot is available for this simulator.",
+      "recoveryHint": "Run snapshot_ui for this simulator, then retry with an elementRef from that snapshot."
     }
   }
 }

@@ -6,13 +6,20 @@ import {
   mockProcess,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler, key_sequenceLogic } from '../key_sequence.ts';
+import { schema, handler, key_sequenceLogic, createKeySequenceExecutor } from '../key_sequence.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import {
+  createMockAxeHelpers,
+  createTrackingExecutor,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
 describe('Key Sequence Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Schema Validation', () => {
@@ -72,7 +79,9 @@ describe('Key Sequence Tool', () => {
     it('should generate correct axe command for basic key sequence', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'key sequence completed',
@@ -110,7 +119,9 @@ describe('Key Sequence Tool', () => {
     it('should generate correct axe command for key sequence with delay', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'key sequence completed',
@@ -151,7 +162,9 @@ describe('Key Sequence Tool', () => {
     it('should generate correct axe command for single key in sequence', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'key sequence completed',
@@ -189,7 +202,9 @@ describe('Key Sequence Tool', () => {
     it('should generate correct axe command with bundled axe path', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'key sequence completed',
@@ -229,6 +244,17 @@ describe('Key Sequence Tool', () => {
   });
 
   describe('Handler Behavior (Complete Literal Returns)', () => {
+    it('captures a fresh runtime snapshot after a successful key sequence', async () => {
+      const { calls, executor } = createTrackingExecutor();
+      const executeKeySequence = createKeySequenceExecutor(executor, createMockAxeHelpers());
+
+      const result = await executeKeySequence({ simulatorId, keyCodes: [40, 42, 44] });
+
+      expect(result.didError).toBe(false);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.map((call) => call.command[1])).toEqual(['key-sequence', 'describe-ui']);
+    });
+
     it('should surface session default requirement when simulatorId is missing', async () => {
       const result = await callHandler(handler, { keyCodes: [40] });
 

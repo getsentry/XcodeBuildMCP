@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import * as z from 'zod';
 import {
   createMockExecutor,
@@ -9,8 +9,17 @@ import { schema, handler, buttonLogic, createButtonExecutor } from '../button.ts
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
 import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import {
+  createMockAxeHelpers,
+  createTrackingExecutor,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
 describe('Button Plugin', () => {
+  beforeEach(() => {
+    __resetRuntimeSnapshotStoreForTests();
+  });
   describe('Export Field Validation (Literal)', () => {
     it('should have handler function', () => {
       expect(typeof handler).toBe('function');
@@ -42,7 +51,9 @@ describe('Button Plugin', () => {
     it('should generate correct axe command for basic button press', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor: CommandExecutor = async (command) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return createMockCommandResponse({
           success: true,
           output: 'button press completed',
@@ -80,7 +91,9 @@ describe('Button Plugin', () => {
     it('should generate correct axe command for button press with duration', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor: CommandExecutor = async (command) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return createMockCommandResponse({
           success: true,
           output: 'button press completed',
@@ -121,7 +134,9 @@ describe('Button Plugin', () => {
     it('should generate correct axe command for different button types', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor: CommandExecutor = async (command) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return createMockCommandResponse({
           success: true,
           output: 'button press completed',
@@ -159,7 +174,9 @@ describe('Button Plugin', () => {
     it('should generate correct axe command with bundled axe path', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor: CommandExecutor = async (command) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return createMockCommandResponse({
           success: true,
           output: 'button press completed',
@@ -196,6 +213,17 @@ describe('Button Plugin', () => {
   });
 
   describe('Executor Behavior', () => {
+    it('captures a fresh runtime snapshot after a successful button press', async () => {
+      const { calls, executor } = createTrackingExecutor();
+      const executeButton = createButtonExecutor(executor, createMockAxeHelpers(), undefined, 0);
+
+      const result = await executeButton({ simulatorId, buttonType: 'home' });
+
+      expect(result.didError).toBe(false);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.map((call) => call.command[1])).toEqual(['button', 'describe-ui']);
+    });
+
     it('waits briefly after successful button presses so system UI transitions can settle', async () => {
       vi.useFakeTimers();
       try {

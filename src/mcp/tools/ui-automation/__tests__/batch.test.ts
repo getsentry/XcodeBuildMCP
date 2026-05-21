@@ -198,7 +198,7 @@ describe('Batch UI Automation Tool', () => {
   });
 
   describe('Runtime snapshot invalidation', () => {
-    it('preserves the cached runtime snapshot after a successful safe same-screen batch', async () => {
+    it('captures a fresh runtime snapshot after a successful switch batch', async () => {
       recordSnapshot([
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: '0' }),
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: 'off' }),
@@ -217,12 +217,12 @@ describe('Batch UI Automation Tool', () => {
       );
 
       expect(result.didError).toBe(false);
-      expect(result.capture).toBeUndefined();
-      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(false);
-      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(true);
+      expect(getRuntimeSnapshot(simulatorId)?.payload.seq).toBe(2);
     });
 
-    it('updates preserved switch state after a successful safe same-screen batch', async () => {
+    it('replaces cached switch state instead of patching it after a successful switch batch', async () => {
       recordSnapshot([
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: '0' }),
         createNode({ type: 'Switch', role: 'AXSwitch', AXValue: 'off' }),
@@ -244,17 +244,10 @@ describe('Batch UI Automation Tool', () => {
 
       expect(result.didError).toBe(false);
       const snapshot = getRuntimeSnapshot(simulatorId);
+      expect(snapshot?.payload.elements).toHaveLength(1);
       expect(snapshot?.payload.elements[0]).toMatchObject({
-        value: '1',
-        state: expect.objectContaining({ selected: true }),
-      });
-      expect(snapshot?.payload.elements[1]).toMatchObject({
-        value: 'on',
-        state: expect.objectContaining({ selected: true }),
-      });
-      expect(snapshot?.payload.elements[2]).toMatchObject({
-        value: 'selected',
-        state: expect.objectContaining({ selected: true }),
+        role: 'button',
+        label: 'Continue',
       });
     });
 

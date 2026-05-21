@@ -14,6 +14,7 @@
 
 ### Changed
 
+- Successful mutating UI automation calls now always attempt to refresh the runtime snapshot after the action instead of preserving or patching cached switch state.
 - Runtime snapshot guidance no longer advertises synthetic sheet swipe targets for foreground sheets. Agents should use real sheet grabber expansion and real descendant scroll/list targets with `drag` instead of inferred app/window-root sheet swipes.
 
 ### Fixed

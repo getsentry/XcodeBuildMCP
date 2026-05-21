@@ -72,7 +72,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
         const { text, isError } = await harness.invoke('ui-automation', 'tap', {
           simulatorId: simulatorUdid,
-          elementRef: 'e3',
+          elementRef: 'e14',
         });
         expect(isError).toBe(false);
         expectFixture(text, 'tap--success');
@@ -141,11 +141,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
     });
 
     describe('swipe', () => {
-      const swipeSuccessTest = runtime === 'cli/json' ? it.skip : it;
-
-      // CLI JSON has a stale success fixture for the former coordinate-based swipe contract.
-      // Keep this explicit until that runtime is re-baselined instead of silently passing.
-      swipeSuccessTest('success', async () => {
+      it('success', async () => {
         const scrollRef = await captureFirstScrollRef('com.apple.Preferences');
         expect(scrollRef).not.toBeNull();
 

@@ -67,62 +67,6 @@ type BatchResult = UiActionResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
 
-function compactBatchElementValue(value: string | undefined): string {
-  return value?.trim().toLowerCase() ?? '';
-}
-
-function isSafeSameScreenBatchElement(element: {
-  role?: string;
-  state?: { selected?: boolean };
-  value?: string;
-}): boolean {
-  const value = compactBatchElementValue(element.value);
-  const isAlreadyActive =
-    element.state?.selected === true || value === 'selected' || value === '1' || value === 'on';
-  if (isAlreadyActive || element.role === 'tab') {
-    return false;
-  }
-
-  if (element.role !== 'switch') {
-    return false;
-  }
-
-  return (
-    element.state?.selected === false ||
-    value === 'not selected' ||
-    value === '0' ||
-    value === 'off'
-  );
-}
-
-function markSwitchValueActivated(value: string | undefined): string | undefined {
-  const compactValue = compactBatchElementValue(value);
-  if (compactValue === '0') {
-    return '1';
-  }
-  if (compactValue === 'off') {
-    return 'on';
-  }
-  if (compactValue === 'not selected') {
-    return 'selected';
-  }
-  return value;
-}
-
-function markSafeBatchSwitchesActivated(params: BatchParams): void {
-  for (const step of params.steps) {
-    const resolution = resolveElementRef(params.simulatorId, step.elementRef, 'tap');
-    if (!resolution.ok || resolution.element.publicElement.role !== 'switch') {
-      continue;
-    }
-
-    const nextState = { ...resolution.element.publicElement.state, selected: true };
-    const nextValue = markSwitchValueActivated(resolution.element.publicElement.value);
-    resolution.element.publicElement.state = nextState;
-    resolution.element.publicElement.value = nextValue;
-  }
-}
-
 function buildBatchCommandArgs(params: BatchParams, resolvedSteps: readonly string[]): string[] {
   const commandArgs = ['batch'];
   for (const step of resolvedSteps) {
@@ -144,12 +88,10 @@ function resolveBatchSteps(params: BatchParams):
   | {
       ok: true;
       steps: string[];
-      preserveSnapshot: boolean;
       previousRuntimeSnapshot: RuntimeSnapshotV1;
     }
   | { ok: false; result: BatchResult } {
   const resolvedSteps: string[] = [];
-  let preserveSnapshot = true;
   let previousRuntimeSnapshot: RuntimeSnapshotV1 | null = null;
 
   for (const step of params.steps) {
@@ -169,7 +111,6 @@ function resolveBatchSteps(params: BatchParams):
     previousRuntimeSnapshot ??= resolution.snapshot.payload;
 
     const usesTouchActivation = resolution.element.publicElement.role === 'switch';
-    preserveSnapshot &&= isSafeSameScreenBatchElement(resolution.element.publicElement);
     if (usesTouchActivation && (step.preDelay !== undefined || step.postDelay !== undefined)) {
       const message =
         'preDelay and postDelay are not supported for switch elementRefs because switches execute as touch down/up batch steps.';
@@ -213,7 +154,7 @@ function resolveBatchSteps(params: BatchParams):
     throw new Error('Batch step resolution succeeded without a runtime snapshot.');
   }
 
-  return { ok: true, steps: resolvedSteps, preserveSnapshot, previousRuntimeSnapshot };
+  return { ok: true, steps: resolvedSteps, previousRuntimeSnapshot };
 }
 
 export function createBatchExecutor(
@@ -245,11 +186,7 @@ export function createBatchExecutor(
 
     try {
       await executeAxeCommand(commandArgs, simulatorId, 'batch', executor, axeHelpers);
-      if (resolvedSteps.preserveSnapshot) {
-        markSafeBatchSwitchesActivated(params);
-      } else {
-        clearRuntimeSnapshot(simulatorId);
-      }
+      clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
@@ -265,12 +202,6 @@ export function createBatchExecutor(
           code: 'ACTION_FAILED',
           message: failure.message,
         }),
-      });
-    }
-
-    if (resolvedSteps.preserveSnapshot) {
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], {
-        previousRuntimeSnapshot: resolvedSteps.previousRuntimeSnapshot,
       });
     }
 

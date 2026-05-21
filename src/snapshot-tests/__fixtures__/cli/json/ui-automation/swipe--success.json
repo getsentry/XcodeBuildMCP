@@ -9,25 +9,64 @@
     },
     "action": {
       "type": "swipe",
+      "withinElementRef": "e1",
+      "direction": "up",
       "from": {
-        "x": 200,
-        "y": 400
+        "x": 201,
+        "y": 743
       },
       "to": {
-        "x": 200,
-        "y": 200
+        "x": 201,
+        "y": 131
       }
     },
     "artifacts": {
       "simulatorId": "<UUID>"
     },
-    "diagnostics": {
-      "warnings": [
-        {
-          "message": "snapshot_ui has not been called yet. Consider using snapshot_ui for precise coordinates instead of guessing from screenshots."
-        }
+    "capture": {
+      "type": "runtime-snapshot",
+      "rs": "1",
+      "screenHash": "<SCREEN_HASH>",
+      "seq": 1,
+      "count": 144,
+      "targets": [
+        "e48|tap|button|Home Screen & App Library||com.apple.settings.homeScreen",
+        "e139|typeText|text-field||Search|",
+        "e40|tap|button|Camera||com.apple.settings.camera",
+        "e56|tap|button|Search||com.apple.settings.search",
+        "e64|tap|button|StandBy||com.apple.settings.standBy",
+        "e73|tap|button|Screen Time||com.apple.settings.screenTime",
+        "e81|tap|button|Passcode||com.apple.settings.passcodeAndBiometrics",
+        "e88|tap|button|Privacy & Security||com.apple.settings.privacyAndSecurity",
+        "e97|tap|button|Game Center||com.apple.settings.gameCenter",
+        "e104|tap|button|iCloud||com.apple.settings.iCloud",
+        "e113|tap|button|Apps||com.apple.settings.apps",
+        "e121|tap|button|Developer||com.apple.settings.developer",
+        "e140|tap|button|Dictate||Dictate",
+        "e142|tap|button|Dictate||Dictate"
       ],
-      "errors": []
+      "scroll": [
+        "e1|swipe|application|Settings||"
+      ],
+      "text": [
+        "e42|text|text|Camera||",
+        "e50|text|text|Home Screen & App Library||",
+        "e58|text|text|Search||",
+        "e66|text|text|StandBy||",
+        "e75|text|text|Screen Time||",
+        "e83|text|text|Passcode||",
+        "e90|text|text|Privacy & Security||",
+        "e99|text|text|Game Center||",
+        "e106|text|text|iCloud||",
+        "e115|text|text|Apps||",
+        "e123|text|text|Developer||"
+      ],
+      "udid": "<UUID>"
     }
-  }
+  },
+  "nextSteps": [
+    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"e40\"},{\"action\":\"tap\",\"elementRef\":\"e56\"}]}'",
+    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e48",
+    "Scroll visible content: xcodebuildmcp ui-automation swipe --simulator-id <UUID> --within-element-ref e1 --direction up --distance 0.5"
+  ]
 }

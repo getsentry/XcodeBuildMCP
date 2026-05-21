@@ -3,7 +3,10 @@ import * as z from 'zod';
 import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
-import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import {
+  __resetRuntimeSnapshotStoreForTests,
+  getRuntimeSnapshot,
+} from '../shared/snapshot-ui-state.ts';
 import { schema, handler, touchLogic } from '../touch.ts';
 import {
   createFailingExecutor,
@@ -74,6 +77,9 @@ describe('Touch Plugin', () => {
         '--udid',
         simulatorId,
       ]);
+      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(true);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
     it('touches up at the referenced element center', async () => {

@@ -19,6 +19,7 @@ import {
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -82,7 +83,20 @@ export function createKeySequenceExecutor(
       await executeAxeCommand(commandArgs, simulatorId, 'key-sequence', executor, axeHelpers);
       clearRuntimeSnapshot(simulatorId);
       log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     } catch (error) {
       if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
         clearRuntimeSnapshot(simulatorId);

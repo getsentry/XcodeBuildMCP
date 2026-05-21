@@ -4,4 +4,5 @@
 ✅ Touch event (touch down+up) on elementRef e3 executed successfully.
 
 Next steps:
-1. Refresh after UI action: snapshot_ui({ simulatorId: "<UUID>" })
+1. Batch same-screen taps: batch({ simulatorId: "<UUID>", steps: [{"action":"tap","elementRef":"e14"},{"action":"tap","elementRef":"e15"}] })
+2. Tap an elementRef: tap({ simulatorId: "<UUID>", elementRef: "e14" })

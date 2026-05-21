@@ -80,17 +80,19 @@ describe('MCP Discovery (e2e)', () => {
   it('representative native tools advertise self-contained output schemas', async () => {
     const result = await harness.client.listTools();
     const expectedSchemas = new Map([
-      ['list_sims', 'xcodebuildmcp.output.simulator-list'],
-      ['build_sim', 'xcodebuildmcp.output.build-result'],
-      ['session_show_defaults', 'xcodebuildmcp.output.session-defaults'],
-      ['show_build_settings', 'xcodebuildmcp.output.build-settings'],
+      ['list_sims', { schema: 'xcodebuildmcp.output.simulator-list', version: '2' }],
+      ['build_sim', { schema: 'xcodebuildmcp.output.build-result', version: '2' }],
+      ['session_show_defaults', { schema: 'xcodebuildmcp.output.session-defaults', version: '2' }],
+      ['show_build_settings', { schema: 'xcodebuildmcp.output.build-settings', version: '2' }],
     ]);
 
-    for (const [toolName, schemaName] of expectedSchemas) {
+    for (const [toolName, schemaInfo] of expectedSchemas) {
       const tool = result.tools.find((candidate) => candidate.name === toolName);
       expect(tool).toBeDefined();
       expectSelfContainedOutputSchema(tool!.outputSchema);
-      expect(tool!.outputSchema).toEqual(expectedRegistrationSchema(schemaName));
+      expect(tool!.outputSchema).toEqual(
+        expectedRegistrationSchema(schemaInfo.schema, schemaInfo.version),
+      );
     }
 
     const listSims = result.tools.find((tool) => tool.name === 'list_sims');

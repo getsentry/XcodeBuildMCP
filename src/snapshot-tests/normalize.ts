@@ -72,6 +72,7 @@ const XCODE_IDE_ARTIFACT_HASH_REGEX =
   /(\/state\/xcode-ide\/call-tool\/[^/\n]+\/[^/\n]+-)[0-9a-f]{8}(?=\.json)/g;
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
+const UI_SNAPSHOT_TIME_TEXT_ROW_REGEX = /\be\d+\|text\|text\|\d{1,2}:\d{2}\|\|/g;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
 const SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX =
@@ -241,6 +242,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(BUILD_SETTINGS_PATH_REGEX, '$1<PATH>');
   normalized = normalized.replace(CODEX_ARG0_PATH_REGEX, '<HOME>/.codex/tmp/arg0/codex-arg0<ARG0>');
   normalized = normalized.replace(ACQUIRED_USAGE_ASSERTION_TIME_REGEX, '$1<TIME>$2');
+  normalized = normalized.replace(UI_SNAPSHOT_TIME_TEXT_ROW_REGEX, 'e<TIME>|text|text|<TIME>||');
   normalized = normalized.replace(
     CODEX_WORKTREE_NODE_MODULES_REGEX,
     '<HOME>/.codex/worktrees/<WORKTREE>/node_modules/.bin',
@@ -301,7 +303,7 @@ export function normalizeSnapshotOutput(text: string): string {
     '  selectedXcode: <XCODE_PATH>',
   );
   normalized = normalized.replace(/  xcrunVersion: xcrun version .+/g, '  xcrunVersion: <VERSION>');
-  normalized = normalized.replace(/  axe: v?[\d.]+[^\n]*/g, '  axe: <VERSION>');
+  normalized = normalized.replace(/  axe: .+/g, '  axe: <VERSION>');
   normalized = normalized.replace(/  mise: v?[\d.]+[^\n]*/g, '  mise: <VERSION>');
   normalized = normalized.replace(
     /  mcpbridge path: \/Applications\/Xcode[^\n]+/g,

@@ -324,7 +324,7 @@ describe('MCP UI Automation Tools (e2e)', () => {
 
       const result = await harness.client.callTool({
         name: 'tap',
-        arguments: { x: 100, y: 200 },
+        arguments: { elementRef: 'e1' },
       });
 
       expect(isErrorResponse(result)).toBe(true);
