@@ -670,32 +670,35 @@ export function createRuntimeSnapshotNextSteps(params: {
     scrollElement !== null &&
     scrollElement.role !== 'application' &&
     scrollElement.role !== 'window';
-  const scrollNextStep: NextStep | null = scrollElement
-    ? shouldDragSheetScroll
-      ? {
-          label: 'Drag visible sheet content',
-          tool: 'drag',
-          params: {
-            simulatorId: params.simulatorId,
-            elementRef: scrollElement.ref,
-            direction: 'up',
-            distance: 0.7,
-            duration: 0.8,
-            steps: 80,
-            postDelay: 0.5,
-          },
-        }
-      : {
-          label: 'Scroll visible content',
-          tool: 'swipe',
-          params: {
-            simulatorId: params.simulatorId,
-            withinElementRef: scrollElement.ref,
-            direction: 'up',
-            distance: 0.5,
-          },
-        }
-    : null;
+  let scrollNextStep: NextStep | null = null;
+  if (scrollElement !== null) {
+    if (shouldDragSheetScroll) {
+      scrollNextStep = {
+        label: 'Drag visible sheet content',
+        tool: 'drag',
+        params: {
+          simulatorId: params.simulatorId,
+          elementRef: scrollElement.ref,
+          direction: 'up',
+          distance: 0.7,
+          duration: 0.8,
+          steps: 80,
+          postDelay: 0.5,
+        },
+      };
+    } else {
+      scrollNextStep = {
+        label: 'Scroll visible content',
+        tool: 'swipe',
+        params: {
+          simulatorId: params.simulatorId,
+          withinElementRef: scrollElement.ref,
+          direction: 'up',
+          distance: 0.5,
+        },
+      };
+    }
+  }
   const shouldPrioritizeScroll =
     scrollNextStep !== null &&
     tapElement !== null &&
