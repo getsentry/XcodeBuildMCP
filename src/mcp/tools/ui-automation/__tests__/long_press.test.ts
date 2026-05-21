@@ -40,6 +40,7 @@ describe('Long Press Plugin', () => {
 
       const schemaObject = z.object(schema);
       expect(schemaObject.safeParse({ elementRef: 'e1', duration: 1500 }).success).toBe(true);
+      expect(schemaObject.safeParse({ elementRef: 'e1', duration: 1500.5 }).success).toBe(false);
       expect(schemaObject.safeParse({ elementRef: 'e1', duration: 0 }).success).toBe(false);
       expect(schemaObject.safeParse({ elementRef: 'e1', duration: 10_001 }).success).toBe(false);
       expect(schemaObject.safeParse({ duration: 1500 }).success).toBe(false);

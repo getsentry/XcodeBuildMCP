@@ -32,6 +32,7 @@ const buttonSchema = z.object({
   duration: z
     .number()
     .min(0, { message: 'Duration must be non-negative' })
+    .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });

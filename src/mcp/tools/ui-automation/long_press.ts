@@ -38,6 +38,7 @@ const longPressSchema = z.object({
   elementRef: z.string().min(1, { message: 'elementRef must be non-empty' }),
   duration: z
     .number()
+    .int({ message: 'Duration must be an integer number of milliseconds' })
     .positive({ message: 'Duration must be greater than 0 milliseconds' })
     .max(10_000, { message: 'Duration must be at most 10000 milliseconds' })
     .describe('milliseconds'),

@@ -24,7 +24,8 @@ describe('Button Plugin', () => {
       expect(schemaObj.safeParse({ buttonType: 'invalid-button' }).success).toBe(false);
       expect(schemaObj.safeParse({ buttonType: 'home', duration: -1 }).success).toBe(false);
       expect(schemaObj.safeParse({ buttonType: 'home', duration: 0 }).success).toBe(true);
-      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10.1 }).success).toBe(true);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10 }).success).toBe(true);
+      expect(schemaObj.safeParse({ buttonType: 'home', duration: 10.1 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',
