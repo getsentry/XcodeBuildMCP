@@ -796,7 +796,10 @@ function createLaunchResultItems(
 ): TextRenderableItem[] {
   const isSimulator = typeof result.artifacts.simulatorId === 'string';
   const isDevice = typeof result.artifacts.deviceId === 'string';
-  const isMac = !isSimulator && !isDevice;
+  const isMac =
+    !isSimulator &&
+    !isDevice &&
+    (!result.didError || result.error === 'Failed to launch macOS app.');
   const title = isMac ? 'Launch macOS App' : 'Launch App';
   const params: HeaderRenderItem['params'] = [];
 
@@ -815,7 +818,9 @@ function createLaunchResultItems(
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
   } else {
-    params.push({ label: 'Simulator', value: result.artifacts.simulatorId! });
+    if (result.artifacts.simulatorId) {
+      params.push({ label: 'Simulator', value: result.artifacts.simulatorId });
+    }
     if (result.artifacts.bundleId) {
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
@@ -1603,7 +1608,8 @@ function createCaptureResultItems(
     items.push(createSection('Accessibility Hierarchy', ['```json', ...uiHierarchyLines, '```']));
     items.push(
       createSection('Tips', [
-        '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
+        '- Prefer runtime snapshot refs from snapshot_ui or wait_for_ui for UI actions',
+        '- Avoid guessing frame coordinates from screenshots or raw accessibility output',
         '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
         '- Screenshots are for visual verification only',
       ]),
