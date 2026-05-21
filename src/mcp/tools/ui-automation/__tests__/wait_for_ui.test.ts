@@ -249,7 +249,8 @@ describe('Wait for UI Plugin', () => {
   });
 
   it('converts elementRef to identifier before polling', async () => {
-    recordSnapshot([createNode({ AXUniqueId: 'continue-button', AXLabel: 'Continue' })], 0);
+    const nowMs = Date.now();
+    recordSnapshot([createNode({ AXUniqueId: 'continue-button', AXLabel: 'Continue' })], nowMs);
     const { calls, executor } = createSequencedExecutor([
       {
         success: true,
@@ -262,6 +263,7 @@ describe('Wait for UI Plugin', () => {
     const result = await runWaitForUi(
       { simulatorId, predicate: 'exists', elementRef: 'e1', timeoutMs: 0 },
       executor,
+      createTiming(nowMs).timing,
     );
 
     expect(result.didError).toBe(false);
@@ -275,7 +277,7 @@ describe('Wait for UI Plugin', () => {
       }),
     );
     expect(calls[0]?.command).toEqual(['/mocked/axe/path', 'describe-ui', '--udid', simulatorId]);
-    expect(getRuntimeSnapshot(simulatorId, 0)?.payload).toBe(result.capture);
+    expect(getRuntimeSnapshot(simulatorId, nowMs)?.payload).toBe(result.capture);
   });
 
   it('converts elementRef to label plus role when no identifier exists', async () => {
@@ -570,6 +572,7 @@ describe('Wait for UI Plugin', () => {
   });
 
   it('times out with latest snapshot and candidates for unresolved enabled state', async () => {
+    const nowMs = Date.now();
     const { executor } = createSequencedExecutor([
       {
         success: true,
@@ -580,6 +583,7 @@ describe('Wait for UI Plugin', () => {
     const result = await runWaitForUi(
       { simulatorId, predicate: 'enabled', identifier: 'login-button', timeoutMs: 0 },
       executor,
+      createTiming(nowMs).timing,
     );
 
     expect(result.didError).toBe(true);
@@ -589,7 +593,7 @@ describe('Wait for UI Plugin', () => {
       candidates: [expect.objectContaining({ identifier: 'login-button' })],
     });
     expect(result.capture).toEqual(expect.objectContaining({ type: 'runtime-snapshot' }));
-    expect(getRuntimeSnapshot(simulatorId, 0)?.payload).toBe(result.capture);
+    expect(getRuntimeSnapshot(simulatorId, nowMs)?.payload).toBe(result.capture);
   });
 
   it('includes empty candidates and exact-match guidance for selector timeouts with zero matches', async () => {
@@ -832,12 +836,14 @@ describe('Wait for UI Plugin', () => {
   });
 
   it('records empty UI payloads and times out with empty candidates', async () => {
-    recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], 0);
+    const nowMs = Date.now();
+    recordSnapshot([createNode({ AXUniqueId: 'stale-button' })], nowMs);
     const { executor } = createSequencedExecutor([{ success: true, output: '[]' }]);
 
     const result = await runWaitForUi(
       { simulatorId, predicate: 'exists', label: 'Ready', timeoutMs: 0 },
       executor,
+      createTiming(nowMs).timing,
     );
 
     expect(result.didError).toBe(true);
@@ -849,7 +855,7 @@ describe('Wait for UI Plugin', () => {
         actions: [],
       }),
     );
-    expect(getRuntimeSnapshot(simulatorId, 0)?.payload).toBe(result.capture);
+    expect(getRuntimeSnapshot(simulatorId, nowMs)?.payload).toBe(result.capture);
   });
 
   it('succeeds for gone when an empty UI payload has no matching elements', async () => {
