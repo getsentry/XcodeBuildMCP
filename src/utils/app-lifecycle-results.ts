@@ -15,6 +15,8 @@ export type LaunchResultArtifacts = LaunchResultDomainResult['artifacts'];
 export type StopResultArtifacts = StopResultDomainResult['artifacts'];
 export type StopResultDiagnosticMessage = StopResultDomainResult['diagnostics']['errors'][number];
 
+type LaunchFailureTarget = 'simulator' | 'device' | 'macos';
+
 function stripKnownPrefix(message: string, prefixes: readonly string[]): string {
   for (const prefix of prefixes) {
     if (message.startsWith(prefix)) {
@@ -24,7 +26,11 @@ function stripKnownPrefix(message: string, prefixes: readonly string[]): string 
   return message;
 }
 
-function isMacLaunch(artifacts: LaunchResultArtifacts): boolean {
+function isMacLaunch(artifacts: LaunchResultArtifacts, target?: LaunchFailureTarget): boolean {
+  if (target) {
+    return target === 'macos';
+  }
+
   return !('simulatorId' in artifacts) && !('deviceId' in artifacts);
 }
 
@@ -88,6 +94,7 @@ export function buildLaunchSuccess(artifacts: LaunchResultArtifacts): LaunchResu
 export function buildLaunchFailure(
   artifacts: LaunchResultArtifacts,
   message: string,
+  options: { target?: LaunchFailureTarget } = {},
 ): LaunchResultDomainResult {
   const diagnosticMessage = stripKnownPrefix(message, [
     'Failed to launch app:',
@@ -99,7 +106,9 @@ export function buildLaunchFailure(
   return {
     kind: 'launch-result',
     didError: true,
-    error: isMacLaunch(artifacts) ? 'Failed to launch macOS app.' : 'Failed to launch app.',
+    error: isMacLaunch(artifacts, options.target)
+      ? 'Failed to launch macOS app.'
+      : 'Failed to launch app.',
     summary: { status: 'FAILED' },
     artifacts,
     diagnostics: createBasicDiagnostics({ errors: [diagnosticMessage] }),

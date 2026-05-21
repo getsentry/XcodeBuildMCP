@@ -74,6 +74,7 @@ export async function launch_app_simLogic(
     const result = buildLaunchFailure(
       { bundleId: params.bundleId },
       `Failed to resolve simulator: ${simulatorResult.error ?? 'No simulator UUID returned'}`,
+      { target: 'simulator' },
     );
     setLaunchResultStructuredOutput(ctx, result);
     log('error', `Error during launch app in simulator operation: ${result.error}`);

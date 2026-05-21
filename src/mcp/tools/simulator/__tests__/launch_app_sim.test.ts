@@ -187,6 +187,37 @@ describe('launch_app_sim tool', () => {
       });
     });
 
+    it('should report simulatorName resolution failures as simulator launch failures', async () => {
+      const executorCalls: string[][] = [];
+      const unavailableSimulatorsJson = JSON.stringify({ devices: { 'iOS 26.0': [] } });
+      const simulatorListExecutor = async (command: string[]) => {
+        executorCalls.push(command);
+        return createMockCommandResponse({ success: true, output: unavailableSimulatorsJson });
+      };
+      const unexpectedLauncher: SimulatorLauncher = async () => {
+        throw new Error('launch should not run when simulator resolution fails');
+      };
+
+      const result = await runLogic(() =>
+        launch_app_simLogic(
+          {
+            simulatorName: 'Missing Phone',
+            bundleId: 'io.sentry.testapp',
+          },
+          simulatorListExecutor,
+          unexpectedLauncher,
+        ),
+      );
+
+      const text = result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+      expect(result.isError).toBe(true);
+      expect(text).toContain('Launch App');
+      expect(text).not.toContain('Launch macOS App');
+      expect(text).toContain('Failed to launch app');
+      expect(text).toContain('Failed to resolve simulator');
+      expect(executorCalls).toEqual([['xcrun', 'simctl', 'list', 'devices', 'available', '-j']]);
+    });
+
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {
       const installCheckExecutor = async () => ({
         success: true,
