@@ -351,6 +351,26 @@ describe('Swipe Tool', () => {
       expect(result.content[0].text).toContain('simulatorId is required');
     });
 
+    it('returns migration guidance for removed coordinate parameters', async () => {
+      sessionStore.setDefaults({ simulatorId });
+
+      const result = await callHandler(handler, {
+        x1: 50,
+        y1: 100,
+        x2: 50,
+        y2: 500,
+        delta: 10,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Coordinate-based swipe parameters');
+      expect(result.content[0].text).toContain('snapshot_ui');
+      expect(result.content[0].text).toContain('withinElementRef');
+      expect(result.content[0].text).toContain('direction');
+      expect(result.content[0].text).toContain('gesture presets');
+      expect(result.content[0].text).toContain('x1, y1, x2, y2, delta');
+    });
+
     it('returns ACTION_FAILED when AXe fails after ref resolution', async () => {
       recordSnapshot([createNode({ type: 'ScrollView', role: 'AXScrollArea' })]);
 

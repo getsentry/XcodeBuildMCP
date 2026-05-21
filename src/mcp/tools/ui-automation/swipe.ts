@@ -34,7 +34,7 @@ import {
   shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
-const swipeSchema = z.object({
+const swipeParamsSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
   withinElementRef: z.string().min(1, { message: 'withinElementRef must be non-empty' }),
   direction: z.enum(['up', 'down', 'left', 'right']).describe('up|down|left|right'),
@@ -63,10 +63,53 @@ const swipeSchema = z.object({
     .describe('seconds'),
 });
 
-export type SwipeParams = z.infer<typeof swipeSchema>;
+const legacySwipeCoordinateFields = ['x1', 'y1', 'x2', 'y2', 'delta'] as const;
+const swipeCoordinateMigrationMessage =
+  'Coordinate-based swipe parameters x1, y1, x2, y2, and delta were removed. Run snapshot_ui, then call swipe with withinElementRef and direction, or use gesture presets for screen and edge gestures.';
+
+const swipeValidationSchema = swipeParamsSchema
+  .partial({ withinElementRef: true, direction: true })
+  .extend({
+    x1: z.unknown().optional(),
+    y1: z.unknown().optional(),
+    x2: z.unknown().optional(),
+    y2: z.unknown().optional(),
+    delta: z.unknown().optional(),
+  })
+  .superRefine((params, ctx) => {
+    const suppliedLegacyFields = legacySwipeCoordinateFields.filter((field) =>
+      Object.prototype.hasOwnProperty.call(params, field),
+    );
+    if (suppliedLegacyFields.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${swipeCoordinateMigrationMessage} Supplied legacy fields: ${suppliedLegacyFields.join(', ')}.`,
+      });
+      return;
+    }
+
+    if (params.withinElementRef === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['withinElementRef'],
+        message: 'Invalid input: expected string, received undefined',
+      });
+    }
+    if (params.direction === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['direction'],
+        message: 'Invalid option: expected one of "up"|"down"|"left"|"right"',
+      });
+    }
+  });
+
+export type SwipeParams = z.infer<typeof swipeParamsSchema>;
 type SwipeResult = UiActionResultDomainResult;
 
-const publicSchemaObject = z.strictObject(swipeSchema.omit({ simulatorId: true } as const).shape);
+const publicSchemaObject = z.strictObject(
+  swipeParamsSchema.omit({ simulatorId: true } as const).shape,
+);
 
 const LOG_PREFIX = '[AXe]';
 
@@ -203,11 +246,11 @@ export async function swipeLogic(
 
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,
-  legacy: swipeSchema,
+  legacy: swipeParamsSchema,
 });
 
 export const handler = createSessionAwareTool<SwipeParams>({
-  internalSchema: toInternalSchema<SwipeParams>(swipeSchema),
+  internalSchema: toInternalSchema<SwipeParams>(swipeValidationSchema),
   logicFunction: (params: SwipeParams, executor: CommandExecutor) =>
     swipeLogic(params, executor, defaultAxeHelpers),
   getExecutor: getDefaultCommandExecutor,

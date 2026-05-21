@@ -17,7 +17,7 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import { clearRuntimeSnapshot, resolveElementRefForAnyAction } from './shared/snapshot-ui-state.ts';
 import {
   getRuntimeElementDirectionalDragPoints,
   getRuntimeElementCenter,
@@ -87,8 +87,18 @@ const publicSchemaObject = z.strictObject(dragSchema.omit({ simulatorId: true } 
 
 const LOG_PREFIX = '[AXe]';
 
-function usesWithinElementDragPoints(role: string | undefined): boolean {
+function prefersWithinElementDragPoints(role: string | undefined): boolean {
   return role === 'application' || role === 'window' || role === 'scroll-view' || role === 'list';
+}
+
+function shouldUseWithinElementDragPoints(
+  actions: readonly string[],
+  role: string | undefined,
+): boolean {
+  return (
+    actions.includes('swipeWithin') &&
+    (!actions.includes('touch') || prefersWithinElementDragPoints(role))
+  );
 }
 
 export function createDragExecutor(
@@ -108,7 +118,10 @@ export function createDragExecutor(
       ...(steps !== undefined ? { steps } : {}),
     };
 
-    const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
+    const resolution = resolveElementRefForAnyAction(simulatorId, elementRef, [
+      'touch',
+      'swipeWithin',
+    ]);
     if (!resolution.ok) {
       return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
         uiError: resolution.error,
@@ -116,17 +129,15 @@ export function createDragExecutor(
     }
 
     const viewportFrame = resolution.snapshot.elements[0]?.publicElement.frame;
-    const { role } = resolution.element.publicElement;
-    const points =
-      resolution.element.publicElement.actions.includes('swipeWithin') &&
-      usesWithinElementDragPoints(role)
-        ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
-        : getRuntimeElementDirectionalDragPoints(
-            resolution.element,
-            direction,
-            distance,
-            viewportFrame,
-          );
+    const { actions, role } = resolution.element.publicElement;
+    const points = shouldUseWithinElementDragPoints(actions, role)
+      ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
+      : getRuntimeElementDirectionalDragPoints(
+          resolution.element,
+          direction,
+          distance,
+          viewportFrame,
+        );
     if (!points.ok) {
       const uiError = createUiAutomationRecoverableError({
         code: 'TARGET_NOT_ACTIONABLE',

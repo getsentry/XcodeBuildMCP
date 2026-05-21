@@ -376,6 +376,141 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
+  it('infers swipeWithin from deeply nested overflowing descendants', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          AXLabel: 'Scrollable panel',
+          frame: { x: 0, y: 0, width: 300, height: 300 },
+          children: [
+            createNode({
+              type: 'Other',
+              role: 'AXGroup',
+              frame: { x: 10, y: 10, width: 280, height: 280 },
+              children: [
+                createNode({
+                  type: 'Other',
+                  role: 'AXGroup',
+                  frame: { x: 20, y: 20, width: 260, height: 260 },
+                  children: [
+                    createNode({
+                      type: 'StaticText',
+                      role: 'AXStaticText',
+                      AXLabel: 'Overflow',
+                      frame: { x: 30, y: 360, width: 120, height: 20 },
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'other',
+        label: 'Scrollable panel',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
+  it('does not infer root viewport swipeWithin when a sheet grabber is nested', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Example',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          frame: { x: 0, y: 0, width: 390, height: 120 },
+          children: [
+            createNode({
+              type: 'Button',
+              role: 'AXButton',
+              AXLabel: 'Sheet Grabber',
+              frame: { x: 157, y: 56, width: 76, height: 24 },
+            }),
+          ],
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'More content below',
+          frame: { x: 40, y: 920, width: 220, height: 24 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'application',
+        label: 'Example',
+        actions: [],
+      }),
+    );
+  });
+
+  it('does not infer root viewport swipeWithin when a better nested scroll target exists', () => {
+    const root = createNode({
+      type: 'Application',
+      role: 'AXApplication',
+      AXLabel: 'Example',
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      children: [
+        createNode({
+          type: 'Other',
+          role: 'AXGroup',
+          frame: { x: 0, y: 100, width: 390, height: 600 },
+          children: [
+            createNode({
+              type: 'ScrollView',
+              role: 'AXScrollArea',
+              AXIdentifier: 'app.nestedContentPanel',
+              frame: { x: 0, y: 100, width: 390, height: 600 },
+            }),
+          ],
+        }),
+        createNode({
+          type: 'StaticText',
+          role: 'AXStaticText',
+          AXLabel: 'Additional details below',
+          frame: { x: 40, y: 920, width: 220, height: 24 },
+        }),
+      ],
+    });
+
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [root],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]?.actions).not.toContain('swipeWithin');
+    expect(
+      snapshot.payload.elements.find((element) => element.identifier === 'app.nestedContentPanel'),
+    ).toEqual(
+      expect.objectContaining({
+        role: 'scroll-view',
+        actions: expect.arrayContaining(['swipeWithin']),
+      }),
+    );
+  });
+
   it('does not synthesize a foreground sheet scroll region without a real scroll descendant', () => {
     const root = createNode({
       type: 'Application',

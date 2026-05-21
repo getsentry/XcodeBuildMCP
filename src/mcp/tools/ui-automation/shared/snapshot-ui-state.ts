@@ -74,10 +74,10 @@ export function getRuntimeSnapshot(
   return getRuntimeSnapshotLookup(simulatorId, nowMs).snapshot;
 }
 
-export function resolveElementRef(
+export function resolveElementRefForAnyAction(
   simulatorId: string,
   elementRef: string,
-  requiredAction: RuntimeActionNameV1,
+  requiredActions: readonly RuntimeActionNameV1[],
   nowMs = Date.now(),
 ): RuntimeElementResolution {
   const lookup = getRuntimeSnapshotLookup(simulatorId, nowMs);
@@ -109,17 +109,23 @@ export function resolveElementRef(
     };
   }
 
-  if (!element.publicElement.actions.includes(requiredAction)) {
+  if (!requiredActions.some((action) => element.publicElement.actions.includes(action))) {
+    const requiredActionText =
+      requiredActions.length === 1
+        ? `'${requiredActions[0]}'`
+        : requiredActions.map((action) => `'${action}'`).join(' or ');
     return {
       ok: false,
       error: {
         code: 'TARGET_NOT_ACTIONABLE',
-        message: `Element ref '${elementRef}' does not support '${requiredAction}'.`,
+        message: `Element ref '${elementRef}' does not support ${requiredActionText}.`,
         recoveryHint:
-          'Choose an elementRef that lists the required action, or refresh with snapshot_ui.',
+          requiredActions.length === 1
+            ? 'Choose an elementRef that lists the required action, or refresh with snapshot_ui.'
+            : `Choose an elementRef that lists ${requiredActionText}, or refresh with snapshot_ui.`,
         elementRef,
         candidates: snapshot.payload.elements.filter((candidate) =>
-          candidate.actions.includes(requiredAction),
+          requiredActions.some((action) => candidate.actions.includes(action)),
         ),
         snapshotAgeMs: ageMs,
       },
@@ -127,6 +133,15 @@ export function resolveElementRef(
   }
 
   return { ok: true, snapshot, element, snapshotAgeMs: ageMs };
+}
+
+export function resolveElementRef(
+  simulatorId: string,
+  elementRef: string,
+  requiredAction: RuntimeActionNameV1,
+  nowMs = Date.now(),
+): RuntimeElementResolution {
+  return resolveElementRefForAnyAction(simulatorId, elementRef, [requiredAction], nowMs);
 }
 
 export function getSnapshotUiWarning(simulatorId: string): string | null {

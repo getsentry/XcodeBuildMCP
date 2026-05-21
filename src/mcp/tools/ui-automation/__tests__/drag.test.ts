@@ -178,6 +178,44 @@ describe('Drag Tool', () => {
       ]);
     });
 
+    it('does not require touch support for swipeWithin-only drag targets', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 402, height: 874 },
+        }),
+      ]);
+      const snapshot = getRuntimeSnapshot(simulatorId);
+      snapshot!.elements[0]!.publicElement.actions = ['swipeWithin'];
+      snapshot!.payload.elements[0]!.actions = ['swipeWithin'];
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runDrag({ simulatorId, elementRef: 'e1', direction: 'down' }, executor);
+
+      expect(result.action).toMatchObject({
+        type: 'drag',
+        elementRef: 'e1',
+        direction: 'down',
+        from: { x: 201, y: 131 },
+        to: { x: 201, y: 743 },
+      });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
+        'drag',
+        '--start-x',
+        '201',
+        '--start-y',
+        '131',
+        '--end-x',
+        '201',
+        '--end-y',
+        '743',
+        '--udid',
+        simulatorId,
+      ]);
+    });
+
     it('uses directional drag points for cell targets instead of in-cell swipe strokes', async () => {
       recordSnapshot([
         createNode({
@@ -244,6 +282,25 @@ describe('Drag Tool', () => {
 
       expect(result.didError).toBe(true);
       expect(result.uiError).toMatchObject({ code: 'ELEMENT_REF_NOT_FOUND', elementRef: 'e404' });
+      expect(calls).toEqual([]);
+    });
+
+    it('reports that drag requires touch or swipeWithin support', async () => {
+      recordSnapshot([createNode()]);
+      const snapshot = getRuntimeSnapshot(simulatorId);
+      snapshot!.elements[0]!.publicElement.actions = ['tap'];
+      snapshot!.payload.elements[0]!.actions = ['tap'];
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runDrag({ simulatorId, elementRef: 'e1', direction: 'up' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'TARGET_NOT_ACTIONABLE',
+        elementRef: 'e1',
+        message: "Element ref 'e1' does not support 'touch' or 'swipeWithin'.",
+        recoveryHint: expect.stringContaining("'touch' or 'swipeWithin'"),
+      });
       expect(calls).toEqual([]);
     });
   });

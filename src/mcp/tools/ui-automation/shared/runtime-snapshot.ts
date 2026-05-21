@@ -314,10 +314,6 @@ function isContainerRole(role: RuntimeElementRoleV1 | undefined): boolean {
   );
 }
 
-function isDescendantPath(parentPath: string, candidatePath: string): boolean {
-  return candidatePath.startsWith(`${parentPath}.`);
-}
-
 function isLargeEnoughInferredScrollContainer(
   role: RuntimeElementRoleV1 | undefined,
   frame: Frame,
@@ -359,37 +355,6 @@ function isTopLevelViewportElement(element: RuntimeSnapshotElementRecord): boole
   return (role === 'application' || role === 'window') && !element.metadata.path.includes('.');
 }
 
-function hasSemanticVerticalOverflowingDescendant(
-  element: RuntimeSnapshotElementRecord,
-  elements: RuntimeSnapshotElementRecord[],
-): boolean {
-  return elements.some((candidate) => {
-    if (
-      candidate === element ||
-      !isDescendantPath(element.metadata.path, candidate.metadata.path)
-    ) {
-      return false;
-    }
-    return (
-      hasPublicSemanticIdentity(candidate.publicElement) &&
-      isVisible(candidate.publicElement.frame) &&
-      frameVerticallyOverflowsContainer(candidate.publicElement.frame, element.publicElement.frame)
-    );
-  });
-}
-
-function hasPreferredDescendantSwipeTarget(
-  element: RuntimeSnapshotElementRecord,
-  elements: RuntimeSnapshotElementRecord[],
-): boolean {
-  return elements.some(
-    (candidate) =>
-      candidate !== element &&
-      isDescendantPath(element.metadata.path, candidate.metadata.path) &&
-      isPreferredSwipeTarget(candidate),
-  );
-}
-
 function createViewportSwipeFrame(viewportFrame: Frame): Frame {
   return normalizeFrame(viewportFrame);
 }
@@ -398,18 +363,87 @@ function isSheetGrabberElement(element: RuntimeSnapshotElementRecord): boolean {
   return element.publicElement.label?.toLowerCase() === 'sheet grabber';
 }
 
-function findSheetGrabberDescendant(
+interface ScrollableDescendantSummary {
+  hasOverflowingDescendant: boolean;
+  hasSemanticVerticalOverflowingDescendant: boolean;
+  hasSheetGrabberDescendant: boolean;
+  hasPreferredDescendantSwipeTarget: boolean;
+}
+
+function createEmptyDescendantSummary(): ScrollableDescendantSummary {
+  return {
+    hasOverflowingDescendant: false,
+    hasSemanticVerticalOverflowingDescendant: false,
+    hasSheetGrabberDescendant: false,
+    hasPreferredDescendantSwipeTarget: false,
+  };
+}
+
+function visitAncestorElements(
   element: RuntimeSnapshotElementRecord,
+  elementByPath: ReadonlyMap<string, RuntimeSnapshotElementRecord>,
+  visit: (ancestor: RuntimeSnapshotElementRecord) => void,
+): void {
+  let separatorIndex = element.metadata.path.lastIndexOf('.');
+
+  while (separatorIndex !== -1) {
+    const ancestorPath = element.metadata.path.slice(0, separatorIndex);
+    const ancestor = elementByPath.get(ancestorPath);
+    if (ancestor) {
+      visit(ancestor);
+    }
+    separatorIndex = ancestorPath.lastIndexOf('.');
+  }
+}
+
+function createDescendantSummaryIndex(
   elements: RuntimeSnapshotElementRecord[],
-): RuntimeSnapshotElementRecord | null {
-  return (
-    elements.find(
-      (candidate) =>
-        candidate !== element &&
-        isDescendantPath(element.metadata.path, candidate.metadata.path) &&
-        isSheetGrabberElement(candidate),
-    ) ?? null
+): Map<RuntimeSnapshotElementRecord, ScrollableDescendantSummary> {
+  const elementByPath = new Map(elements.map((element) => [element.metadata.path, element]));
+  const summaries = new Map(
+    elements.map((element) => [element, createEmptyDescendantSummary()] as const),
   );
+
+  for (const descendant of elements) {
+    visitAncestorElements(descendant, elementByPath, (ancestor) => {
+      const summary = summaries.get(ancestor)!;
+      const descendantFrame = descendant.publicElement.frame;
+      const ancestorFrame = ancestor.publicElement.frame;
+
+      if (frameOverflowsContainer(descendantFrame, ancestorFrame)) {
+        summary.hasOverflowingDescendant = true;
+      }
+      if (
+        hasPublicSemanticIdentity(descendant.publicElement) &&
+        isVisible(descendantFrame) &&
+        frameVerticallyOverflowsContainer(descendantFrame, ancestorFrame)
+      ) {
+        summary.hasSemanticVerticalOverflowingDescendant = true;
+      }
+      if (isSheetGrabberElement(descendant)) {
+        summary.hasSheetGrabberDescendant = true;
+      }
+    });
+  }
+
+  return summaries;
+}
+
+function addPreferredDescendantSwipeTargets(
+  summaries: Map<RuntimeSnapshotElementRecord, ScrollableDescendantSummary>,
+  elements: RuntimeSnapshotElementRecord[],
+): void {
+  const elementByPath = new Map(elements.map((element) => [element.metadata.path, element]));
+
+  for (const descendant of elements) {
+    if (!isPreferredSwipeTarget(descendant)) {
+      continue;
+    }
+
+    visitAncestorElements(descendant, elementByPath, (ancestor) => {
+      summaries.get(ancestor)!.hasPreferredDescendantSwipeTarget = true;
+    });
+  }
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -458,8 +492,10 @@ function applyViewportVisibility(elements: RuntimeSnapshotElementRecord[]): void
 }
 
 function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): void {
+  const descendantSummaries = createDescendantSummaryIndex(elements);
+
   for (const element of elements) {
-    const { publicElement, metadata } = element;
+    const { publicElement } = element;
     if (
       !isContainerRole(publicElement.role) ||
       publicElement.state?.visible === false ||
@@ -472,43 +508,36 @@ function inferScrollableContainers(elements: RuntimeSnapshotElementRecord[]): vo
       continue;
     }
 
-    const sheetGrabber =
-      publicElement.role === 'application' || publicElement.role === 'window'
-        ? findSheetGrabberDescendant(element, elements)
-        : null;
-    if (sheetGrabber) {
+    const summary = descendantSummaries.get(element)!;
+    if (
+      (publicElement.role === 'application' || publicElement.role === 'window') &&
+      summary.hasSheetGrabberDescendant
+    ) {
       continue;
     }
-
-    const hasOverflowingDescendant = elements.some((candidate) => {
-      if (candidate === element) {
-        return false;
-      }
-      return (
-        isDescendantPath(metadata.path, candidate.metadata.path) &&
-        frameOverflowsContainer(candidate.publicElement.frame, publicElement.frame)
-      );
-    });
 
     if (
       publicElement.role !== 'application' &&
       publicElement.role !== 'window' &&
-      hasOverflowingDescendant
+      summary.hasOverflowingDescendant
     ) {
       publicElement.actions.push('swipeWithin');
     }
   }
 
+  addPreferredDescendantSwipeTargets(descendantSummaries, elements);
+
   for (const element of elements) {
     const { publicElement, metadata } = element;
+    const summary = descendantSummaries.get(element)!;
     if (
       !isTopLevelViewportElement(element) ||
       publicElement.state?.visible === false ||
       !isVisible(publicElement.frame) ||
       publicElement.actions.includes('swipeWithin') ||
-      findSheetGrabberDescendant(element, elements) !== null ||
-      hasPreferredDescendantSwipeTarget(element, elements) ||
-      !hasSemanticVerticalOverflowingDescendant(element, elements)
+      summary.hasSheetGrabberDescendant ||
+      summary.hasPreferredDescendantSwipeTarget ||
+      !summary.hasSemanticVerticalOverflowingDescendant
     ) {
       continue;
     }
