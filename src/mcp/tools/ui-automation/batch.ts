@@ -18,6 +18,7 @@ import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-sn
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
+import type { RuntimeSnapshotV1 } from '../../../types/ui-snapshot.ts';
 import {
   createUiActionFailureResult,
   createUiActionSuccessResult,
@@ -139,11 +140,17 @@ function buildBatchCommandArgs(params: BatchParams, resolvedSteps: readonly stri
   return commandArgs;
 }
 
-function resolveBatchSteps(
-  params: BatchParams,
-): { ok: true; steps: string[]; preserveSnapshot: boolean } | { ok: false; result: BatchResult } {
+function resolveBatchSteps(params: BatchParams):
+  | {
+      ok: true;
+      steps: string[];
+      preserveSnapshot: boolean;
+      previousRuntimeSnapshot: RuntimeSnapshotV1;
+    }
+  | { ok: false; result: BatchResult } {
   const resolvedSteps: string[] = [];
   let preserveSnapshot = true;
+  let previousRuntimeSnapshot: RuntimeSnapshotV1 | null = null;
 
   for (const step of params.steps) {
     const resolution = resolveElementRef(params.simulatorId, step.elementRef, 'tap');
@@ -158,6 +165,8 @@ function resolveBatchSteps(
         ),
       };
     }
+
+    previousRuntimeSnapshot ??= resolution.snapshot.payload;
 
     const usesTouchActivation = resolution.element.publicElement.role === 'switch';
     preserveSnapshot &&= isSafeSameScreenBatchElement(resolution.element.publicElement);
@@ -200,7 +209,11 @@ function resolveBatchSteps(
     resolvedSteps.push(...createSemanticTapBatchSteps(tapCommand));
   }
 
-  return { ok: true, steps: resolvedSteps, preserveSnapshot };
+  if (!previousRuntimeSnapshot) {
+    throw new Error('Batch step resolution succeeded without a runtime snapshot.');
+  }
+
+  return { ok: true, steps: resolvedSteps, preserveSnapshot, previousRuntimeSnapshot };
 }
 
 export function createBatchExecutor(
@@ -256,7 +269,9 @@ export function createBatchExecutor(
     }
 
     if (resolvedSteps.preserveSnapshot) {
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
+      return createUiActionSuccessResult(action, simulatorId, [guard.warningText], {
+        previousRuntimeSnapshot: resolvedSteps.previousRuntimeSnapshot,
+      });
     }
 
     const captureResult = await captureRuntimeSnapshotAfterActionSafely({
@@ -269,6 +284,7 @@ export function createBatchExecutor(
       simulatorId,
       [guard.warningText, captureResult.warning],
       {
+        previousRuntimeSnapshot: resolvedSteps.previousRuntimeSnapshot,
         ...(captureResult.capture ? { capture: captureResult.capture } : {}),
         ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
       },
