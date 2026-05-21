@@ -229,7 +229,7 @@ function normalizeCustomActions(value: unknown): string[] {
   return value.map(normalizeText).filter((entry): entry is string => entry !== undefined);
 }
 
-function readState(node: AccessibilityNode, frame: Frame): RuntimeElementStateV1 | undefined {
+function readState(node: AccessibilityNode, frame: Frame): RuntimeElementStateV1 {
   const state: RuntimeElementStateV1 = {
     enabled: node.enabled !== false,
     visible: isVisible(frame),
@@ -247,7 +247,7 @@ function readState(node: AccessibilityNode, frame: Frame): RuntimeElementStateV1
     state.selected = node.AXSelected;
   }
 
-  return Object.keys(state).length > 0 ? state : undefined;
+  return state;
 }
 
 function stableSignature(params: {
