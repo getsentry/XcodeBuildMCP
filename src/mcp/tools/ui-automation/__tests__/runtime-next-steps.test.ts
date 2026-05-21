@@ -43,6 +43,58 @@ describe('runtime snapshot next steps', () => {
     __resetRuntimeSnapshotStoreForTests();
   });
 
+  it('ignores expired stored metadata when creating next steps', () => {
+    recordSnapshot(
+      [
+        createScrollView({
+          AXIdentifier: 'example.expiredSheet',
+          children: [
+            createNode({ AXLabel: 'Close' }),
+            createNode({
+              type: 'TextField',
+              role: 'AXTextField',
+              AXLabel: 'Search',
+            }),
+            createNode({
+              AXLabel: 'London, England',
+              AXIdentifier: 'example.locationCard',
+            }),
+          ],
+        }),
+      ],
+      0,
+    );
+
+    const storedSnapshot = getRuntimeSnapshot(simulatorId, 0);
+    expect(storedSnapshot).not.toBeNull();
+    const expiredSnapshot = storedSnapshot!.payload;
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: expiredSnapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+    expect(steps).toEqual([
+      {
+        label: 'Tap an elementRef',
+        tool: 'tap',
+        params: { simulatorId, elementRef: 'e4' },
+      },
+      {
+        label: 'Scroll visible content',
+        tool: 'swipe',
+        params: {
+          simulatorId,
+          withinElementRef: 'e1',
+          direction: 'up',
+          distance: 0.5,
+        },
+      },
+    ]);
+  });
+
   it('prefers tap and scroll examples from the active foreground container', () => {
     recordSnapshot([
       createScrollView({

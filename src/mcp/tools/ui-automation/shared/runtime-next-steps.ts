@@ -303,10 +303,7 @@ function findStoredSnapshotRecords(params: {
   simulatorId: string;
   runtimeSnapshot: RuntimeSnapshotV1;
 }): Map<string, RuntimeSnapshotElementRecord> {
-  const storedSnapshot = getRuntimeSnapshot(
-    params.simulatorId,
-    params.runtimeSnapshot.capturedAtMs,
-  );
+  const storedSnapshot = getRuntimeSnapshot(params.simulatorId);
   if (
     storedSnapshot?.payload.screenHash !== params.runtimeSnapshot.screenHash ||
     storedSnapshot.payload.seq !== params.runtimeSnapshot.seq
