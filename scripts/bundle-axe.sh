@@ -324,6 +324,7 @@ else
     echo "⚠️  Skipping AXe binary verification on non-macOS (detected $OS_NAME)"
     AXE_VERSION="unknown (verification skipped)"
 fi
+
 validate_axe_version_metadata() {
     if [ "$AXE_VERSION" = "unknown (verification skipped)" ]; then
         return
