@@ -132,6 +132,7 @@ export function createLongPressExecutor(
       [guard.warningText, captureResult.warning],
       {
         ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+        previousRuntimeSnapshot: resolution.snapshot.payload,
         ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
       },
     );
