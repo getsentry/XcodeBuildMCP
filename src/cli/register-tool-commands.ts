@@ -96,6 +96,9 @@ function createBufferedHandlerContext(
   };
 }
 
+const UI_ACTION_RESULT_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
+const UI_ACTION_RESULT_VERBOSE_SCHEMA_VERSION = '3';
+
 function writeJsonOutput(
   handlerContext: ToolHandlerContext,
   session: ReturnType<typeof createRenderSession>,
@@ -106,12 +109,14 @@ function writeJsonOutput(
     ? toStructuredEnvelope(
         structuredOutput.result,
         structuredOutput.schema,
-        structuredOutput.schemaVersion,
+        structuredOutput.schema === UI_ACTION_RESULT_SCHEMA && options.verbose === true
+          ? UI_ACTION_RESULT_VERBOSE_SCHEMA_VERSION
+          : structuredOutput.schemaVersion,
         {
           nextSteps: session.getNextSteps?.(),
           nextStepRuntime: session.getNextStepsRuntime?.(),
           outputStyle: options.outputStyle,
-          runtimeSnapshot: 'compact',
+          runtimeSnapshot: options.verbose ? 'full' : 'compact',
         },
       )
     : toStructuredEnvelope(

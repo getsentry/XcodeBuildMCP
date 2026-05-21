@@ -391,6 +391,9 @@ describe('structured output schema bundling', () => {
     const actionValidate = ajv.compile(
       getMcpOutputSchema({ schema: 'xcodebuildmcp.output.ui-action-result', version: '2' }),
     );
+    const actionV3Validate = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.ui-action-result', version: '3' }),
+    );
 
     expect(
       captureValidate({
@@ -460,6 +463,65 @@ describe('structured output schema bundling', () => {
             screenHash: 'screen-hash',
             seq: 2,
             unchanged: true,
+            udid: 'SIM-1',
+          },
+        },
+      }),
+    ).toBe(true);
+
+    const fullUiActionEnvelope = {
+      schema: 'xcodebuildmcp.output.ui-action-result',
+      schemaVersion: '3',
+      didError: false,
+      error: null,
+      data: {
+        summary: { status: 'SUCCEEDED' },
+        action: { type: 'tap', elementRef: 'e1' },
+        artifacts: { simulatorId: 'SIM-1' },
+        capture: {
+          type: 'runtime-snapshot',
+          protocol: 'rs/1',
+          simulatorId: 'SIM-1',
+          screenHash: 'screen-hash',
+          seq: 1,
+          capturedAtMs: 1_000,
+          expiresAtMs: 61_000,
+          elements: [
+            {
+              ref: 'e1',
+              role: 'button',
+              label: 'Continue',
+              frame: { x: 10, y: 20, width: 100, height: 40 },
+              state: { enabled: true, selected: true, visible: true },
+              actions: ['tap'],
+            },
+          ],
+          actions: [{ action: 'tap', elementRef: 'e1', label: 'Continue' }],
+        },
+      },
+    };
+
+    expect(actionValidate({ ...fullUiActionEnvelope, schemaVersion: '2' })).toBe(false);
+    expect(actionV3Validate(fullUiActionEnvelope)).toBe(true);
+
+    expect(
+      actionValidate({
+        schema: 'xcodebuildmcp.output.ui-action-result',
+        schemaVersion: '2',
+        didError: false,
+        error: null,
+        data: {
+          summary: { status: 'SUCCEEDED' },
+          action: { type: 'tap', elementRef: 'e1' },
+          artifacts: { simulatorId: 'SIM-1' },
+          capture: {
+            type: 'runtime-snapshot',
+            rs: '1',
+            screenHash: 'screen-hash',
+            seq: 1,
+            count: 1,
+            targets: ['e1|tap|button|Continue||'],
+            scroll: [],
             udid: 'SIM-1',
           },
         },

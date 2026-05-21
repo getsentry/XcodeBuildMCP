@@ -1212,7 +1212,7 @@ describe('registerToolCommands', () => {
     expect(output.data.waitMatch.matches).toEqual(['e11|none|text|No matches||']);
   });
 
-  it('keeps UI action runtime snapshots compact for verbose JSON output', async () => {
+  it('emits compact UI action runtime snapshots by default and full snapshots for verbose JSON output', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks = captureStdoutChunks();
 
@@ -1266,14 +1266,16 @@ describe('registerToolCommands', () => {
     const app = createApp(createCatalog([tool]));
 
     await expect(
-      app.parseAsync(['simulator', 'run-tool', '--output', 'json', '--verbose']),
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
     ).resolves.toBeDefined();
 
     const output = JSON.parse(stdoutChunks.join('')) as {
       schema: string;
+      schemaVersion: string;
       data: { capture: { targets: string[]; elements?: unknown[] } };
     };
     expect(output.schema).toBe('xcodebuildmcp.output.ui-action-result');
+    expect(output.schemaVersion).toBe('2');
     expect(output.data.capture).toEqual(
       expect.objectContaining({
         type: 'runtime-snapshot',
@@ -1283,9 +1285,45 @@ describe('registerToolCommands', () => {
       }),
     );
     expect(output.data.capture.elements).toBeUndefined();
+
+    stdoutChunks.length = 0;
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json', '--verbose']),
+    ).resolves.toBeDefined();
+
+    const verboseOutput = JSON.parse(stdoutChunks.join('')) as {
+      schema: string;
+      schemaVersion: string;
+      data: {
+        capture: { rs?: string; protocol?: string; elements?: unknown[]; actions?: unknown[] };
+      };
+    };
+    expect(verboseOutput.schema).toBe('xcodebuildmcp.output.ui-action-result');
+    expect(verboseOutput.schemaVersion).toBe('3');
+    expect(verboseOutput.data.capture).toEqual(
+      expect.objectContaining({
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-hash',
+        seq: 1,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+      }),
+    );
+    expect(verboseOutput.data.capture.rs).toBeUndefined();
+    expect(verboseOutput.data.capture.elements).toEqual([
+      expect.objectContaining({ ref: 'e1', role: 'application', label: 'Weather' }),
+      expect.objectContaining({ ref: 'e2', role: 'button', label: 'Continue' }),
+    ]);
+    expect(verboseOutput.data.capture.actions).toEqual([
+      { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+      { action: 'tap', elementRef: 'e2', label: 'Continue' },
+    ]);
   });
 
-  it('keeps capture runtime snapshots compact for verbose JSON output', async () => {
+  it('emits full capture runtime snapshots for verbose JSON output', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
@@ -1337,17 +1375,31 @@ describe('registerToolCommands', () => {
 
     const output = JSON.parse(stdoutChunks.join('')) as {
       schema: string;
-      data: { capture: { scroll: string[]; elements?: unknown[] } };
+      schemaVersion: string;
+      data: {
+        capture: { rs?: string; protocol?: string; elements?: unknown[]; actions?: unknown[] };
+      };
     };
     expect(output.schema).toBe('xcodebuildmcp.output.capture-result');
+    expect(output.schemaVersion).toBe('2');
     expect(output.data.capture).toEqual(
       expect.objectContaining({
         type: 'runtime-snapshot',
-        rs: '1',
-        scroll: ['e1|swipe|application|Weather||'],
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-hash',
+        seq: 1,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
       }),
     );
-    expect(output.data.capture.elements).toBeUndefined();
+    expect(output.data.capture.rs).toBeUndefined();
+    expect(output.data.capture.elements).toEqual([
+      expect.objectContaining({ ref: 'e1', role: 'application', label: 'Weather' }),
+    ]);
+    expect(output.data.capture.actions).toEqual([
+      { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+    ]);
   });
 
   it('writes one NDJSON line per domain fragment for jsonl output and omits the final envelope', async () => {
