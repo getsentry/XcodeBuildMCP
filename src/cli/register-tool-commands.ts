@@ -372,7 +372,22 @@ function registerToolSubcommand(
           rawDefaults.simulatorName,
         );
         if (!resolvedSimulator.success) {
-          console.error(`Error: ${resolvedSimulator.error}`);
+          if (outputFormat === 'json') {
+            const errorOutput = createStructuredErrorOutput({
+              category: 'runtime',
+              code: 'SIMULATOR_RESOLUTION_FAILED',
+              message: resolvedSimulator.error,
+            });
+            const envelope = toStructuredEnvelope(
+              errorOutput.result,
+              errorOutput.schema,
+              errorOutput.schemaVersion,
+              { outputStyle },
+            );
+            process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
+          } else {
+            console.error(`Error: ${resolvedSimulator.error}`);
+          }
           process.exitCode = 1;
           return;
         }

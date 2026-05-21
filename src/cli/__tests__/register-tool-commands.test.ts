@@ -305,6 +305,51 @@ describe('registerToolCommands', () => {
     stdoutWrite.mockRestore();
   });
 
+  it('emits structured JSON when configured simulatorName resolution fails', async () => {
+    vi.spyOn(simulatorResolver, 'resolveSimulatorNameToId').mockResolvedValue({
+      success: false,
+      error: 'Simulator named "Missing Phone" not found.',
+    });
+    const invokeDirect = vi
+      .spyOn(DefaultToolInvoker.prototype, 'invokeDirect')
+      .mockResolvedValue(undefined);
+    const stdoutChunks = captureStdoutChunks();
+
+    const tool = createTool({
+      cliSchema: {
+        simulatorId: z.string().describe('Simulator ID'),
+      },
+      mcpSchema: {
+        simulatorId: z.string().describe('Simulator ID'),
+      },
+    });
+    const app = createApp(createCatalog([tool]), {
+      ...baseRuntimeConfig,
+      sessionDefaults: {
+        simulatorName: 'Missing Phone',
+      },
+      sessionDefaultsProfiles: undefined,
+      activeSessionDefaultsProfile: undefined,
+    });
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json']),
+    ).resolves.toBeDefined();
+
+    expect(invokeDirect).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(JSON.parse(stdoutChunks.join(''))).toEqual({
+      schema: 'xcodebuildmcp.output.error',
+      schemaVersion: '1',
+      didError: true,
+      error: 'Simulator named "Missing Phone" not found.',
+      data: {
+        category: 'runtime',
+        code: 'SIMULATOR_RESOLUTION_FAILED',
+      },
+    });
+  });
+
   it('does not synthesize simulatorId for tools that already accept simulatorName', async () => {
     const resolveSimulatorNameToId = vi.spyOn(simulatorResolver, 'resolveSimulatorNameToId');
     const invokeDirect = vi
