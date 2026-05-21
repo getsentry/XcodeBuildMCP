@@ -1167,7 +1167,80 @@ describe('registerToolCommands', () => {
     expect(output.data.waitMatch.matches).toEqual(['e11|none|text|No matches||']);
   });
 
-  it('writes the full runtime snapshot envelope for verbose JSON output', async () => {
+  it('keeps UI action runtime snapshots compact for verbose JSON output', async () => {
+    mockInvokeDirectThroughHandler();
+    const stdoutChunks = captureStdoutChunks();
+
+    const tool = createTool({
+      handler: vi.fn(async (_args, ctx) => {
+        if (ctx) {
+          ctx.structuredOutput = {
+            schema: 'xcodebuildmcp.output.ui-action-result',
+            schemaVersion: '2',
+            result: {
+              kind: 'ui-action-result',
+              didError: false,
+              error: null,
+              summary: { status: 'SUCCEEDED' },
+              action: { type: 'tap', elementRef: 'e2' },
+              artifacts: { simulatorId: 'SIMULATOR-1' },
+              capture: {
+                type: 'runtime-snapshot',
+                protocol: 'rs/1',
+                simulatorId: 'SIMULATOR-1',
+                screenHash: 'screen-hash',
+                seq: 1,
+                capturedAtMs: 1_000,
+                expiresAtMs: 61_000,
+                elements: [
+                  {
+                    ref: 'e1',
+                    role: 'application',
+                    label: 'Weather',
+                    frame: { x: 0, y: 0, width: 390, height: 844 },
+                    actions: ['swipeWithin'],
+                  },
+                  {
+                    ref: 'e2',
+                    role: 'button',
+                    label: 'Continue',
+                    frame: { x: 20, y: 80, width: 120, height: 44 },
+                    actions: ['tap'],
+                  },
+                ],
+                actions: [
+                  { action: 'swipeWithin', elementRef: 'e1', label: 'Weather' },
+                  { action: 'tap', elementRef: 'e2', label: 'Continue' },
+                ],
+              },
+            },
+          };
+        }
+      }) as ToolDefinition['handler'],
+    });
+    const app = createApp(createCatalog([tool]));
+
+    await expect(
+      app.parseAsync(['simulator', 'run-tool', '--output', 'json', '--verbose']),
+    ).resolves.toBeDefined();
+
+    const output = JSON.parse(stdoutChunks.join('')) as {
+      schema: string;
+      data: { capture: { targets: string[]; elements?: unknown[] } };
+    };
+    expect(output.schema).toBe('xcodebuildmcp.output.ui-action-result');
+    expect(output.data.capture).toEqual(
+      expect.objectContaining({
+        type: 'runtime-snapshot',
+        rs: '1',
+        targets: ['e2|tap|button|Continue||'],
+        scroll: ['e1|swipe|application|Weather||'],
+      }),
+    );
+    expect(output.data.capture.elements).toBeUndefined();
+  });
+
+  it('keeps capture runtime snapshots compact for verbose JSON output', async () => {
     mockInvokeDirectThroughHandler();
     const stdoutChunks: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
@@ -1217,16 +1290,19 @@ describe('registerToolCommands', () => {
       app.parseAsync(['simulator', 'run-tool', '--output', 'json', '--verbose']),
     ).resolves.toBeDefined();
 
-    const output = JSON.parse(stdoutChunks.join('')) as { schema: string; data: unknown };
+    const output = JSON.parse(stdoutChunks.join('')) as {
+      schema: string;
+      data: { capture: { scroll: string[]; elements?: unknown[] } };
+    };
     expect(output.schema).toBe('xcodebuildmcp.output.capture-result');
-    expect(output.data).toEqual(
+    expect(output.data.capture).toEqual(
       expect.objectContaining({
-        capture: expect.objectContaining({
-          type: 'runtime-snapshot',
-          elements: [expect.objectContaining({ ref: 'e1', actions: ['swipeWithin'] })],
-        }),
+        type: 'runtime-snapshot',
+        rs: '1',
+        scroll: ['e1|swipe|application|Weather||'],
       }),
     );
+    expect(output.data.capture.elements).toBeUndefined();
   });
 
   it('writes one NDJSON line per domain fragment for jsonl output and omits the final envelope', async () => {

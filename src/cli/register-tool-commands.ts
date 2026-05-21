@@ -112,7 +112,7 @@ function writeJsonOutput(
           nextSteps: session.getNextSteps?.(),
           nextStepRuntime: session.getNextStepsRuntime?.(),
           outputStyle: options.outputStyle,
-          runtimeSnapshot: options.verbose ? 'full' : 'compact',
+          runtimeSnapshot: 'compact',
           ...(suppressedTargetRefs
             ? { runtimeSnapshotSuppressedTargetRefs: suppressedTargetRefs }
             : {}),
