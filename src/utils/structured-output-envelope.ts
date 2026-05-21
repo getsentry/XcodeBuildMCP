@@ -106,7 +106,7 @@ function compactRuntimeSnapshotText(value: string | undefined): string {
 }
 
 function normalizedRuntimeSnapshotText(value: string | undefined): string {
-  return compactRuntimeSnapshotText(value).toLocaleLowerCase();
+  return compactRuntimeSnapshotText(value).toLowerCase();
 }
 
 function isHiddenRuntimeTarget(element: RuntimeElementV1): boolean {
