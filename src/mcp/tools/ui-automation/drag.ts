@@ -22,6 +22,7 @@ import {
   getRuntimeElementDirectionalDragPoints,
   getRuntimeElementCenter,
   getRuntimeElementSwipePoints,
+  findViewportFrame,
 } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
@@ -128,7 +129,7 @@ export function createDragExecutor(
       });
     }
 
-    const viewportFrame = resolution.snapshot.elements[0]?.publicElement.frame;
+    const viewportFrame = findViewportFrame(resolution.snapshot.elements) ?? undefined;
     const { actions, role } = resolution.element.publicElement;
     const points = shouldUseWithinElementDragPoints(actions, role)
       ? getRuntimeElementSwipePoints(resolution.element, direction, distance)

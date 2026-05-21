@@ -450,7 +450,7 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-function findViewportFrame(elements: RuntimeSnapshotElementRecord[]): Frame | null {
+export function findViewportFrame(elements: RuntimeSnapshotElementRecord[]): Frame | null {
   return (
     elements.find(
       (element) =>
