@@ -18,6 +18,7 @@ When reading issues:
 -
 ## Tools
 - GitHub CLI for issues/PRs
+- MCP `readOnlyHint` describes whether a tool mutates host/project state such as files, build artifacts, configuration, or external services. Simulator HID/UI actions that only tap, type, press, or gesture inside the simulator may remain `readOnlyHint: true`; do not flip them to `false` merely because app UI state changes.
 - CLI design note: do not rely on CLI session-default writes. CLI is intentionally deterministic for CI/scripting and should use explicit command arguments as the primary input surface.
 - When working on skill sources in `skills/`, use the `skill-creator` skill workflow.
 - After modifying any skill source, run `npx skill-check <skill-directory>` and address all errors/warnings before handoff.

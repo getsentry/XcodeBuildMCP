@@ -70,6 +70,7 @@ ESM TypeScript project (`type: module`). Key layers:
 
 ## Tool Development
 - Tool manifests in `manifests/tools/*.yaml` define `id`, `module`, `names.mcp` (snake_case), optional `names.cli` (kebab-case), predicates, and annotations
+- MCP `readOnlyHint` describes whether a tool mutates host/project state such as files, build artifacts, configuration, or external services. Simulator HID/UI actions that only tap, type, press, or gesture inside the simulator may remain `readOnlyHint: true`; do not flip them to `false` merely because app UI state changes.
 - Workflow manifests in `manifests/workflows/*.yaml` group tools and define exposure rules
 - Tool modules export a Zod `schema`, a pure `*Logic` function, and a `handler` built with `createTypedTool` or `createSessionAwareTool`
 - Resource modules export a `handler` (and a pure `*Logic` function); `uri`, `name`, `description`, and `mimeType` are declared in `manifests/resources/*.yaml`
