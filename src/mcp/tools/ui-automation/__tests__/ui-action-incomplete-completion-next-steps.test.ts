@@ -289,7 +289,9 @@ describe('UI action incomplete completion next steps', () => {
     });
 
     expect(ctx.nextSteps?.[0]?.params?.elementRef).not.toBe(addRef);
-    expect(ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs).toBeUndefined();
+    expect(
+      ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
+    ).toBeUndefined();
     expect(
       compactTargets(envelope).some(
         (target) => target.startsWith(`${rowRef}|tap|`) && target.includes('not saved'),
