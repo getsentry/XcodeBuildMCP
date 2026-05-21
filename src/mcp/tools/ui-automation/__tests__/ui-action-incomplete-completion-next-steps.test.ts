@@ -263,4 +263,37 @@ describe('UI action incomplete completion next steps', () => {
     expect(notSavedEvidenceLine?.startsWith(`${rowRef}|`)).toBe(false);
     expect(notSavedEvidenceLine?.split('|')).toHaveLength(4);
   });
+
+  it('keeps incomplete foreground status visible after a no-op Add tap', async () => {
+    recordSnapshot(createSearchResultBeforeCompletionNodes());
+    const snapshot = currentSnapshot().payload;
+    const rowRef = snapshot.elements.find((element) => element.value === 'not saved')?.ref;
+    const addRef = snapshot.elements.find((element) => element.label === 'Add')?.ref;
+    expect(rowRef).toBeDefined();
+    expect(addRef).toBeDefined();
+    const { ctx, run } = createMockToolHandlerContext();
+
+    await run(() =>
+      tapLogic(
+        { simulatorId, elementRef: addRef! },
+        sameSearchResultExecutor(),
+        createMockAxeHelpers(),
+      ),
+    );
+
+    const result = ctx.structuredOutput?.result as UiActionResultDomainResult;
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.ui-action-result', '2', {
+      nextSteps: ctx.nextSteps,
+      runtimeSnapshotSuppressedTargetRefs:
+        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
+    });
+
+    expect(ctx.nextSteps?.[0]?.params?.elementRef).not.toBe(addRef);
+    expect(ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs).toBeUndefined();
+    expect(
+      compactTargets(envelope).some(
+        (target) => target.startsWith(`${rowRef}|tap|`) && target.includes('not saved'),
+      ),
+    ).toBe(true);
+  });
 });

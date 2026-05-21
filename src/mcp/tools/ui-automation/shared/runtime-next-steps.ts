@@ -546,6 +546,7 @@ function findForegroundIncompleteCompletionTapElement(
 export function getForegroundCompletionSuppressedRuntimeTargetRefs(params: {
   simulatorId: string;
   runtimeSnapshot: RuntimeSnapshotV1;
+  actionContext?: RuntimeSnapshotNextStepActionContext;
 }): string[] {
   const recordsByRef = findStoredSnapshotRecords(params);
   const foregroundRoot = findActiveForegroundRoot(recordsByRef);
@@ -558,9 +559,10 @@ export function getForegroundCompletionSuppressedRuntimeTargetRefs(params: {
     recordsByRef,
     foregroundRoot,
   );
+  const repeatedNoOpAction = getRepeatedNoOpActionRef(params);
   const completionActionElement = findForegroundIncompleteCompletionTapElement(
     foregroundElements,
-    null,
+    repeatedNoOpAction,
   );
   if (completionActionElement) {
     return foregroundElements

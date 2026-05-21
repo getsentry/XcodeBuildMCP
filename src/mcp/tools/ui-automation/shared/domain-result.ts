@@ -298,6 +298,7 @@ export function setUiActionStructuredOutput(
     const suppressedTargetRefs = getForegroundCompletionSuppressedRuntimeTargetRefs({
       simulatorId: result.artifacts.simulatorId,
       runtimeSnapshot: result.capture,
+      ...(actionContext ? { actionContext } : {}),
     });
     ctx.structuredOutput = {
       result,
