@@ -138,7 +138,7 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
-  it('puts suppressed target evidence in a no-ref evidence array, not text rows', () => {
+  it('preserves actionable targets in compact runtime snapshot output', () => {
     const result: CaptureResultDomainResult = {
       kind: 'capture-result',
       didError: false,
@@ -186,19 +186,13 @@ describe('toStructuredEnvelope', () => {
       },
     };
 
-    expect(
-      toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2', {
-        runtimeSnapshotSuppressedTargetRefs: ['e2'],
-      }),
-    ).toMatchObject({
-      data: {
-        capture: {
-          targets: ['e1|tap|button|Add||'],
-          text: ['e3|text|text|Search results||'],
-          evidence: ['button|London, England|not saved|'],
-        },
-      },
-    });
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as { capture: { targets: string[]; text: string[] } };
+
+    expect(data.capture.targets).toEqual(
+      expect.arrayContaining(['e1|tap|button|Add||', 'e2|tap|button|London, England|not saved|']),
+    );
+    expect(data.capture.text).toEqual(['e3|text|text|Search results||']);
   });
 
   it('caps compact runtime snapshot rows by category', () => {

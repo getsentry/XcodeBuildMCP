@@ -32,8 +32,6 @@ function buildStructuredContent(
     return undefined;
   }
 
-  const suppressedTargetRefs = structuredOutput.renderHints?.runtimeSnapshot?.suppressedTargetRefs;
-
   return toStructuredEnvelope(
     structuredOutput.result,
     structuredOutput.schema,
@@ -42,9 +40,6 @@ function buildStructuredContent(
       nextSteps: session.getNextSteps?.(),
       nextStepRuntime: 'mcp',
       outputStyle: 'minimal',
-      ...(suppressedTargetRefs
-        ? { runtimeSnapshotSuppressedTargetRefs: suppressedTargetRefs }
-        : {}),
     },
   );
 }

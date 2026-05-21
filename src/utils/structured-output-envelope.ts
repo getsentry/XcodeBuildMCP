@@ -22,7 +22,6 @@ export interface StructuredEnvelopeOptions {
   nextStepRuntime?: RuntimeKind;
   outputStyle?: OutputStyle;
   runtimeSnapshot?: RuntimeSnapshotEnvelopeMode;
-  runtimeSnapshotSuppressedTargetRefs?: readonly string[];
 }
 
 type RuntimeSnapshotCompactCapture = {
@@ -51,7 +50,6 @@ const MINIMAL_DATA_PRUNE_KEYS = ['request'] as const;
 const COMPACT_RUNTIME_TARGET_LIMIT = 64;
 const COMPACT_RUNTIME_SCROLL_LIMIT = 32;
 const COMPACT_RUNTIME_TEXT_LIMIT = 64;
-const COMPACT_RUNTIME_EVIDENCE_LIMIT = 64;
 const HIDDEN_RUNTIME_TARGET_LABELS = new Set(['sheet grabber']);
 const LOW_PRIORITY_RUNTIME_TARGET_LABELS = new Set([
   'sheet grabber',
@@ -192,15 +190,6 @@ function compactRuntimeElementRow(element: RuntimeElementV1, action: string): st
   ].join('|');
 }
 
-function compactSuppressedRuntimeEvidenceRow(element: RuntimeElementV1): string {
-  return [
-    element.role ?? '',
-    compactRuntimeSnapshotText(element.label),
-    compactRuntimeSnapshotText(element.value),
-    compactRuntimeSnapshotText(element.identifier),
-  ].join('|');
-}
-
 function primaryRuntimeElementAction(element: RuntimeElementV1): RuntimeActionNameV1 | 'none' {
   if (element.actions.includes('typeText')) {
     return 'typeText';
@@ -227,19 +216,6 @@ function isRuntimeTextSummaryElement(element: RuntimeElementV1): boolean {
   );
 }
 
-function isSuppressedRuntimeTextEvidenceElement(
-  element: RuntimeElementV1,
-  suppressedTargetRefs: ReadonlySet<string>,
-): boolean {
-  return (
-    suppressedTargetRefs.has(element.ref) &&
-    element.state?.visible !== false &&
-    !isHiddenRuntimeTarget(element) &&
-    !isLowPriorityRuntimeTarget(element) &&
-    hasRuntimeTextEvidence(element)
-  );
-}
-
 function uniqueRuntimeElements(elements: RuntimeElementV1[]): RuntimeElementV1[] {
   const seenRefs = new Set<string>();
   return elements.filter((element) => {
@@ -253,13 +229,10 @@ function uniqueRuntimeElements(elements: RuntimeElementV1[]): RuntimeElementV1[]
 
 function toRuntimeSnapshotCompactCapture(
   snapshot: RuntimeSnapshotV1,
-  options: { suppressedTargetRefs?: readonly string[] } = {},
 ): RuntimeSnapshotCompactCapture {
-  const suppressedTargetRefs = new Set(options.suppressedTargetRefs ?? []);
   const targets = sortRuntimeTargetsForDisplay(
     snapshot.elements.filter(
       (element) =>
-        !suppressedTargetRefs.has(element.ref) &&
         !isHiddenRuntimeTarget(element) &&
         (element.actions.includes('tap') || element.actions.includes('typeText')),
     ),
@@ -278,23 +251,12 @@ function toRuntimeSnapshotCompactCapture(
     )
     .slice(0, COMPACT_RUNTIME_SCROLL_LIMIT)
     .map((element) => compactRuntimeElementRow(element, 'swipe'));
-  const suppressedTextEvidence = sortRuntimeTextForDisplay(
-    snapshot.elements.filter((element) =>
-      isSuppressedRuntimeTextEvidenceElement(element, suppressedTargetRefs),
-    ),
-  );
   const ordinaryTextEvidence = sortRuntimeTextForDisplay(
-    snapshot.elements.filter(
-      (element) => !suppressedTargetRefs.has(element.ref) && isRuntimeTextSummaryElement(element),
-    ),
+    snapshot.elements.filter((element) => isRuntimeTextSummaryElement(element)),
   );
   const text = uniqueRuntimeElements(ordinaryTextEvidence)
     .slice(0, COMPACT_RUNTIME_TEXT_LIMIT)
     .map((element) => compactRuntimeElementRow(element, 'text'));
-  const evidence = uniqueRuntimeElements(suppressedTextEvidence)
-    .slice(0, COMPACT_RUNTIME_EVIDENCE_LIMIT)
-    .map(compactSuppressedRuntimeEvidenceRow);
-
   return {
     type: 'runtime-snapshot',
     rs: '1',
@@ -304,7 +266,6 @@ function toRuntimeSnapshotCompactCapture(
     targets,
     scroll,
     ...(text.length > 0 ? { text } : {}),
-    ...(evidence.length > 0 ? { evidence } : {}),
     udid: snapshot.simulatorId,
   };
 }
@@ -373,12 +334,7 @@ function projectRuntimeSnapshotData<TData>(
   if (isRuntimeSnapshotCapture(dataWithCapture.capture)) {
     projectedData = {
       ...dataWithCapture,
-      capture: toRuntimeSnapshotCompactCapture(
-        dataWithCapture.capture,
-        options.runtimeSnapshotSuppressedTargetRefs
-          ? { suppressedTargetRefs: options.runtimeSnapshotSuppressedTargetRefs }
-          : {},
-      ),
+      capture: toRuntimeSnapshotCompactCapture(dataWithCapture.capture),
     };
   } else if (isRuntimeSnapshotUnchangedCapture(dataWithCapture.capture)) {
     projectedData = {

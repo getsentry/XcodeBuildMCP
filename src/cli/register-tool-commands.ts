@@ -102,7 +102,6 @@ function writeJsonOutput(
   options: { outputStyle: OutputStyle; verbose?: boolean },
 ): boolean {
   const { structuredOutput } = handlerContext;
-  const suppressedTargetRefs = structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs;
   const envelope = structuredOutput
     ? toStructuredEnvelope(
         structuredOutput.result,
@@ -113,9 +112,6 @@ function writeJsonOutput(
           nextStepRuntime: session.getNextStepsRuntime?.(),
           outputStyle: options.outputStyle,
           runtimeSnapshot: 'compact',
-          ...(suppressedTargetRefs
-            ? { runtimeSnapshotSuppressedTargetRefs: suppressedTargetRefs }
-            : {}),
         },
       )
     : toStructuredEnvelope(

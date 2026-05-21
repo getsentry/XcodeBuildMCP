@@ -297,25 +297,17 @@ describe('UI action no-op next steps', () => {
     const { ctx } = createMockToolHandlerContext();
     const result = createCaptureSuccessResult(simulatorId, { capture: snapshot });
     setCaptureStructuredOutput(ctx, result);
-    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2', {
-      runtimeSnapshotSuppressedTargetRefs:
-        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
-    });
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
 
     expect(snapshot.elements.find((element) => element.ref === rowRef)?.actions).toContain('tap');
     expect(compactTargets(envelope).some((target) => target.startsWith(`${rowRef}|tap|`))).toBe(
-      false,
+      true,
     );
     expect(compactTargets(envelope).some((target) => target.startsWith(`${addRef}|tap|`))).toBe(
       true,
     );
     expect(compactText(envelope).some((line) => line.includes('not saved'))).toBe(false);
-    const notSavedEvidenceLine = compactEvidence(envelope).find((line) =>
-      line.includes('not saved'),
-    );
-    expect(notSavedEvidenceLine).toBeDefined();
-    expect(notSavedEvidenceLine?.startsWith(`${rowRef}|`)).toBe(false);
-    expect(notSavedEvidenceLine?.split('|')).toHaveLength(4);
+    expect(compactEvidence(envelope)).toEqual([]);
   });
 
   it('keeps completed foreground-sheet rows actionable in regular snapshot affordances', () => {
@@ -344,10 +336,7 @@ describe('UI action no-op next steps', () => {
     const { ctx } = createMockToolHandlerContext();
     const result = createCaptureSuccessResult(simulatorId, { capture: snapshot });
     setCaptureStructuredOutput(ctx, result);
-    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2', {
-      runtimeSnapshotSuppressedTargetRefs:
-        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
-    });
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
 
     expect(snapshot.elements.find((element) => element.ref === savedRowRef)?.actions).toContain(
       'tap',
@@ -406,8 +395,6 @@ describe('UI action no-op next steps', () => {
     ]);
     const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.ui-action-result', '2', {
       nextSteps: ctx.nextSteps,
-      runtimeSnapshotSuppressedTargetRefs:
-        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
     });
     expect(
       compactTargets(envelope).some((target) => target.startsWith(`${savedRow?.ref}|tap|`)),

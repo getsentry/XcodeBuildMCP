@@ -239,8 +239,6 @@ describe('UI action incomplete completion next steps', () => {
     const result = ctx.structuredOutput?.result as UiActionResultDomainResult;
     const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.ui-action-result', '2', {
       nextSteps: ctx.nextSteps,
-      runtimeSnapshotSuppressedTargetRefs:
-        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
     });
 
     expect(ctx.nextSteps?.[0]).toEqual({
@@ -250,18 +248,13 @@ describe('UI action incomplete completion next steps', () => {
     });
     expect(ctx.nextSteps?.[0]?.params?.elementRef).not.toBe(closeRef);
     expect(compactTargets(envelope).some((target) => target.startsWith(`${rowRef}|tap|`))).toBe(
-      false,
+      true,
     );
     expect(compactTargets(envelope).some((target) => target.startsWith(`${addRef}|tap|`))).toBe(
       true,
     );
     expect(compactText(envelope).some((line) => line.includes('not saved'))).toBe(false);
-    const notSavedEvidenceLine = compactEvidence(envelope).find((line) =>
-      line.includes('not saved'),
-    );
-    expect(notSavedEvidenceLine).toBeDefined();
-    expect(notSavedEvidenceLine?.startsWith(`${rowRef}|`)).toBe(false);
-    expect(notSavedEvidenceLine?.split('|')).toHaveLength(4);
+    expect(compactEvidence(envelope)).toEqual([]);
   });
 
   it('keeps incomplete foreground status visible after a no-op Add tap', async () => {
@@ -284,8 +277,6 @@ describe('UI action incomplete completion next steps', () => {
     const result = ctx.structuredOutput?.result as UiActionResultDomainResult;
     const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.ui-action-result', '2', {
       nextSteps: ctx.nextSteps,
-      runtimeSnapshotSuppressedTargetRefs:
-        ctx.structuredOutput?.renderHints?.runtimeSnapshot?.suppressedTargetRefs,
     });
 
     expect(ctx.nextSteps?.[0]?.params?.elementRef).not.toBe(addRef);
