@@ -158,6 +158,52 @@ describe('runtime snapshot next steps', () => {
     });
   });
 
+  it('uses a cell as a fallback scroll surface before whole-application scrolling', () => {
+    const snapshot: RuntimeSnapshotV1 = {
+      type: 'runtime-snapshot',
+      protocol: 'rs/1',
+      simulatorId,
+      screenHash: 'cell-scroll-fallback',
+      seq: 1,
+      capturedAtMs: Date.now(),
+      expiresAtMs: Date.now() + 60_000,
+      actions: [],
+      elements: [
+        {
+          ref: 'e1',
+          role: 'application',
+          label: 'Example',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          actions: ['swipeWithin'],
+        },
+        {
+          ref: 'e2',
+          role: 'cell',
+          label: 'Visible row',
+          frame: { x: 20, y: 420, width: 350, height: 80 },
+          actions: ['tap', 'swipeWithin'],
+        },
+      ],
+    };
+
+    const steps = createRuntimeSnapshotNextSteps({
+      simulatorId,
+      runtimeSnapshot: snapshot,
+      includeRefreshAndWait: false,
+    });
+
+    expect(steps).toContainEqual({
+      label: 'Scroll visible content',
+      tool: 'swipe',
+      params: {
+        simulatorId,
+        withinElementRef: 'e2',
+        direction: 'up',
+        distance: 0.5,
+      },
+    });
+  });
+
   it('prioritizes real scrolling over low-information chrome taps', () => {
     const snapshot: RuntimeSnapshotV1 = {
       type: 'runtime-snapshot',

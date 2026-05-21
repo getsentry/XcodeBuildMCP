@@ -174,6 +174,7 @@ function isScrollableNextStepElement(element: {
     element.actions.includes('swipeWithin') &&
     (element.role === 'scroll-view' ||
       element.role === 'list' ||
+      element.role === 'cell' ||
       element.role === 'application' ||
       element.role === 'window' ||
       (element.role === 'other' && hasScrollSemanticIdentity(element)))
@@ -187,11 +188,13 @@ function getScrollRolePriority(element: RuntimeElementV1): number {
       return 0;
     case 'other':
       return 1;
+    case 'cell':
+      return 2;
     case 'application':
     case 'window':
-      return 2;
-    default:
       return 3;
+    default:
+      return 4;
   }
 }
 
