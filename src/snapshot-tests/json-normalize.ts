@@ -50,6 +50,15 @@ function normalizeString(value: string, key?: string, path: string[] = []): stri
 }
 
 function normalizeNumber(path: string[], key: string | undefined, value: number): number {
+  if (
+    path.includes('capture') &&
+    path.includes('elements') &&
+    path.at(-2) === 'frame' &&
+    (key === 'x' || key === 'y' || key === 'width' || key === 'height')
+  ) {
+    return key === 'width' || key === 'height' ? 1 : 0;
+  }
+
   switch (key) {
     case 'toolCount':
       if (path.includes('data')) return 99999;

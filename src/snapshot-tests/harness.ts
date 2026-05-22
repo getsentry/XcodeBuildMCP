@@ -3,7 +3,11 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { formatStructuredEnvelopeFixture } from './json-normalize.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
-import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import type {
+  SnapshotInvokeOptions,
+  SnapshotResult,
+  WorkflowSnapshotHarness,
+} from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
@@ -35,6 +39,7 @@ function runSnapshotCli(
   args: Record<string, unknown>,
   output: 'text' | 'json' = 'text',
   options: CreateSnapshotHarnessOptions = {},
+  invokeOptions: SnapshotInvokeOptions = {},
 ): ReturnType<typeof spawnSync> {
   const commandArgs = [
     CLI_PATH,
@@ -46,6 +51,9 @@ function runSnapshotCli(
   ];
   if (output !== 'text') {
     commandArgs.push('--output', output);
+  }
+  if (invokeOptions.verbose === true) {
+    commandArgs.push('--verbose');
   }
 
   return spawnSync('node', commandArgs, {
@@ -124,6 +132,7 @@ export async function createSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    invokeOptions: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
     const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
 
@@ -136,7 +145,7 @@ export async function createSnapshotHarness(
     }
 
     const label = `${workflow}/${cliToolName}`;
-    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options);
+    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options, invokeOptions);
     assertCliSnapshotProcessResult(result, label);
     const stdout = readProcessOutput(result.stdout);
 
@@ -159,6 +168,7 @@ export async function createCliJsonSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    invokeOptions: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
     const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
 
@@ -171,7 +181,7 @@ export async function createCliJsonSnapshotHarness(
     }
 
     const label = `${workflow}/${cliToolName}`;
-    const result = runSnapshotCli(workflow, cliToolName, args, 'json', options);
+    const result = runSnapshotCli(workflow, cliToolName, args, 'json', options, invokeOptions);
     assertCliSnapshotProcessResult(result, label);
     const stdout = readProcessOutput(result.stdout);
     const envelope = parseStructuredEnvelope(stdout, label);

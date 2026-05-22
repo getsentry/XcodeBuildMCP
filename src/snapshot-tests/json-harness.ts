@@ -1,5 +1,9 @@
 import { formatStructuredEnvelopeFixture } from './json-normalize.ts';
-import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import type {
+  SnapshotInvokeOptions,
+  SnapshotResult,
+  WorkflowSnapshotHarness,
+} from './contracts.ts';
 import { createMcpSnapshotHarness, type CreateMcpSnapshotHarnessOptions } from './mcp-harness.ts';
 
 export async function createMcpJsonSnapshotHarness(
@@ -11,8 +15,9 @@ export async function createMcpJsonSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    options: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
-    const result = await harness.invoke(workflow, cliToolName, args);
+    const result = await harness.invoke(workflow, cliToolName, args, options);
     const envelope = result.structuredEnvelope;
     if (!envelope) {
       throw new Error(`Structured output missing for ${workflow}/${cliToolName}`);

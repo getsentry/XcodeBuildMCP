@@ -3,7 +3,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
-import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import type {
+  SnapshotInvokeOptions,
+  SnapshotResult,
+  WorkflowSnapshotHarness,
+} from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
@@ -140,6 +144,7 @@ export async function createMcpSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    _options: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
     const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
     if (!resolved) {

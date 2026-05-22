@@ -51,11 +51,16 @@ export interface SnapshotResult {
   structuredEnvelope?: StructuredOutputEnvelope<unknown> | null;
 }
 
+export interface SnapshotInvokeOptions {
+  verbose?: boolean;
+}
+
 export interface WorkflowSnapshotHarness {
   invoke(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    options?: SnapshotInvokeOptions,
   ): Promise<SnapshotResult>;
   cleanup(): Promise<void>;
 }
