@@ -231,6 +231,17 @@ export function createWaitForUiExecutor(
       }
     }
 
+    if (predicate === 'textContains' && text === undefined) {
+      const message = 'textContains waits require text.';
+      return createCaptureFailureResult(simulatorId, message, {
+        uiError: {
+          code: 'TARGET_NOT_FOUND',
+          message,
+          recoveryHint: 'Provide text for textContains waits.',
+        },
+      });
+    }
+
     if (predicate !== 'settled' && predicate !== 'textContains' && !selector && !text) {
       const message = `${predicate} waits require at least one selector field.`;
       return createCaptureFailureResult(simulatorId, message, {

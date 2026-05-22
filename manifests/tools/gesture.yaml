@@ -7,6 +7,8 @@ description: Simulator gesture preset.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
   version: "2"
+routing:
+  stateful: true
 annotations:
   title: Gesture
   readOnlyHint: true

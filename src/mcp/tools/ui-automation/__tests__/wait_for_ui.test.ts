@@ -15,7 +15,7 @@ import {
   recordRuntimeSnapshot,
 } from '../shared/snapshot-ui-state.ts';
 import { createRuntimeSnapshotRecord } from '../shared/runtime-snapshot.ts';
-import { handler, schema, wait_for_uiLogic } from '../wait_for_ui.ts';
+import { createWaitForUiExecutor, handler, schema, wait_for_uiLogic } from '../wait_for_ui.ts';
 import {
   createMockAxeHelpers,
   createNode,
@@ -203,6 +203,27 @@ describe('Wait for UI Plugin', () => {
 
       expect(ctx.structuredOutput?.result.didError).toBe(false);
       expect(calls[0]?.command.slice(1)).toEqual(['describe-ui', '--udid', simulatorId]);
+    });
+  });
+
+  it('returns a recoverable failure when direct executor calls omit textContains text', async () => {
+    const executor: CommandExecutor = async () => {
+      throw new Error('AXe should not run when textContains text is missing');
+    };
+    const executeWaitForUi = createWaitForUiExecutor(
+      executor,
+      createMockAxeHelpers(),
+      undefined,
+      createTiming().timing,
+    );
+
+    const result = await executeWaitForUi({ simulatorId, predicate: 'textContains', timeoutMs: 0 });
+
+    expect(result.didError).toBe(true);
+    expect(result.uiError).toMatchObject({
+      code: 'TARGET_NOT_FOUND',
+      message: 'textContains waits require text.',
+      recoveryHint: 'Provide text for textContains waits.',
     });
   });
 
