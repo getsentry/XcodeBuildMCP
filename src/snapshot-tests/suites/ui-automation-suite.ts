@@ -48,6 +48,22 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
       return /\b(e\d+)\|swipe\|/.exec(text)?.[1] ?? null;
     }
 
+    async function captureTapRefByLabel(bundleId: string, label: string): Promise<string | null> {
+      await harness.invoke('simulator', 'launch-app', {
+        simulatorId: simulatorUdid,
+        bundleId,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+        simulatorId: simulatorUdid,
+      });
+      expect(isError).toBe(false);
+
+      const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b(e\\d+)\\|tap\\|[^|]*\\|${escapedLabel}\\|`).exec(text)?.[1] ?? null;
+    }
+
     beforeAll(async () => {
       vi.setConfig({ testTimeout: 120_000 });
       simulatorUdid = await ensureSimulatorBooted('iPhone 17 Pro');
@@ -68,11 +84,14 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('tap', () => {
       it('success', async () => {
-        await refreshRuntimeSnapshot();
+        const tapRef = await captureTapRefByLabel(BUNDLE_ID, '7');
+        if (!tapRef) {
+          throw new Error("Expected Calculator button '7' to have a tap ref.");
+        }
 
         const { text, isError } = await harness.invoke('ui-automation', 'tap', {
           simulatorId: simulatorUdid,
-          elementRef: 'e14',
+          elementRef: tapRef,
         });
         expect(isError).toBe(false);
         expectFixture(text, 'tap--success');
@@ -80,14 +99,17 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
       if (runtime === 'cli/json') {
         it('success - verbose runtime snapshot', async () => {
-          await refreshRuntimeSnapshot();
+          const tapRef = await captureTapRefByLabel(BUNDLE_ID, '7');
+          if (!tapRef) {
+            throw new Error("Expected Calculator button '7' to have a tap ref.");
+          }
 
           const { text, isError, structuredEnvelope } = await harness.invoke(
             'ui-automation',
             'tap',
             {
               simulatorId: simulatorUdid,
-              elementRef: 'e14',
+              elementRef: tapRef,
             },
             { verbose: true },
           );
