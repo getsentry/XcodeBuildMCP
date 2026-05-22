@@ -96,6 +96,12 @@ When reading issues:
 - Use shared lock and atomic-write helpers for mutable shared files.
 - Prefer one-record-per-file registries over shared aggregate files.
 - Cleanup must verify ownership before deleting shared artifacts.
+- Multi-process safety means concurrent processes must not corrupt or delete each other's state.
+  It does not mean ephemeral runtime handles should become portable between invocation surfaces.
+- Keep runtime/session-scoped handles isolated unless the product explicitly defines a cross-process
+  contract. For example, UI automation `elementRef` values from runtime snapshots are handles for
+  the runtime/session that produced them, not durable IDs to share between separate MCP and CLI
+  invocations.
 - User-facing artifact/log paths in final text or structured output must use `displayPath()` from `src/utils/build-preflight.ts`, so paths are cwd-relative when possible or `~/...` instead of absolute home paths. Keep stored files at their real absolute paths; only normalize response/display values.
 
 ## Style
