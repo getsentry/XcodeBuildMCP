@@ -3,6 +3,8 @@ import type { AccessibilityNode, Frame, Point } from './domain-results.ts';
 export type RuntimeSnapshotProtocol = 'rs/1';
 export type RuntimeSnapshotCaptureType = 'runtime-snapshot';
 
+export const COMPACT_RUNTIME_TARGET_LIMIT = 64;
+
 export type RuntimeActionNameV1 = 'tap' | 'typeText' | 'longPress' | 'touch' | 'swipeWithin';
 
 export type RuntimeElementRoleV1 =

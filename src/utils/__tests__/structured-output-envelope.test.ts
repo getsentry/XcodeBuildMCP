@@ -5,6 +5,7 @@ import type {
   CaptureResultDomainResult,
   DeviceListDomainResult,
 } from '../../types/domain-results.ts';
+import { COMPACT_RUNTIME_TARGET_LIMIT } from '../../types/ui-snapshot.ts';
 
 describe('toStructuredEnvelope', () => {
   it('strips kind, didError, and error from the data payload', () => {
@@ -408,6 +409,43 @@ describe('toStructuredEnvelope', () => {
         },
       },
     });
+  });
+
+  it('caps compact runtime snapshot candidates inside recoverable UI errors', () => {
+    const candidates = Array.from({ length: COMPACT_RUNTIME_TARGET_LIMIT + 16 }, (_, index) => ({
+      ref: `e${index + 1}`,
+      role: 'button' as const,
+      label: `Candidate ${index + 1}`,
+      frame: { x: 0, y: index, width: 100, height: 40 },
+      actions: ['tap' as const],
+    }));
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: true,
+      error: 'Element ref is not actionable.',
+      summary: { status: 'FAILED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      uiError: {
+        code: 'TARGET_NOT_ACTIONABLE',
+        message: 'Element ref is not actionable.',
+        recoveryHint: 'Choose another elementRef.',
+        elementRef: 'e404',
+        candidates,
+      },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as {
+      uiError: { candidates: string[]; message: string; elementRef: string };
+    };
+
+    expect(data.uiError.message).toBe('Element ref is not actionable.');
+    expect(data.uiError.elementRef).toBe('e404');
+    expect(data.uiError.candidates).toHaveLength(COMPACT_RUNTIME_TARGET_LIMIT);
+    expect(data.uiError.candidates[0]).toBe('e1|tap|button|Candidate 1||');
+    expect(data.uiError.candidates[COMPACT_RUNTIME_TARGET_LIMIT - 1]).toBe(
+      `e${COMPACT_RUNTIME_TARGET_LIMIT}|tap|button|Candidate ${COMPACT_RUNTIME_TARGET_LIMIT}||`,
+    );
   });
 
   it('can keep full runtime snapshots and candidates for verbose callers', () => {

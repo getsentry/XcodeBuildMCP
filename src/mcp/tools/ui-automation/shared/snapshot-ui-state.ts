@@ -1,3 +1,4 @@
+import { COMPACT_RUNTIME_TARGET_LIMIT } from '../../../../types/ui-snapshot.ts';
 import type {
   RuntimeActionNameV1,
   RuntimeElementResolution,
@@ -124,9 +125,11 @@ export function resolveElementRefForAnyAction(
             ? 'Choose an elementRef that lists the required action, or refresh with snapshot_ui.'
             : `Choose an elementRef that lists ${requiredActionText}, or refresh with snapshot_ui.`,
         elementRef,
-        candidates: snapshot.payload.elements.filter((candidate) =>
-          requiredActions.some((action) => candidate.actions.includes(action)),
-        ),
+        candidates: snapshot.payload.elements
+          .filter((candidate) =>
+            requiredActions.some((action) => candidate.actions.includes(action)),
+          )
+          .slice(0, COMPACT_RUNTIME_TARGET_LIMIT),
         snapshotAgeMs: ageMs,
       },
     };

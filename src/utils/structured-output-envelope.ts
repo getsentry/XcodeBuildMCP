@@ -2,6 +2,7 @@ import type { RuntimeKind } from '../runtime/types.ts';
 import type { NextStep, OutputStyle } from '../types/common.ts';
 import type { ToolDomainResult } from '../types/domain-results.ts';
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
+import { COMPACT_RUNTIME_TARGET_LIMIT } from '../types/ui-snapshot.ts';
 import type {
   RuntimeActionNameV1,
   RuntimeElementV1,
@@ -47,7 +48,6 @@ type RuntimeSnapshotUnchangedCompactCapture = {
 };
 
 const MINIMAL_DATA_PRUNE_KEYS = ['request'] as const;
-const COMPACT_RUNTIME_TARGET_LIMIT = 64;
 const COMPACT_RUNTIME_SCROLL_LIMIT = 32;
 const COMPACT_RUNTIME_TEXT_LIMIT = 64;
 const HIDDEN_RUNTIME_TARGET_LABELS = new Set(['sheet grabber']);
@@ -350,9 +350,11 @@ function projectRuntimeSnapshotData<TData>(
   const uiError = Array.isArray(dataWithRuntimeRows.uiError?.candidates)
     ? {
         ...dataWithRuntimeRows.uiError,
-        candidates: dataWithRuntimeRows.uiError.candidates.map((candidate) =>
-          isRuntimeElement(candidate) ? compactRuntimeElementCandidate(candidate) : candidate,
-        ),
+        candidates: dataWithRuntimeRows.uiError.candidates
+          .slice(0, COMPACT_RUNTIME_TARGET_LIMIT)
+          .map((candidate) =>
+            isRuntimeElement(candidate) ? compactRuntimeElementCandidate(candidate) : candidate,
+          ),
       }
     : dataWithRuntimeRows.uiError;
   const waitMatch = Array.isArray(dataWithRuntimeRows.waitMatch?.matches)
@@ -382,7 +384,7 @@ export function toStructuredEnvelope<TResult extends ToolDomainResult>(
   options: StructuredEnvelopeOptions = {},
 ): StructuredOutputEnvelope<unknown> {
   const { nextSteps, nextStepRuntime = 'cli', outputStyle = 'normal' } = options;
-  const { kind: _kind, didError, error, ...data } = result;
+  const { kind: neverKind, didError, error, ...data } = result;
   const projectedData = projectRuntimeSnapshotData(data as DomainResultData<TResult>, options);
   const serializedNextSteps =
     schema === 'xcodebuildmcp.output.error'

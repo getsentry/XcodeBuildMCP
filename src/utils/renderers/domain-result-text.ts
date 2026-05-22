@@ -796,10 +796,7 @@ function createLaunchResultItems(
 ): TextRenderableItem[] {
   const isSimulator = typeof result.artifacts.simulatorId === 'string';
   const isDevice = typeof result.artifacts.deviceId === 'string';
-  const isMac =
-    !isSimulator &&
-    !isDevice &&
-    (!result.didError || result.error === 'Failed to launch macOS app.');
+  const isMac = !isSimulator && !isDevice && typeof result.artifacts.appPath === 'string';
   const title = isMac ? 'Launch macOS App' : 'Launch App';
   const params: HeaderRenderItem['params'] = [];
 

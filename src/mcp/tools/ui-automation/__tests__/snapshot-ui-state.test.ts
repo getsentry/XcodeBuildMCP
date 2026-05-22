@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AccessibilityNode } from '../../../../types/domain-results.ts';
+import { COMPACT_RUNTIME_TARGET_LIMIT } from '../../../../types/ui-snapshot.ts';
 import { createRuntimeSnapshotRecord } from '../shared/runtime-snapshot.ts';
 import {
   __resetRuntimeSnapshotStoreForTests,
@@ -101,6 +102,46 @@ describe('runtime snapshot store', () => {
       element: snapshot.elements[0],
       snapshotAgeMs: 1_000,
     });
+  });
+
+  it('caps not-actionable candidate lists at the compact runtime target limit', () => {
+    const textFields: AccessibilityNode[] = Array.from(
+      { length: COMPACT_RUNTIME_TARGET_LIMIT + 10 },
+      (_, index) => ({
+        type: 'TextField',
+        role: 'AXTextField',
+        frame: { x: 10, y: 80 + index, width: 200, height: 40 },
+        children: [],
+        enabled: true,
+        custom_actions: [],
+        AXLabel: `Field ${index + 1}`,
+      }),
+    );
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [node, ...textFields],
+      nowMs: 1_000,
+    });
+    recordRuntimeSnapshot(snapshot);
+
+    const result = resolveElementRef(simulatorId, 'e1', 'typeText', 2_000);
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: 'TARGET_NOT_ACTIONABLE',
+        message: "Element ref 'e1' does not support 'typeText'.",
+        elementRef: 'e1',
+        candidates: expect.any(Array),
+      }),
+    });
+    if (!result.ok) {
+      expect(result.error.candidates).toHaveLength(COMPACT_RUNTIME_TARGET_LIMIT);
+      expect(result.error.candidates?.[0]?.ref).toBe('e2');
+      expect(result.error.candidates?.[COMPACT_RUNTIME_TARGET_LIMIT - 1]?.ref).toBe(
+        `e${COMPACT_RUNTIME_TARGET_LIMIT + 1}`,
+      );
+    }
   });
 
   it('returns typed recoverable errors for missing, expired, not-found, and not-actionable refs', () => {
