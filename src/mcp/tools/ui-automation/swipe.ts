@@ -17,7 +17,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRef,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { getRuntimeElementSwipePoints } from './shared/runtime-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
@@ -118,117 +122,123 @@ export function createSwipeExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<SwipeParams, SwipeResult> {
-  return async (params) => {
-    const toolName = 'swipe';
-    const { simulatorId, withinElementRef, direction, duration, distance, preDelay, postDelay } =
-      params;
-    const unresolvedAction = {
-      type: 'swipe' as const,
-      withinElementRef,
-      direction,
-      ...(duration !== undefined ? { durationSeconds: duration } : {}),
-    };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'swipe';
+      const { simulatorId, withinElementRef, direction, duration, distance, preDelay, postDelay } =
+        params;
+      const unresolvedAction = {
+        type: 'swipe' as const,
+        withinElementRef,
+        direction,
+        ...(duration !== undefined ? { durationSeconds: duration } : {}),
+      };
 
-    const resolution = resolveElementRef(simulatorId, withinElementRef, 'swipeWithin');
-    if (!resolution.ok) {
-      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
-        uiError: resolution.error,
-      });
-    }
-
-    const points = getRuntimeElementSwipePoints(resolution.element, direction, distance);
-    if (!points.ok) {
-      const uiError = createUiAutomationRecoverableError({
-        code: 'TARGET_NOT_ACTIONABLE',
-        message: points.message,
-        elementRef: withinElementRef,
-      });
-      return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
-        uiError,
-      });
-    }
-
-    const action = {
-      ...unresolvedAction,
-      from: points.from,
-      to: points.to,
-    };
-
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = [
-      'swipe',
-      '--start-x',
-      String(points.from.x),
-      '--start-y',
-      String(points.from.y),
-      '--end-x',
-      String(points.to.x),
-      '--end-y',
-      String(points.to.y),
-    ];
-    if (duration !== undefined) {
-      commandArgs.push('--duration', String(duration));
-    }
-    if (preDelay !== undefined) {
-      commandArgs.push('--pre-delay', String(preDelay));
-    }
-    if (postDelay !== undefined) {
-      commandArgs.push('--post-delay', String(postDelay));
-    }
-
-    const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting ${direction} swipe within ${withinElementRef}${optionsText} on ${simulatorId}`,
-    );
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
+      const resolution = resolveElementRef(simulatorId, withinElementRef, 'swipeWithin');
+      if (!resolution.ok) {
+        return createUiActionFailureResult(
+          unresolvedAction,
+          simulatorId,
+          resolution.error.message,
+          {
+            uiError: resolution.error,
+          },
+        );
       }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () =>
-          `Failed to simulate ${direction} swipe within ${withinElementRef}.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-          elementRef: withinElementRef,
-        }),
-      });
-    }
 
-    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-      simulatorId,
-      executor,
-      axeHelpers,
+      const points = getRuntimeElementSwipePoints(resolution.element, direction, distance);
+      if (!points.ok) {
+        const uiError = createUiAutomationRecoverableError({
+          code: 'TARGET_NOT_ACTIONABLE',
+          message: points.message,
+          elementRef: withinElementRef,
+        });
+        return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
+          uiError,
+        });
+      }
+
+      const action = {
+        ...unresolvedAction,
+        from: points.from,
+        to: points.to,
+      };
+
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = [
+        'swipe',
+        '--start-x',
+        String(points.from.x),
+        '--start-y',
+        String(points.from.y),
+        '--end-x',
+        String(points.to.x),
+        '--end-y',
+        String(points.to.y),
+      ];
+      if (duration !== undefined) {
+        commandArgs.push('--duration', String(duration));
+      }
+      if (preDelay !== undefined) {
+        commandArgs.push('--pre-delay', String(preDelay));
+      }
+      if (postDelay !== undefined) {
+        commandArgs.push('--post-delay', String(postDelay));
+      }
+
+      const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${direction} swipe within ${withinElementRef}${optionsText} on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'swipe', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () =>
+            `Failed to simulate ${direction} swipe within ${withinElementRef}.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+            elementRef: withinElementRef,
+          }),
+        });
+      }
+
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          previousRuntimeSnapshot: resolution.snapshot.payload,
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     });
-    return createUiActionSuccessResult(
-      action,
-      simulatorId,
-      [guard.warningText, captureResult.warning],
-      {
-        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-        previousRuntimeSnapshot: resolution.snapshot.payload,
-        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-      },
-    );
-  };
 }
 
 export async function swipeLogic(

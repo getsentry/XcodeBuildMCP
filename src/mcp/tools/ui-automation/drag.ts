@@ -17,7 +17,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRefForAnyAction } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRefForAnyAction,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import {
   getRuntimeElementDirectionalDragPoints,
   getRuntimeElementCenter,
@@ -107,133 +111,139 @@ export function createDragExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<DragParams, DragResult> {
-  return async (params) => {
-    const toolName = 'drag';
-    const { simulatorId, elementRef, direction, duration, distance, steps, preDelay, postDelay } =
-      params;
-    const unresolvedAction = {
-      type: 'drag' as const,
-      elementRef,
-      direction,
-      ...(duration !== undefined ? { durationSeconds: duration } : {}),
-      ...(steps !== undefined ? { steps } : {}),
-    };
-
-    const resolution = resolveElementRefForAnyAction(simulatorId, elementRef, [
-      'touch',
-      'swipeWithin',
-    ]);
-    if (!resolution.ok) {
-      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
-        uiError: resolution.error,
-      });
-    }
-
-    const viewportFrame = findViewportFrame(resolution.snapshot.elements) ?? undefined;
-    const { actions, role } = resolution.element.publicElement;
-    const points = shouldUseWithinElementDragPoints(actions, role)
-      ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
-      : getRuntimeElementDirectionalDragPoints(
-          resolution.element,
-          direction,
-          distance,
-          viewportFrame,
-        );
-    if (!points.ok) {
-      const uiError = createUiAutomationRecoverableError({
-        code: 'TARGET_NOT_ACTIONABLE',
-        message: points.message,
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'drag';
+      const { simulatorId, elementRef, direction, duration, distance, steps, preDelay, postDelay } =
+        params;
+      const unresolvedAction = {
+        type: 'drag' as const,
         elementRef,
-      });
-      return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
-        uiError,
-      });
-    }
+        direction,
+        ...(duration !== undefined ? { durationSeconds: duration } : {}),
+        ...(steps !== undefined ? { steps } : {}),
+      };
 
-    const action = {
-      ...unresolvedAction,
-      from: points.from,
-      to: points.to,
-    };
-
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = [
-      'drag',
-      '--start-x',
-      String(points.from.x),
-      '--start-y',
-      String(points.from.y),
-      '--end-x',
-      String(points.to.x),
-      '--end-y',
-      String(points.to.y),
-    ];
-    if (duration !== undefined) {
-      commandArgs.push('--duration', String(duration));
-    }
-    if (steps !== undefined) {
-      commandArgs.push('--steps', String(steps));
-    }
-    if (preDelay !== undefined) {
-      commandArgs.push('--pre-delay', String(preDelay));
-    }
-    if (postDelay !== undefined) {
-      commandArgs.push('--post-delay', String(postDelay));
-    }
-
-    const target = getRuntimeElementCenter(resolution.element);
-    const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting ${direction} drag from ${elementRef} at (${target.x}, ${target.y})${optionsText} on ${simulatorId}`,
-    );
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'drag', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
+      const resolution = resolveElementRefForAnyAction(simulatorId, elementRef, [
+        'touch',
+        'swipeWithin',
+      ]);
+      if (!resolution.ok) {
+        return createUiActionFailureResult(
+          unresolvedAction,
+          simulatorId,
+          resolution.error.message,
+          {
+            uiError: resolution.error,
+          },
+        );
       }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to simulate ${direction} drag from ${elementRef}.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-          elementRef,
-        }),
-      });
-    }
 
-    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-      simulatorId,
-      executor,
-      axeHelpers,
+      const viewportFrame = findViewportFrame(resolution.snapshot.elements) ?? undefined;
+      const { actions, role } = resolution.element.publicElement;
+      const points = shouldUseWithinElementDragPoints(actions, role)
+        ? getRuntimeElementSwipePoints(resolution.element, direction, distance)
+        : getRuntimeElementDirectionalDragPoints(
+            resolution.element,
+            direction,
+            distance,
+            viewportFrame,
+          );
+      if (!points.ok) {
+        const uiError = createUiAutomationRecoverableError({
+          code: 'TARGET_NOT_ACTIONABLE',
+          message: points.message,
+          elementRef,
+        });
+        return createUiActionFailureResult(unresolvedAction, simulatorId, points.message, {
+          uiError,
+        });
+      }
+
+      const action = {
+        ...unresolvedAction,
+        from: points.from,
+        to: points.to,
+      };
+
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = [
+        'drag',
+        '--start-x',
+        String(points.from.x),
+        '--start-y',
+        String(points.from.y),
+        '--end-x',
+        String(points.to.x),
+        '--end-y',
+        String(points.to.y),
+      ];
+      if (duration !== undefined) {
+        commandArgs.push('--duration', String(duration));
+      }
+      if (steps !== undefined) {
+        commandArgs.push('--steps', String(steps));
+      }
+      if (preDelay !== undefined) {
+        commandArgs.push('--pre-delay', String(preDelay));
+      }
+      if (postDelay !== undefined) {
+        commandArgs.push('--post-delay', String(postDelay));
+      }
+
+      const target = getRuntimeElementCenter(resolution.element);
+      const optionsText = duration !== undefined ? ` duration=${duration}s` : '';
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${direction} drag from ${elementRef} at (${target.x}, ${target.y})${optionsText} on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'drag', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to simulate ${direction} drag from ${elementRef}.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+            elementRef,
+          }),
+        });
+      }
+
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          previousRuntimeSnapshot: resolution.snapshot.payload,
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     });
-    return createUiActionSuccessResult(
-      action,
-      simulatorId,
-      [guard.warningText, captureResult.warning],
-      {
-        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-        previousRuntimeSnapshot: resolution.snapshot.payload,
-        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-      },
-    );
-  };
 }
 
 export async function dragLogic(

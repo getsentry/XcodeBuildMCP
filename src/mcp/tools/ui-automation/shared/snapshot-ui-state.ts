@@ -9,6 +9,33 @@ import type {
 
 const runtimeSnapshots = new Map<string, RuntimeSnapshotRecord>();
 const runtimeSnapshotSeqs = new Map<string, number>();
+const simulatorUiAutomationQueues = new Map<string, Promise<void>>();
+
+export async function withSimulatorUiAutomationTransaction<T>(
+  simulatorId: string,
+  transaction: () => Promise<T>,
+): Promise<T> {
+  const previousTransaction = simulatorUiAutomationQueues.get(simulatorId) ?? Promise.resolve();
+  let releaseCurrentTransaction!: () => void;
+  const currentTransaction = new Promise<void>((resolve) => {
+    releaseCurrentTransaction = resolve;
+  });
+  const queuedTransaction = previousTransaction
+    .catch(() => undefined)
+    .then(() => currentTransaction);
+  simulatorUiAutomationQueues.set(simulatorId, queuedTransaction);
+
+  await previousTransaction.catch(() => undefined);
+
+  try {
+    return await transaction();
+  } finally {
+    releaseCurrentTransaction();
+    if (simulatorUiAutomationQueues.get(simulatorId) === queuedTransaction) {
+      simulatorUiAutomationQueues.delete(simulatorId);
+    }
+  }
+}
 
 function snapshotAgeMs(snapshot: RuntimeSnapshotRecord, nowMs: number): number {
   return Math.max(0, nowMs - snapshot.capturedAtMs);
@@ -48,6 +75,7 @@ export function clearRuntimeSnapshot(simulatorId: string): void {
 export function __resetRuntimeSnapshotStoreForTests(): void {
   runtimeSnapshots.clear();
   runtimeSnapshotSeqs.clear();
+  simulatorUiAutomationQueues.clear();
 }
 
 export function getRuntimeSnapshotLookup(

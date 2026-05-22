@@ -17,7 +17,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRef,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
@@ -72,96 +76,103 @@ export function createTouchExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<TouchParams, TouchResult> {
-  return async (params) => {
-    const toolName = 'touch';
-    const { simulatorId, elementRef, down, up, delay } = params;
-    const actionText =
-      down && up ? 'touch down+up' : down ? 'touch down' : up ? 'touch up' : undefined;
-    const unresolvedAction = {
-      type: 'touch' as const,
-      elementRef,
-      ...(actionText ? { event: actionText } : {}),
-    };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'touch';
+      const { simulatorId, elementRef, down, up, delay } = params;
+      const actionText =
+        down && up ? 'touch down+up' : down ? 'touch down' : up ? 'touch up' : undefined;
+      const unresolvedAction = {
+        type: 'touch' as const,
+        elementRef,
+        ...(actionText ? { event: actionText } : {}),
+      };
 
-    if (!down && !up) {
-      return createUiActionFailureResult(
-        unresolvedAction,
-        simulatorId,
-        'At least one of "down" or "up" must be true',
-      );
-    }
-
-    const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
-    if (!resolution.ok) {
-      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
-        uiError: resolution.error,
-      });
-    }
-
-    const center = getRuntimeElementActivationPoint(resolution.element);
-    const action = { ...unresolvedAction, x: center.x, y: center.y };
-
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = ['touch', '-x', String(center.x), '-y', String(center.y)];
-    if (down) {
-      commandArgs.push('--down');
-    }
-    if (up) {
-      commandArgs.push('--up');
-    }
-    if (delay !== undefined) {
-      commandArgs.push('--delay', String(delay));
-    }
-
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting ${actionText ?? 'touch'} on elementRef ${elementRef} on ${simulatorId}`,
-    );
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'touch', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-        simulatorId,
-        executor,
-        axeHelpers,
-      });
-      return createUiActionSuccessResult(
-        action,
-        simulatorId,
-        [guard.warningText, captureResult.warning],
-        {
-          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-        },
-      );
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
+      if (!down && !up) {
+        return createUiActionFailureResult(
+          unresolvedAction,
+          simulatorId,
+          'At least one of "down" or "up" must be true',
+        );
       }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => 'Failed to execute touch event.',
+
+      const resolution = resolveElementRef(simulatorId, elementRef, 'touch');
+      if (!resolution.ok) {
+        return createUiActionFailureResult(
+          unresolvedAction,
+          simulatorId,
+          resolution.error.message,
+          {
+            uiError: resolution.error,
+          },
+        );
+      }
+
+      const center = getRuntimeElementActivationPoint(resolution.element);
+      const action = { ...unresolvedAction, x: center.x, y: center.y };
+
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
       });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-          elementRef,
-        }),
-      });
-    }
-  };
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = ['touch', '-x', String(center.x), '-y', String(center.y)];
+      if (down) {
+        commandArgs.push('--down');
+      }
+      if (up) {
+        commandArgs.push('--up');
+      }
+      if (delay !== undefined) {
+        commandArgs.push('--delay', String(delay));
+      }
+
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${actionText ?? 'touch'} on elementRef ${elementRef} on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'touch', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            previousRuntimeSnapshot: resolution.snapshot.payload,
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => 'Failed to execute touch event.',
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+            elementRef,
+          }),
+        });
+      }
+    });
 }
 
 export async function touchLogic(

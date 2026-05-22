@@ -11,7 +11,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { getRuntimeSnapshot, recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import {
+  getRuntimeSnapshot,
+  recordRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { CaptureResultDomainResult } from '../../../types/domain-results.ts';
@@ -48,86 +52,87 @@ export function createSnapshotUiExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<SnapshotUiParams, SnapshotUiResult> {
-  return async (params) => {
-    const toolName = 'snapshot_ui';
-    const { simulatorId } = params;
-    const commandArgs = ['describe-ui'];
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'snapshot_ui';
+      const { simulatorId } = params;
+      const commandArgs = ['describe-ui'];
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createCaptureFailureResult(simulatorId, guard.blockedMessage, {
-        uiError: {
-          code: 'ACTION_FAILED',
-          message: guard.blockedMessage,
-          recoveryHint:
-            'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
-        },
-      });
-    }
-
-    log('info', `${LOG_PREFIX}/${toolName}: Starting for ${simulatorId}`);
-
-    try {
-      const responseText = await executeAxeCommand(
-        commandArgs,
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
         simulatorId,
-        'describe-ui',
-        executor,
-        axeHelpers,
-      );
-
-      const snapshot = parseRuntimeSnapshotResponse({
-        simulatorId,
-        responseText,
-        allowEmpty: true,
+        toolName,
       });
-      recordRuntimeSnapshot(snapshot);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-
-      if (params.sinceScreenHash === snapshot.screenHash) {
-        return createCaptureSuccessResult(simulatorId, {
-          capture: {
-            type: 'runtime-snapshot-unchanged',
-            protocol: 'rs/1',
-            simulatorId,
-            screenHash: snapshot.screenHash,
-            seq: snapshot.seq,
+      if (guard.blockedMessage) {
+        return createCaptureFailureResult(simulatorId, guard.blockedMessage, {
+          uiError: {
+            code: 'ACTION_FAILED',
+            message: guard.blockedMessage,
+            recoveryHint:
+              'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
           },
+        });
+      }
+
+      log('info', `${LOG_PREFIX}/${toolName}: Starting for ${simulatorId}`);
+
+      try {
+        const responseText = await executeAxeCommand(
+          commandArgs,
+          simulatorId,
+          'describe-ui',
+          executor,
+          axeHelpers,
+        );
+
+        const snapshot = parseRuntimeSnapshotResponse({
+          simulatorId,
+          responseText,
+          allowEmpty: true,
+        });
+        recordRuntimeSnapshot(snapshot);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+
+        if (params.sinceScreenHash === snapshot.screenHash) {
+          return createCaptureSuccessResult(simulatorId, {
+            capture: {
+              type: 'runtime-snapshot-unchanged',
+              protocol: 'rs/1',
+              simulatorId,
+              screenHash: snapshot.screenHash,
+              seq: snapshot.seq,
+            },
+            warnings: [guard.warningText],
+          });
+        }
+
+        return createCaptureSuccessResult(simulatorId, {
+          capture: snapshot.payload,
           warnings: [guard.warningText],
         });
-      }
+      } catch (error) {
+        if (error instanceof RuntimeSnapshotParseError) {
+          const message = 'Failed to parse runtime UI snapshot.';
+          log('error', `${LOG_PREFIX}/${toolName}: Failed - ${message}`);
+          return createCaptureFailureResult(simulatorId, message, {
+            details: [error.message],
+            uiError: {
+              code: 'SNAPSHOT_PARSE_FAILED',
+              message,
+              recoveryHint: 'Run snapshot_ui again after the app is fully launched and responsive.',
+            },
+          });
+        }
 
-      return createCaptureSuccessResult(simulatorId, {
-        capture: snapshot.payload,
-        warnings: [guard.warningText],
-      });
-    } catch (error) {
-      if (error instanceof RuntimeSnapshotParseError) {
-        const message = 'Failed to parse runtime UI snapshot.';
-        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${message}`);
-        return createCaptureFailureResult(simulatorId, message, {
-          details: [error.message],
-          uiError: {
-            code: 'SNAPSHOT_PARSE_FAILED',
-            message,
-            recoveryHint: 'Run snapshot_ui again after the app is fully launched and responsive.',
-          },
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => 'Failed to get accessibility hierarchy.',
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createCaptureFailureResult(simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
         });
       }
-
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => 'Failed to get accessibility hierarchy.',
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createCaptureFailureResult(simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-      });
-    }
-  };
+    });
 }
 
 export async function snapshot_uiLogic(
@@ -147,7 +152,13 @@ export async function snapshot_uiLogic(
     if (result.capture.type === 'runtime-snapshot') {
       runtimeSnapshot = result.capture;
     } else if (result.capture.type === 'runtime-snapshot-unchanged') {
-      runtimeSnapshot = getRuntimeSnapshot(params.simulatorId)?.payload;
+      const currentRuntimeSnapshot = getRuntimeSnapshot(params.simulatorId);
+      if (
+        currentRuntimeSnapshot?.payload.seq === result.capture.seq &&
+        currentRuntimeSnapshot.screenHash === result.capture.screenHash
+      ) {
+        runtimeSnapshot = currentRuntimeSnapshot.payload;
+      }
     }
 
     if (runtimeSnapshot) {

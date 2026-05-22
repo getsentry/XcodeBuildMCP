@@ -12,7 +12,10 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
-import { clearRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -56,61 +59,65 @@ export function createButtonExecutor(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
   settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
 ): NonStreamingExecutor<ButtonParams, ButtonResult> {
-  return async (params) => {
-    const toolName = 'button';
-    const { simulatorId, buttonType, duration } = params;
-    const action = { type: 'button' as const, button: buttonType };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'button';
+      const { simulatorId, buttonType, duration } = params;
+      const action = { type: 'button' as const, button: buttonType };
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = ['button', buttonType];
-    if (duration !== undefined) {
-      commandArgs.push('--duration', String(duration));
-    }
-
-    log('info', `${LOG_PREFIX}/${toolName}: Starting ${buttonType} button press on ${simulatorId}`);
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'button', executor, axeHelpers);
-      if (settleDelayMs > 0) {
-        await delayMs(settleDelayMs);
-      }
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
         simulatorId,
-        executor,
-        axeHelpers,
+        toolName,
       });
-      return createUiActionSuccessResult(
-        action,
-        simulatorId,
-        [guard.warningText, captureResult.warning],
-        {
-          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-        },
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = ['button', buttonType];
+      if (duration !== undefined) {
+        commandArgs.push('--duration', String(duration));
+      }
+
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${buttonType} button press on ${simulatorId}`,
       );
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'button', executor, axeHelpers);
+        if (settleDelayMs > 0) {
+          await delayMs(settleDelayMs);
+        }
         clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+        });
       }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-      });
-    }
-  };
+    });
 }
 
 export async function buttonLogic(

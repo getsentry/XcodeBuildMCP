@@ -481,16 +481,20 @@ function filterToForegroundElements(
   });
 }
 
+type RepeatedNoOpAction = { tool: 'tap' | 'swipe' | 'drag'; ref: string };
+
 function getRepeatedNoOpActionRef(params: {
   runtimeSnapshot: RuntimeSnapshotV1;
   actionContext?: RuntimeSnapshotNextStepActionContext;
-}): { tool: 'tap' | 'swipe' | 'drag'; ref: string } | null {
+}): RepeatedNoOpAction | null {
   if (params.actionContext?.previousScreenHash !== params.runtimeSnapshot.screenHash) {
     return null;
   }
 
   switch (params.actionContext.action.type) {
     case 'tap':
+    case 'touch':
+    case 'long-press':
       return { tool: 'tap', ref: params.actionContext.action.elementRef };
     case 'swipe':
       return { tool: 'swipe', ref: params.actionContext.action.withinElementRef };
@@ -509,7 +513,7 @@ function hasIncompleteStateSignal(element: { label?: string; value?: string }): 
 
 function findForegroundIncompleteCompletionTapElement(
   elements: readonly RuntimeElementV1[],
-  repeatedNoOpAction: { tool: 'tap' | 'swipe' | 'drag'; ref: string } | null,
+  repeatedNoOpAction: RepeatedNoOpAction | null,
 ): RuntimeElementV1 | null {
   if (!elements.some(hasIncompleteStateSignal)) {
     return null;

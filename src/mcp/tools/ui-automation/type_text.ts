@@ -17,7 +17,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRef,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import {
   createSemanticTapCommand,
@@ -78,120 +82,121 @@ export function createTypeTextExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<TypeTextParams, TypeTextResult> {
-  return async (params) => {
-    const toolName = 'type_text';
-    const { simulatorId, elementRef, text, replaceExisting } = params;
-    const action = { type: 'type-text' as const, elementRef, textLength: text.length };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'type_text';
+      const { simulatorId, elementRef, text, replaceExisting } = params;
+      const action = { type: 'type-text' as const, elementRef, textLength: text.length };
 
-    const resolution = resolveElementRef(simulatorId, elementRef, 'typeText');
-    if (!resolution.ok) {
-      return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
-        uiError: resolution.error,
+      const resolution = resolveElementRef(simulatorId, elementRef, 'typeText');
+      if (!resolution.ok) {
+        return createUiActionFailureResult(action, simulatorId, resolution.error.message, {
+          uiError: resolution.error,
+        });
+      }
+
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
       });
-    }
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
+      if (containsUnsupportedAxeTypeText(text)) {
+        return createUiActionFailureResult(action, simulatorId, AXE_UNSUPPORTED_TEXT_MESSAGE, {
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: AXE_UNSUPPORTED_TEXT_MESSAGE,
+            recoveryHint: 'Use only US keyboard characters supported by AXe type.',
+            elementRef,
+          }),
+        });
+      }
 
-    if (containsUnsupportedAxeTypeText(text)) {
-      return createUiActionFailureResult(action, simulatorId, AXE_UNSUPPORTED_TEXT_MESSAGE, {
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: AXE_UNSUPPORTED_TEXT_MESSAGE,
-          recoveryHint: 'Use only US keyboard characters supported by AXe type.',
-          elementRef,
-        }),
-      });
-    }
+      const focusCommand = createSemanticTapCommand(
+        resolution.element,
+        elementRef,
+        [],
+        resolution.snapshot.elements,
+      );
+      const typeCommandArgs = ['type', text];
 
-    const focusCommand = createSemanticTapCommand(
-      resolution.element,
-      elementRef,
-      [],
-      resolution.snapshot.elements,
-    );
-    const typeCommandArgs = ['type', text];
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting type into elementRef ${elementRef}, length=${text.length} on ${simulatorId}`,
+      );
 
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting type into elementRef ${elementRef}, length=${text.length} on ${simulatorId}`,
-    );
+      try {
+        await executeSemanticTapWithAmbiguityFallback({
+          command: focusCommand,
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to focus elementRef ${elementRef} before typing.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Focus failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+            elementRef,
+          }),
+        });
+      }
 
-    try {
-      await executeSemanticTapWithAmbiguityFallback({
-        command: focusCommand,
+      try {
+        if (replaceExisting === true) {
+          await executeAxeCommand(
+            ['key-combo', '--modifiers', '227', '--key', '4'],
+            simulatorId,
+            'key-combo',
+            executor,
+            axeHelpers,
+          );
+        }
+        await executeAxeCommand(typeCommandArgs, simulatorId, 'type', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to type text into elementRef ${elementRef}.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Typing failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+            elementRef,
+          }),
+        });
+      }
+
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
         simulatorId,
         executor,
         axeHelpers,
       });
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
-      }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to focus elementRef ${elementRef} before typing.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Focus failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-          elementRef,
-        }),
-      });
-    }
-
-    try {
-      if (replaceExisting === true) {
-        await executeAxeCommand(
-          ['key-combo', '--modifiers', '227', '--key', '4'],
-          simulatorId,
-          'key-combo',
-          executor,
-          axeHelpers,
-        );
-      }
-      await executeAxeCommand(typeCommandArgs, simulatorId, 'type', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
-      }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to type text into elementRef ${elementRef}.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Typing failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-          elementRef,
-        }),
-      });
-    }
-
-    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-      simulatorId,
-      executor,
-      axeHelpers,
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     });
-    return createUiActionSuccessResult(
-      action,
-      simulatorId,
-      [guard.warningText, captureResult.warning],
-      {
-        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-      },
-    );
-  };
 }
 
 export async function type_textLogic(

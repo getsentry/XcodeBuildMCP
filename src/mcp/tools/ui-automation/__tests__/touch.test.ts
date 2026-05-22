@@ -82,6 +82,22 @@ describe('Touch Plugin', () => {
       expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
+    it('does not suggest tapping the same element after a successful touch on an unchanged screen', async () => {
+      recordSnapshot([createNode()]);
+      const { ctx, run } = createMockToolHandlerContext();
+      const { executor } = createTrackingExecutor();
+
+      await run(() =>
+        touchLogic({ simulatorId, elementRef: 'e1', down: true }, executor, createMockAxeHelpers()),
+      );
+
+      expect(ctx.nextSteps).not.toContainEqual({
+        label: 'Tap an elementRef',
+        tool: 'tap',
+        params: { simulatorId, elementRef: 'e1' },
+      });
+    });
+
     it('touches up at the referenced element center', async () => {
       recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
       const { calls, executor } = createTrackingExecutor();

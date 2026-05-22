@@ -21,7 +21,10 @@ import type {
 } from '../../../types/ui-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
-import { recordRuntimeSnapshot } from './shared/snapshot-ui-state.ts';
+import {
+  recordRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import {
   parseRuntimeSnapshotResponse,
   RuntimeSnapshotParseError,
@@ -208,189 +211,190 @@ export function createWaitForUiExecutor(
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
   timing: WaitTiming = { now: Date.now, sleep: defaultSleep },
 ): NonStreamingExecutor<WaitForUiParams, WaitForUiResult> {
-  return async (params) => {
-    const toolName = 'wait_for_ui';
-    const { simulatorId, predicate, elementRef, text } = params;
-    const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const pollIntervalMs = params.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-    const settledDurationMs = params.settledDurationMs ?? DEFAULT_SETTLED_DURATION_MS;
-    const startedAtMs = timing.now();
-    const deadlineMs = startedAtMs + timeoutMs;
-    let selector: ResolvedWaitSelector | null = null;
-    if (predicate !== 'settled') {
-      if (elementRef) {
-        const selectorResolution = resolveElementSelector(simulatorId, elementRef, startedAtMs);
-        if (!selectorResolution.ok) {
-          return createCaptureFailureResult(simulatorId, selectorResolution.error.message, {
-            uiError: selectorResolution.error,
-          });
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'wait_for_ui';
+      const { simulatorId, predicate, elementRef, text } = params;
+      const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const pollIntervalMs = params.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+      const settledDurationMs = params.settledDurationMs ?? DEFAULT_SETTLED_DURATION_MS;
+      const startedAtMs = timing.now();
+      const deadlineMs = startedAtMs + timeoutMs;
+      let selector: ResolvedWaitSelector | null = null;
+      if (predicate !== 'settled') {
+        if (elementRef) {
+          const selectorResolution = resolveElementSelector(simulatorId, elementRef, startedAtMs);
+          if (!selectorResolution.ok) {
+            return createCaptureFailureResult(simulatorId, selectorResolution.error.message, {
+              uiError: selectorResolution.error,
+            });
+          }
+          selector = selectorResolution.selector;
+        } else {
+          selector = selectorFromParams(params);
         }
-        selector = selectorResolution.selector;
-      } else {
-        selector = selectorFromParams(params);
       }
-    }
 
-    if (predicate === 'textContains' && text === undefined) {
-      const message = 'textContains waits require text.';
-      return createCaptureFailureResult(simulatorId, message, {
-        uiError: {
-          code: 'TARGET_NOT_FOUND',
-          message,
-          recoveryHint: 'Provide text for textContains waits.',
-        },
-      });
-    }
-
-    if (predicate !== 'settled' && predicate !== 'textContains' && !selector && !text) {
-      const message = `${predicate} waits require at least one selector field.`;
-      return createCaptureFailureResult(simulatorId, message, {
-        uiError: {
-          code: 'TARGET_NOT_FOUND',
-          message,
-          recoveryHint:
-            'Provide elementRef, identifier, label, role, or value, or use settled for selector-free waits.',
-        },
-      });
-    }
-
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createCaptureFailureResult(simulatorId, guard.blockedMessage, {
-        uiError: {
-          code: 'ACTION_FAILED',
-          message: guard.blockedMessage,
-          recoveryHint:
-            'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
-        },
-      });
-    }
-
-    let latestSnapshot: RuntimeSnapshotRecord | null = null;
-    let latestCandidates: RuntimeElementV1[] = [];
-    let lastParseError: RuntimeSnapshotParseError | null = null;
-    let lastPollError: string | null = null;
-    const settledTracker: SettledTracker = { signature: null, stableSinceMs: null };
-
-    log('info', `${LOG_PREFIX}/${toolName}: Waiting for ${predicate} on ${simulatorId}`);
-
-    while (true) {
-      try {
-        const responseText = await executeAxeCommand(
-          ['describe-ui'],
-          simulatorId,
-          'describe-ui',
-          executor,
-          axeHelpers,
-        );
-        const nowMs = timing.now();
-        const snapshot = parseRuntimeSnapshotResponse({
-          simulatorId,
-          responseText,
-          nowMs,
-          allowEmpty: true,
+      if (predicate === 'textContains' && text === undefined) {
+        const message = 'textContains waits require text.';
+        return createCaptureFailureResult(simulatorId, message, {
+          uiError: {
+            code: 'TARGET_NOT_FOUND',
+            message,
+            recoveryHint: 'Provide text for textContains waits.',
+          },
         });
-        latestSnapshot = snapshot;
-        lastParseError = null;
-        lastPollError = null;
-        recordRuntimeSnapshot(snapshot);
+      }
 
-        const matched = evaluateWaitPredicate({
-          predicate,
-          selector,
-          snapshot,
-          text,
-          nowMs,
-          settledDurationMs,
-          settledTracker,
+      if (predicate !== 'settled' && predicate !== 'textContains' && !selector && !text) {
+        const message = `${predicate} waits require at least one selector field.`;
+        return createCaptureFailureResult(simulatorId, message, {
+          uiError: {
+            code: 'TARGET_NOT_FOUND',
+            message,
+            recoveryHint:
+              'Provide elementRef, identifier, label, role, or value, or use settled for selector-free waits.',
+          },
         });
+      }
 
-        if (typeof matched === 'boolean') {
-          if (matched) {
-            return createCaptureSuccessResult(simulatorId, {
-              capture: snapshot.payload,
-              warnings: [guard.warningText],
-            });
-          }
-        } else {
-          latestCandidates = matched.candidates ?? [];
-          if (matched.uiError) {
-            return createCaptureFailureResult(simulatorId, matched.uiError.message, {
-              warnings: [guard.warningText],
-              uiError: matched.uiError,
-              capture: snapshot.payload,
-            });
-          }
-          if (matched.matched) {
-            return createCaptureSuccessResult(simulatorId, {
-              capture: snapshot.payload,
-              warnings: [guard.warningText],
-              waitMatch: createWaitMatch(predicate, matched.candidates),
-            });
-          }
-        }
-      } catch (error) {
-        if (error instanceof RuntimeSnapshotParseError) {
-          lastParseError = error;
-          lastPollError = null;
-        } else {
-          const failure = mapAxeCommandError(error, {
-            axeFailureMessage: () => 'Failed to poll runtime UI snapshot.',
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createCaptureFailureResult(simulatorId, guard.blockedMessage, {
+          uiError: {
+            code: 'ACTION_FAILED',
+            message: guard.blockedMessage,
+            recoveryHint:
+              'Resume execution with debug_continue, remove breakpoints, or detach with debug_detach before retrying UI automation.',
+          },
+        });
+      }
+
+      let latestSnapshot: RuntimeSnapshotRecord | null = null;
+      let latestCandidates: RuntimeElementV1[] = [];
+      let lastParseError: RuntimeSnapshotParseError | null = null;
+      let lastPollError: string | null = null;
+      const settledTracker: SettledTracker = { signature: null, stableSinceMs: null };
+
+      log('info', `${LOG_PREFIX}/${toolName}: Waiting for ${predicate} on ${simulatorId}`);
+
+      while (true) {
+        try {
+          const responseText = await executeAxeCommand(
+            ['describe-ui'],
+            simulatorId,
+            'describe-ui',
+            executor,
+            axeHelpers,
+          );
+          const nowMs = timing.now();
+          const snapshot = parseRuntimeSnapshotResponse({
+            simulatorId,
+            responseText,
+            nowMs,
+            allowEmpty: true,
           });
-          lastPollError = failure.message;
+          latestSnapshot = snapshot;
           lastParseError = null;
+          lastPollError = null;
+          recordRuntimeSnapshot(snapshot);
+
+          const matched = evaluateWaitPredicate({
+            predicate,
+            selector,
+            snapshot,
+            text,
+            nowMs,
+            settledDurationMs,
+            settledTracker,
+          });
+
+          if (typeof matched === 'boolean') {
+            if (matched) {
+              return createCaptureSuccessResult(simulatorId, {
+                capture: snapshot.payload,
+                warnings: [guard.warningText],
+              });
+            }
+          } else {
+            latestCandidates = matched.candidates ?? [];
+            if (matched.uiError) {
+              return createCaptureFailureResult(simulatorId, matched.uiError.message, {
+                warnings: [guard.warningText],
+                uiError: matched.uiError,
+                capture: snapshot.payload,
+              });
+            }
+            if (matched.matched) {
+              return createCaptureSuccessResult(simulatorId, {
+                capture: snapshot.payload,
+                warnings: [guard.warningText],
+                waitMatch: createWaitMatch(predicate, matched.candidates),
+              });
+            }
+          }
+        } catch (error) {
+          if (error instanceof RuntimeSnapshotParseError) {
+            lastParseError = error;
+            lastPollError = null;
+          } else {
+            const failure = mapAxeCommandError(error, {
+              axeFailureMessage: () => 'Failed to poll runtime UI snapshot.',
+            });
+            lastPollError = failure.message;
+            lastParseError = null;
+          }
         }
+
+        const nowMs = timing.now();
+        if (nowMs >= deadlineMs) {
+          break;
+        }
+
+        await timing.sleep(Math.min(pollIntervalMs, deadlineMs - nowMs));
       }
 
-      const nowMs = timing.now();
-      if (nowMs >= deadlineMs) {
-        break;
+      if (latestSnapshot) {
+        const uiError = createWaitTimeoutError({
+          predicate,
+          timeoutMs,
+          selector: selector ?? undefined,
+          candidates: latestCandidates,
+        });
+        return createCaptureFailureResult(simulatorId, uiError.message, {
+          warnings: [guard.warningText],
+          uiError,
+          capture: latestSnapshot.payload,
+        });
       }
 
-      await timing.sleep(Math.min(pollIntervalMs, deadlineMs - nowMs));
-    }
+      if (lastParseError) {
+        const message = 'Failed to parse runtime UI snapshot while waiting for UI.';
+        return createCaptureFailureResult(simulatorId, message, {
+          details: [lastParseError.message],
+          uiError: {
+            code: 'SNAPSHOT_PARSE_FAILED',
+            message,
+            recoveryHint: 'Retry after the app is fully launched and responsive.',
+          },
+        });
+      }
 
-    if (latestSnapshot) {
-      const uiError = createWaitTimeoutError({
-        predicate,
-        timeoutMs,
-        selector: selector ?? undefined,
-        candidates: latestCandidates,
-      });
-      return createCaptureFailureResult(simulatorId, uiError.message, {
-        warnings: [guard.warningText],
-        uiError,
-        capture: latestSnapshot.payload,
-      });
-    }
-
-    if (lastParseError) {
-      const message = 'Failed to parse runtime UI snapshot while waiting for UI.';
+      const message =
+        lastPollError ?? `Timed out after ${timeoutMs}ms waiting for UI predicate '${predicate}'.`;
       return createCaptureFailureResult(simulatorId, message, {
-        details: [lastParseError.message],
         uiError: {
-          code: 'SNAPSHOT_PARSE_FAILED',
+          code: lastPollError ? 'ACTION_FAILED' : 'WAIT_TIMEOUT',
           message,
           recoveryHint: 'Retry after the app is fully launched and responsive.',
+          ...(lastPollError ? {} : { timeoutMs }),
         },
       });
-    }
-
-    const message =
-      lastPollError ?? `Timed out after ${timeoutMs}ms waiting for UI predicate '${predicate}'.`;
-    return createCaptureFailureResult(simulatorId, message, {
-      uiError: {
-        code: lastPollError ? 'ACTION_FAILED' : 'WAIT_TIMEOUT',
-        message,
-        recoveryHint: 'Retry after the app is fully launched and responsive.',
-        ...(lastPollError ? {} : { timeoutMs }),
-      },
     });
-  };
 }
 
 export async function wait_for_uiLogic(

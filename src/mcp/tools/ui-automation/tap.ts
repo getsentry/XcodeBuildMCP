@@ -11,7 +11,11 @@ import {
   getHandlerContext,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRef,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { defaultAxeHelpers } from './shared/axe-command.ts';
 import {
@@ -67,103 +71,109 @@ export function createTapExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<TapParams, TapResult> {
-  return async (params) => {
-    const toolName = 'tap';
-    const { simulatorId, elementRef, preDelay, postDelay } = params;
-    const unresolvedAction = { type: 'tap' as const, elementRef };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'tap';
+      const { simulatorId, elementRef, preDelay, postDelay } = params;
+      const unresolvedAction = { type: 'tap' as const, elementRef };
 
-    const resolution = resolveElementRef(simulatorId, elementRef, 'tap');
-    if (!resolution.ok) {
-      return createUiActionFailureResult(unresolvedAction, simulatorId, resolution.error.message, {
-        uiError: resolution.error,
-      });
-    }
-
-    const activationPoint = getRuntimeElementActivationPoint(resolution.element);
-    const action = {
-      ...unresolvedAction,
-      x: activationPoint.x,
-      y: activationPoint.y,
-    };
-
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const usesTouchActivation = resolution.element.publicElement.role === 'switch';
-    const extraArgs: string[] = [];
-    if (!usesTouchActivation && preDelay !== undefined) {
-      extraArgs.push('--pre-delay', String(preDelay));
-    }
-    if (!usesTouchActivation && postDelay !== undefined) {
-      extraArgs.push('--post-delay', String(postDelay));
-    }
-    const tapCommand = createSemanticTapCommand(
-      resolution.element,
-      elementRef,
-      extraArgs,
-      resolution.snapshot.elements,
-    );
-
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting for ${tapCommand.targetDescription} on ${simulatorId}`,
-    );
-
-    try {
-      if (usesTouchActivation && preDelay !== undefined) {
-        await delayMs(preDelay * 1000);
+      const resolution = resolveElementRef(simulatorId, elementRef, 'tap');
+      if (!resolution.ok) {
+        return createUiActionFailureResult(
+          unresolvedAction,
+          simulatorId,
+          resolution.error.message,
+          {
+            uiError: resolution.error,
+          },
+        );
       }
-      await executeSemanticTapWithAmbiguityFallback({
-        command: tapCommand,
+
+      const activationPoint = getRuntimeElementActivationPoint(resolution.element);
+      const action = {
+        ...unresolvedAction,
+        x: activationPoint.x,
+        y: activationPoint.y,
+      };
+
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const usesTouchActivation = resolution.element.publicElement.role === 'switch';
+      const extraArgs: string[] = [];
+      if (!usesTouchActivation && preDelay !== undefined) {
+        extraArgs.push('--pre-delay', String(preDelay));
+      }
+      if (!usesTouchActivation && postDelay !== undefined) {
+        extraArgs.push('--post-delay', String(postDelay));
+      }
+      const tapCommand = createSemanticTapCommand(
+        resolution.element,
+        elementRef,
+        extraArgs,
+        resolution.snapshot.elements,
+      );
+
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting for ${tapCommand.targetDescription} on ${simulatorId}`,
+      );
+
+      try {
+        if (usesTouchActivation && preDelay !== undefined) {
+          await delayMs(preDelay * 1000);
+        }
+        await executeSemanticTapWithAmbiguityFallback({
+          command: tapCommand,
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+        clearRuntimeSnapshot(simulatorId);
+        if (usesTouchActivation && postDelay !== undefined) {
+          await delayMs(postDelay * 1000);
+        }
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to simulate tap on elementRef ${elementRef}.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+          uiError: createUiAutomationRecoverableError({
+            code: tapCommand.usedSelector ? 'UI_STATE_CHANGED' : 'ACTION_FAILED',
+            message: failure.message,
+            elementRef,
+          }),
+        });
+      }
+
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
         simulatorId,
         executor,
         axeHelpers,
       });
-      clearRuntimeSnapshot(simulatorId);
-      if (usesTouchActivation && postDelay !== undefined) {
-        await delayMs(postDelay * 1000);
-      }
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
-      }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to simulate tap on elementRef ${elementRef}.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-        uiError: createUiAutomationRecoverableError({
-          code: tapCommand.usedSelector ? 'UI_STATE_CHANGED' : 'ACTION_FAILED',
-          message: failure.message,
-          elementRef,
-        }),
-      });
-    }
-
-    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-      simulatorId,
-      executor,
-      axeHelpers,
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          previousRuntimeSnapshot: resolution.snapshot.payload,
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     });
-    return createUiActionSuccessResult(
-      action,
-      simulatorId,
-      [guard.warningText, captureResult.warning],
-      {
-        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-        previousRuntimeSnapshot: resolution.snapshot.payload,
-        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-      },
-    );
-  };
 }
 
 export async function tapLogic(

@@ -10,9 +10,11 @@ import {
   getSnapshotUiWarning,
   recordRuntimeSnapshot,
   resolveElementRef,
+  withSimulatorUiAutomationTransaction,
 } from '../shared/snapshot-ui-state.ts';
 
 const simulatorId = '12345678-1234-4234-8234-123456789012';
+const secondSimulatorId = '87654321-4321-4234-8234-210987654321';
 
 const node: AccessibilityNode = {
   type: 'Button',
@@ -23,6 +25,19 @@ const node: AccessibilityNode = {
   custom_actions: [],
   AXLabel: 'Continue',
 };
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
+async function flushPromises(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 describe('runtime snapshot store', () => {
   beforeEach(() => {
@@ -179,5 +194,88 @@ describe('runtime snapshot store', () => {
         snapshotAgeMs: 1_000,
       }),
     });
+  });
+
+  it('serializes UI automation transactions for the same simulator', async () => {
+    const events: string[] = [];
+    const firstGate = deferred();
+
+    const first = withSimulatorUiAutomationTransaction(simulatorId, async () => {
+      events.push('first:start');
+      await firstGate.promise;
+      events.push('first:end');
+      return 'first';
+    });
+    await flushPromises();
+
+    const second = withSimulatorUiAutomationTransaction(simulatorId, async () => {
+      events.push('second:start');
+      return 'second';
+    });
+    await flushPromises();
+
+    expect(events).toEqual(['first:start']);
+
+    firstGate.resolve();
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['first', 'second']);
+    expect(events).toEqual(['first:start', 'first:end', 'second:start']);
+  });
+
+  it('releases UI automation transaction locks after errors', async () => {
+    const events: string[] = [];
+    const firstGate = deferred();
+
+    const first = withSimulatorUiAutomationTransaction(simulatorId, async () => {
+      events.push('first:start');
+      await firstGate.promise;
+      events.push('first:error');
+      throw new Error('transaction failed');
+    });
+    const firstResult = first.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await flushPromises();
+
+    const second = withSimulatorUiAutomationTransaction(simulatorId, async () => {
+      events.push('second:start');
+      return 'second';
+    });
+    await flushPromises();
+
+    expect(events).toEqual(['first:start']);
+
+    firstGate.resolve();
+
+    expect(await firstResult).toBeInstanceOf(Error);
+    await expect(second).resolves.toBe('second');
+    expect(events).toEqual(['first:start', 'first:error', 'second:start']);
+  });
+
+  it('allows UI automation transactions on different simulators to run concurrently', async () => {
+    const events: string[] = [];
+    const firstGate = deferred();
+
+    const first = withSimulatorUiAutomationTransaction(simulatorId, async () => {
+      events.push('first:start');
+      await firstGate.promise;
+      events.push('first:end');
+      return 'first';
+    });
+    await flushPromises();
+
+    const second = withSimulatorUiAutomationTransaction(secondSimulatorId, async () => {
+      events.push('second:start');
+      return 'second';
+    });
+    await flushPromises();
+
+    expect(events).toEqual(['first:start', 'second:start']);
+
+    firstGate.resolve();
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['first', 'second']);
+    expect(events).toEqual(['first:start', 'second:start', 'first:end']);
   });
 });

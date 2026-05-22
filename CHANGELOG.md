@@ -67,6 +67,7 @@
 - Fixed `snapshot_ui` next-step guidance so state-changing controls such as segmented units and switches remain available in targets without being promoted as generic tap or batch suggestions.
 - Fixed `snapshot_ui` tap next-step priority so content-rich cards are suggested before navigation controls like Settings.
 - Fixed successful UI action results so they include a fresh runtime snapshot and actionable next steps, reducing follow-up refresh calls after taps, typing, swipes, and batches.
+- Fixed same-simulator UI automation transactions so runtime snapshot resolution, actions, invalidation, and refreshes cannot interleave within one MCP or daemon process.
 
 ## [2.5.2]
 
@@ -703,4 +704,3 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-

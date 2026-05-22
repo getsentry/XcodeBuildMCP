@@ -78,6 +78,26 @@ describe('Long Press Plugin', () => {
       ]);
     });
 
+    it('does not suggest tapping the same element after a successful long press on an unchanged screen', async () => {
+      recordSnapshot([createNode()]);
+      const { ctx, run } = createMockToolHandlerContext();
+      const { executor } = createTrackingExecutor();
+
+      await run(() =>
+        long_pressLogic(
+          { simulatorId, elementRef: 'e1', duration: 1500 },
+          executor,
+          createMockAxeHelpers(),
+        ),
+      );
+
+      expect(ctx.nextSteps).not.toContainEqual({
+        label: 'Tap an elementRef',
+        tool: 'tap',
+        params: { simulatorId, elementRef: 'e1' },
+      });
+    });
+
     it('uses the switch activation point for wide switch rows', async () => {
       recordSnapshot([
         createNode({

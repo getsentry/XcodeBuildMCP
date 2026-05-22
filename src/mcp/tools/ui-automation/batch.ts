@@ -12,7 +12,11 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
-import { clearRuntimeSnapshot, resolveElementRef } from './shared/snapshot-ui-state.ts';
+import {
+  clearRuntimeSnapshot,
+  resolveElementRef,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
 import { createSemanticTapBatchSteps, createSemanticTapCommand } from './shared/semantic-tap.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
@@ -162,65 +166,69 @@ export function createBatchExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<BatchParams, BatchResult> {
-  return async (params) => {
-    const toolName = 'batch';
-    const { simulatorId, steps } = params;
-    const action = { type: 'batch' as const, stepCount: steps.length };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'batch';
+      const { simulatorId, steps } = params;
+      const action = { type: 'batch' as const, stepCount: steps.length };
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
-    });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const resolvedSteps = resolveBatchSteps(params);
-    if (!resolvedSteps.ok) {
-      return resolvedSteps.result;
-    }
-
-    const commandArgs = buildBatchCommandArgs(params, resolvedSteps.steps);
-    log('info', `${LOG_PREFIX}/${toolName}: Starting ${steps.length} step batch on ${simulatorId}`);
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'batch', executor, axeHelpers);
-      clearRuntimeSnapshot(simulatorId);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-    } catch (error) {
-      if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
-        clearRuntimeSnapshot(simulatorId);
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
       }
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to execute AXe batch with ${steps.length} steps.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-        uiError: createUiAutomationRecoverableError({
-          code: 'ACTION_FAILED',
-          message: failure.message,
-        }),
-      });
-    }
 
-    const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-      simulatorId,
-      executor,
-      axeHelpers,
+      const resolvedSteps = resolveBatchSteps(params);
+      if (!resolvedSteps.ok) {
+        return resolvedSteps.result;
+      }
+
+      const commandArgs = buildBatchCommandArgs(params, resolvedSteps.steps);
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${steps.length} step batch on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'batch', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to execute AXe batch with ${steps.length} steps.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+          uiError: createUiAutomationRecoverableError({
+            code: 'ACTION_FAILED',
+            message: failure.message,
+          }),
+        });
+      }
+
+      const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+        simulatorId,
+        executor,
+        axeHelpers,
+      });
+      return createUiActionSuccessResult(
+        action,
+        simulatorId,
+        [guard.warningText, captureResult.warning],
+        {
+          previousRuntimeSnapshot: resolvedSteps.previousRuntimeSnapshot,
+          ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+          ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+        },
+      );
     });
-    return createUiActionSuccessResult(
-      action,
-      simulatorId,
-      [guard.warningText, captureResult.warning],
-      {
-        previousRuntimeSnapshot: resolvedSteps.previousRuntimeSnapshot,
-        ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-        ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-      },
-    );
-  };
 }
 
 export async function batchLogic(
