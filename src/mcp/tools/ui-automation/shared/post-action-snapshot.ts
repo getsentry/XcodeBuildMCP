@@ -73,12 +73,27 @@ export async function captureRuntimeSnapshotAfterAction(params: {
 
   while (true) {
     const nowMs = timing.now();
-    const snapshot = await describeRuntimeSnapshot({
-      simulatorId: params.simulatorId,
-      executor: params.executor,
-      axeHelpers: params.axeHelpers,
-      nowMs,
-    });
+    let snapshot: RuntimeSnapshotRecord;
+    try {
+      snapshot = await describeRuntimeSnapshot({
+        simulatorId: params.simulatorId,
+        executor: params.executor,
+        axeHelpers: params.axeHelpers,
+        nowMs,
+      });
+    } catch (error) {
+      if (!(error instanceof RuntimeSnapshotParseError)) {
+        throw error;
+      }
+
+      const remainingMs = deadlineMs - timing.now();
+      if (remainingMs <= 0) {
+        throw error;
+      }
+
+      await timing.sleep(Math.min(pollIntervalMs, remainingMs));
+      continue;
+    }
 
     if (
       evaluateSettledPredicate({

@@ -96,4 +96,43 @@ describe('post-action runtime snapshots', () => {
       recoveryHint: expect.stringContaining('snapshot_ui'),
     });
   });
+
+  it('retries transient empty snapshots while waiting for settled refs', async () => {
+    let nowMs = 0;
+    const timing = {
+      now: () => nowMs,
+      sleep: async (durationMs: number) => {
+        nowMs += durationMs;
+      },
+    };
+    const settledSnapshot = JSON.stringify({
+      elements: [createNode({ frame: { x: 10, y: 220, width: 100, height: 40 } })],
+    });
+    const { calls, executor } = createSequencedExecutor([
+      { success: true, output: JSON.stringify({ elements: [] }) },
+      { success: true, output: settledSnapshot },
+      { success: true, output: settledSnapshot },
+    ]);
+
+    const capture = await captureRuntimeSnapshotAfterAction({
+      simulatorId,
+      executor,
+      axeHelpers: createMockAxeHelpers(),
+      timing,
+      timeoutMs: 1_000,
+      pollIntervalMs: 100,
+      settledDurationMs: 100,
+    });
+
+    expect(calls.map((call) => call.command[1])).toEqual([
+      'describe-ui',
+      'describe-ui',
+      'describe-ui',
+    ]);
+    expect('elements' in capture).toBe(true);
+    if (!('elements' in capture)) {
+      throw new Error('expected runtime snapshot with elements');
+    }
+    expect(capture.elements[0]?.frame?.y).toBe(220);
+  });
 });

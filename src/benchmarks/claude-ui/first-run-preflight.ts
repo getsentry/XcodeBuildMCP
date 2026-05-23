@@ -204,7 +204,6 @@ export async function dismissFirstRunPrompts(opts: {
   try {
     const deadline = timing.now() + timeoutMs;
     let promptsDismissed = false;
-    let uiSeen = false;
     while (timing.now() < deadline) {
       const search = await findFirstRunPromptLabel({
         simulatorId: opts.simulatorId,
@@ -227,9 +226,6 @@ export async function dismissFirstRunPrompts(opts: {
 
       if (search.status === 'not-found') {
         if (search.hasElements) {
-          uiSeen = true;
-        }
-        if (uiSeen) {
           promptsDismissed = true;
           break;
         }
@@ -237,7 +233,6 @@ export async function dismissFirstRunPrompts(opts: {
         continue;
       }
 
-      uiSeen = true;
       const { label } = search;
       opts.onEvent?.(`dismissing first-run prompt '${label}'`);
       await appendLifecycleLog(opts.logPath, `Dismissing first-run prompt label: ${label}`);

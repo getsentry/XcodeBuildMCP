@@ -114,6 +114,77 @@ describe('Claude UI first-run prompt preflight', () => {
     expect(log).toContain('First-run prompt preflight: complete');
   });
 
+  it('keeps polling through empty transitions between sequential prompts', async () => {
+    const logPath = await tempLogPath();
+    const commands: LifecycleCommandOptions[] = [];
+    const describeOutputs = [
+      describeUiWithLabel('Continue'),
+      emptyDescribeUi,
+      describeUiWithLabel('Not Now'),
+      loadedDescribeUi,
+    ];
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
+        return {
+          exitCode: 0,
+          stdout: describeOutputs.shift() ?? loadedDescribeUi,
+          stderr: '',
+          durationSeconds: 0.01,
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+    let now = 1_000;
+
+    await dismissFirstRunPrompts({
+      config: config(),
+      simulatorId: 'TEMP-SIM-123',
+      cwd: '/repo',
+      logPath,
+      executor,
+      axePath: '/mock/axe',
+      timing: {
+        now: () => now,
+        sleep: async (milliseconds) => {
+          now += milliseconds;
+        },
+      },
+    });
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      ['xcrun', 'simctl', 'launch', 'TEMP-SIM-123', 'com.apple.reminders'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      [
+        '/mock/axe',
+        'tap',
+        '--label',
+        'Continue',
+        '--element-type',
+        'Button',
+        '--udid',
+        'TEMP-SIM-123',
+      ],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      [
+        '/mock/axe',
+        'tap',
+        '--label',
+        'Not Now',
+        '--element-type',
+        'Button',
+        '--udid',
+        'TEMP-SIM-123',
+      ],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['xcrun', 'simctl', 'terminate', 'TEMP-SIM-123', 'com.apple.reminders'],
+    ]);
+    const log = await readFile(logPath, 'utf8');
+    expect(log).toContain('Dismissing first-run prompt label: Continue');
+    expect(log).toContain('Dismissing first-run prompt label: Not Now');
+  });
+
   it('retries transient describe-ui failures before dismissing prompts', async () => {
     const logPath = await tempLogPath();
     const commands: LifecycleCommandOptions[] = [];

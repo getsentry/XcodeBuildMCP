@@ -259,7 +259,13 @@ describe('Button Plugin', () => {
           getBundledAxeEnvironment: () => ({}),
         };
 
-        const executeButton = createButtonExecutor(mockExecutor, mockAxeHelpers, undefined, 500);
+        const executeButton = createButtonExecutor(
+          mockExecutor,
+          mockAxeHelpers,
+          undefined,
+          500,
+          createImmediatePostActionTiming(),
+        );
         let settled = false;
         const resultPromise = executeButton({
           simulatorId: '12345678-1234-4234-8234-123456789012',
