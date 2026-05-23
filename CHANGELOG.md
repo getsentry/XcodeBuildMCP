@@ -23,6 +23,7 @@
 ### Fixed
 
 - Fixed Claude UI benchmark preflight so transient malformed or still-loading UI snapshots no longer crash the harness or finish before app UI is observable.
+- Fixed Claude UI benchmark preflight so configured first-run dismissals require a concrete simulator ID and suite-provided simulator IDs are recorded in command logs.
 - Fixed Claude UI benchmark config handling so invalid `failurePatterns` regexes fail before a suite starts and partial `allowedVariance` overrides preserve defaults for omitted metrics.
 - Fixed Claude UI benchmark temporary simulator cleanup so simulators created by the harness are deleted even when post-creation setup fails.
 - Fixed UI action snapshot refreshes so timeout while waiting for a settled post-action snapshot returns a recoverable warning instead of unstable element refs.

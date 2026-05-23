@@ -70,7 +70,6 @@ export async function captureRuntimeSnapshotAfterAction(params: {
   const settledDurationMs = params.settledDurationMs ?? POST_ACTION_SNAPSHOT_SETTLED_DURATION_MS;
   const deadlineMs = timing.now() + timeoutMs;
   const settledTracker: SettledTracker = { signature: null, stableSinceMs: null };
-  let latestSnapshot: RuntimeSnapshotRecord | null = null;
 
   while (true) {
     const nowMs = timing.now();
@@ -80,7 +79,6 @@ export async function captureRuntimeSnapshotAfterAction(params: {
       axeHelpers: params.axeHelpers,
       nowMs,
     });
-    latestSnapshot = snapshot;
 
     if (
       evaluateSettledPredicate({

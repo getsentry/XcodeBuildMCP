@@ -135,6 +135,31 @@ function isolatedSessionDefaults(
   );
 }
 
+export function resolveBenchmarkSimulatorId(
+  config: BenchmarkConfig,
+  temporarySimulator: CreatedTemporarySimulator | undefined,
+): string | undefined {
+  return (
+    temporarySimulator?.simulatorId ??
+    (typeof config.sessionDefaults?.simulatorId === 'string'
+      ? config.sessionDefaults.simulatorId
+      : undefined)
+  );
+}
+
+export function requireFirstRunPreflightSimulatorId(
+  config: BenchmarkConfig,
+  temporarySimulator: CreatedTemporarySimulator | undefined,
+): string | undefined {
+  const simulatorId = resolveBenchmarkSimulatorId(config, temporarySimulator);
+  if (config.firstRunPromptDismissals && !simulatorId) {
+    throw new Error(
+      'firstRunPromptDismissals requires a temporary simulator or sessionDefaults.simulatorId',
+    );
+  }
+  return simulatorId;
+}
+
 export async function writeMcpConfig(opts: {
   config: BenchmarkConfig;
   mcpConfigPath: string;
@@ -374,11 +399,7 @@ export async function runSuite(
       progress?.event(`simulator setup took ${simulatorSetupDurationSeconds.toFixed(2)}s`);
     }
 
-    const effectiveSimulatorId =
-      temporarySimulator?.simulatorId ??
-      (typeof config.sessionDefaults?.simulatorId === 'string'
-        ? config.sessionDefaults.simulatorId
-        : undefined);
+    const effectiveSimulatorId = requireFirstRunPreflightSimulatorId(config, temporarySimulator);
     if (effectiveSimulatorId) {
       await dismissFirstRunPrompts({
         config,
@@ -422,7 +443,7 @@ export async function runSuite(
     ];
     await writeFile(
       artifacts.claudeCommandLogPath,
-      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${workingDirectory}\nMCP workspace: ${artifacts.mcpWorkspaceDirectory}\nMCP workspace config: ${artifacts.mcpWorkspaceConfigPath}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${temporarySimulator?.simulatorId ?? 'suite/default'}\nStarted: ${new Date().toISOString()}\n`,
+      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${workingDirectory}\nMCP workspace: ${artifacts.mcpWorkspaceDirectory}\nMCP workspace config: ${artifacts.mcpWorkspaceConfigPath}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${effectiveSimulatorId ?? 'suite/default'}\nStarted: ${new Date().toISOString()}\n`,
       'utf8',
     );
 

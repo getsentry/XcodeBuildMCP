@@ -3,7 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { readConfig } from '../config.ts';
-import { claudeBenchmarkEnv, writeMcpConfig } from '../harness.ts';
+import {
+  claudeBenchmarkEnv,
+  requireFirstRunPreflightSimulatorId,
+  resolveBenchmarkSimulatorId,
+  writeMcpConfig,
+} from '../harness.ts';
 import {
   deleteTemporarySimulator,
   prepareTemporarySimulator,
@@ -71,6 +76,30 @@ describe('Claude UI temporary simulator lifecycle', () => {
       reason: 'sessionDefaults.simulatorId is set',
       existingSimulatorId: 'USER-SIM-1',
     });
+  });
+
+  it('uses the configured simulatorId when no temporary simulator is created', () => {
+    const parsed = config({
+      sessionDefaults: { simulatorId: 'USER-SIM-1', bundleId: 'com.example.App' },
+      temporarySimulator: false,
+    });
+
+    expect(resolveBenchmarkSimulatorId(parsed, undefined)).toBe('USER-SIM-1');
+    expect(requireFirstRunPreflightSimulatorId(parsed, undefined)).toBe('USER-SIM-1');
+  });
+
+  it('fails first-run preflight config when no simulatorId can be resolved', () => {
+    expect(() =>
+      requireFirstRunPreflightSimulatorId(
+        config({
+          temporarySimulator: false,
+          firstRunPromptDismissals: { labels: ['Continue'] },
+        }),
+        undefined,
+      ),
+    ).toThrow(
+      'firstRunPromptDismissals requires a temporary simulator or sessionDefaults.simulatorId',
+    );
   });
 
   it('rejects ambiguous config that both forces temp sim and provides simulatorId', () => {
