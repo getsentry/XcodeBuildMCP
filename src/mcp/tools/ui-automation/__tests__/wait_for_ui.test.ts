@@ -460,6 +460,32 @@ describe('Wait for UI Plugin', () => {
     });
   });
 
+  it('returns TARGET_AMBIGUOUS for selector-free gone with ambiguous partial text', async () => {
+    const { executor } = createSequencedExecutor([
+      {
+        success: true,
+        output: hierarchyJson([
+          createNode({ AXLabel: 'Ready' }),
+          createNode({ AXLabel: 'Ready now' }),
+        ]),
+      },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'gone', text: 'Ready', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(true);
+    expect(result.uiError).toMatchObject({
+      code: 'TARGET_AMBIGUOUS',
+      candidates: [
+        expect.objectContaining({ label: 'Ready' }),
+        expect.objectContaining({ label: 'Ready now' }),
+      ],
+    });
+  });
+
   it('succeeds for gone when selector matches remain but none contain text', async () => {
     const { executor } = createSequencedExecutor([
       {

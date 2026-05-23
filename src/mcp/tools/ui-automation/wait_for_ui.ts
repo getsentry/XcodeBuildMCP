@@ -198,7 +198,7 @@ function evaluateWaitPredicate(args: {
     return {
       matched: (textMatch.candidates ?? []).length === 0,
       candidates: textMatch.candidates ?? [],
-      uiError: undefined,
+      uiError: textMatch.uiError,
     };
   }
 
