@@ -33,7 +33,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
       snapshotCaptured = true;
     }
 
-    async function captureFirstScrollRef(bundleId: string): Promise<string | null> {
+    async function launchAndSnapshot(bundleId: string): Promise<string> {
       await harness.invoke('simulator', 'launch-app', {
         simulatorId: simulatorUdid,
         bundleId,
@@ -44,22 +44,16 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
         simulatorId: simulatorUdid,
       });
       expect(isError).toBe(false);
+      return text;
+    }
 
+    async function captureFirstScrollRef(bundleId: string): Promise<string | null> {
+      const text = await launchAndSnapshot(bundleId);
       return /\b(e\d+)\|swipe\|/.exec(text)?.[1] ?? null;
     }
 
     async function captureTapRefByLabel(bundleId: string, label: string): Promise<string | null> {
-      await harness.invoke('simulator', 'launch-app', {
-        simulatorId: simulatorUdid,
-        bundleId,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
-        simulatorId: simulatorUdid,
-      });
-      expect(isError).toBe(false);
-
+      const text = await launchAndSnapshot(bundleId);
       const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return new RegExp(`\\b(e\\d+)\\|tap\\|[^|]*\\|${escapedLabel}\\|`).exec(text)?.[1] ?? null;
     }

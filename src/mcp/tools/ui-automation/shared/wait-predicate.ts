@@ -1,8 +1,9 @@
-import type {
-  RuntimeElementRoleV1,
-  RuntimeElementV1,
-  RuntimeSnapshotRecord,
-  UiAutomationRecoverableError,
+import {
+  COMPACT_RUNTIME_TARGET_LIMIT,
+  type RuntimeElementRoleV1,
+  type RuntimeElementV1,
+  type RuntimeSnapshotRecord,
+  type UiAutomationRecoverableError,
 } from '../../../../types/ui-snapshot.ts';
 import { getRuntimeSnapshotLookup } from './snapshot-ui-state.ts';
 
@@ -214,6 +215,10 @@ function matchSelector(
     });
 }
 
+function compactRuntimeCandidates(candidates: RuntimeElementV1[]): RuntimeElementV1[] {
+  return candidates.slice(0, COMPACT_RUNTIME_TARGET_LIMIT);
+}
+
 function ambiguousSelectorError(
   selector: ResolvedWaitSelector,
   candidates: RuntimeElementV1[],
@@ -224,7 +229,7 @@ function ambiguousSelectorError(
     recoveryHint:
       'Retry with the intended candidate elementRef from this result, or narrow the selector with role, label, value, or identifier. Refresh with snapshot_ui only if the refs are stale.',
     ...(selector.sourceElementRef ? { elementRef: selector.sourceElementRef } : {}),
-    candidates,
+    candidates: compactRuntimeCandidates(candidates),
   };
 }
 
@@ -359,6 +364,8 @@ export function createWaitTimeoutError(params: {
     recoveryHint,
     timeoutMs: params.timeoutMs,
     ...(params.selector?.sourceElementRef ? { elementRef: params.selector.sourceElementRef } : {}),
-    ...(params.candidates !== undefined ? { candidates: params.candidates } : {}),
+    ...(params.candidates !== undefined
+      ? { candidates: compactRuntimeCandidates(params.candidates) }
+      : {}),
   };
 }

@@ -360,9 +360,11 @@ function projectRuntimeSnapshotData<TData>(
   const waitMatch = Array.isArray(dataWithRuntimeRows.waitMatch?.matches)
     ? {
         ...dataWithRuntimeRows.waitMatch,
-        matches: dataWithRuntimeRows.waitMatch.matches.map((match) =>
-          isRuntimeElement(match) ? compactRuntimeElementCandidate(match) : match,
-        ),
+        matches: dataWithRuntimeRows.waitMatch.matches
+          .slice(0, COMPACT_RUNTIME_TARGET_LIMIT)
+          .map((match) =>
+            isRuntimeElement(match) ? compactRuntimeElementCandidate(match) : match,
+          ),
       }
     : dataWithRuntimeRows.waitMatch;
 

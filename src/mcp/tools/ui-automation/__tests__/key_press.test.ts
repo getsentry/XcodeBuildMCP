@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import {
-  createMockCommandResponse,
-  createMockExecutor,
-  createNoopExecutor,
-  mockProcess,
-} from '../../../../test-utils/mock-executors.ts';
+import { createMockExecutor, createNoopExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, key_pressLogic, createKeyPressExecutor } from '../key_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
@@ -83,19 +78,7 @@ describe('Key Press Tool', () => {
 
   describe('Command Generation', () => {
     it('should generate correct axe command for basic key press', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -104,12 +87,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 40,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '40',
@@ -119,19 +102,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command for key press with duration', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -141,12 +112,12 @@ describe('Key Press Tool', () => {
             keyCode: 42,
             duration: 1.5,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '42',
@@ -158,19 +129,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command for different key codes', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -179,12 +138,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 255,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '255',
@@ -194,19 +153,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/path/to/bundled/axe',
         getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
@@ -218,12 +165,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 44,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/path/to/bundled/axe',
         'key',
         '44',

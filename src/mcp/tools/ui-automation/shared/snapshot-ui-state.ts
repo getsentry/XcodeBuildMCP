@@ -7,6 +7,8 @@ import type {
   UiAutomationRecoverableError,
 } from '../../../../types/ui-snapshot.ts';
 
+// Runtime element refs are process/session-scoped handles, not durable cross-process IDs. Keep the
+// snapshot store in-memory so separate MCP, daemon, and CLI runtimes cannot consume each other's refs.
 const runtimeSnapshots = new Map<string, RuntimeSnapshotRecord>();
 const runtimeSnapshotSeqs = new Map<string, number>();
 const simulatorUiAutomationQueues = new Map<string, Promise<void>>();

@@ -4,6 +4,7 @@ import type {
   AccessibilityNode,
   CaptureResultDomainResult,
 } from '../../../../types/domain-results.ts';
+import { COMPACT_RUNTIME_TARGET_LIMIT } from '../../../../types/ui-snapshot.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import type { DebuggerBackend } from '../../../../utils/debugger/backends/DebuggerBackend.ts';
 import { DebuggerManager } from '../../../../utils/debugger/debugger-manager.ts';
@@ -154,17 +155,12 @@ describe('Wait for UI Plugin', () => {
         { success: true, output: hierarchyJson([createNode({ AXLabel: 'Ready' })]) },
       ]);
 
-      const { ctx, run } = createMockToolHandlerContext();
-      await run(() =>
-        (
-          handler as unknown as (
-            args: Record<string, unknown>,
-            executor: CommandExecutor,
-          ) => Promise<void>
-        )({ simulatorId, predicate: 'gone', text: 'Loading', timeoutMs: 0 }, executor),
+      const result = await runWaitForUi(
+        { simulatorId, predicate: 'gone', text: 'Loading', timeoutMs: 0 },
+        executor,
       );
 
-      expect(ctx.structuredOutput?.result.didError).toBe(false);
+      expect(result.didError).toBe(false);
     });
 
     it('rejects unknown fields instead of silently broadening wait selectors', async () => {
@@ -191,17 +187,12 @@ describe('Wait for UI Plugin', () => {
         { success: true, output: hierarchyJson([createNode({ AXLabel: 'Ready' })]) },
       ]);
 
-      const { ctx, run } = createMockToolHandlerContext();
-      await run(() =>
-        (
-          handler as unknown as (
-            args: Record<string, unknown>,
-            executor: CommandExecutor,
-          ) => Promise<void>
-        )({ predicate: 'textContains', text: 'Ready', timeoutMs: 0 }, executor),
+      const result = await runWaitForUi(
+        { simulatorId, predicate: 'textContains', text: 'Ready', timeoutMs: 0 },
+        executor,
       );
 
-      expect(ctx.structuredOutput?.result.didError).toBe(false);
+      expect(result.didError).toBe(false);
       expect(calls[0]?.command.slice(1)).toEqual(['describe-ui', '--udid', simulatorId]);
     });
   });
@@ -536,6 +527,27 @@ describe('Wait for UI Plugin', () => {
         expect.objectContaining({ label: 'Duplicate' }),
       ]),
     });
+  });
+
+  it('caps ambiguous wait candidates before returning the domain result', async () => {
+    const { executor } = createSequencedExecutor([
+      {
+        success: true,
+        output: hierarchyJson(
+          Array.from({ length: COMPACT_RUNTIME_TARGET_LIMIT + 16 }, () =>
+            createNode({ AXLabel: 'Duplicate', AXUniqueId: undefined }),
+          ),
+        ),
+      },
+    ]);
+
+    const result = await runWaitForUi(
+      { simulatorId, predicate: 'focused', label: 'Duplicate', timeoutMs: 0 },
+      executor,
+    );
+
+    expect(result.didError).toBe(true);
+    expect(result.uiError?.candidates).toHaveLength(COMPACT_RUNTIME_TARGET_LIMIT);
   });
 
   it('returns TARGET_NOT_ACTIONABLE when focused state is unavailable', async () => {

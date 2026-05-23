@@ -52,6 +52,53 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
+  it('omits nextSteps when no next steps are provided', () => {
+    const result: DeviceListDomainResult = {
+      kind: 'device-list',
+      didError: false,
+      error: null,
+      devices: [],
+    };
+
+    expect(
+      toStructuredEnvelope(result, 'xcodebuildmcp.output.device-list', '1', {
+        nextSteps: [],
+      }),
+    ).toEqual({
+      schema: 'xcodebuildmcp.output.device-list',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: { devices: [] },
+    });
+  });
+
+  it('does not serialize next steps on error envelopes', () => {
+    const result: BuildResultDomainResult = {
+      kind: 'build-result',
+      didError: true,
+      error: 'Build failed',
+    };
+
+    expect(
+      toStructuredEnvelope(result, 'xcodebuildmcp.output.error', '1', {
+        nextSteps: [
+          {
+            label: 'Retry build',
+            tool: 'build_sim',
+            params: { simulatorId: 'SIMULATOR-1' },
+          },
+        ],
+      }),
+    ).toEqual({
+      schema: 'xcodebuildmcp.output.error',
+      schemaVersion: '1',
+      didError: true,
+      error: 'Build failed',
+      data: null,
+    });
+  });
+
   it('compacts runtime snapshots inside the capture payload by default', () => {
     const result: CaptureResultDomainResult = {
       kind: 'capture-result',
@@ -194,6 +241,33 @@ describe('toStructuredEnvelope', () => {
       expect.arrayContaining(['e1|tap|button|Add||', 'e2|tap|button|London, England|not saved|']),
     );
     expect(data.capture.text).toEqual(['e3|text|text|Search results||']);
+  });
+
+  it('caps compact runtime snapshot wait matches', () => {
+    const matches = Array.from({ length: COMPACT_RUNTIME_TARGET_LIMIT + 16 }, (_, index) => ({
+      ref: `e${index + 1}`,
+      role: 'button' as const,
+      label: `Match ${index + 1}`,
+      frame: { x: 0, y: index, width: 100, height: 40 },
+      actions: ['tap' as const],
+    }));
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      waitMatch: { predicate: 'exists', matches },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as { waitMatch: { matches: string[] } };
+
+    expect(data.waitMatch.matches).toHaveLength(COMPACT_RUNTIME_TARGET_LIMIT);
+    expect(data.waitMatch.matches[0]).toBe('e1|tap|button|Match 1||');
+    expect(data.waitMatch.matches[COMPACT_RUNTIME_TARGET_LIMIT - 1]).toBe(
+      `e${COMPACT_RUNTIME_TARGET_LIMIT}|tap|button|Match ${COMPACT_RUNTIME_TARGET_LIMIT}||`,
+    );
   });
 
   it('caps compact runtime snapshot rows by category', () => {

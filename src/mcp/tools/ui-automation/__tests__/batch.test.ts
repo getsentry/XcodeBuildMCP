@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
-import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { DebuggerManager } from '../../../../utils/debugger/debugger-manager.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
@@ -377,17 +376,12 @@ describe('Batch UI Automation Tool', () => {
       recordSnapshot([createNode()]);
       const { calls, executor } = createTrackingExecutor();
 
-      const { ctx, run } = createMockToolHandlerContext();
-      await run(() =>
-        (
-          handler as unknown as (
-            args: Record<string, unknown>,
-            executor: CommandExecutor,
-          ) => Promise<void>
-        )({ steps: [{ action: 'tap', elementRef: 'e1' }] }, executor),
+      const result = await runBatch(
+        { simulatorId, steps: [{ action: 'tap', elementRef: 'e1' }] },
+        executor,
       );
 
-      expect(ctx.structuredOutput?.result.didError).toBe(false);
+      expect(result.didError).toBe(false);
       expect(calls[0]?.command.slice(1)).toEqual([
         'batch',
         '--step',

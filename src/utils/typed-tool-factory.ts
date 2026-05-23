@@ -118,6 +118,8 @@ function filterSessionDefaultsForSchema(
   defaults: SessionDefaults,
   schema: z.ZodType<unknown>,
 ): Record<string, unknown> {
+  // Tool invocation validates the internal schema only. Simulator-name defaults are refreshed into
+  // simulatorId outside this hot path; callers needing immediate determinism should provide the UUID.
   const schemaKeys = getObjectSchemaKeys(schema);
   if (!schemaKeys) {
     return defaults;

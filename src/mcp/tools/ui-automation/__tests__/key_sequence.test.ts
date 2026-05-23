@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import {
-  createMockExecutor,
-  createNoopExecutor,
-  mockProcess,
-} from '../../../../test-utils/mock-executors.ts';
+import { createMockExecutor, createNoopExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, key_sequenceLogic, createKeySequenceExecutor } from '../key_sequence.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
@@ -77,19 +73,7 @@ describe('Key Sequence Tool', () => {
 
   describe('Command Generation', () => {
     it('should generate correct axe command for basic key sequence', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return {
-          success: true,
-          output: 'key sequence completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
@@ -101,12 +85,12 @@ describe('Key Sequence Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCodes: [40, 42, 44],
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key-sequence',
         '--keycodes',
@@ -117,19 +101,7 @@ describe('Key Sequence Tool', () => {
     });
 
     it('should generate correct axe command for key sequence with delay', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return {
-          success: true,
-          output: 'key sequence completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
@@ -142,12 +114,12 @@ describe('Key Sequence Tool', () => {
             keyCodes: [58, 59, 60],
             delay: 0.5,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key-sequence',
         '--keycodes',
@@ -160,19 +132,7 @@ describe('Key Sequence Tool', () => {
     });
 
     it('should generate correct axe command for single key in sequence', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return {
-          success: true,
-          output: 'key sequence completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/usr/local/bin/axe',
         getBundledAxeEnvironment: () => ({}),
@@ -184,12 +144,12 @@ describe('Key Sequence Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCodes: [255],
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key-sequence',
         '--keycodes',
@@ -200,19 +160,7 @@ describe('Key Sequence Tool', () => {
     });
 
     it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        if (command[1] !== 'describe-ui') {
-          capturedCommand = command;
-        }
-        return {
-          success: true,
-          output: 'key sequence completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/path/to/bundled/axe',
         getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
@@ -225,12 +173,12 @@ describe('Key Sequence Tool', () => {
             keyCodes: [0, 1, 2, 3, 4],
             delay: 1.0,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/path/to/bundled/axe',
         'key-sequence',
         '--keycodes',
