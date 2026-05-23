@@ -101,13 +101,14 @@ def extract_user_text(entry: dict) -> str:
     return "\n\n".join(parts)
 
 
-def parse(path: Path, out_dir: Path, tool_prefix: str) -> None:
+def parse(path: Path, out_dir: Path, tool_prefix: str) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Track tool_use_ids that target our prefix so we keep matching results.
     tracked_ids: set[str] = set()
     tool_name_by_id: dict[str, str] = {}
     counter = 0
+    had_errors = False
 
     def next_path(kind: str, label: str | None = None) -> Path:
         nonlocal counter
@@ -124,6 +125,7 @@ def parse(path: Path, out_dir: Path, tool_prefix: str) -> None:
                 entry = json.loads(raw)
             except json.JSONDecodeError as exc:
                 print(f"warn: skipping line {line_no}: {exc}", file=sys.stderr)
+                had_errors = True
                 continue
 
             etype = entry.get("type")
@@ -204,6 +206,7 @@ def parse(path: Path, out_dir: Path, tool_prefix: str) -> None:
             # last-prompt, file-history-snapshot, thinking blocks) is dropped.
 
     print(f"Wrote {counter} files to {out_dir}")
+    return not had_errors
 
 
 def main() -> int:
@@ -227,8 +230,7 @@ def main() -> int:
         return 1
 
     out = args.output or args.jsonl.with_name(f"{args.jsonl.stem}_conversation")
-    parse(args.jsonl, out, args.tool_prefix)
-    return 0
+    return 0 if parse(args.jsonl, out, args.tool_prefix) else 1
 
 
 if __name__ == "__main__":

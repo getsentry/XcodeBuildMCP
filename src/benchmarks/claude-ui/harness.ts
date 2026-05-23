@@ -64,6 +64,13 @@ export async function listSuitePaths(): Promise<string[]> {
     .sort();
 }
 
+export function requireSuitePaths(suitePaths: string[]): string[] {
+  if (suitePaths.length === 0) {
+    throw new Error('no suite files found in benchmarks/claude-ui/suites');
+  }
+  return suitePaths;
+}
+
 function suiteSlug(name: string): string {
   const slug = name
     .toLowerCase()
@@ -564,7 +571,9 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
     throw new Error('pass exactly one of --suite <name-or-path>, --all, or --from-result <path>');
   }
 
-  const suitePaths = args.all ? await listSuitePaths() : [resolveSuitePath(args.suite as string)];
+  const suitePaths = requireSuitePaths(
+    args.all ? await listSuitePaths() : [resolveSuitePath(args.suite as string)],
+  );
   const progress = createProgressReporter({ enabled: !args.json });
   const results: BenchmarkResult[] = [];
   for (let index = 0; index < suitePaths.length; index += 1) {

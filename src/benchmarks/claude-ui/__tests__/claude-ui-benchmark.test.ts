@@ -1,10 +1,11 @@
+import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
 import { readConfig } from '../config.ts';
-import { resolveParserPath } from '../harness.ts';
+import { requireSuitePaths, resolveParserPath } from '../harness.ts';
 import { analyzeClaudeJsonl } from '../transcript.ts';
 import type { BenchmarkConfig, BenchmarkRunMetadata } from '../types.ts';
 
@@ -13,6 +14,28 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 function line(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function runParserScript(args: string[]): Promise<{
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('python3', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+    child.on('error', reject);
+    child.on('close', (exitCode) => {
+      resolve({
+        exitCode,
+        stdout: Buffer.concat(stdout).toString('utf8'),
+        stderr: Buffer.concat(stderr).toString('utf8'),
+      });
+    });
+  });
 }
 
 function runMetadata(
@@ -72,6 +95,36 @@ describe('Claude UI benchmark harness', () => {
       await expect(resolveParserPath(path.join(dir, 'missing.py'))).rejects.toThrow(
         'Claude UI benchmark parser does not exist',
       );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects empty --all suite discovery', () => {
+    expect(() => requireSuitePaths([])).toThrow(
+      'no suite files found in benchmarks/claude-ui/suites',
+    );
+  });
+
+  it('returns a non-zero parser exit when JSONL lines are malformed', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-parser-'));
+    try {
+      const jsonlPath = path.join(dir, 'claude.jsonl');
+      const outputPath = path.join(dir, 'parsed');
+      await writeFile(
+        jsonlPath,
+        `${line({ type: 'assistant', message: { content: [{ type: 'text', text: 'ok' }] } })}\n{broken\n`,
+        'utf8',
+      );
+
+      const result = await runParserScript([
+        path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py'),
+        jsonlPath,
+        outputPath,
+      ]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('warn: skipping line 2');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
