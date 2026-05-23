@@ -104,6 +104,10 @@ describe('normalizeSnapshotOutput', () => {
     );
   });
 
+  it('normalizes UI snapshot clock text without hiding element refs', () => {
+    expect(normalizeSnapshotOutput('"e42|text|text|12:34||"\n')).toBe('"e42|text|text|<TIME>||"\n');
+  });
+
   it('collapses long simulator failure progress streams while preserving final counts', () => {
     const normalized = normalizeSnapshotOutput(`${progressBlock(42, 3)}\n`);
 

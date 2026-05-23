@@ -481,7 +481,11 @@ function filterToForegroundElements(
   });
 }
 
-type RepeatedNoOpAction = { tool: 'tap' | 'swipe' | 'drag'; ref: string };
+type RepeatedNoOpAction = {
+  tool: 'tap' | 'swipe' | 'drag';
+  ref: string;
+  target?: RuntimeSnapshotNextStepActionTarget;
+};
 
 function getRepeatedNoOpActionRef(params: {
   runtimeSnapshot: RuntimeSnapshotV1;
@@ -495,7 +499,11 @@ function getRepeatedNoOpActionRef(params: {
     case 'tap':
     case 'touch':
     case 'long-press':
-      return { tool: 'tap', ref: params.actionContext.action.elementRef };
+      return {
+        tool: 'tap',
+        ref: params.actionContext.action.elementRef,
+        target: params.actionContext.actionTarget,
+      };
     case 'swipe':
       return { tool: 'swipe', ref: params.actionContext.action.withinElementRef };
     case 'drag':
@@ -509,6 +517,25 @@ function hasIncompleteStateSignal(element: { label?: string; value?: string }): 
   const label = compactTapNextStepText(element.label).toLowerCase();
   const value = compactTapNextStepText(element.value).toLowerCase();
   return INCOMPLETE_STATE_NEXT_STEP_TEXT.has(label) || INCOMPLETE_STATE_NEXT_STEP_TEXT.has(value);
+}
+
+function hasSameExposedState(
+  element: RuntimeElementV1,
+  target: RuntimeSnapshotNextStepActionTarget | undefined,
+): boolean {
+  if (!target) {
+    return false;
+  }
+  const hasComparableState =
+    element.value !== undefined ||
+    target.value !== undefined ||
+    element.state?.selected !== undefined ||
+    target.state?.selected !== undefined;
+  return (
+    hasComparableState &&
+    compactTapNextStepText(element.value) === compactTapNextStepText(target.value) &&
+    element.state?.selected === target.state?.selected
+  );
 }
 
 function findForegroundIncompleteCompletionTapElement(
@@ -625,7 +652,14 @@ export function createRuntimeSnapshotNextSteps(params: {
       !isLowPriorityTapNextStepElement(element.label),
   );
   const switchBatchElements = nextStepElements.filter(
-    (element) => element.role === 'switch' && element.actions.includes('tap'),
+    (element) =>
+      element.role === 'switch' &&
+      element.actions.includes('tap') &&
+      !(
+        repeatedNoOpAction?.tool === 'tap' &&
+        repeatedNoOpAction.ref === element.ref &&
+        hasSameExposedState(element, repeatedNoOpAction.target)
+      ),
   );
   let batchElements = sameScreenBatchElements;
   if (switchBatchElements.length >= 2) {

@@ -432,6 +432,103 @@ describe('toStructuredEnvelope', () => {
     });
   });
 
+  it('orders destructive compact runtime targets after useful targets', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-hash',
+        seq: 1,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
+          {
+            ref: 'e1',
+            role: 'button',
+            label: 'Remove',
+            identifier: 'trash',
+            frame: { x: 300, y: 180, width: 40, height: 40 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e2',
+            role: 'button',
+            label: 'Portland, 1:24 PM · Light Rain',
+            frame: { x: 20, y: 140, width: 300, height: 80 },
+            actions: ['tap'],
+          },
+        ],
+        actions: [
+          { action: 'tap', elementRef: 'e1', label: 'Remove' },
+          { action: 'tap', elementRef: 'e2', label: 'Portland, 1:24 PM · Light Rain' },
+        ],
+      },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as { capture: { targets: string[] } };
+
+    expect(data.capture.targets).toEqual([
+      'e2|tap|button|Portland, 1:24 PM · Light Rain||',
+      'e1|tap|button|Remove||trash',
+    ]);
+  });
+
+  it('orders unselected compact runtime segmented controls before selected controls', () => {
+    const result: CaptureResultDomainResult = {
+      kind: 'capture-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: { simulatorId: 'SIMULATOR-1' },
+      capture: {
+        type: 'runtime-snapshot',
+        protocol: 'rs/1',
+        simulatorId: 'SIMULATOR-1',
+        screenHash: 'screen-hash',
+        seq: 1,
+        capturedAtMs: 1_000,
+        expiresAtMs: 61_000,
+        elements: [
+          {
+            ref: 'e9',
+            role: 'button',
+            label: '°F',
+            value: 'selected',
+            frame: { x: 20, y: 40, width: 70, height: 44 },
+            actions: ['tap'],
+          },
+          {
+            ref: 'e10',
+            role: 'button',
+            label: '°C',
+            value: 'not selected',
+            frame: { x: 100, y: 40, width: 70, height: 44 },
+            actions: ['tap'],
+          },
+        ],
+        actions: [
+          { action: 'tap', elementRef: 'e9', label: '°F' },
+          { action: 'tap', elementRef: 'e10', label: '°C' },
+        ],
+      },
+    };
+
+    const envelope = toStructuredEnvelope(result, 'xcodebuildmcp.output.capture-result', '2');
+    const data = envelope.data as { capture: { targets: string[] } };
+
+    expect(data.capture.targets).toEqual([
+      'e10|tap|button|°C|not selected|',
+      'e9|tap|button|°F|selected|',
+    ]);
+  });
+
   it('compacts runtime snapshot candidates inside recoverable UI errors by default', () => {
     const result: CaptureResultDomainResult = {
       kind: 'capture-result',

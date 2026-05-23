@@ -334,6 +334,9 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
       }
 
       case 'next-steps': {
+        if (!includeNextSteps) {
+          break;
+        }
         sawProgressNextSteps = true;
         const runtime = item.runtime === 'mcp' || item.runtime === 'daemon' ? 'mcp' : 'cli';
         writeSection(formatNextStepsEvent(item, runtime));
