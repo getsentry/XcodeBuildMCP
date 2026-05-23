@@ -38,6 +38,7 @@ function describeUiWithLabel(label: string): string {
 }
 
 const emptyDescribeUi = JSON.stringify({ elements: [] });
+const loadedDescribeUi = describeUiWithLabel('Application Ready');
 
 describe('Claude UI first-run prompt preflight', () => {
   it('launches the app, dismisses configured first-run prompts, and terminates before Claude runs', async () => {
@@ -47,7 +48,7 @@ describe('Claude UI first-run prompt preflight', () => {
     const describeOutputs = [
       describeUiWithLabel('Continue'),
       describeUiWithLabel('Not Now'),
-      emptyDescribeUi,
+      loadedDescribeUi,
     ];
     const executor: LifecycleCommandExecutor = async (opts) => {
       commands.push(opts);
@@ -120,7 +121,7 @@ describe('Claude UI first-run prompt preflight', () => {
       { exitCode: 1, stdout: '' },
       { exitCode: 1, stdout: '' },
       { exitCode: 0, stdout: describeUiWithLabel('Continue') },
-      { exitCode: 0, stdout: emptyDescribeUi },
+      { exitCode: 0, stdout: loadedDescribeUi },
     ];
     const executor: LifecycleCommandExecutor = async (opts) => {
       commands.push(opts);
@@ -175,7 +176,7 @@ describe('Claude UI first-run prompt preflight', () => {
     const commands: LifecycleCommandOptions[] = [];
     const describeResults = [
       { exitCode: 1, stdout: '' },
-      { exitCode: 0, stdout: emptyDescribeUi },
+      { exitCode: 0, stdout: loadedDescribeUi },
     ];
     let now = 1_000;
     const executor: LifecycleCommandExecutor = async (opts) => {
@@ -220,7 +221,7 @@ describe('Claude UI first-run prompt preflight', () => {
     const executor: LifecycleCommandExecutor = async (opts) => {
       commands.push(opts);
       if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
-        return { exitCode: 0, stdout: emptyDescribeUi, stderr: '', durationSeconds: 0.01 };
+        return { exitCode: 0, stdout: loadedDescribeUi, stderr: '', durationSeconds: 0.01 };
       }
       return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
     };
@@ -249,6 +250,88 @@ describe('Claude UI first-run prompt preflight', () => {
     ]);
     const log = await readFile(logPath, 'utf8');
     expect(log).toContain('First-run prompt preflight: complete');
+  });
+
+  it('waits for observable UI before treating missing prompt labels as complete', async () => {
+    const logPath = await tempLogPath();
+    const commands: LifecycleCommandOptions[] = [];
+    const describeResults = [
+      { exitCode: 0, stdout: emptyDescribeUi },
+      { exitCode: 0, stdout: loadedDescribeUi },
+    ];
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
+        const result = describeResults.shift() ?? { exitCode: 0, stdout: loadedDescribeUi };
+        return { ...result, stderr: '', durationSeconds: 0.01 };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+    let now = 1_000;
+
+    await dismissFirstRunPrompts({
+      config: config(),
+      simulatorId: 'TEMP-SIM-123',
+      cwd: '/repo',
+      logPath,
+      executor,
+      axePath: '/mock/axe',
+      timing: {
+        now: () => now,
+        sleep: async (milliseconds) => {
+          now += milliseconds;
+        },
+      },
+    });
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      ['xcrun', 'simctl', 'launch', 'TEMP-SIM-123', 'com.apple.reminders'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['xcrun', 'simctl', 'terminate', 'TEMP-SIM-123', 'com.apple.reminders'],
+    ]);
+  });
+
+  it('retries malformed describe-ui output as transiently unavailable', async () => {
+    const logPath = await tempLogPath();
+    const commands: LifecycleCommandOptions[] = [];
+    const describeResults = [
+      { exitCode: 0, stdout: 'not json' },
+      { exitCode: 0, stdout: loadedDescribeUi },
+    ];
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
+        const result = describeResults.shift() ?? { exitCode: 0, stdout: loadedDescribeUi };
+        return { ...result, stderr: '', durationSeconds: 0.01 };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+    let now = 1_000;
+
+    await dismissFirstRunPrompts({
+      config: config(),
+      simulatorId: 'TEMP-SIM-123',
+      cwd: '/repo',
+      logPath,
+      executor,
+      axePath: '/mock/axe',
+      timing: {
+        now: () => now,
+        sleep: async (milliseconds) => {
+          now += milliseconds;
+        },
+      },
+    });
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      ['xcrun', 'simctl', 'launch', 'TEMP-SIM-123', 'com.apple.reminders'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['xcrun', 'simctl', 'terminate', 'TEMP-SIM-123', 'com.apple.reminders'],
+    ]);
+    const log = await readFile(logPath, 'utf8');
+    expect(log).toContain('First-run prompt preflight: UI unavailable; retrying (exit null)');
   });
 
   it('does nothing when a suite has no configured first-run prompt dismissals', async () => {

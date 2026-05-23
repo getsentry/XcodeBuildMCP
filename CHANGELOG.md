@@ -22,6 +22,10 @@
 
 ### Fixed
 
+- Fixed Claude UI benchmark preflight so transient malformed or still-loading UI snapshots no longer crash the harness or finish before app UI is observable.
+- Fixed Claude UI benchmark config handling so invalid `failurePatterns` regexes fail before a suite starts and partial `allowedVariance` overrides preserve defaults for omitted metrics.
+- Fixed Claude UI benchmark temporary simulator cleanup so simulators created by the harness are deleted even when post-creation setup fails.
+- Fixed UI action snapshot refreshes so timeout while waiting for a settled post-action snapshot returns a recoverable warning instead of unstable element refs.
 - Fixed Claude UI benchmark suite runs so temporary simulators are applied through an isolated per-run MCP config instead of being overridden by repo or example-project config defaults.
 - Fixed simulator launch failures before simulator-name resolution so they are not reported as macOS launch failures.
 - Fixed CLI JSON output so simulator-name resolution failures return the structured error envelope instead of plain stderr.

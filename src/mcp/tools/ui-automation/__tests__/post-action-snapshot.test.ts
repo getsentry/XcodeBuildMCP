@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { captureRuntimeSnapshotAfterAction } from '../shared/post-action-snapshot.ts';
+import {
+  captureRuntimeSnapshotAfterAction,
+  captureRuntimeSnapshotAfterActionSafely,
+} from '../shared/post-action-snapshot.ts';
 import {
   createMockAxeHelpers,
   createNode,
@@ -51,5 +54,46 @@ describe('post-action runtime snapshots', () => {
     }
     expect(capture.elements[0]?.frame?.y).toBe(220);
     expect(nowMs).toBe(300);
+  });
+
+  it('reports a recoverable error when the refreshed snapshot never settles', async () => {
+    let nowMs = 0;
+    const timing = {
+      now: () => nowMs,
+      sleep: async (durationMs: number) => {
+        nowMs += durationMs;
+      },
+    };
+    const { executor } = createSequencedExecutor([
+      {
+        success: true,
+        output: JSON.stringify({
+          elements: [createNode({ frame: { x: 10, y: 260, width: 100, height: 40 } })],
+        }),
+      },
+      {
+        success: true,
+        output: JSON.stringify({
+          elements: [createNode({ frame: { x: 10, y: 220, width: 100, height: 40 } })],
+        }),
+      },
+    ]);
+
+    const result = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers: createMockAxeHelpers(),
+      timing,
+      timeoutMs: 100,
+      pollIntervalMs: 100,
+      settledDurationMs: 200,
+    });
+
+    expect(result.capture).toBeUndefined();
+    expect(result.warning).toContain('did not settle before timeout');
+    expect(result.uiError).toMatchObject({
+      code: 'SNAPSHOT_CAPTURE_FAILED',
+      recoveryHint: expect.stringContaining('snapshot_ui'),
+    });
   });
 });

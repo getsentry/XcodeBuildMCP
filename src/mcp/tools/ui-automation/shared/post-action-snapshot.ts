@@ -22,6 +22,13 @@ export interface PostActionSnapshotTiming {
   sleep: (durationMs: number) => Promise<void>;
 }
 
+class RuntimeSnapshotSettleTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`runtime snapshot did not settle within ${timeoutMs}ms`);
+    this.name = 'RuntimeSnapshotSettleTimeoutError';
+  }
+}
+
 function defaultSleep(durationMs: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, durationMs);
@@ -89,8 +96,7 @@ export async function captureRuntimeSnapshotAfterAction(params: {
 
     const remainingMs = deadlineMs - timing.now();
     if (remainingMs <= 0) {
-      recordRuntimeSnapshot(latestSnapshot);
-      return latestSnapshot.payload;
+      throw new RuntimeSnapshotSettleTimeoutError(timeoutMs);
     }
 
     await timing.sleep(Math.min(pollIntervalMs, remainingMs));
@@ -117,9 +123,12 @@ export async function captureRuntimeSnapshotAfterActionSafely(params: {
     clearRuntimeSnapshot(params.simulatorId);
 
     const isParseFailure = error instanceof RuntimeSnapshotParseError;
+    const isSettleTimeout = error instanceof RuntimeSnapshotSettleTimeoutError;
     const message = isParseFailure
       ? 'UI action succeeded, but the refreshed runtime snapshot could not be parsed.'
-      : 'UI action succeeded, but the refreshed runtime snapshot could not be captured.';
+      : isSettleTimeout
+        ? 'UI action succeeded, but the refreshed runtime snapshot did not settle before timeout.'
+        : 'UI action succeeded, but the refreshed runtime snapshot could not be captured.';
     const detail = error instanceof Error ? error.message : String(error);
 
     return {

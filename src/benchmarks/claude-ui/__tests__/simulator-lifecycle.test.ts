@@ -42,11 +42,6 @@ function config(overrides: Partial<BenchmarkConfig> = {}): BenchmarkConfig {
   };
 }
 
-async function tempLogPath(): Promise<string> {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'claude-ui-lifecycle-'));
-  return path.join(directory, 'simulator-lifecycle.log');
-}
-
 function inMemoryLifecycleLog() {
   const messages: string[] = [];
   return {
@@ -222,6 +217,51 @@ describe('Claude UI temporary simulator lifecycle', () => {
     ).toEqual(['create', 'boot', 'bootstatus', 'open']);
     expect(log.messages.join('\n')).toContain(
       'Boot command reported simulator was already booted; continuing',
+    );
+  });
+
+  it('deletes the harness-created simulator when setup fails after creation', async () => {
+    const logPath = '/tmp/simulator-lifecycle.log';
+    const log = inMemoryLifecycleLog();
+    const commands: LifecycleCommandOptions[] = [];
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.args[1] === 'create') {
+        return { exitCode: 0, stdout: 'TEMP-SIM-SETUP-FAIL\n', stderr: '', durationSeconds: 0.01 };
+      }
+      if (opts.args[1] === 'bootstatus') {
+        return { exitCode: 1, stdout: '', stderr: 'not ready', durationSeconds: 0.01 };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+
+    await expect(
+      prepareTemporarySimulator({
+        config: config(),
+        suiteSlug: 'weather',
+        timestamp: '20260522T120000Z',
+        cwd: '/repo',
+        logPath,
+        executor,
+        logWriter: log.writer,
+        readinessDelayMs: 0,
+      }),
+    ).rejects.toThrow('temporary simulator did not reach bootstatus');
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      [
+        'xcrun',
+        'simctl',
+        'create',
+        'XcodeBuildMCP Claude UI weather 20260522T120000Z',
+        'iPhone 17 Pro Max',
+      ],
+      ['xcrun', 'simctl', 'boot', 'TEMP-SIM-SETUP-FAIL'],
+      ['xcrun', 'simctl', 'bootstatus', 'TEMP-SIM-SETUP-FAIL', '-b'],
+      ['xcrun', 'simctl', 'delete', 'TEMP-SIM-SETUP-FAIL'],
+    ]);
+    expect(log.messages.join('\n')).toContain(
+      'Setup failed, cleaning up simulator TEMP-SIM-SETUP-FAIL',
     );
   });
 

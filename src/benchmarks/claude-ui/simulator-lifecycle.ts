@@ -278,65 +278,94 @@ export async function prepareTemporarySimulator(opts: {
     logPath: opts.logPath,
   } satisfies CreatedTemporarySimulator;
 
-  opts.onEvent?.(`booting simulator ${simulatorId}`);
-  const bootArgs = ['simctl', 'boot', simulatorId];
-  const bootResult = await executor({
-    command: 'xcrun',
-    args: bootArgs,
-    cwd: opts.cwd,
-    logPath: opts.logPath,
-  });
-  if (!isAlreadyBooted(bootResult)) {
-    throw new Error(
-      `${opts.config.name}: failed to boot temporary simulator with ${commandText('xcrun', bootArgs)} (exit ${bootResult.exitCode}); see ${opts.logPath}`,
-    );
-  }
-  if (bootResult.exitCode !== 0) {
-    await appendLifecycleLog(
+  try {
+    opts.onEvent?.(`booting simulator ${simulatorId}`);
+    const bootArgs = ['simctl', 'boot', simulatorId];
+    const bootResult = await executor({
+      command: 'xcrun',
+      args: bootArgs,
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (!isAlreadyBooted(bootResult)) {
+      throw new Error(
+        `${opts.config.name}: failed to boot temporary simulator with ${commandText('xcrun', bootArgs)} (exit ${bootResult.exitCode}); see ${opts.logPath}`,
+      );
+    }
+    if (bootResult.exitCode !== 0) {
+      await appendLifecycleLog(
+        opts.logPath,
+        'Boot command reported simulator was already booted; continuing',
+        logWriter,
+      );
+    }
+
+    opts.onEvent?.(`waiting for simulator ${simulatorId} bootstatus`);
+    const bootstatusArgs = ['simctl', 'bootstatus', simulatorId, '-b'];
+    const bootstatusResult = await executor({
+      command: 'xcrun',
+      args: bootstatusArgs,
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (bootstatusResult.exitCode !== 0) {
+      throw new Error(
+        `${opts.config.name}: temporary simulator did not reach bootstatus with ${commandText('xcrun', bootstatusArgs)} (exit ${bootstatusResult.exitCode}); see ${opts.logPath}`,
+      );
+    }
+
+    opts.onEvent?.(`opening Simulator.app for ${simulatorId}`);
+    const openArgs = ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulatorId];
+    const openResult = await executor({
+      command: 'open',
+      args: openArgs,
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (openResult.exitCode !== 0) {
+      throw new Error(
+        `${opts.config.name}: failed to open Simulator.app with ${commandText('open', openArgs)} (exit ${openResult.exitCode}); see ${opts.logPath}`,
+      );
+    }
+
+    await waitForReadinessDelay({
+      logPath: opts.logPath,
+      milliseconds: opts.readinessDelayMs ?? 2_000,
+      onEvent: opts.onEvent,
+      logWriter,
+    });
+    await appendLifecycleLog(opts.logPath, `Temporary simulator ready: ${simulatorId}`, logWriter);
+    opts.onEvent?.(`simulator ready ${simulatorId}`);
+
+    return simulator;
+  } catch (error) {
+    await tryAppendLifecycleLog(
       opts.logPath,
-      'Boot command reported simulator was already booted; continuing',
+      `Setup failed, cleaning up simulator ${simulatorId}`,
       logWriter,
     );
+    try {
+      const deleteResult = await executor({
+        command: 'xcrun',
+        args: ['simctl', 'delete', simulatorId],
+        cwd: opts.cwd,
+        logPath: opts.logPath,
+      });
+      await tryAppendLifecycleLog(
+        opts.logPath,
+        `Setup cleanup delete exit status: ${deleteResult.exitCode}`,
+        logWriter,
+      );
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
+      await tryAppendLifecycleLog(
+        opts.logPath,
+        `Setup cleanup delete failed for simulatorId: ${simulatorId}\nError: ${message}`,
+        logWriter,
+      );
+    }
+    throw error;
   }
-
-  opts.onEvent?.(`waiting for simulator ${simulatorId} bootstatus`);
-  const bootstatusArgs = ['simctl', 'bootstatus', simulatorId, '-b'];
-  const bootstatusResult = await executor({
-    command: 'xcrun',
-    args: bootstatusArgs,
-    cwd: opts.cwd,
-    logPath: opts.logPath,
-  });
-  if (bootstatusResult.exitCode !== 0) {
-    throw new Error(
-      `${opts.config.name}: temporary simulator did not reach bootstatus with ${commandText('xcrun', bootstatusArgs)} (exit ${bootstatusResult.exitCode}); see ${opts.logPath}`,
-    );
-  }
-
-  opts.onEvent?.(`opening Simulator.app for ${simulatorId}`);
-  const openArgs = ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulatorId];
-  const openResult = await executor({
-    command: 'open',
-    args: openArgs,
-    cwd: opts.cwd,
-    logPath: opts.logPath,
-  });
-  if (openResult.exitCode !== 0) {
-    throw new Error(
-      `${opts.config.name}: failed to open Simulator.app with ${commandText('open', openArgs)} (exit ${openResult.exitCode}); see ${opts.logPath}`,
-    );
-  }
-
-  await waitForReadinessDelay({
-    logPath: opts.logPath,
-    milliseconds: opts.readinessDelayMs ?? 2_000,
-    onEvent: opts.onEvent,
-    logWriter,
-  });
-  await appendLifecycleLog(opts.logPath, `Temporary simulator ready: ${simulatorId}`, logWriter);
-  opts.onEvent?.(`simulator ready ${simulatorId}`);
-
-  return simulator;
 }
 
 export async function deleteTemporarySimulator(

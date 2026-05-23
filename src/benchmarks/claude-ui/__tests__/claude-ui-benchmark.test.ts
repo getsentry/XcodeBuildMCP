@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
+import { readConfig } from '../config.ts';
 import { resolveParserPath } from '../harness.ts';
 import { analyzeClaudeJsonl } from '../transcript.ts';
 import type { BenchmarkConfig, BenchmarkRunMetadata } from '../types.ts';
@@ -199,6 +200,19 @@ describe('Claude UI benchmark analysis', () => {
     expect(audit.patternFailures).toHaveLength(1);
   });
 
+  it('rejects malformed failure pattern regexes when loading config', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          failurePatterns: ['stale element ref', '[unclosed'],
+        },
+        'weather.yml',
+      ),
+    ).toThrow('weather.yml.failurePatterns[1]: invalid regular expression');
+  });
+
   it('warns by default when tool sequences drift', () => {
     const config: BenchmarkConfig = {
       name: 'weather',
@@ -249,6 +263,57 @@ describe('Claude UI benchmark analysis', () => {
     expect(result.sequence.pass).toBe(true);
     expect(result.sequence.additional).toEqual(['screenshot']);
     expect(result.pass).toBe(false);
+  });
+
+  it('preserves default allowed variance when config only overrides some keys', () => {
+    const config: BenchmarkConfig = readConfig(
+      {
+        name: 'weather',
+        prompt: 'prompt.md',
+        baseline: {
+          totalToolCalls: 3,
+          wallClockSeconds: 120,
+        },
+        allowedVariance: {
+          wallClockSeconds: 30,
+        },
+      },
+      'weather.yml',
+    );
+    const audit = analyzeClaudeJsonl(
+      [
+        line({
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'tool_use', id: 'tool-1', name: 'Read', input: {} },
+              { type: 'tool_use', id: 'tool-2', name: 'Edit', input: {} },
+              { type: 'tool_use', id: 'tool-3', name: 'Write', input: {} },
+            ],
+          },
+        }),
+      ].join('\n'),
+      { mcpToolPrefix: toolPrefix },
+    );
+
+    const result = compareBenchmark(config, audit, runMetadata(145));
+
+    expect(result.metrics).toEqual([
+      {
+        name: 'totalToolCalls',
+        actual: 3,
+        expected: 3,
+        allowedVariance: 0,
+        pass: true,
+      },
+      {
+        name: 'wallClockSeconds',
+        actual: 145,
+        expected: 120,
+        allowedVariance: 30,
+        pass: true,
+      },
+    ]);
   });
 
   it('fails on tool sequence drift when strict mode is enabled', () => {

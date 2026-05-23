@@ -108,13 +108,37 @@ function readAllowedVariance(raw: unknown, source: string): Partial<AllowedVaria
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) throw new Error(`${source}: expected object`);
 
-  return {
-    totalToolCalls: readOptionalNumber(raw, 'totalToolCalls', source),
-    mcpToolCalls: readOptionalNumber(raw, 'mcpToolCalls', source),
-    uiAutomationCalls: readOptionalNumber(raw, 'uiAutomationCalls', source),
-    wallClockSeconds: readOptionalNumber(raw, 'wallClockSeconds', source),
-    toolCalls: readOptionalNumber(raw, 'toolCalls', source),
-  };
+  const variance: Partial<AllowedVariance> = {};
+  const totalToolCalls = readOptionalNumber(raw, 'totalToolCalls', source);
+  if (totalToolCalls !== undefined) variance.totalToolCalls = totalToolCalls;
+  const mcpToolCalls = readOptionalNumber(raw, 'mcpToolCalls', source);
+  if (mcpToolCalls !== undefined) variance.mcpToolCalls = mcpToolCalls;
+  const uiAutomationCalls = readOptionalNumber(raw, 'uiAutomationCalls', source);
+  if (uiAutomationCalls !== undefined) variance.uiAutomationCalls = uiAutomationCalls;
+  const wallClockSeconds = readOptionalNumber(raw, 'wallClockSeconds', source);
+  if (wallClockSeconds !== undefined) variance.wallClockSeconds = wallClockSeconds;
+  const toolCalls = readOptionalNumber(raw, 'toolCalls', source);
+  if (toolCalls !== undefined) variance.toolCalls = toolCalls;
+  return variance;
+}
+
+function readFailurePatterns(raw: unknown, source: string): string[] | undefined {
+  const patterns = readOptionalStringArray(
+    raw as Record<string, unknown>,
+    'failurePatterns',
+    source,
+  );
+  for (const [index, pattern] of (patterns ?? []).entries()) {
+    try {
+      new RegExp(pattern, 'i');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `${source}.failurePatterns[${index}]: invalid regular expression: ${message}`,
+      );
+    }
+  }
+  return patterns;
 }
 
 function readFirstRunPromptDismissals(
@@ -153,7 +177,7 @@ export function readConfig(raw: unknown, source: string): BenchmarkConfig {
     workingDirectory: readOptionalString(raw, 'workingDirectory', source),
     expectedToolSequence: readOptionalStringArray(raw, 'expectedToolSequence', source),
     sequence: readSequenceConfig(raw.sequence, `${source}.sequence`),
-    failurePatterns: readOptionalStringArray(raw, 'failurePatterns', source),
+    failurePatterns: readFailurePatterns(raw, source),
     temporarySimulator: readOptionalBoolean(raw, 'temporarySimulator', source),
     firstRunPromptDismissals: readFirstRunPromptDismissals(
       raw.firstRunPromptDismissals,
@@ -185,17 +209,4 @@ export function readConfig(raw: unknown, source: string): BenchmarkConfig {
 export async function loadSuite(suitePath: string): Promise<BenchmarkConfig> {
   const raw = parseYaml(await readFile(suitePath, 'utf8')) as unknown;
   return readConfig(raw, suitePath);
-}
-
-export function sessionDefaultsEnv(
-  sessionDefaults: Record<string, unknown> | undefined,
-): Record<string, string> {
-  const validated = validateSessionDefaults(sessionDefaults);
-  if (!validated) return {};
-
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(validated)) {
-    env[sessionDefaultEnvNames[key]] = String(value);
-  }
-  return env;
 }

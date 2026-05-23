@@ -64,7 +64,7 @@ function hierarchyContainsLabel(elements: unknown[], label: string): boolean {
 
 type FirstRunPromptSearchResult =
   | { status: 'found'; label: string }
-  | { status: 'not-found' }
+  | { status: 'not-found'; hasElements: boolean }
   | { status: 'unavailable'; exitCode: number | null };
 
 async function findFirstRunPromptLabel(opts: {
@@ -85,9 +85,17 @@ async function findFirstRunPromptLabel(opts: {
   });
   if (result.exitCode !== 0) return { status: 'unavailable', exitCode: result.exitCode };
 
-  const elements = parseDescribeUiElements(result.stdout);
+  let elements: unknown[];
+  try {
+    elements = parseDescribeUiElements(result.stdout);
+  } catch {
+    return { status: 'unavailable', exitCode: null };
+  }
+
   const label = opts.labels.find((item) => hierarchyContainsLabel(elements, item));
-  return label ? { status: 'found', label } : { status: 'not-found' };
+  return label
+    ? { status: 'found', label }
+    : { status: 'not-found', hasElements: elements.length > 0 };
 }
 
 const defaultTiming: FirstRunPreflightTiming = {
@@ -154,6 +162,7 @@ export async function dismissFirstRunPrompts(opts: {
 
   const deadline = timing.now() + timeoutMs;
   let promptsDismissed = false;
+  let uiSeen = false;
   while (timing.now() < deadline) {
     const search = await findFirstRunPromptLabel({
       simulatorId: opts.simulatorId,
@@ -175,10 +184,18 @@ export async function dismissFirstRunPrompts(opts: {
     }
 
     if (search.status === 'not-found') {
-      promptsDismissed = true;
-      break;
+      if (search.hasElements) {
+        uiSeen = true;
+      }
+      if (uiSeen) {
+        promptsDismissed = true;
+        break;
+      }
+      await timing.sleep(500);
+      continue;
     }
 
+    uiSeen = true;
     const { label } = search;
     opts.onEvent?.(`dismissing first-run prompt '${label}'`);
     await appendLifecycleLog(opts.logPath, `Dismissing first-run prompt label: ${label}`);
