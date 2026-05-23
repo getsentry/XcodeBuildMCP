@@ -170,6 +170,50 @@ describe('Claude UI first-run prompt preflight', () => {
     expect(log).toContain('Dismissing first-run prompt label: Continue');
   });
 
+  it('starts the prompt timeout after app launch completes', async () => {
+    const logPath = await tempLogPath();
+    const commands: LifecycleCommandOptions[] = [];
+    const describeResults = [
+      { exitCode: 1, stdout: '' },
+      { exitCode: 0, stdout: emptyDescribeUi },
+    ];
+    let now = 1_000;
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.command === 'xcrun' && opts.args[1] === 'launch') now += 9_000;
+      if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
+        const result = describeResults.shift() ?? { exitCode: 0, stdout: emptyDescribeUi };
+        return { ...result, stderr: '', durationSeconds: 0.01 };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+
+    await dismissFirstRunPrompts({
+      config: config({ firstRunPromptDismissals: { labels: ['Continue'], timeoutSeconds: 5 } }),
+      simulatorId: 'TEMP-SIM-123',
+      cwd: '/repo',
+      logPath,
+      executor,
+      axePath: '/mock/axe',
+      timing: {
+        now: () => now,
+        sleep: async (milliseconds) => {
+          now += milliseconds;
+        },
+      },
+    });
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      ['xcrun', 'simctl', 'launch', 'TEMP-SIM-123', 'com.apple.reminders'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['xcrun', 'simctl', 'terminate', 'TEMP-SIM-123', 'com.apple.reminders'],
+    ]);
+    const log = await readFile(logPath, 'utf8');
+    expect(log).toContain('First-run prompt preflight: UI unavailable; retrying (exit 1)');
+    expect(log).toContain('First-run prompt preflight: complete');
+  });
+
   it('does not fail after prompts are gone even when the timeout deadline has passed', async () => {
     const logPath = await tempLogPath();
     const commands: LifecycleCommandOptions[] = [];

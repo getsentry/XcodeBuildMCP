@@ -129,7 +129,6 @@ export async function dismissFirstRunPrompts(opts: {
   const axeEnv = opts.axeEnv ?? { ...process.env, ...getBundledAxeEnvironment() };
   const timing = opts.timing ?? defaultTiming;
   const timeoutMs = (dismissals.timeoutSeconds ?? 10) * 1000;
-  const deadline = timing.now() + timeoutMs;
 
   opts.onEvent?.(`preflighting first-run prompts for ${bundleId}`);
   await appendLifecycleLog(
@@ -153,6 +152,7 @@ export async function dismissFirstRunPrompts(opts: {
     );
   }
 
+  const deadline = timing.now() + timeoutMs;
   let promptsDismissed = false;
   while (timing.now() < deadline) {
     const search = await findFirstRunPromptLabel({
