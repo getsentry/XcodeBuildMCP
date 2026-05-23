@@ -213,6 +213,34 @@ describe('Claude UI benchmark analysis', () => {
     ).toThrow('weather.yml.failurePatterns[1]: invalid regular expression');
   });
 
+  it('rejects invalid session defaults when loading config', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          sessionDefaults: {
+            simulatorTypo: 'iPhone 17 Pro Max',
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow("unknown sessionDefaults key 'simulatorTypo'");
+
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          sessionDefaults: {
+            simulatorId: 42,
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow('sessionDefaults.simulatorId must be a string or boolean');
+  });
+
   it('warns by default when tool sequences drift', () => {
     const config: BenchmarkConfig = {
       name: 'weather',

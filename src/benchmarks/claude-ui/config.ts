@@ -185,7 +185,12 @@ export function readConfig(raw: unknown, source: string): BenchmarkConfig {
     ),
   };
 
-  if (isRecord(raw.sessionDefaults)) config.sessionDefaults = raw.sessionDefaults;
+  if (raw.sessionDefaults !== undefined) {
+    if (!isRecord(raw.sessionDefaults)) {
+      throw new Error(`${source}.sessionDefaults: expected object`);
+    }
+    config.sessionDefaults = validateSessionDefaults(raw.sessionDefaults);
+  }
   config.allowedVariance = readAllowedVariance(raw.allowedVariance, `${source}.allowedVariance`);
 
   if (raw.baseline !== undefined) {
