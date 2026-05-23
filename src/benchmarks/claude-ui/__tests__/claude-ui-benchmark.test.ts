@@ -53,15 +53,15 @@ describe('Claude UI benchmark harness', () => {
     }
   });
 
-  it('requires an explicit parser path or parser environment variable', async () => {
+  it('defaults to the bundled parser path', async () => {
     delete process.env[parserEnvName];
 
-    await expect(resolveParserPath(undefined)).rejects.toThrow(
-      `Pass --parser <path> or set ${parserEnvName}`,
+    await expect(resolveParserPath(undefined)).resolves.toBe(
+      path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py'),
     );
   });
 
-  it('resolves configured parser paths and rejects missing files', async () => {
+  it('prefers configured parser paths and rejects missing files', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-parser-'));
     try {
       const parserPath = path.join(dir, 'parse_claude_conversation.py');

@@ -31,6 +31,7 @@ import type {
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(sourceDir, '../../..');
 const suitesDir = path.join(repoRoot, 'benchmarks/claude-ui/suites');
+const bundledParserPath = path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py');
 const parserEnvName = 'CLAUDE_UI_BENCHMARK_PARSER';
 const serverName = 'xcodebuildmcp-dev';
 const mcpToolPrefix = `mcp__${serverName}__`;
@@ -83,13 +84,7 @@ function resolveFrom(baseDir: string, filePath: string): string {
 }
 
 export async function resolveParserPath(parserPath: string | undefined): Promise<string> {
-  const configured = parserPath ?? process.env[parserEnvName];
-  if (!configured) {
-    throw new Error(
-      `Claude UI benchmark parser path is required. Pass --parser <path> or set ${parserEnvName}.`,
-    );
-  }
-
+  const configured = parserPath ?? process.env[parserEnvName] ?? bundledParserPath;
   const resolved = path.resolve(configured);
   try {
     await access(resolved);
@@ -517,7 +512,7 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
     })
     .option('parser', {
       type: 'string',
-      describe: `Path to parse_claude_conversation.py (or set ${parserEnvName})`,
+      describe: `Path to parse_claude_conversation.py (defaults to benchmarks/claude-ui/parse_claude_conversation.py; can also set ${parserEnvName})`,
     })
     .option('from-result', {
       type: 'string',
