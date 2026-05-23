@@ -25,6 +25,46 @@ async function appendLifecycleLog(logPath: string, message: string): Promise<voi
   await appendFile(logPath, `${message}\n`, 'utf8');
 }
 
+async function terminatePreflightApp(opts: {
+  config: BenchmarkConfig;
+  simulatorId: string;
+  bundleId: string;
+  cwd: string;
+  logPath: string;
+  executor: LifecycleCommandExecutor;
+  suppressFailure: boolean;
+}): Promise<void> {
+  try {
+    const terminate = await opts.executor({
+      command: 'xcrun',
+      args: ['simctl', 'terminate', opts.simulatorId, opts.bundleId],
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (terminate.exitCode === 0) return;
+
+    const message = `${opts.config.name}: failed to terminate app after first-run prompt preflight (exit ${terminate.exitCode}); see ${opts.logPath}`;
+    if (opts.suppressFailure) {
+      await appendLifecycleLog(
+        opts.logPath,
+        `First-run prompt preflight terminate failed: ${message}`,
+      );
+      return;
+    }
+    throw new Error(message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (opts.suppressFailure) {
+      await appendLifecycleLog(
+        opts.logPath,
+        `First-run prompt preflight terminate failed: ${message}`,
+      );
+      return;
+    }
+    throw error;
+  }
+}
+
 function readNodeText(node: unknown, key: string): string | undefined {
   if (typeof node !== 'object' || node === null || Array.isArray(node)) return undefined;
   const value = (node as Record<string, unknown>)[key];
@@ -160,76 +200,80 @@ export async function dismissFirstRunPrompts(opts: {
     );
   }
 
-  const deadline = timing.now() + timeoutMs;
-  let promptsDismissed = false;
-  let uiSeen = false;
-  while (timing.now() < deadline) {
-    const search = await findFirstRunPromptLabel({
+  let preflightError: unknown;
+  try {
+    const deadline = timing.now() + timeoutMs;
+    let promptsDismissed = false;
+    let uiSeen = false;
+    while (timing.now() < deadline) {
+      const search = await findFirstRunPromptLabel({
+        simulatorId: opts.simulatorId,
+        labels: dismissals.labels,
+        cwd: opts.cwd,
+        logPath: opts.logPath,
+        executor,
+        axePath,
+        axeEnv,
+      });
+
+      if (search.status === 'unavailable') {
+        await appendLifecycleLog(
+          opts.logPath,
+          `First-run prompt preflight: UI unavailable; retrying (exit ${search.exitCode})`,
+        );
+        await timing.sleep(500);
+        continue;
+      }
+
+      if (search.status === 'not-found') {
+        if (search.hasElements) {
+          uiSeen = true;
+        }
+        if (uiSeen) {
+          promptsDismissed = true;
+          break;
+        }
+        await timing.sleep(500);
+        continue;
+      }
+
+      uiSeen = true;
+      const { label } = search;
+      opts.onEvent?.(`dismissing first-run prompt '${label}'`);
+      await appendLifecycleLog(opts.logPath, `Dismissing first-run prompt label: ${label}`);
+      const tap = await executor({
+        command: axePath,
+        args: ['tap', '--label', label, '--element-type', 'Button', '--udid', opts.simulatorId],
+        cwd: opts.cwd,
+        logPath: opts.logPath,
+        env: axeEnv,
+      });
+      if (tap.exitCode !== 0) {
+        throw new Error(
+          `${opts.config.name}: failed to dismiss first-run prompt '${label}' (exit ${tap.exitCode}); see ${opts.logPath}`,
+        );
+      }
+      await timing.sleep(500);
+    }
+
+    if (!promptsDismissed) {
+      throw new Error(
+        `${opts.config.name}: timed out during first-run prompt preflight; see ${opts.logPath}`,
+      );
+    }
+  } catch (error) {
+    preflightError = error;
+    throw error;
+  } finally {
+    await terminatePreflightApp({
+      config: opts.config,
       simulatorId: opts.simulatorId,
-      labels: dismissals.labels,
+      bundleId,
       cwd: opts.cwd,
       logPath: opts.logPath,
       executor,
-      axePath,
-      axeEnv,
+      suppressFailure: preflightError !== undefined,
     });
-
-    if (search.status === 'unavailable') {
-      await appendLifecycleLog(
-        opts.logPath,
-        `First-run prompt preflight: UI unavailable; retrying (exit ${search.exitCode})`,
-      );
-      await timing.sleep(500);
-      continue;
-    }
-
-    if (search.status === 'not-found') {
-      if (search.hasElements) {
-        uiSeen = true;
-      }
-      if (uiSeen) {
-        promptsDismissed = true;
-        break;
-      }
-      await timing.sleep(500);
-      continue;
-    }
-
-    uiSeen = true;
-    const { label } = search;
-    opts.onEvent?.(`dismissing first-run prompt '${label}'`);
-    await appendLifecycleLog(opts.logPath, `Dismissing first-run prompt label: ${label}`);
-    const tap = await executor({
-      command: axePath,
-      args: ['tap', '--label', label, '--element-type', 'Button', '--udid', opts.simulatorId],
-      cwd: opts.cwd,
-      logPath: opts.logPath,
-      env: axeEnv,
-    });
-    if (tap.exitCode !== 0) {
-      throw new Error(
-        `${opts.config.name}: failed to dismiss first-run prompt '${label}' (exit ${tap.exitCode}); see ${opts.logPath}`,
-      );
-    }
-    await timing.sleep(500);
-  }
-
-  if (!promptsDismissed) {
-    throw new Error(
-      `${opts.config.name}: timed out during first-run prompt preflight; see ${opts.logPath}`,
-    );
-  }
-
-  const terminate = await executor({
-    command: 'xcrun',
-    args: ['simctl', 'terminate', opts.simulatorId, bundleId],
-    cwd: opts.cwd,
-    logPath: opts.logPath,
-  });
-  if (terminate.exitCode !== 0) {
-    throw new Error(
-      `${opts.config.name}: failed to terminate app after first-run prompt preflight (exit ${terminate.exitCode}); see ${opts.logPath}`,
-    );
   }
   await appendLifecycleLog(opts.logPath, 'First-run prompt preflight: complete');
 }

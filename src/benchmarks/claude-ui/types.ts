@@ -1,3 +1,5 @@
+import type { SessionDefaults } from '../../utils/session-store.ts';
+
 export interface AllowedVariance {
   totalToolCalls: number;
   mcpToolCalls: number;
@@ -29,7 +31,7 @@ export interface BenchmarkConfig {
   name: string;
   prompt: string;
   workingDirectory?: string;
-  sessionDefaults?: Record<string, unknown>;
+  sessionDefaults?: SessionDefaults;
   temporarySimulator?: boolean;
   firstRunPromptDismissals?: FirstRunPromptDismissals;
   baseline?: BenchmarkBaseline;

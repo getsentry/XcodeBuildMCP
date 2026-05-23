@@ -292,6 +292,43 @@ describe('Claude UI first-run prompt preflight', () => {
     ]);
   });
 
+  it('terminates the app when prompt dismissal times out after launch', async () => {
+    const logPath = await tempLogPath();
+    const commands: LifecycleCommandOptions[] = [];
+    const executor: LifecycleCommandExecutor = async (opts) => {
+      commands.push(opts);
+      if (opts.command === '/mock/axe' && opts.args[0] === 'describe-ui') {
+        return { exitCode: 0, stdout: emptyDescribeUi, stderr: '', durationSeconds: 0.01 };
+      }
+      return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
+    };
+    let now = 1_000;
+
+    await expect(
+      dismissFirstRunPrompts({
+        config: config({ firstRunPromptDismissals: { labels: ['Continue'], timeoutSeconds: 1 } }),
+        simulatorId: 'TEMP-SIM-123',
+        cwd: '/repo',
+        logPath,
+        executor,
+        axePath: '/mock/axe',
+        timing: {
+          now: () => now,
+          sleep: async (milliseconds) => {
+            now += milliseconds;
+          },
+        },
+      }),
+    ).rejects.toThrow('timed out during first-run prompt preflight');
+
+    expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+      ['xcrun', 'simctl', 'launch', 'TEMP-SIM-123', 'com.apple.reminders'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['/mock/axe', 'describe-ui', '--udid', 'TEMP-SIM-123'],
+      ['xcrun', 'simctl', 'terminate', 'TEMP-SIM-123', 'com.apple.reminders'],
+    ]);
+  });
+
   it('retries malformed describe-ui output as transiently unavailable', async () => {
     const logPath = await tempLogPath();
     const commands: LifecycleCommandOptions[] = [];

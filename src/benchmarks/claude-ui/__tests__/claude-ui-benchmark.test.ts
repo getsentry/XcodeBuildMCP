@@ -225,7 +225,7 @@ describe('Claude UI benchmark analysis', () => {
         },
         'weather.yml',
       ),
-    ).toThrow("unknown sessionDefaults key 'simulatorTypo'");
+    ).toThrow('Unrecognized key: "simulatorTypo"');
 
     expect(() =>
       readConfig(
@@ -233,12 +233,40 @@ describe('Claude UI benchmark analysis', () => {
           name: 'weather',
           prompt: 'prompt.md',
           sessionDefaults: {
-            simulatorId: 42,
+            projectPath: true,
           },
         },
         'weather.yml',
       ),
-    ).toThrow('sessionDefaults.simulatorId must be a string or boolean');
+    ).toThrow('projectPath: Invalid input: expected string');
+
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          sessionDefaults: {
+            arch: 'ppc',
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow('arch: Invalid option');
+  });
+
+  it('accepts session default env values supported by the runtime schema', () => {
+    const config = readConfig(
+      {
+        name: 'weather',
+        prompt: 'prompt.md',
+        sessionDefaults: {
+          env: { FEATURE_FLAG: '1' },
+        },
+      },
+      'weather.yml',
+    );
+
+    expect(config.sessionDefaults?.env).toEqual({ FEATURE_FLAG: '1' });
   });
 
   it('warns by default when tool sequences drift', () => {

@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { appendFile } from 'node:fs/promises';
 import type { BenchmarkConfig } from './types.ts';
 
+type SessionDefaultKey = keyof NonNullable<BenchmarkConfig['sessionDefaults']>;
+
 export interface LoggedCommandResult {
   exitCode: number | null;
   stdout: string;
@@ -51,7 +53,7 @@ export interface DeleteTemporarySimulatorResult {
   error?: string;
 }
 
-function sessionDefaultString(config: BenchmarkConfig, key: string): string | undefined {
+function sessionDefaultString(config: BenchmarkConfig, key: SessionDefaultKey): string | undefined {
   const value = config.sessionDefaults?.[key];
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || value.length === 0) {

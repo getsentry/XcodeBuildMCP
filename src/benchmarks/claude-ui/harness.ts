@@ -27,6 +27,7 @@ import type {
   BenchmarkRunMetadata,
   TemporarySimulatorRunMetadata,
 } from './types.ts';
+import type { SessionDefaults } from '../../utils/session-store.ts';
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(sourceDir, '../../..');
@@ -97,7 +98,7 @@ export async function resolveParserPath(parserPath: string | undefined): Promise
 function sessionDefaultsWithTemporarySimulator(
   config: BenchmarkConfig,
   temporarySimulator: CreatedTemporarySimulator | undefined,
-): Record<string, unknown> | undefined {
+): SessionDefaults | undefined {
   if (!temporarySimulator) return config.sessionDefaults;
   const defaults = { ...config.sessionDefaults };
   delete defaults.simulatorName;
@@ -119,20 +120,21 @@ function isolatedSessionDefaults(
   config: BenchmarkConfig,
   workingDirectory: string,
   temporarySimulator: CreatedTemporarySimulator | undefined,
-): Record<string, string | boolean> | undefined {
+): SessionDefaults | undefined {
   const defaults = validateSessionDefaults(
     sessionDefaultsWithTemporarySimulator(config, temporarySimulator),
   );
   if (!defaults) return undefined;
 
-  return Object.fromEntries(
-    Object.entries(defaults).map(([key, value]) => [
-      key,
-      typeof value === 'string' && shouldResolveSessionDefaultPath(key, value)
-        ? path.resolve(workingDirectory, value)
-        : value,
-    ]),
-  );
+  const resolved = { ...defaults };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (typeof value === 'string' && shouldResolveSessionDefaultPath(key, value)) {
+      if (key === 'workspacePath' || key === 'projectPath' || key === 'derivedDataPath') {
+        resolved[key] = path.resolve(workingDirectory, value);
+      }
+    }
+  }
+  return resolved;
 }
 
 export function resolveBenchmarkSimulatorId(

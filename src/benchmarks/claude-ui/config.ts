@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
+import * as z from 'zod';
+import { sessionDefaultsSchema } from '../../utils/session-defaults-schema.ts';
+import type { SessionDefaults } from '../../utils/session-store.ts';
 import type { AllowedVariance, BenchmarkConfig, SequenceMode } from './types.ts';
 
 export const sessionDefaultEnvNames: Record<string, string> = {
@@ -155,18 +158,23 @@ function readFirstRunPromptDismissals(
 
 export function validateSessionDefaults(
   sessionDefaults: Record<string, unknown> | undefined,
-): Record<string, string | boolean> | undefined {
+): SessionDefaults | undefined {
   if (!sessionDefaults) return undefined;
 
-  const validated: Record<string, string | boolean> = {};
-  for (const [key, value] of Object.entries(sessionDefaults)) {
-    if (!sessionDefaultEnvNames[key]) throw new Error(`unknown sessionDefaults key '${key}'`);
-    if (typeof value !== 'string' && typeof value !== 'boolean') {
-      throw new Error(`sessionDefaults.${key} must be a string or boolean`);
-    }
-    validated[key] = value;
+  const parsed = sessionDefaultsSchema.strict().safeParse(sessionDefaults);
+  if (!parsed.success) {
+    throw new Error(`invalid sessionDefaults:\n${formatZodIssues(parsed.error)}`);
   }
-  return validated;
+  return parsed.data;
+}
+
+function formatZodIssues(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.map(String).join('.') : 'root';
+      return `${path}: ${issue.message}`;
+    })
+    .join('\n');
 }
 
 export function readConfig(raw: unknown, source: string): BenchmarkConfig {
