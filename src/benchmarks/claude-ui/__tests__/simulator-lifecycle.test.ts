@@ -47,6 +47,16 @@ async function tempLogPath(): Promise<string> {
   return path.join(directory, 'simulator-lifecycle.log');
 }
 
+function inMemoryLifecycleLog() {
+  const messages: string[] = [];
+  return {
+    messages,
+    writer: async (_logPath: string, message: string) => {
+      messages.push(message);
+    },
+  };
+}
+
 describe('Claude UI temporary simulator lifecycle', () => {
   it('enables temporary simulators by default when no simulatorId is configured', () => {
     const plan = resolveTemporarySimulatorPlan(config());
@@ -117,7 +127,8 @@ describe('Claude UI temporary simulator lifecycle', () => {
   });
 
   it('creates, boots, opens, and deletes only the harness-created simulator', async () => {
-    const logPath = await tempLogPath();
+    const logPath = '/tmp/simulator-lifecycle.log';
+    const log = inMemoryLifecycleLog();
     const commands: LifecycleCommandOptions[] = [];
     const events: string[] = [];
     const executor: LifecycleCommandExecutor = async (opts) => {
@@ -137,6 +148,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
       cwd: '/repo',
       logPath,
       executor,
+      logWriter: log.writer,
       onEvent: (message) => events.push(message),
       readinessDelayMs: 0,
     });
@@ -164,17 +176,18 @@ describe('Claude UI temporary simulator lifecycle', () => {
     const deletion = await deleteTemporarySimulator(simulator as CreatedTemporarySimulator, {
       cwd: '/repo',
       executor,
+      logWriter: log.writer,
     });
 
     expect(deletion).toEqual({ attempted: true, succeeded: true, exitCode: 0 });
     expect(commands[4]?.args).toEqual(['simctl', 'delete', 'TEMP-SIM-123']);
-    const log = await readFile(logPath, 'utf8');
-    expect(log).toContain('Created simulatorId: TEMP-SIM-123');
-    expect(log).toContain('Temporary simulator ready: TEMP-SIM-123');
+    expect(log.messages.join('\n')).toContain('Created simulatorId: TEMP-SIM-123');
+    expect(log.messages.join('\n')).toContain('Temporary simulator ready: TEMP-SIM-123');
   });
 
   it('continues when the harness-created simulator is already booted before bootstatus', async () => {
-    const logPath = await tempLogPath();
+    const logPath = '/tmp/simulator-lifecycle.log';
+    const log = inMemoryLifecycleLog();
     const commands: LifecycleCommandOptions[] = [];
     const executor: LifecycleCommandExecutor = async (opts) => {
       commands.push(opts);
@@ -199,6 +212,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
       cwd: '/repo',
       logPath,
       executor,
+      logWriter: log.writer,
       readinessDelayMs: 0,
     });
 
@@ -206,13 +220,14 @@ describe('Claude UI temporary simulator lifecycle', () => {
     expect(
       commands.map((item) => (item.command === 'xcrun' ? item.args[1] : item.command)),
     ).toEqual(['create', 'boot', 'bootstatus', 'open']);
-    await expect(readFile(logPath, 'utf8')).resolves.toContain(
+    expect(log.messages.join('\n')).toContain(
       'Boot command reported simulator was already booted; continuing',
     );
   });
 
   it('logs deletion failures as best effort instead of throwing', async () => {
-    const logPath = await tempLogPath();
+    const logPath = '/tmp/simulator-lifecycle.log';
+    const log = inMemoryLifecycleLog();
     const simulator: CreatedTemporarySimulator = {
       createdByHarness: true,
       simulatorId: 'TEMP-SIM-DELETE-FAIL',
@@ -224,7 +239,11 @@ describe('Claude UI temporary simulator lifecycle', () => {
       throw new Error('simctl unavailable');
     };
 
-    const deletion = await deleteTemporarySimulator(simulator, { cwd: '/repo', executor });
+    const deletion = await deleteTemporarySimulator(simulator, {
+      cwd: '/repo',
+      executor,
+      logWriter: log.writer,
+    });
 
     expect(deletion).toEqual({
       attempted: true,
@@ -232,13 +251,14 @@ describe('Claude UI temporary simulator lifecycle', () => {
       exitCode: null,
       error: 'simctl unavailable',
     });
-    const log = await readFile(logPath, 'utf8');
-    expect(log).toContain('Delete failed for simulatorId: TEMP-SIM-DELETE-FAIL');
-    expect(log).toContain('simctl unavailable');
+    expect(log.messages.join('\n')).toContain(
+      'Delete failed for simulatorId: TEMP-SIM-DELETE-FAIL',
+    );
+    expect(log.messages.join('\n')).toContain('simctl unavailable');
   });
 
   it('still runs simctl delete when lifecycle logging fails', async () => {
-    const logPath = await mkdtemp(path.join(os.tmpdir(), 'claude-ui-log-directory-'));
+    const logPath = '/tmp/simulator-lifecycle.log';
     const commands: LifecycleCommandOptions[] = [];
     const simulator: CreatedTemporarySimulator = {
       createdByHarness: true,
@@ -252,7 +272,13 @@ describe('Claude UI temporary simulator lifecycle', () => {
       return { exitCode: 0, stdout: '', stderr: '', durationSeconds: 0.01 };
     };
 
-    const deletion = await deleteTemporarySimulator(simulator, { cwd: '/repo', executor });
+    const deletion = await deleteTemporarySimulator(simulator, {
+      cwd: '/repo',
+      executor,
+      logWriter: async () => {
+        throw new Error('log unavailable');
+      },
+    });
 
     expect(commands[0]?.args).toEqual(['simctl', 'delete', 'TEMP-SIM-LOG-FAIL']);
     expect(deletion.attempted).toBe(true);

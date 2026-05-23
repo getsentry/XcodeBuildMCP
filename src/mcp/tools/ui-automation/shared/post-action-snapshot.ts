@@ -17,7 +17,7 @@ const POST_ACTION_SNAPSHOT_TIMEOUT_MS = 1_500;
 const POST_ACTION_SNAPSHOT_POLL_INTERVAL_MS = 100;
 const POST_ACTION_SNAPSHOT_SETTLED_DURATION_MS = 100;
 
-interface PostActionSnapshotTiming {
+export interface PostActionSnapshotTiming {
   now: () => number;
   sleep: (durationMs: number) => Promise<void>;
 }
@@ -101,6 +101,10 @@ export async function captureRuntimeSnapshotAfterActionSafely(params: {
   simulatorId: string;
   executor: CommandExecutor;
   axeHelpers: AxeHelpers;
+  timing?: PostActionSnapshotTiming;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  settledDurationMs?: number;
 }): Promise<
   | { capture: CapturePayload; warning?: never; uiError?: never }
   | { capture?: never; warning: string; uiError: UiAutomationRecoverableError }

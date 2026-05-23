@@ -16,7 +16,10 @@ import {
   clearRuntimeSnapshot,
   withSimulatorUiAutomationTransaction,
 } from './shared/snapshot-ui-state.ts';
-import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
+import {
+  captureRuntimeSnapshotAfterActionSafely,
+  type PostActionSnapshotTiming,
+} from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -58,6 +61,7 @@ export function createButtonExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
   settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
+  postActionSnapshotTiming?: PostActionSnapshotTiming,
 ): NonStreamingExecutor<ButtonParams, ButtonResult> {
   return async (params) =>
     withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
@@ -95,6 +99,7 @@ export function createButtonExecutor(
           simulatorId,
           executor,
           axeHelpers,
+          timing: postActionSnapshotTiming,
         });
         return createUiActionSuccessResult(
           action,

@@ -12,7 +12,7 @@ The harness:
 - optionally preflights configured first-run prompts before Claude launches, outside the measured run
 - deletes the temporary simulator at the end of the suite, best effort, using only the ID created by the harness
 - writes artifacts under `out.nosync/claude-benchmarks/<suite>/<timestamp>/`
-- runs `/Volumes/Developer/parse_claude_conversation.py` against Claude's stream JSONL
+- runs the configured `parse_claude_conversation.py` parser against Claude's stream JSONL
 - audits tool counts, MCP calls, UI automation calls, wall clock, failures/stumbles, and expected tool sequence drift
 - prints a structured per-suite report and (for `--all`) an aggregate summary
 - optionally prints machine-readable JSON with `--json`
@@ -32,19 +32,19 @@ npx tsx benchmarks/claude-ui/run.ts --suite weather
 Shortcut:
 
 ```bash
-npm run bench:claude-ui -- --suite weather
+npm run bench:claude-ui -- --suite weather --parser /path/to/parse_claude_conversation.py
 ```
 
 Run every suite YAML:
 
 ```bash
-npm run bench:claude-ui -- --all
+CLAUDE_UI_BENCHMARK_PARSER=/path/to/parse_claude_conversation.py npm run bench:claude-ui -- --all
 ```
 
 Print machine-readable output from a new run:
 
 ```bash
-npm run bench:claude-ui -- --suite reminders --json
+npm run bench:claude-ui -- --suite reminders --parser /path/to/parse_claude_conversation.py --json
 ```
 
 Render an existing result without rerunning Claude:
@@ -53,6 +53,8 @@ Render an existing result without rerunning Claude:
 npm run bench:claude-ui -- --from-result out.nosync/claude-benchmarks/reminders/20260522T130926Z
 npm run bench:claude-ui -- --from-result out.nosync/claude-benchmarks/reminders/20260522T130926Z/result.json --json
 ```
+
+The parser path is required for new runs. Pass `--parser /path/to/parse_claude_conversation.py` or set `CLAUDE_UI_BENCHMARK_PARSER`. `--from-result` does not need a parser because it only re-renders existing artifacts.
 
 ## Suite YAML shape
 

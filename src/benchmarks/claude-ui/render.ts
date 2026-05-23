@@ -222,11 +222,11 @@ function renderFailureSection(result: BenchmarkResult, opts: ResolvedOptions): s
 
   const lines: string[] = ['', `${statusLabel('FAIL', opts)}  failures/stumbles: ${total}`];
 
-  if (claudeExitCode !== 0 && claudeExitCode !== null) {
-    lines.push(`  • claude exit code: ${claudeExitCode}`);
+  if (claudeExitCode !== 0) {
+    lines.push(`  • claude exit code: ${claudeExitCode ?? 'null'}`);
   }
-  if (parserExitCode !== 0 && parserExitCode !== null) {
-    lines.push(`  • parser exit code: ${parserExitCode}`);
+  if (parserExitCode !== 0) {
+    lines.push(`  • parser exit code: ${parserExitCode ?? 'null'}`);
   }
   if (parseErrors.length > 0) {
     lines.push(`  • parse errors: ${parseErrors.length}`);

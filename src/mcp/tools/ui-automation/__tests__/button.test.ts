@@ -16,6 +16,16 @@ import {
   simulatorId,
 } from './ui-action-test-helpers.ts';
 
+function createImmediatePostActionTiming() {
+  let nowMs = 0;
+  return {
+    now: () => nowMs,
+    sleep: async (durationMs: number) => {
+      nowMs += durationMs;
+    },
+  };
+}
+
 describe('Button Plugin', () => {
   beforeEach(() => {
     __resetRuntimeSnapshotStoreForTests();
@@ -215,7 +225,13 @@ describe('Button Plugin', () => {
   describe('Executor Behavior', () => {
     it('captures a fresh runtime snapshot after a successful button press', async () => {
       const { calls, executor } = createTrackingExecutor();
-      const executeButton = createButtonExecutor(executor, createMockAxeHelpers(), undefined, 0);
+      const executeButton = createButtonExecutor(
+        executor,
+        createMockAxeHelpers(),
+        undefined,
+        0,
+        createImmediatePostActionTiming(),
+      );
 
       const result = await executeButton({ simulatorId, buttonType: 'home' });
 

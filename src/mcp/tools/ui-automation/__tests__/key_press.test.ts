@@ -19,6 +19,16 @@ function createDefaultMockAxeHelpers() {
   };
 }
 
+function createImmediatePostActionTiming() {
+  let nowMs = 0;
+  return {
+    now: () => nowMs,
+    sleep: async (durationMs: number) => {
+      nowMs += durationMs;
+    },
+  };
+}
+
 describe('Key Press Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
@@ -186,7 +196,12 @@ describe('Key Press Tool', () => {
 
     it('captures a fresh runtime snapshot after a successful key press', async () => {
       const { calls, executor } = createTrackingExecutor();
-      const executeKeyPress = createKeyPressExecutor(executor, createMockAxeHelpers());
+      const executeKeyPress = createKeyPressExecutor(
+        executor,
+        createMockAxeHelpers(),
+        undefined,
+        createImmediatePostActionTiming(),
+      );
 
       const result = await executeKeyPress({ simulatorId, keyCode: 40 });
 

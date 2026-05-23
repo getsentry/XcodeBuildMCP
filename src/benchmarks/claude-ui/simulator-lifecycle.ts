@@ -21,6 +21,12 @@ export type LifecycleCommandExecutor = (
   opts: LifecycleCommandOptions,
 ) => Promise<LoggedCommandResult>;
 
+export type LifecycleLogWriter = (logPath: string, message: string) => Promise<void>;
+
+const defaultLifecycleLogWriter: LifecycleLogWriter = async (logPath, message) => {
+  await appendFile(logPath, `${message}\n`, 'utf8');
+};
+
 export interface TemporarySimulatorPlan {
   enabled: boolean;
   reason?: string;
@@ -88,16 +94,21 @@ export function temporarySimulatorName(suiteSlug: string, timestamp: string): st
   return `XcodeBuildMCP Claude UI ${suiteSlug} ${timestamp}`;
 }
 
-async function appendLifecycleLog(logPath: string, message: string): Promise<void> {
-  await appendFile(logPath, `${message}\n`, 'utf8');
+async function appendLifecycleLog(
+  logPath: string,
+  message: string,
+  logWriter: LifecycleLogWriter = defaultLifecycleLogWriter,
+): Promise<void> {
+  await logWriter(logPath, message);
 }
 
 async function tryAppendLifecycleLog(
   logPath: string,
   message: string,
+  logWriter: LifecycleLogWriter = defaultLifecycleLogWriter,
 ): Promise<string | undefined> {
   try {
-    await appendLifecycleLog(logPath, message);
+    await appendLifecycleLog(logPath, message, logWriter);
     return undefined;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
@@ -121,11 +132,16 @@ async function waitForReadinessDelay(opts: {
   logPath: string;
   milliseconds: number;
   onEvent?: LifecycleProgressReporter;
+  logWriter?: LifecycleLogWriter;
 }): Promise<void> {
   if (opts.milliseconds <= 0) return;
   const seconds = opts.milliseconds / 1000;
   opts.onEvent?.(`waiting ${seconds.toFixed(1)}s for simulator UI readiness`);
-  await appendLifecycleLog(opts.logPath, `Readiness delay seconds: ${seconds.toFixed(1)}`);
+  await appendLifecycleLog(
+    opts.logPath,
+    `Readiness delay seconds: ${seconds.toFixed(1)}`,
+    opts.logWriter,
+  );
   await new Promise<void>((resolve) => {
     setTimeout(resolve, opts.milliseconds);
   });
@@ -196,10 +212,12 @@ export async function prepareTemporarySimulator(opts: {
   cwd: string;
   logPath: string;
   executor?: LifecycleCommandExecutor;
+  logWriter?: LifecycleLogWriter;
   onEvent?: LifecycleProgressReporter;
   readinessDelayMs?: number;
 }): Promise<CreatedTemporarySimulator | undefined> {
   const plan = resolveTemporarySimulatorPlan(opts.config);
+  const logWriter = opts.logWriter ?? defaultLifecycleLogWriter;
 
   if (!plan.enabled) {
     await appendLifecycleLog(
@@ -213,6 +231,7 @@ export async function prepareTemporarySimulator(opts: {
       ]
         .filter((line): line is string => line !== undefined)
         .join('\n'),
+      logWriter,
     );
     return undefined;
   }
@@ -227,6 +246,7 @@ export async function prepareTemporarySimulator(opts: {
   await appendLifecycleLog(
     opts.logPath,
     [`Temporary simulator: enabled`, `Name: ${name}`, `Device type: ${deviceTypeName}`].join('\n'),
+    logWriter,
   );
 
   opts.onEvent?.(`creating simulator ${name}`);
@@ -248,7 +268,7 @@ export async function prepareTemporarySimulator(opts: {
     throw new Error(`${opts.config.name}: simctl create did not return a simulatorId`);
   }
 
-  await appendLifecycleLog(opts.logPath, `Created simulatorId: ${simulatorId}`);
+  await appendLifecycleLog(opts.logPath, `Created simulatorId: ${simulatorId}`, logWriter);
 
   const simulator = {
     createdByHarness: true,
@@ -275,6 +295,7 @@ export async function prepareTemporarySimulator(opts: {
     await appendLifecycleLog(
       opts.logPath,
       'Boot command reported simulator was already booted; continuing',
+      logWriter,
     );
   }
 
@@ -310,8 +331,9 @@ export async function prepareTemporarySimulator(opts: {
     logPath: opts.logPath,
     milliseconds: opts.readinessDelayMs ?? 2_000,
     onEvent: opts.onEvent,
+    logWriter,
   });
-  await appendLifecycleLog(opts.logPath, `Temporary simulator ready: ${simulatorId}`);
+  await appendLifecycleLog(opts.logPath, `Temporary simulator ready: ${simulatorId}`, logWriter);
   opts.onEvent?.(`simulator ready ${simulatorId}`);
 
   return simulator;
@@ -322,6 +344,7 @@ export async function deleteTemporarySimulator(
   opts: {
     cwd: string;
     executor?: LifecycleCommandExecutor;
+    logWriter?: LifecycleLogWriter;
   },
 ): Promise<DeleteTemporarySimulatorResult> {
   if (simulator.createdByHarness !== true) {
@@ -329,10 +352,12 @@ export async function deleteTemporarySimulator(
   }
 
   const executor = opts.executor ?? runLoggedCommand;
+  const logWriter = opts.logWriter ?? defaultLifecycleLogWriter;
   const logErrors: string[] = [];
   const startLogError = await tryAppendLifecycleLog(
     simulator.logPath,
     `Deleting simulatorId: ${simulator.simulatorId}\nName: ${simulator.name}`,
+    logWriter,
   );
   if (startLogError) logErrors.push(startLogError);
 
@@ -347,6 +372,7 @@ export async function deleteTemporarySimulator(
     const resultLogError = await tryAppendLifecycleLog(
       simulator.logPath,
       `Delete ${succeeded ? 'succeeded' : 'failed'} for simulatorId: ${simulator.simulatorId}`,
+      logWriter,
     );
     if (resultLogError) logErrors.push(resultLogError);
     const deletion = { attempted: true, succeeded, exitCode: result.exitCode };
@@ -357,6 +383,7 @@ export async function deleteTemporarySimulator(
     const failureLogError = await tryAppendLifecycleLog(
       simulator.logPath,
       `Delete failed for simulatorId: ${simulator.simulatorId}\nError: ${message}`,
+      logWriter,
     );
     if (failureLogError) logErrors.push(failureLogError);
     return { attempted: true, succeeded: false, exitCode: null, error: logErrors.join('; ') };

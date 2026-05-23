@@ -128,6 +128,23 @@ describe('renderSuiteReport', () => {
     expect(output).toContain('transcript    out.nosync/claude-benchmarks/weather');
   });
 
+  it('renders null process exit codes as failures', () => {
+    const result = baseResult({
+      pass: false,
+      failureMetric: { pass: false, count: 2 },
+      run: {
+        ...baseResult().run,
+        claudeExitCode: null,
+        parserExitCode: null,
+      },
+    });
+
+    const output = renderSuiteReport(result, { color: false, width: 80, cwd: '/repo' });
+
+    expect(output).toContain('claude exit code: null');
+    expect(output).toContain('parser exit code: null');
+  });
+
   it('renders sequence drift hunks with marker columns', () => {
     const result = baseResult({
       sequence: {

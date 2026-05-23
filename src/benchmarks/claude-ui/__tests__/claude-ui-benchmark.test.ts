@@ -1,7 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
+import { resolveParserPath } from '../harness.ts';
 import { analyzeClaudeJsonl } from '../transcript.ts';
 import type { BenchmarkConfig, BenchmarkRunMetadata } from '../types.ts';
 
@@ -38,6 +40,42 @@ function runMetadata(
     },
   };
 }
+
+describe('Claude UI benchmark harness', () => {
+  const parserEnvName = 'CLAUDE_UI_BENCHMARK_PARSER';
+  const originalParserEnv = process.env[parserEnvName];
+
+  afterEach(() => {
+    if (originalParserEnv === undefined) {
+      delete process.env[parserEnvName];
+    } else {
+      process.env[parserEnvName] = originalParserEnv;
+    }
+  });
+
+  it('requires an explicit parser path or parser environment variable', async () => {
+    delete process.env[parserEnvName];
+
+    await expect(resolveParserPath(undefined)).rejects.toThrow(
+      `Pass --parser <path> or set ${parserEnvName}`,
+    );
+  });
+
+  it('resolves configured parser paths and rejects missing files', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-parser-'));
+    try {
+      const parserPath = path.join(dir, 'parse_claude_conversation.py');
+      await writeFile(parserPath, '# parser\n', 'utf8');
+
+      await expect(resolveParserPath(parserPath)).resolves.toBe(parserPath);
+      await expect(resolveParserPath(path.join(dir, 'missing.py'))).rejects.toThrow(
+        'Claude UI benchmark parser does not exist',
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('Claude UI benchmark analysis', () => {
   it('keeps task prompts deterministic', async () => {

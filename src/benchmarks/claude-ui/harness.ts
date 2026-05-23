@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { finished } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +31,7 @@ import type {
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(sourceDir, '../../..');
 const suitesDir = path.join(repoRoot, 'benchmarks/claude-ui/suites');
-const parserPath = '/Volumes/Developer/parse_claude_conversation.py';
+const parserEnvName = 'CLAUDE_UI_BENCHMARK_PARSER';
 const serverName = 'xcodebuildmcp-dev';
 const mcpToolPrefix = `mcp__${serverName}__`;
 const sessionDefaultEnvNameSet = new Set(Object.values(sessionDefaultEnvNames));
@@ -80,6 +80,23 @@ function timestamp(): string {
 
 function resolveFrom(baseDir: string, filePath: string): string {
   return path.isAbsolute(filePath) ? filePath : path.resolve(baseDir, filePath);
+}
+
+export async function resolveParserPath(parserPath: string | undefined): Promise<string> {
+  const configured = parserPath ?? process.env[parserEnvName];
+  if (!configured) {
+    throw new Error(
+      `Claude UI benchmark parser path is required. Pass --parser <path> or set ${parserEnvName}.`,
+    );
+  }
+
+  const resolved = path.resolve(configured);
+  try {
+    await access(resolved);
+  } catch {
+    throw new Error(`Claude UI benchmark parser does not exist: ${resolved}`);
+  }
+  return resolved;
 }
 
 function sessionDefaultsWithTemporarySimulator(
@@ -207,7 +224,10 @@ function runCommand(opts: {
   });
 }
 
-async function runParser(artifacts: BenchmarkArtifacts): Promise<number | null> {
+async function runParser(
+  artifacts: BenchmarkArtifacts,
+  parserPath: string,
+): Promise<number | null> {
   const result = await runCommand({
     command: 'python3',
     args: [
@@ -293,9 +313,11 @@ export async function runSuite(
   opts: {
     simulatorExecutor?: LifecycleCommandExecutor;
     progress?: ProgressReporter;
+    parserPath?: string;
   } = {},
 ): Promise<BenchmarkResult> {
   const config = await loadSuite(suitePath);
+  const parserPath = await resolveParserPath(opts.parserPath);
   const slug = suiteSlug(config.name);
   const runTimestamp = timestamp();
   const runDirectory = path.join(repoRoot, 'out.nosync', 'claude-benchmarks', slug, runTimestamp);
@@ -430,7 +452,7 @@ export async function runSuite(
     );
 
     progress?.event('parsing transcript');
-    const parserExitCode = await runParser(artifacts);
+    const parserExitCode = await runParser(artifacts, parserPath);
     progress?.event(`parser finished (exit ${parserExitCode ?? 'null'})`);
 
     progress?.event('evaluating result');
@@ -493,6 +515,10 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
       default: false,
       describe: 'Print machine-readable JSON results',
     })
+    .option('parser', {
+      type: 'string',
+      describe: `Path to parse_claude_conversation.py (or set ${parserEnvName})`,
+    })
     .option('from-result', {
       type: 'string',
       describe: 'Render an existing result.json or artifact directory without running Claude',
@@ -530,7 +556,7 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
       suitePaths.length,
       path.basename(suitePath, path.extname(suitePath)),
     );
-    const item = await runSuite(suitePath, { progress });
+    const item = await runSuite(suitePath, { progress, parserPath: args.parser });
     results.push(item);
     progress.event(`suite ${item.pass ? 'passed' : 'failed'}`);
     if (!args.json) process.stdout.write(renderSuiteReport(item));

@@ -16,7 +16,10 @@ import {
   clearRuntimeSnapshot,
   withSimulatorUiAutomationTransaction,
 } from './shared/snapshot-ui-state.ts';
-import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
+import {
+  captureRuntimeSnapshotAfterActionSafely,
+  type PostActionSnapshotTiming,
+} from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -53,6 +56,7 @@ export function createKeyPressExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  postActionSnapshotTiming?: PostActionSnapshotTiming,
 ): NonStreamingExecutor<KeyPressParams, KeyPressResult> {
   return async (params) =>
     withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
@@ -84,6 +88,7 @@ export function createKeyPressExecutor(
           simulatorId,
           executor,
           axeHelpers,
+          timing: postActionSnapshotTiming,
         });
         return createUiActionSuccessResult(
           action,

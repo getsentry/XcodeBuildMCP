@@ -153,6 +153,7 @@ export async function dismissFirstRunPrompts(opts: {
     );
   }
 
+  let promptsDismissed = false;
   while (timing.now() < deadline) {
     const search = await findFirstRunPromptLabel({
       simulatorId: opts.simulatorId,
@@ -173,7 +174,10 @@ export async function dismissFirstRunPrompts(opts: {
       continue;
     }
 
-    if (search.status === 'not-found') break;
+    if (search.status === 'not-found') {
+      promptsDismissed = true;
+      break;
+    }
 
     const { label } = search;
     opts.onEvent?.(`dismissing first-run prompt '${label}'`);
@@ -193,7 +197,7 @@ export async function dismissFirstRunPrompts(opts: {
     await timing.sleep(500);
   }
 
-  if (timing.now() >= deadline) {
+  if (!promptsDismissed) {
     throw new Error(
       `${opts.config.name}: timed out during first-run prompt preflight; see ${opts.logPath}`,
     );
