@@ -1,0 +1,201 @@
+import { readFile } from 'node:fs/promises';
+import { parse as parseYaml } from 'yaml';
+import type { AllowedVariance, BenchmarkConfig, SequenceMode } from './types.ts';
+
+export const sessionDefaultEnvNames: Record<string, string> = {
+  workspacePath: 'XCODEBUILDMCP_WORKSPACE_PATH',
+  projectPath: 'XCODEBUILDMCP_PROJECT_PATH',
+  scheme: 'XCODEBUILDMCP_SCHEME',
+  configuration: 'XCODEBUILDMCP_CONFIGURATION',
+  simulatorName: 'XCODEBUILDMCP_SIMULATOR_NAME',
+  simulatorId: 'XCODEBUILDMCP_SIMULATOR_ID',
+  simulatorPlatform: 'XCODEBUILDMCP_SIMULATOR_PLATFORM',
+  deviceId: 'XCODEBUILDMCP_DEVICE_ID',
+  derivedDataPath: 'XCODEBUILDMCP_DERIVED_DATA_PATH',
+  platform: 'XCODEBUILDMCP_PLATFORM',
+  bundleId: 'XCODEBUILDMCP_BUNDLE_ID',
+  arch: 'XCODEBUILDMCP_ARCH',
+  useLatestOS: 'XCODEBUILDMCP_USE_LATEST_OS',
+  suppressWarnings: 'XCODEBUILDMCP_SUPPRESS_WARNINGS',
+  preferXcodebuild: 'XCODEBUILDMCP_PREFER_XCODEBUILD',
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readString(value: Record<string, unknown>, key: string, source: string): string {
+  const raw = value[key];
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new Error(`${source}: expected non-empty string field '${key}'`);
+  }
+  return raw;
+}
+
+function readOptionalString(
+  value: Record<string, unknown>,
+  key: string,
+  source: string,
+): string | undefined {
+  const raw = value[key];
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'string' || raw.length === 0) {
+    throw new Error(`${source}: expected string field '${key}'`);
+  }
+  return raw;
+}
+
+function readOptionalStringArray(
+  value: Record<string, unknown>,
+  key: string,
+  source: string,
+): string[] | undefined {
+  const raw = value[key];
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) {
+    throw new Error(`${source}: expected string array field '${key}'`);
+  }
+  return raw as string[];
+}
+
+function readOptionalBoolean(
+  value: Record<string, unknown>,
+  key: string,
+  source: string,
+): boolean | undefined {
+  const raw = value[key];
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'boolean') throw new Error(`${source}.${key}: expected boolean`);
+  return raw;
+}
+
+function readSequenceMode(raw: unknown, source: string): SequenceMode {
+  if (raw === 'warn' || raw === 'fail') return raw;
+  throw new Error(`${source}: expected 'warn' or 'fail'`);
+}
+
+function readSequenceConfig(raw: unknown, source: string): BenchmarkConfig['sequence'] {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
+  return {
+    mode: raw.mode === undefined ? undefined : readSequenceMode(raw.mode, `${source}.mode`),
+  };
+}
+
+function readOptionalNumber(
+  value: Record<string, unknown>,
+  key: string,
+  source: string,
+): number | undefined {
+  const raw = value[key];
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'number') throw new Error(`${source}.${key}: expected number`);
+  return raw;
+}
+
+function readNumberMap(value: unknown, source: string): Record<string, number> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error(`${source}: expected object`);
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => {
+      if (typeof item !== 'number') throw new Error(`${source}.${key}: expected number`);
+      return [key, item];
+    }),
+  );
+}
+
+function readAllowedVariance(raw: unknown, source: string): Partial<AllowedVariance> | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
+
+  return {
+    totalToolCalls: readOptionalNumber(raw, 'totalToolCalls', source),
+    mcpToolCalls: readOptionalNumber(raw, 'mcpToolCalls', source),
+    uiAutomationCalls: readOptionalNumber(raw, 'uiAutomationCalls', source),
+    wallClockSeconds: readOptionalNumber(raw, 'wallClockSeconds', source),
+    toolCalls: readOptionalNumber(raw, 'toolCalls', source),
+  };
+}
+
+function readFirstRunPromptDismissals(
+  raw: unknown,
+  source: string,
+): BenchmarkConfig['firstRunPromptDismissals'] {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
+  return {
+    labels: readOptionalStringArray(raw, 'labels', source) ?? [],
+    timeoutSeconds: readOptionalNumber(raw, 'timeoutSeconds', source),
+  };
+}
+
+export function validateSessionDefaults(
+  sessionDefaults: Record<string, unknown> | undefined,
+): Record<string, string | boolean> | undefined {
+  if (!sessionDefaults) return undefined;
+
+  const validated: Record<string, string | boolean> = {};
+  for (const [key, value] of Object.entries(sessionDefaults)) {
+    if (!sessionDefaultEnvNames[key]) throw new Error(`unknown sessionDefaults key '${key}'`);
+    if (typeof value !== 'string' && typeof value !== 'boolean') {
+      throw new Error(`sessionDefaults.${key} must be a string or boolean`);
+    }
+    validated[key] = value;
+  }
+  return validated;
+}
+
+export function readConfig(raw: unknown, source: string): BenchmarkConfig {
+  if (!isRecord(raw)) throw new Error(`${source}: expected YAML object`);
+  const config: BenchmarkConfig = {
+    name: readString(raw, 'name', source),
+    prompt: readString(raw, 'prompt', source),
+    workingDirectory: readOptionalString(raw, 'workingDirectory', source),
+    expectedToolSequence: readOptionalStringArray(raw, 'expectedToolSequence', source),
+    sequence: readSequenceConfig(raw.sequence, `${source}.sequence`),
+    failurePatterns: readOptionalStringArray(raw, 'failurePatterns', source),
+    temporarySimulator: readOptionalBoolean(raw, 'temporarySimulator', source),
+    firstRunPromptDismissals: readFirstRunPromptDismissals(
+      raw.firstRunPromptDismissals,
+      `${source}.firstRunPromptDismissals`,
+    ),
+  };
+
+  if (isRecord(raw.sessionDefaults)) config.sessionDefaults = raw.sessionDefaults;
+  config.allowedVariance = readAllowedVariance(raw.allowedVariance, `${source}.allowedVariance`);
+
+  if (raw.baseline !== undefined) {
+    if (!isRecord(raw.baseline)) throw new Error(`${source}.baseline: expected object`);
+    config.baseline = {
+      totalToolCalls: readOptionalNumber(raw.baseline, 'totalToolCalls', `${source}.baseline`),
+      mcpToolCalls: readOptionalNumber(raw.baseline, 'mcpToolCalls', `${source}.baseline`),
+      uiAutomationCalls: readOptionalNumber(
+        raw.baseline,
+        'uiAutomationCalls',
+        `${source}.baseline`,
+      ),
+      wallClockSeconds: readOptionalNumber(raw.baseline, 'wallClockSeconds', `${source}.baseline`),
+      tools: readNumberMap(raw.baseline.tools, `${source}.baseline.tools`),
+    };
+  }
+
+  return config;
+}
+
+export async function loadSuite(suitePath: string): Promise<BenchmarkConfig> {
+  const raw = parseYaml(await readFile(suitePath, 'utf8')) as unknown;
+  return readConfig(raw, suitePath);
+}
+
+export function sessionDefaultsEnv(
+  sessionDefaults: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const validated = validateSessionDefaults(sessionDefaults);
+  if (!validated) return {};
+
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(validated)) {
+    env[sessionDefaultEnvNames[key]] = String(value);
+  }
+  return env;
+}

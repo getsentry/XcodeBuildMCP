@@ -200,7 +200,11 @@ describe('Key Sequence Tool', () => {
 
       expect(result.didError).toBe(false);
       expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
-      expect(calls.map((call) => call.command[1])).toEqual(['key-sequence', 'describe-ui']);
+      expect(calls.map((call) => call.command[1])).toEqual([
+        'key-sequence',
+        'describe-ui',
+        'describe-ui',
+      ]);
     });
 
     it('should surface session default requirement when simulatorId is missing', async () => {

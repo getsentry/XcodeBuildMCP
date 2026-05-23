@@ -192,7 +192,7 @@ describe('Key Press Tool', () => {
 
       expect(result.didError).toBe(false);
       expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
-      expect(calls.map((call) => call.command[1])).toEqual(['key', 'describe-ui']);
+      expect(calls.map((call) => call.command[1])).toEqual(['key', 'describe-ui', 'describe-ui']);
     });
 
     it('should return success for valid key press execution', async () => {

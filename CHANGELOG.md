@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added `--from-result` to the Claude UI benchmark harness so existing `result.json` artifacts can be rendered as text or JSON without rerunning Claude.
 - Added `nextSteps` hint lines to MCP `structuredContent` and CLI `--output json` envelopes so agents can consume follow-up actions without scraping text. CLI JSON renders shell command lines; MCP structured content renders MCP tool-call hints. Structured result schemas that include `nextSteps` now use schema version 2; existing version 1 schema files remain available for current validators.
 - Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.
 - Added `batch` for executing multiple AXe UI automation steps in one simulator session.
@@ -14,11 +15,14 @@
 
 ### Changed
 
+- Changed Claude UI benchmark suite runs to create a temporary simulator by default and delete only that harness-created simulator after the suite finishes.
+- Changed Claude UI benchmark exact tool sequence drift to warn by default, with `sequence.mode: fail` available for strict suites.
 - Successful mutating UI automation calls now always attempt to refresh the runtime snapshot after the action instead of preserving or patching cached switch state.
 - Runtime snapshot guidance no longer advertises synthetic sheet swipe targets for foreground sheets. Agents should use real sheet grabber expansion and real descendant scroll/list targets with `drag` instead of inferred app/window-root sheet swipes.
 
 ### Fixed
 
+- Fixed Claude UI benchmark suite runs so temporary simulators are applied through an isolated per-run MCP config instead of being overridden by repo or example-project config defaults.
 - Fixed simulator launch failures before simulator-name resolution so they are not reported as macOS launch failures.
 - Fixed CLI JSON output so simulator-name resolution failures return the structured error envelope instead of plain stderr.
 - Fixed accessibility hierarchy tips so UI automation guidance prefers runtime element refs over raw coordinate guessing.

@@ -1,0 +1,43 @@
+name: weather
+prompt: ../prompts/weather.md
+workingDirectory: example_projects/Weather
+sessionDefaults:
+  projectPath: Weather.xcodeproj
+  scheme: Weather
+  simulatorName: iPhone 17 Pro Max
+baseline:
+  totalToolCalls: 13
+  mcpToolCalls: 12
+  uiAutomationCalls: 10
+  wallClockSeconds: 98
+  tools:
+    session_show_defaults: 1
+    build_run_sim: 1
+    snapshot_ui: 1
+    tap: 6
+    batch: 1
+    type_text: 1
+    swipe: 1
+allowedVariance:
+  totalToolCalls: 2
+  mcpToolCalls: 2
+  uiAutomationCalls: 2
+  wallClockSeconds: 45
+  toolCalls: 2
+expectedToolSequence:
+  - session_show_defaults
+  - build_run_sim
+  - snapshot_ui
+  - tap
+  - batch
+  - tap
+  - tap
+  - type_text
+  - tap
+  - tap
+  - swipe
+  - tap
+failurePatterns:
+  - STALE_ELEMENT_REF
+  - SNAPSHOT_MISSING
+  - WAIT_TIMEOUT

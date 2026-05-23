@@ -221,7 +221,11 @@ describe('Button Plugin', () => {
 
       expect(result.didError).toBe(false);
       expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
-      expect(calls.map((call) => call.command[1])).toEqual(['button', 'describe-ui']);
+      expect(calls.map((call) => call.command[1])).toEqual([
+        'button',
+        'describe-ui',
+        'describe-ui',
+      ]);
     });
 
     it('waits briefly after successful button presses so system UI transitions can settle', async () => {

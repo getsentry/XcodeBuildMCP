@@ -1,0 +1,47 @@
+name: contacts
+prompt: ../prompts/contacts.md
+workingDirectory: .
+sessionDefaults:
+  bundleId: com.apple.MobileAddressBook
+  simulatorName: iPhone 17 Pro Max
+firstRunPromptDismissals:
+  labels:
+    - Continue
+    - Not Now
+    - OK
+  timeoutSeconds: 8
+baseline:
+  totalToolCalls: 14
+  mcpToolCalls: 13
+  uiAutomationCalls: 11
+  wallClockSeconds: 97
+  tools:
+    session_show_defaults: 1
+    launch_app_sim: 1
+    snapshot_ui: 1
+    tap: 5
+    type_text: 5
+allowedVariance:
+  totalToolCalls: 3
+  mcpToolCalls: 3
+  uiAutomationCalls: 3
+  wallClockSeconds: 45
+  toolCalls: 2
+expectedToolSequence:
+  - session_show_defaults
+  - launch_app_sim
+  - snapshot_ui
+  - tap
+  - tap
+  - type_text
+  - type_text
+  - type_text
+  - tap
+  - type_text
+  - tap
+  - type_text
+  - tap
+failurePatterns:
+  - STALE_ELEMENT_REF
+  - SNAPSHOT_MISSING
+  - WAIT_TIMEOUT

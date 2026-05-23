@@ -27,6 +27,10 @@ async function runSwipe(
   return ctx.structuredOutput?.result as UiActionResultDomainResult;
 }
 
+function actionCommands(calls: Array<{ command: string[] }>): string[][] {
+  return calls.map((call) => call.command).filter((command) => command[1] !== 'describe-ui');
+}
+
 describe('Swipe Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
@@ -201,33 +205,35 @@ describe('Swipe Tool', () => {
         executor,
       );
 
-      expect(calls[0]?.command).toEqual([
-        '/mocked/axe/path',
-        'swipe',
-        '--start-x',
-        '100',
-        '--start-y',
-        '270',
-        '--end-x',
-        '100',
-        '--end-y',
-        '130',
-        '--udid',
-        simulatorId,
-      ]);
-      expect(calls[2]?.command).toEqual([
-        '/mocked/axe/path',
-        'swipe',
-        '--start-x',
-        '100',
-        '--start-y',
-        '312',
-        '--end-x',
-        '100',
-        '--end-y',
-        '88',
-        '--udid',
-        simulatorId,
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'swipe',
+          '--start-x',
+          '100',
+          '--start-y',
+          '270',
+          '--end-x',
+          '100',
+          '--end-y',
+          '130',
+          '--udid',
+          simulatorId,
+        ],
+        [
+          '/mocked/axe/path',
+          'swipe',
+          '--start-x',
+          '100',
+          '--start-y',
+          '312',
+          '--end-x',
+          '100',
+          '--end-y',
+          '88',
+          '--udid',
+          simulatorId,
+        ],
       ]);
     });
   });
