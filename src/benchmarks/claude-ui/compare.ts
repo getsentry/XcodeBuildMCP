@@ -183,7 +183,7 @@ export function compareBenchmark(
     audit.failures.length +
     audit.patternFailures.length +
     (run.claudeExitCode === 0 ? 0 : 1) +
-    (run.parserExitCode === 0 ? 0 : 1);
+    (run.parserExitCode === 0 || audit.parseErrors.length > 0 ? 0 : 1);
   const sequenceMode = config.sequence?.mode ?? 'warn';
   const sequenceMatched =
     expected.length === 0 || (missing.length === 0 && additional.length === 0);
