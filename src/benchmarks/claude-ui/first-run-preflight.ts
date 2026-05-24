@@ -34,24 +34,14 @@ async function terminatePreflightApp(opts: {
   executor: LifecycleCommandExecutor;
   suppressFailure: boolean;
 }): Promise<void> {
+  let terminate: Awaited<ReturnType<LifecycleCommandExecutor>>;
   try {
-    const terminate = await opts.executor({
+    terminate = await opts.executor({
       command: 'xcrun',
       args: ['simctl', 'terminate', opts.simulatorId, opts.bundleId],
       cwd: opts.cwd,
       logPath: opts.logPath,
     });
-    if (terminate.exitCode === 0) return;
-
-    const message = `${opts.config.name}: failed to terminate app after first-run prompt preflight (exit ${terminate.exitCode}); see ${opts.logPath}`;
-    if (opts.suppressFailure) {
-      await appendLifecycleLog(
-        opts.logPath,
-        `First-run prompt preflight terminate failed: ${message}`,
-      );
-      return;
-    }
-    throw new Error(message);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (opts.suppressFailure) {
@@ -63,6 +53,18 @@ async function terminatePreflightApp(opts: {
     }
     throw error;
   }
+
+  if (terminate.exitCode === 0) return;
+
+  const message = `${opts.config.name}: failed to terminate app after first-run prompt preflight (exit ${terminate.exitCode}); see ${opts.logPath}`;
+  if (opts.suppressFailure) {
+    await appendLifecycleLog(
+      opts.logPath,
+      `First-run prompt preflight terminate failed: ${message}`,
+    );
+    return;
+  }
+  throw new Error(message);
 }
 
 function readNodeText(node: unknown, key: string): string | undefined {
@@ -200,7 +202,7 @@ export async function dismissFirstRunPrompts(opts: {
     );
   }
 
-  let preflightError: unknown;
+  let preflightSucceeded = false;
   try {
     const deadline = timing.now() + timeoutMs;
     let promptsDismissed = false;
@@ -256,9 +258,7 @@ export async function dismissFirstRunPrompts(opts: {
         `${opts.config.name}: timed out during first-run prompt preflight; see ${opts.logPath}`,
       );
     }
-  } catch (error) {
-    preflightError = error;
-    throw error;
+    preflightSucceeded = true;
   } finally {
     await terminatePreflightApp({
       config: opts.config,
@@ -267,7 +267,7 @@ export async function dismissFirstRunPrompts(opts: {
       cwd: opts.cwd,
       logPath: opts.logPath,
       executor,
-      suppressFailure: preflightError !== undefined,
+      suppressFailure: !preflightSucceeded,
     });
   }
   await appendLifecycleLog(opts.logPath, 'First-run prompt preflight: complete');
