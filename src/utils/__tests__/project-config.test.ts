@@ -218,6 +218,8 @@ describe('project-config', () => {
         '  ios:',
         '    workspacePath: "~/Code/App.xcworkspace"',
         '    derivedDataPath: "~/.cache/dd"',
+        '    extraArgs:',
+        '      - "-skipPackagePluginValidation"',
         '',
       ].join('\n');
 
@@ -231,6 +233,9 @@ describe('project-config', () => {
       expect(result.config.sessionDefaultsProfiles?.ios?.derivedDataPath).toBe(
         path.join(homedir(), '.cache/dd'),
       );
+      expect(result.config.sessionDefaultsProfiles?.ios?.extraArgs).toEqual([
+        '-skipPackagePluginValidation',
+      ]);
     });
 
     it('normalizes namespaced session defaults profiles and active profile', async () => {

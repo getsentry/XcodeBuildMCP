@@ -122,6 +122,26 @@ describe('SessionStore', () => {
     expect(stored.env).toEqual({ API_KEY: 'secret' });
   });
 
+  it('does not retain external extraArgs array references passed into setDefaults', () => {
+    const extraArgs = ['-skipPackagePluginValidation'];
+    sessionStore.setDefaults({ extraArgs });
+
+    extraArgs.push('-quiet');
+
+    const stored = sessionStore.getAll();
+    expect(stored.extraArgs).toEqual(['-skipPackagePluginValidation']);
+  });
+
+  it('getAll returns a detached copy of extraArgs so mutations do not affect stored defaults', () => {
+    sessionStore.setDefaults({ extraArgs: ['-skipPackagePluginValidation'] });
+
+    const copy = sessionStore.getAll();
+    copy.extraArgs!.push('-quiet');
+
+    const stored = sessionStore.getAll();
+    expect(stored.extraArgs).toEqual(['-skipPackagePluginValidation']);
+  });
+
   it('does not compute derivedDataPath from workspacePath', () => {
     sessionStore.setDefaults({ workspacePath: '/Users/dev/clone-1/MyApp.xcworkspace' });
 

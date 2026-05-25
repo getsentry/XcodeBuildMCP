@@ -22,7 +22,8 @@
         "preferXcodebuild": null,
         "platform": null,
         "bundleId": null,
-        "env": null
+        "env": null,
+        "extraArgs": null
       },
       "MyCustomProfile": {
         "projectPath": null,
@@ -40,7 +41,8 @@
         "preferXcodebuild": null,
         "platform": null,
         "bundleId": null,
-        "env": null
+        "env": null,
+        "extraArgs": null
       }
     },
     "operation": {

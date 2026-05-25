@@ -38,6 +38,7 @@ function createSessionDefaultsProfile(profile: Record<string, unknown>): Session
     platform: (profile.platform as string | undefined) ?? null,
     bundleId: (profile.bundleId as string | undefined) ?? null,
     env: (profile.env as Record<string, string> | undefined) ?? null,
+    extraArgs: (profile.extraArgs as string[] | undefined) ?? null,
   };
 }
 

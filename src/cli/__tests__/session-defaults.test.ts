@@ -126,4 +126,34 @@ describe('CLI session defaults', () => {
       },
     });
   });
+
+  it('appends explicit extraArgs after configured extraArgs', () => {
+    const merged = mergeCliSessionDefaults({
+      defaults: {
+        extraArgs: ['-skipPackagePluginValidation'],
+      },
+      explicitArgs: {
+        extraArgs: ['-quiet'],
+      },
+    });
+
+    expect(merged).toEqual({
+      extraArgs: ['-skipPackagePluginValidation', '-quiet'],
+    });
+  });
+
+  it('allows an explicit empty extraArgs array to clear configured extraArgs', () => {
+    const merged = mergeCliSessionDefaults({
+      defaults: {
+        extraArgs: ['-skipPackagePluginValidation'],
+      },
+      explicitArgs: {
+        extraArgs: [],
+      },
+    });
+
+    expect(merged).toEqual({
+      extraArgs: [],
+    });
+  });
 });

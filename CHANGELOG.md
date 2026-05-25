@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added `extraArgs` as a first-class session-default value. Repo config or runtime defaults can now carry common `xcodebuild` flags (for example `-skipPackagePluginValidation` or `-disableAutomaticPackageResolution`) so they don't need repeating on every build or test call. Per-call `extraArgs` append after the configured defaults, and an explicit empty array (`extraArgs: []`) clears the defaults for a single call. The session management tools show, set, sync, and clear `extraArgs` alongside the other defaults.
+
 ## [2.6.2]
 
 ### Fixed

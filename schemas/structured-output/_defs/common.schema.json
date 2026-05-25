@@ -375,6 +375,19 @@
               }
             }
           ]
+        },
+        "extraArgs": {
+          "anyOf": [
+            {
+              "const": null
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -393,7 +406,8 @@
         "preferXcodebuild",
         "platform",
         "bundleId",
-        "env"
+        "env",
+        "extraArgs"
       ]
     },
     "buildInvocationRequest": {

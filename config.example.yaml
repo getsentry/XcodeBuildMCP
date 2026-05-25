@@ -26,3 +26,4 @@ sessionDefaults:
   preferXcodebuild: false
   platform: 'iOS'
   bundleId: 'io.sentry.myapp'
+  extraArgs: ['-skipPackagePluginValidation']

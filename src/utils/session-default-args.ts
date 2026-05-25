@@ -46,6 +46,17 @@ export function mergeSessionDefaultArgs(opts: {
   const merged: Record<string, unknown> = { ...opts.defaults, ...sanitizedArgs };
 
   if (
+    Object.prototype.hasOwnProperty.call(sanitizedArgs, 'extraArgs') &&
+    Array.isArray(opts.defaults.extraArgs) &&
+    Array.isArray(sanitizedArgs.extraArgs)
+  ) {
+    merged.extraArgs =
+      sanitizedArgs.extraArgs.length === 0
+        ? []
+        : [...opts.defaults.extraArgs, ...sanitizedArgs.extraArgs];
+  }
+
+  if (
     opts.defaults.env &&
     typeof opts.defaults.env === 'object' &&
     !Array.isArray(opts.defaults.env) &&

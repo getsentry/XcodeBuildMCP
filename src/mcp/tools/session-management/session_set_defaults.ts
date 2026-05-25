@@ -71,6 +71,7 @@ function createSessionDefaultsProfile(defaults: SessionDefaults): SessionDefault
     platform: defaults.platform ?? null,
     bundleId: defaults.bundleId ?? null,
     env: defaults.env ?? null,
+    extraArgs: defaults.extraArgs ?? null,
   };
 }
 

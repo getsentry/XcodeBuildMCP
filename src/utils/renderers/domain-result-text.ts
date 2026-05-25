@@ -104,6 +104,7 @@ const SESSION_DEFAULT_KEYS = [
   'platform',
   'bundleId',
   'env',
+  'extraArgs',
 ] as const;
 
 type CoverageTargetFile = {

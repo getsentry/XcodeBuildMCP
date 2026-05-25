@@ -19,6 +19,7 @@ export const sessionDefaultKeys = [
   'platform',
   'bundleId',
   'env',
+  'extraArgs',
 ] as const;
 
 export type SessionDefaultKey = (typeof sessionDefaultKeys)[number];
@@ -57,4 +58,8 @@ export const sessionDefaultsSchema = z.object({
     .record(nonEmptyString, z.string())
     .optional()
     .describe('Default environment variables to pass to launched apps.'),
+  extraArgs: z
+    .array(z.string())
+    .optional()
+    .describe('Default extra xcodebuild arguments for tools that accept extraArgs.'),
 });
