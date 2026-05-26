@@ -58,6 +58,10 @@ interface StreamJsonResult {
   type?: unknown;
   is_error?: unknown;
 }
+interface SuiteDirectories {
+  suitesDir: string;
+  localSuitesDir: string;
+}
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath);
@@ -67,7 +71,10 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function resolveSuitePath(suite: string): Promise<string> {
+export async function resolveSuitePath(
+  suite: string,
+  directories: SuiteDirectories = { suitesDir, localSuitesDir },
+): Promise<string> {
   if (
     path.isAbsolute(suite) ||
     suite.includes(path.sep) ||
@@ -78,8 +85,8 @@ export async function resolveSuitePath(suite: string): Promise<string> {
   }
 
   const candidates = [
-    path.join(suitesDir, `${suite}.yml`),
-    path.join(localSuitesDir, `${suite}.yml`),
+    path.join(directories.suitesDir, `${suite}.yml`),
+    path.join(directories.localSuitesDir, `${suite}.yml`),
   ];
   const matches = [];
   for (const candidate of candidates) {
@@ -110,10 +117,12 @@ async function listYamlFiles(directory: string, required: boolean): Promise<stri
     .sort();
 }
 
-export async function listSuitePaths(): Promise<string[]> {
+export async function listSuitePaths(
+  directories: SuiteDirectories = { suitesDir, localSuitesDir },
+): Promise<string[]> {
   return [
-    ...(await listYamlFiles(suitesDir, true)),
-    ...(await listYamlFiles(localSuitesDir, false)),
+    ...(await listYamlFiles(directories.suitesDir, true)),
+    ...(await listYamlFiles(directories.localSuitesDir, false)),
   ];
 }
 

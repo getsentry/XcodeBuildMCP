@@ -89,16 +89,22 @@ describe('Claude UI benchmark harness', () => {
   });
 
   it('discovers local private suites when present', async () => {
-    const localSuitesDir = path.join(repoRoot, 'benchmarks/claude-ui/local/suites');
-    const suiteName = `unit-private-suite-${process.pid}`;
-    const suitePath = path.join(localSuitesDir, `${suiteName}.yml`);
-    await mkdir(localSuitesDir, { recursive: true });
-    await writeFile(suitePath, `name: ${suiteName}\nprompt: ../prompts/weather.md\n`, 'utf8');
+    const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-suites-'));
     try {
-      await expect(resolveSuitePath(suiteName)).resolves.toBe(suitePath);
-      await expect(listSuitePaths()).resolves.toContain(suitePath);
+      const suiteDirectories = {
+        suitesDir: path.join(dir, 'suites'),
+        localSuitesDir: path.join(dir, 'local-suites'),
+      };
+      const suiteName = `unit-private-suite-${process.pid}`;
+      const suitePath = path.join(suiteDirectories.localSuitesDir, `${suiteName}.yml`);
+      await mkdir(suiteDirectories.suitesDir, { recursive: true });
+      await mkdir(suiteDirectories.localSuitesDir, { recursive: true });
+      await writeFile(suitePath, `name: ${suiteName}\nprompt: ../prompts/weather.md\n`, 'utf8');
+
+      await expect(resolveSuitePath(suiteName, suiteDirectories)).resolves.toBe(suitePath);
+      await expect(listSuitePaths(suiteDirectories)).resolves.toContain(suitePath);
     } finally {
-      await rm(suitePath, { force: true });
+      await rm(dir, { recursive: true, force: true });
     }
   });
 });
