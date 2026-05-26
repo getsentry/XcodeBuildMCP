@@ -6,7 +6,7 @@ names:
 description: Create a new simulator.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
-  version: "1"
+  version: '2'
 annotations:
   title: Create Simulator
   readOnlyHint: false

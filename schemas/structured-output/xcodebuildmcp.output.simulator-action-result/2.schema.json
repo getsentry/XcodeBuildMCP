@@ -168,6 +168,62 @@
               "required": [
                 "type"
               ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "clone"
+                },
+                "sourceSimulatorId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "sourceSimulatorId"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "create"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "deviceType": {
+                  "type": "string"
+                },
+                "runtime": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "deviceType",
+                "runtime"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "delete"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "target"
+              ]
             }
           ]
         },

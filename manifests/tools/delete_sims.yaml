@@ -6,7 +6,7 @@ names:
 description: Delete simulators by UDID, all simulators, or unavailable simulators.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
-  version: "1"
+  version: '2'
 annotations:
   title: Delete Simulators
   readOnlyHint: false
