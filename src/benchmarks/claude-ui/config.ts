@@ -3,7 +3,14 @@ import { parse as parseYaml } from 'yaml';
 import * as z from 'zod';
 import { sessionDefaultsSchema } from '../../utils/session-defaults-schema.ts';
 import type { SessionDefaults } from '../../utils/session-store.ts';
-import type { AllowedVariance, BenchmarkConfig, SequenceMode } from './types.ts';
+import type {
+  BenchmarkConfig,
+  ClaudeInvocationConfig,
+  FailurePatternTarget,
+  ToolAnalysisConfig,
+  ToolMatcher,
+  ToolMatcherShortName,
+} from './types.ts';
 
 export const sessionDefaultEnvNames: Record<string, string> = {
   workspacePath: 'XCODEBUILDMCP_WORKSPACE_PATH',
@@ -72,19 +79,6 @@ function readOptionalBoolean(
   return raw;
 }
 
-function readSequenceMode(raw: unknown, source: string): SequenceMode {
-  if (raw === 'warn' || raw === 'fail') return raw;
-  throw new Error(`${source}: expected 'warn' or 'fail'`);
-}
-
-function readSequenceConfig(raw: unknown, source: string): BenchmarkConfig['sequence'] {
-  if (raw === undefined) return undefined;
-  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
-  return {
-    mode: raw.mode === undefined ? undefined : readSequenceMode(raw.mode, `${source}.mode`),
-  };
-}
-
 function readOptionalNumber(
   value: Record<string, unknown>,
   key: string,
@@ -107,41 +101,106 @@ function readNumberMap(value: unknown, source: string): Record<string, number> |
   );
 }
 
-function readAllowedVariance(raw: unknown, source: string): Partial<AllowedVariance> | undefined {
+function readClaudeInvocationConfig(
+  raw: unknown,
+  source: string,
+): ClaudeInvocationConfig | undefined {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) throw new Error(`${source}: expected object`);
-
-  const variance: Partial<AllowedVariance> = {};
-  const totalToolCalls = readOptionalNumber(raw, 'totalToolCalls', source);
-  if (totalToolCalls !== undefined) variance.totalToolCalls = totalToolCalls;
-  const mcpToolCalls = readOptionalNumber(raw, 'mcpToolCalls', source);
-  if (mcpToolCalls !== undefined) variance.mcpToolCalls = mcpToolCalls;
-  const uiAutomationCalls = readOptionalNumber(raw, 'uiAutomationCalls', source);
-  if (uiAutomationCalls !== undefined) variance.uiAutomationCalls = uiAutomationCalls;
-  const wallClockSeconds = readOptionalNumber(raw, 'wallClockSeconds', source);
-  if (wallClockSeconds !== undefined) variance.wallClockSeconds = wallClockSeconds;
-  const toolCalls = readOptionalNumber(raw, 'toolCalls', source);
-  if (toolCalls !== undefined) variance.toolCalls = toolCalls;
-  return variance;
+  const permissionMode = readOptionalString(raw, 'permissionMode', source);
+  if (
+    permissionMode !== undefined &&
+    permissionMode !== 'default' &&
+    permissionMode !== 'bypassPermissions'
+  ) {
+    throw new Error(`${source}.permissionMode: expected 'default' or 'bypassPermissions'`);
+  }
+  return {
+    useMcpServer: readOptionalBoolean(raw, 'useMcpServer', source),
+    permissionMode,
+    tools: readOptionalStringArray(raw, 'tools', source),
+    allowedTools: readOptionalStringArray(raw, 'allowedTools', source),
+    appendSystemPrompt: readOptionalString(raw, 'appendSystemPrompt', source),
+    extraArgs: readOptionalStringArray(raw, 'extraArgs', source),
+    pluginDirs: readOptionalStringArray(raw, 'pluginDirs', source),
+    skillDirs: readOptionalStringArray(raw, 'skillDirs', source),
+    activateSkill: readOptionalString(raw, 'activateSkill', source),
+    isolatedWorkingDirectory: readOptionalBoolean(raw, 'isolatedWorkingDirectory', source),
+    maxClaudeSeconds: readOptionalNumber(raw, 'maxClaudeSeconds', source),
+  };
 }
 
-function readFailurePatterns(raw: unknown, source: string): string[] | undefined {
-  const patterns = readOptionalStringArray(
-    raw as Record<string, unknown>,
-    'failurePatterns',
-    source,
-  );
+function readShortNameMode(raw: unknown, source: string): ToolMatcherShortName | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === 'afterLastDoubleUnderscore' || raw === 'afterPrefix' || raw === 'full') {
+    return raw;
+  }
+  throw new Error(`${source}: expected 'afterLastDoubleUnderscore', 'afterPrefix', or 'full'`);
+}
+
+function readToolMatcher(raw: unknown, source: string): ToolMatcher {
+  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
+  const kind = readString(raw, 'kind', source);
+  if (kind === 'namePrefix') {
+    return {
+      kind,
+      prefix: readString(raw, 'prefix', source),
+      shortName: readShortNameMode(raw.shortName, `${source}.shortName`),
+      uiAutomationNames: readOptionalStringArray(raw, 'uiAutomationNames', source),
+    };
+  }
+  if (kind === 'bashCommand') {
+    return {
+      kind,
+      commandPrefix: readString(raw, 'commandPrefix', source),
+      shortName: readString(raw, 'shortName', source),
+      uiAutomation: readOptionalBoolean(raw, 'uiAutomation', source),
+    };
+  }
+  throw new Error(`${source}.kind: expected 'namePrefix' or 'bashCommand'`);
+}
+
+function readToolAnalysisConfig(raw: unknown, source: string): ToolAnalysisConfig | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) throw new Error(`${source}: expected object`);
+  const matchers = raw.matchers;
+  if (!Array.isArray(matchers)) throw new Error(`${source}.matchers: expected array`);
+  return {
+    matchers: matchers.map((matcher, index) =>
+      readToolMatcher(matcher, `${source}.matchers[${index}]`),
+    ),
+  };
+}
+
+function readRegexPatterns(
+  raw: Record<string, unknown>,
+  key: string,
+  source: string,
+): string[] | undefined {
+  const patterns = readOptionalStringArray(raw, key, source);
   for (const [index, pattern] of (patterns ?? []).entries()) {
     try {
       new RegExp(pattern, 'i');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `${source}.failurePatterns[${index}]: invalid regular expression: ${message}`,
-      );
+      throw new Error(`${source}.${key}[${index}]: invalid regular expression: ${message}`);
     }
   }
   return patterns;
+}
+
+function readFailurePatternTarget(raw: unknown, source: string): FailurePatternTarget {
+  if (raw === 'commands' || raw === 'toolResults') return raw;
+  throw new Error(`${source}: expected 'commands' or 'toolResults'`);
+}
+
+function readFailurePatternTargets(
+  raw: unknown,
+  source: string,
+): FailurePatternTarget[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) throw new Error(`${source}: expected array`);
+  return raw.map((target, index) => readFailurePatternTarget(target, `${source}[${index}]`));
 }
 
 function readFirstRunPromptDismissals(
@@ -177,16 +236,33 @@ function formatZodIssues(error: z.ZodError): string {
     .join('\n');
 }
 
+function rejectRemovedConfigKeys(raw: Record<string, unknown>, source: string): void {
+  const removedKeys: Record<string, string> = {
+    allowedVariance: 'removed; baselines are observed data only',
+    expectedFailures: 'removed; benchmark stumbles are observed data',
+    expectedToolSequence: 'renamed to baselineToolSequence',
+  };
+  for (const [key, message] of Object.entries(removedKeys)) {
+    if (raw[key] !== undefined) throw new Error(`${source}.${key}: ${message}`);
+  }
+}
+
 export function readConfig(raw: unknown, source: string): BenchmarkConfig {
   if (!isRecord(raw)) throw new Error(`${source}: expected YAML object`);
+  rejectRemovedConfigKeys(raw, source);
   const config: BenchmarkConfig = {
     name: readString(raw, 'name', source),
     prompt: readString(raw, 'prompt', source),
     workingDirectory: readOptionalString(raw, 'workingDirectory', source),
-    expectedToolSequence: readOptionalStringArray(raw, 'expectedToolSequence', source),
-    sequence: readSequenceConfig(raw.sequence, `${source}.sequence`),
-    failurePatterns: readFailurePatterns(raw, source),
+    baselineToolSequence: readOptionalStringArray(raw, 'baselineToolSequence', source),
+    failurePatterns: readRegexPatterns(raw, 'failurePatterns', source),
+    failurePatternTargets: readFailurePatternTargets(
+      raw.failurePatternTargets,
+      `${source}.failurePatternTargets`,
+    ),
+    ignoredFailurePatterns: readRegexPatterns(raw, 'ignoredFailurePatterns', source),
     temporarySimulator: readOptionalBoolean(raw, 'temporarySimulator', source),
+    preflightCommands: readOptionalStringArray(raw, 'preflightCommands', source),
     firstRunPromptDismissals: readFirstRunPromptDismissals(
       raw.firstRunPromptDismissals,
       `${source}.firstRunPromptDismissals`,
@@ -199,12 +275,12 @@ export function readConfig(raw: unknown, source: string): BenchmarkConfig {
     }
     config.sessionDefaults = validateSessionDefaults(raw.sessionDefaults);
   }
-  config.allowedVariance = readAllowedVariance(raw.allowedVariance, `${source}.allowedVariance`);
 
   if (raw.baseline !== undefined) {
     if (!isRecord(raw.baseline)) throw new Error(`${source}.baseline: expected object`);
     config.baseline = {
       totalToolCalls: readOptionalNumber(raw.baseline, 'totalToolCalls', `${source}.baseline`),
+      trackedToolCalls: readOptionalNumber(raw.baseline, 'trackedToolCalls', `${source}.baseline`),
       mcpToolCalls: readOptionalNumber(raw.baseline, 'mcpToolCalls', `${source}.baseline`),
       uiAutomationCalls: readOptionalNumber(
         raw.baseline,
@@ -215,6 +291,8 @@ export function readConfig(raw: unknown, source: string): BenchmarkConfig {
       tools: readNumberMap(raw.baseline.tools, `${source}.baseline.tools`),
     };
   }
+  config.claude = readClaudeInvocationConfig(raw.claude, `${source}.claude`);
+  config.toolAnalysis = readToolAnalysisConfig(raw.toolAnalysis, `${source}.toolAnalysis`);
 
   return config;
 }

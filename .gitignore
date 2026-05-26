@@ -118,3 +118,4 @@ DerivedData
 /repros
 /.xcodebuildmcp
 /out.nosync
+/benchmarks/claude-ui/local/

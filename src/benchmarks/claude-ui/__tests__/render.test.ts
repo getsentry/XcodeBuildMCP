@@ -5,38 +5,30 @@ function baseResult(overrides: Partial<BenchmarkResult> = {}): BenchmarkResult {
   const runDirectory = '/repo/out.nosync/claude-benchmarks/weather/20260101T000000Z';
   return {
     name: 'weather',
-    pass: true,
+    completed: true,
     metrics: [
       {
         name: 'totalToolCalls',
         actual: 13,
-        expected: 19,
-        allowedVariance: 2,
-        pass: true,
+        baseline: 19,
       },
       {
         name: 'mcpToolCalls',
         actual: 12,
-        expected: 18,
-        allowedVariance: 2,
-        pass: true,
+        baseline: 18,
       },
       {
         name: 'wallClockSeconds',
         actual: 98.62,
-        expected: 125,
-        allowedVariance: 45,
-        pass: true,
+        baseline: 125,
       },
-      { name: 'tool:tap', actual: 6, expected: 9, allowedVariance: 2, pass: true },
-      { name: 'tool:snapshot_ui', actual: 1, expected: 1, allowedVariance: 2, pass: true },
+      { name: 'tool:tap', actual: 6, baseline: 9 },
+      { name: 'tool:snapshot_ui', actual: 1, baseline: 1 },
     ],
-    failureMetric: { pass: true, count: 0 },
+    completion: { completed: true, issueCount: 0 },
     sequence: {
-      mode: 'warn',
-      pass: true,
       matched: true,
-      expected: ['snapshot_ui', 'tap'],
+      baseline: ['snapshot_ui', 'tap'],
       actual: ['snapshot_ui', 'tap'],
       diff: [],
       missing: [],
@@ -47,10 +39,13 @@ function baseResult(overrides: Partial<BenchmarkResult> = {}): BenchmarkResult {
       parseErrors: [],
       totalToolCalls: 13,
       totalToolCallsByName: {},
+      trackedToolCalls: 12,
+      trackedToolCallsByName: {},
       mcpToolCalls: 12,
       mcpToolCallsByName: {},
       uiAutomationCalls: 10,
       uiAutomationCallsByName: {},
+      trackedSequence: [],
       mcpSequence: [],
       failures: [],
       patternFailures: [],
@@ -80,22 +75,23 @@ function baseResult(overrides: Partial<BenchmarkResult> = {}): BenchmarkResult {
 }
 
 describe('renderSuiteReport', () => {
-  it('renders a passing suite with no sequence drift', () => {
+  it('renders a completed suite with no sequence delta', () => {
     const output = renderSuiteReport(baseResult(), { color: false, width: 80, cwd: '/repo' });
 
-    expect(output).toContain('PASS  weather');
+    expect(output).toContain('COMPLETED  weather');
     expect(output).toContain('Metrics');
     expect(output).toContain('totalToolCalls');
-    expect(output).toContain('Tool calls (baseline-tracked)');
-    expect(output).toContain('PASS  failures/stumbles: 0');
+    expect(output).toContain('METRIC            ACTUAL  BASELINE   DELTA');
+    expect(output).toContain('Tool calls (baseline-observed)');
+    expect(output).toContain('OBSERVED  stumbles: 0');
     expect(output).not.toContain('Inspect');
-    expect(output).not.toContain('@@ expected');
+    expect(output).not.toContain('@@ baseline');
   });
 
   it('renders failure detail and inspect hints when failures present', () => {
     const result = baseResult({
-      pass: false,
-      failureMetric: { pass: false, count: 2 },
+      completed: false,
+      completion: { completed: false, issueCount: 2 },
       audit: {
         ...baseResult().audit,
         failures: [
@@ -118,9 +114,9 @@ describe('renderSuiteReport', () => {
 
     const output = renderSuiteReport(result, { color: false, width: 80, cwd: '/repo' });
 
-    expect(output).toContain('FAIL  weather');
-    expect(output).toContain('FAIL  failures/stumbles: 2');
-    expect(output).toContain('tool failures: 1');
+    expect(output).toContain('INCOMPLETE  weather');
+    expect(output).toContain('INCOMPLETE  stumbles: 2');
+    expect(output).toContain('tool errors: 1');
     expect(output).toContain('boot_sim @ line 9: Boot failed');
     expect(output).toContain('pattern matches: 1');
     expect(output).toContain('STALE_ELEMENT_REF @ line 22');
@@ -128,10 +124,34 @@ describe('renderSuiteReport', () => {
     expect(output).toContain('transcript    out.nosync/claude-benchmarks/weather');
   });
 
-  it('renders null process exit codes as failures', () => {
+  it('renders inspect hints for completed suites with stumbles', () => {
     const result = baseResult({
-      pass: false,
-      failureMetric: { pass: false, count: 2 },
+      completion: { completed: true, issueCount: 1 },
+      audit: {
+        ...baseResult().audit,
+        failures: [
+          {
+            shortName: 'screen',
+            fullName: 'Bash',
+            line: 7,
+            message: 'temporary probe error',
+          },
+        ],
+      },
+    });
+
+    const output = renderSuiteReport(result, { color: false, width: 80, cwd: '/repo' });
+
+    expect(output).toContain('COMPLETED  weather');
+    expect(output).toContain('OBSERVED  stumbles: 1');
+    expect(output).toContain('Inspect');
+    expect(output).toContain('transcript    out.nosync/claude-benchmarks/weather');
+  });
+
+  it('renders null process exit codes as incomplete', () => {
+    const result = baseResult({
+      completed: false,
+      completion: { completed: false, issueCount: 2 },
       run: {
         ...baseResult().run,
         claudeExitCode: null,
@@ -145,13 +165,11 @@ describe('renderSuiteReport', () => {
     expect(output).toContain('parser exit code: null');
   });
 
-  it('renders sequence drift hunks with marker columns', () => {
+  it('renders observed sequence delta hunks with marker columns', () => {
     const result = baseResult({
       sequence: {
-        mode: 'warn',
-        pass: true,
         matched: false,
-        expected: ['session_show_defaults', 'snapshot_ui', 'tap'],
+        baseline: ['session_show_defaults', 'snapshot_ui', 'tap'],
         actual: ['session_show_defaults', 'snapshot_ui', 'screenshot', 'tap'],
         diff: [
           {
@@ -159,14 +177,14 @@ describe('renderSuiteReport', () => {
               {
                 kind: 'context',
                 tool: 'snapshot_ui',
-                expectedIndex: 1,
+                baselineIndex: 1,
                 actualIndex: 1,
               },
               { kind: 'additional', tool: 'screenshot', actualIndex: 2 },
               {
                 kind: 'context',
                 tool: 'tap',
-                expectedIndex: 2,
+                baselineIndex: 2,
                 actualIndex: 3,
               },
             ],
@@ -179,8 +197,8 @@ describe('renderSuiteReport', () => {
 
     const output = renderSuiteReport(result, { color: false, width: 80, cwd: '/repo' });
 
-    expect(output).toContain('WARN  tool sequence (warn): drift: 0 missing, 1 additional');
-    expect(output).toContain('@@ expected[1..2] actual[1..3] @@');
+    expect(output).toContain('OBSERVED  tool sequence: 0 missing from baseline, 1 additional');
+    expect(output).toContain('@@ baseline[1..2] actual[1..3] @@');
     expect(output).toContain('+ screenshot');
   });
 
@@ -198,7 +216,7 @@ describe('renderSuiteReport', () => {
           ...baseResult().run,
           temporarySimulator: {
             simulatorId: 'TEMP-SIM-123',
-            name: 'XcodeBuildMCP Claude UI weather 20260101T000000Z',
+            name: 'Claude UI weather 20260101T000000Z',
             lifecycleLogPath:
               '/repo/out.nosync/claude-benchmarks/weather/20260101T000000Z/simulator-lifecycle.log',
             setupDurationSeconds: 23.4,
@@ -217,9 +235,9 @@ describe('renderSuiteReport', () => {
 });
 
 describe('renderAggregate', () => {
-  it('summarizes pass/fail/warn counts and lists each suite', () => {
-    const pass = baseResult();
-    const warn = baseResult({
+  it('summarizes completion counts and lists each suite', () => {
+    const completed = baseResult();
+    const sequenceDelta = baseResult({
       name: 'contacts',
       sequence: {
         ...baseResult().sequence,
@@ -236,17 +254,15 @@ describe('renderAggregate', () => {
         },
       },
     });
-    const fail = baseResult({
+    const incomplete = baseResult({
       name: 'reminders',
-      pass: false,
-      failureMetric: { pass: false, count: 1 },
+      completed: false,
+      completion: { completed: false, issueCount: 1 },
       metrics: [
         {
           name: 'mcpToolCalls',
           actual: 30,
-          expected: 18,
-          allowedVariance: 2,
-          pass: false,
+          baseline: 18,
         },
       ],
       sequence: {
@@ -265,21 +281,21 @@ describe('renderAggregate', () => {
       },
     });
 
-    const output = renderAggregate([pass, warn, fail], {
+    const output = renderAggregate([completed, sequenceDelta, incomplete], {
       color: false,
       width: 80,
       cwd: '/repo',
     });
 
     expect(output).toContain('Claude UI Benchmarks · Summary');
-    expect(output).toContain('Suites:    3 total · 2 passed · 1 failed · 1 sequence warnings');
+    expect(output).toContain('Suites:    3 total · 2 completed · 1 incomplete');
     expect(output).toContain('total ');
     expect(output).toContain('slowest reminders (2m 25.0s)');
     expect(output).toContain('Artifacts: out.nosync/claude-benchmarks/');
-    expect(output).toContain('PASS  weather');
-    expect(output).toContain('WARN  contacts');
-    expect(output).toContain('FAIL  reminders');
-    expect(output).toContain('sequence warn: 2m/1a');
-    expect(output).toContain('metrics: mcpToolCalls');
+    expect(output).toContain('COMPLETED   weather');
+    expect(output).toContain('COMPLETED   contacts');
+    expect(output).toContain('INCOMPLETE  reminders');
+    expect(output).toContain('sequence delta: 2m/1a');
+    expect(output).not.toContain('metric warning');
   });
 });

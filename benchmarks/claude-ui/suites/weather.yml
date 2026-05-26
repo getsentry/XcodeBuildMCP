@@ -6,25 +6,20 @@ sessionDefaults:
   scheme: Weather
   simulatorName: iPhone 17 Pro Max
 baseline:
-  totalToolCalls: 13
-  mcpToolCalls: 12
-  uiAutomationCalls: 10
-  wallClockSeconds: 98
+  totalToolCalls: 14
+  trackedToolCalls: 13
+  mcpToolCalls: 13
+  uiAutomationCalls: 11
+  wallClockSeconds: 100.03
   tools:
     session_show_defaults: 1
     build_run_sim: 1
-    snapshot_ui: 1
+    snapshot_ui: 2
     tap: 6
     batch: 1
     type_text: 1
     swipe: 1
-allowedVariance:
-  totalToolCalls: 2
-  mcpToolCalls: 2
-  uiAutomationCalls: 2
-  wallClockSeconds: 45
-  toolCalls: 2
-expectedToolSequence:
+baselineToolSequence:
   - session_show_defaults
   - build_run_sim
   - snapshot_ui
@@ -36,6 +31,7 @@ expectedToolSequence:
   - tap
   - tap
   - swipe
+  - snapshot_ui
   - tap
 failurePatterns:
   - STALE_ELEMENT_REF

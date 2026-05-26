@@ -9,38 +9,38 @@ firstRunPromptDismissals:
     - Continue
     - Not Now
     - OK
-  timeoutSeconds: 8
+  timeoutSeconds: 30
 baseline:
-  totalToolCalls: 14
-  mcpToolCalls: 13
-  uiAutomationCalls: 11
-  wallClockSeconds: 97
+  totalToolCalls: 19
+  trackedToolCalls: 18
+  mcpToolCalls: 18
+  uiAutomationCalls: 16
+  wallClockSeconds: 102.94
   tools:
     session_show_defaults: 1
     launch_app_sim: 1
-    snapshot_ui: 1
+    snapshot_ui: 6
     tap: 5
     type_text: 5
-allowedVariance:
-  totalToolCalls: 3
-  mcpToolCalls: 3
-  uiAutomationCalls: 3
-  wallClockSeconds: 45
-  toolCalls: 2
-expectedToolSequence:
+baselineToolSequence:
   - session_show_defaults
   - launch_app_sim
   - snapshot_ui
   - tap
+  - snapshot_ui
   - tap
   - type_text
+  - snapshot_ui
   - type_text
   - type_text
   - tap
+  - snapshot_ui
   - type_text
   - tap
+  - snapshot_ui
   - type_text
   - tap
+  - snapshot_ui
 failurePatterns:
   - STALE_ELEMENT_REF
   - SNAPSHOT_MISSING

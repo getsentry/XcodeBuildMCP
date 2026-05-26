@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Parse a Claude Code NDJSON session log into per-turn files.
 
-Filters to: user prompts, assistant text replies, and XcodeBuildMCP tool
+Filters to: user prompts, assistant text replies, and configured tool
 calls/results. Strips screenshot image blobs to a short placeholder.
 
 Usage:
     parse_claude_conversation.py <session.jsonl> [output_dir] \\
-        [--tool-prefix=mcp__xcodebuildmcp]
+        [--tool-prefix=mcp__xcodebuildmcp] [--tool-name=Bash]
 """
 
 from __future__ import annotations
@@ -101,10 +101,14 @@ def extract_user_text(entry: dict) -> str:
     return "\n\n".join(parts)
 
 
-def parse(path: Path, out_dir: Path, tool_prefix: str) -> bool:
+def matches_tool_name(name: str, tool_prefixes: list[str], tool_names: set[str]) -> bool:
+    return name in tool_names or any(name.startswith(prefix) for prefix in tool_prefixes)
+
+
+def parse(path: Path, out_dir: Path, tool_prefixes: list[str], tool_names: set[str]) -> bool:
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Track tool_use_ids that target our prefix so we keep matching results.
+    # Track tool_use_ids that target configured tools so we keep matching results.
     tracked_ids: set[str] = set()
     tool_name_by_id: dict[str, str] = {}
     counter = 0
@@ -185,7 +189,7 @@ def parse(path: Path, out_dir: Path, tool_prefix: str) -> bool:
                         )
                     elif btype == "tool_use":
                         name = block.get("name", "")
-                        if not name.startswith(tool_prefix):
+                        if not matches_tool_name(name, tool_prefixes, tool_names):
                             continue
                         tool_id = block.get("id", "")
                         tracked_ids.add(tool_id)
@@ -220,8 +224,15 @@ def main() -> int:
     )
     ap.add_argument(
         "--tool-prefix",
-        default="mcp__xcodebuildmcp",
+        action="append",
+        default=None,
         help="Only include tool calls whose name starts with this prefix",
+    )
+    ap.add_argument(
+        "--tool-name",
+        action="append",
+        default=[],
+        help="Also include tool calls whose name exactly matches this value",
     )
     args = ap.parse_args()
 
@@ -230,7 +241,8 @@ def main() -> int:
         return 1
 
     out = args.output or args.jsonl.with_name(f"{args.jsonl.stem}_conversation")
-    return 0 if parse(args.jsonl, out, args.tool_prefix) else 1
+    tool_prefixes = args.tool_prefix or ["mcp__xcodebuildmcp"]
+    return 0 if parse(args.jsonl, out, tool_prefixes, set(args.tool_name)) else 1
 
 
 if __name__ == "__main__":

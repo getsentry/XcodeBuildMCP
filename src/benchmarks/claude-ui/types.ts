@@ -1,30 +1,55 @@
 import type { SessionDefaults } from '../../utils/session-store.ts';
 
-export interface AllowedVariance {
-  totalToolCalls: number;
-  mcpToolCalls: number;
-  uiAutomationCalls: number;
-  wallClockSeconds: number;
-  toolCalls: number;
-}
-
 export interface BenchmarkBaseline {
   totalToolCalls?: number;
+  trackedToolCalls?: number;
   mcpToolCalls?: number;
   uiAutomationCalls?: number;
   wallClockSeconds?: number;
   tools?: Record<string, number>;
 }
 
-export type SequenceMode = 'warn' | 'fail';
-
-export interface SequenceConfig {
-  mode?: SequenceMode;
-}
+export type FailurePatternTarget = 'commands' | 'toolResults';
 
 export interface FirstRunPromptDismissals {
   labels: string[];
   timeoutSeconds?: number;
+}
+
+export interface ClaudeInvocationConfig {
+  useMcpServer?: boolean;
+  permissionMode?: 'default' | 'bypassPermissions';
+  tools?: string[];
+  allowedTools?: string[];
+  appendSystemPrompt?: string;
+  extraArgs?: string[];
+  pluginDirs?: string[];
+  skillDirs?: string[];
+  activateSkill?: string;
+  isolatedWorkingDirectory?: boolean;
+  maxClaudeSeconds?: number;
+}
+
+export type ToolMatcherShortName = 'afterLastDoubleUnderscore' | 'afterPrefix' | 'full';
+
+export interface NamePrefixToolMatcher {
+  kind: 'namePrefix';
+  prefix: string;
+  shortName?: ToolMatcherShortName;
+  uiAutomationNames?: string[];
+}
+
+export interface BashCommandToolMatcher {
+  kind: 'bashCommand';
+  commandPrefix: string;
+  shortName: string;
+  uiAutomation?: boolean;
+}
+
+export type ToolMatcher = NamePrefixToolMatcher | BashCommandToolMatcher;
+
+export interface ToolAnalysisConfig {
+  matchers: ToolMatcher[];
 }
 
 export interface BenchmarkConfig {
@@ -34,11 +59,14 @@ export interface BenchmarkConfig {
   sessionDefaults?: SessionDefaults;
   temporarySimulator?: boolean;
   firstRunPromptDismissals?: FirstRunPromptDismissals;
+  preflightCommands?: string[];
   baseline?: BenchmarkBaseline;
-  expectedToolSequence?: string[];
-  sequence?: SequenceConfig;
-  allowedVariance?: Partial<AllowedVariance>;
+  baselineToolSequence?: string[];
   failurePatterns?: string[];
+  failurePatternTargets?: FailurePatternTarget[];
+  ignoredFailurePatterns?: string[];
+  claude?: ClaudeInvocationConfig;
+  toolAnalysis?: ToolAnalysisConfig;
 }
 
 export interface ToolCallRecord {
@@ -48,6 +76,7 @@ export interface ToolCallRecord {
   input: unknown;
   line: number;
   timestamp?: string;
+  isTracked: boolean;
   isMcp: boolean;
   isUiAutomation: boolean;
 }
@@ -71,10 +100,13 @@ export interface TranscriptAudit {
   parseErrors: string[];
   totalToolCalls: number;
   totalToolCallsByName: Record<string, number>;
+  trackedToolCalls: number;
+  trackedToolCallsByName: Record<string, number>;
   mcpToolCalls: number;
   mcpToolCallsByName: Record<string, number>;
   uiAutomationCalls: number;
   uiAutomationCallsByName: Record<string, number>;
+  trackedSequence: ToolCallRecord[];
   mcpSequence: ToolCallRecord[];
   failures: ToolFailureRecord[];
   patternFailures: PatternFailureRecord[];
@@ -85,9 +117,7 @@ export interface TranscriptAudit {
 export interface MetricResult {
   name: string;
   actual: number;
-  expected: number;
-  allowedVariance: number;
-  pass: boolean;
+  baseline: number;
 }
 
 export type SequenceDiffLineKind = 'context' | 'missing' | 'additional';
@@ -95,7 +125,7 @@ export type SequenceDiffLineKind = 'context' | 'missing' | 'additional';
 export interface SequenceDiffLine {
   kind: SequenceDiffLineKind;
   tool: string;
-  expectedIndex?: number;
+  baselineIndex?: number;
   actualIndex?: number;
 }
 
@@ -140,17 +170,15 @@ export interface BenchmarkRunMetadata {
 
 export interface BenchmarkResult {
   name: string;
-  pass: boolean;
+  completed: boolean;
   metrics: MetricResult[];
-  failureMetric: {
-    pass: boolean;
-    count: number;
+  completion: {
+    completed: boolean;
+    issueCount: number;
   };
   sequence: {
-    mode: SequenceMode;
-    pass: boolean;
     matched: boolean;
-    expected: string[];
+    baseline: string[];
     actual: string[];
     diff: SequenceDiffHunk[];
     missing: string[];
@@ -159,11 +187,3 @@ export interface BenchmarkResult {
   audit: TranscriptAudit;
   run: BenchmarkRunMetadata;
 }
-
-export const DEFAULT_ALLOWED_VARIANCE: AllowedVariance = {
-  totalToolCalls: 0,
-  mcpToolCalls: 0,
-  uiAutomationCalls: 0,
-  wallClockSeconds: 30,
-  toolCalls: 0,
-};

@@ -202,10 +202,10 @@ export async function dismissFirstRunPrompts(opts: {
     );
   }
 
-  let preflightSucceeded = false;
   try {
     const deadline = timing.now() + timeoutMs;
     let promptsDismissed = false;
+    let consecutiveReadySnapshots = 0;
     while (timing.now() < deadline) {
       const search = await findFirstRunPromptLabel({
         simulatorId: opts.simulatorId,
@@ -218,6 +218,7 @@ export async function dismissFirstRunPrompts(opts: {
       });
 
       if (search.status === 'unavailable') {
+        consecutiveReadySnapshots = 0;
         await appendLifecycleLog(
           opts.logPath,
           `First-run prompt preflight: UI unavailable; retrying (exit ${search.exitCode})`,
@@ -227,7 +228,8 @@ export async function dismissFirstRunPrompts(opts: {
       }
 
       if (search.status === 'not-found') {
-        if (search.hasElements) {
+        consecutiveReadySnapshots = search.hasElements ? consecutiveReadySnapshots + 1 : 0;
+        if (consecutiveReadySnapshots >= 2) {
           promptsDismissed = true;
           break;
         }
@@ -235,6 +237,7 @@ export async function dismissFirstRunPrompts(opts: {
         continue;
       }
 
+      consecutiveReadySnapshots = 0;
       const { label } = search;
       opts.onEvent?.(`dismissing first-run prompt '${label}'`);
       await appendLifecycleLog(opts.logPath, `Dismissing first-run prompt label: ${label}`);
@@ -258,7 +261,6 @@ export async function dismissFirstRunPrompts(opts: {
         `${opts.config.name}: timed out during first-run prompt preflight; see ${opts.logPath}`,
       );
     }
-    preflightSucceeded = true;
   } finally {
     await terminatePreflightApp({
       config: opts.config,
@@ -267,7 +269,7 @@ export async function dismissFirstRunPrompts(opts: {
       cwd: opts.cwd,
       logPath: opts.logPath,
       executor,
-      suppressFailure: !preflightSucceeded,
+      suppressFailure: true,
     });
   }
   await appendLifecycleLog(opts.logPath, 'First-run prompt preflight: complete');

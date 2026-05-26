@@ -1,11 +1,15 @@
-import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
 import { readConfig } from '../config.ts';
-import { requireSuitePaths, resolveParserPath } from '../harness.ts';
+import {
+  listSuitePaths,
+  requireSuitePaths,
+  resolveParserPath,
+  resolveSuitePath,
+} from '../harness.ts';
 import { analyzeClaudeJsonl } from '../transcript.ts';
 import type { BenchmarkConfig, BenchmarkRunMetadata } from '../types.ts';
 
@@ -14,28 +18,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 function line(value: unknown): string {
   return JSON.stringify(value);
-}
-
-function runParserScript(args: string[]): Promise<{
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('python3', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    child.on('error', reject);
-    child.on('close', (exitCode) => {
-      resolve({
-        exitCode,
-        stdout: Buffer.concat(stdout).toString('utf8'),
-        stderr: Buffer.concat(stderr).toString('utf8'),
-      });
-    });
-  });
 }
 
 function runMetadata(
@@ -106,27 +88,17 @@ describe('Claude UI benchmark harness', () => {
     );
   });
 
-  it('returns a non-zero parser exit when JSONL lines are malformed', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-parser-'));
+  it('discovers local private suites when present', async () => {
+    const localSuitesDir = path.join(repoRoot, 'benchmarks/claude-ui/local/suites');
+    const suiteName = `unit-private-suite-${process.pid}`;
+    const suitePath = path.join(localSuitesDir, `${suiteName}.yml`);
+    await mkdir(localSuitesDir, { recursive: true });
+    await writeFile(suitePath, `name: ${suiteName}\nprompt: ../prompts/weather.md\n`, 'utf8');
     try {
-      const jsonlPath = path.join(dir, 'claude.jsonl');
-      const outputPath = path.join(dir, 'parsed');
-      await writeFile(
-        jsonlPath,
-        `${line({ type: 'assistant', message: { content: [{ type: 'text', text: 'ok' }] } })}\n{broken\n`,
-        'utf8',
-      );
-
-      const result = await runParserScript([
-        path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py'),
-        jsonlPath,
-        outputPath,
-      ]);
-
-      expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain('warn: skipping line 2');
+      await expect(resolveSuitePath(suiteName)).resolves.toBe(suitePath);
+      await expect(listSuitePaths()).resolves.toContain(suitePath);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await rm(suitePath, { force: true });
     }
   });
 });
@@ -246,11 +218,57 @@ describe('Claude UI benchmark analysis', () => {
 
     const audit = analyzeClaudeJsonl(transcript, {
       mcpToolPrefix: toolPrefix,
-      failurePatterns: ['stale element ref'],
+      failurePatterns: ['WAIT_TIMEOUT'],
     });
 
     expect(audit.failures).toHaveLength(1);
     expect(audit.patternFailures).toHaveLength(1);
+
+    const result = compareBenchmark(
+      { name: 'weather', prompt: 'prompt.md' },
+      audit,
+      runMetadata(10),
+    );
+
+    expect(result.completion.issueCount).toBe(1);
+  });
+
+  it('counts parser failures once when malformed JSONL also records parse errors', () => {
+    const audit = analyzeClaudeJsonl('{broken\n', { mcpToolPrefix: toolPrefix });
+
+    const result = compareBenchmark(
+      { name: 'weather', prompt: 'prompt.md' },
+      audit,
+      runMetadata(10, 0, 1),
+    );
+
+    expect(audit.parseErrors).toHaveLength(1);
+    expect(result.completion.issueCount).toBe(1);
+    expect(result.completed).toBe(false);
+  });
+
+  it('rejects removed old suite config keys', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          expectedToolSequence: ['snapshot_ui'],
+        },
+        'weather.yml',
+      ),
+    ).toThrow('weather.yml.expectedToolSequence: renamed to baselineToolSequence');
+
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          allowedVariance: { totalToolCalls: 2 },
+        },
+        'weather.yml',
+      ),
+    ).toThrow('weather.yml.allowedVariance: removed; baselines are observed data only');
   });
 
   it('rejects malformed failure pattern regexes when loading config', () => {
@@ -322,7 +340,7 @@ describe('Claude UI benchmark analysis', () => {
     expect(config.sessionDefaults?.env).toEqual({ FEATURE_FLAG: '1' });
   });
 
-  it('warns by default when tool sequences drift', () => {
+  it('reports observed metric and tool sequence deltas without affecting completion', () => {
     const config: BenchmarkConfig = {
       name: 'weather',
       prompt: 'prompt.md',
@@ -332,13 +350,7 @@ describe('Claude UI benchmark analysis', () => {
         uiAutomationCalls: 2,
         wallClockSeconds: 120,
       },
-      allowedVariance: {
-        totalToolCalls: 1,
-        mcpToolCalls: 0,
-        uiAutomationCalls: 0,
-        wallClockSeconds: 30,
-      },
-      expectedToolSequence: ['session_show_defaults', 'snapshot_ui', 'tap'],
+      baselineToolSequence: ['session_show_defaults', 'snapshot_ui', 'tap'],
     };
     const audit = analyzeClaudeJsonl(
       [
@@ -365,16 +377,22 @@ describe('Claude UI benchmark analysis', () => {
 
     const result = compareBenchmark(config, audit, runMetadata(145));
 
-    expect(result.metrics.find((item) => item.name === 'totalToolCalls')?.pass).toBe(true);
-    expect(result.metrics.find((item) => item.name === 'mcpToolCalls')?.pass).toBe(false);
-    expect(result.sequence.mode).toBe('warn');
+    expect(result.metrics.find((item) => item.name === 'totalToolCalls')).toEqual({
+      name: 'totalToolCalls',
+      actual: 5,
+      baseline: 4,
+    });
+    expect(result.metrics.find((item) => item.name === 'mcpToolCalls')).toEqual({
+      name: 'mcpToolCalls',
+      actual: 4,
+      baseline: 3,
+    });
     expect(result.sequence.matched).toBe(false);
-    expect(result.sequence.pass).toBe(true);
     expect(result.sequence.additional).toEqual(['screenshot']);
-    expect(result.pass).toBe(false);
+    expect(result.completed).toBe(true);
   });
 
-  it('preserves default allowed variance when config only overrides some keys', () => {
+  it('reports actual and baseline metrics without variance classification', () => {
     const config: BenchmarkConfig = readConfig(
       {
         name: 'weather',
@@ -382,9 +400,6 @@ describe('Claude UI benchmark analysis', () => {
         baseline: {
           totalToolCalls: 3,
           wallClockSeconds: 120,
-        },
-        allowedVariance: {
-          wallClockSeconds: 30,
         },
       },
       'weather.yml',
@@ -411,26 +426,21 @@ describe('Claude UI benchmark analysis', () => {
       {
         name: 'totalToolCalls',
         actual: 3,
-        expected: 3,
-        allowedVariance: 0,
-        pass: true,
+        baseline: 3,
       },
       {
         name: 'wallClockSeconds',
         actual: 145,
-        expected: 120,
-        allowedVariance: 30,
-        pass: true,
+        baseline: 120,
       },
     ]);
   });
 
-  it('fails on tool sequence drift when strict mode is enabled', () => {
+  it('reports tool sequence deltas without affecting completion', () => {
     const config: BenchmarkConfig = {
       name: 'weather',
       prompt: 'prompt.md',
-      expectedToolSequence: ['session_show_defaults', 'snapshot_ui', 'tap'],
-      sequence: { mode: 'fail' },
+      baselineToolSequence: ['session_show_defaults', 'snapshot_ui', 'tap'],
     };
     const audit = analyzeClaudeJsonl(
       [
@@ -456,13 +466,12 @@ describe('Claude UI benchmark analysis', () => {
 
     const result = compareBenchmark(config, audit, runMetadata(10));
 
-    expect(result.sequence.mode).toBe('fail');
     expect(result.sequence.matched).toBe(false);
-    expect(result.sequence.pass).toBe(false);
-    expect(result.pass).toBe(false);
+    expect(result.sequence.additional).toEqual(['screenshot']);
+    expect(result.completed).toBe(true);
   });
 
-  it('fails the benchmark when the external parser fails', () => {
+  it('marks the benchmark incomplete when the external parser exits non-zero', () => {
     const config: BenchmarkConfig = {
       name: 'weather',
       prompt: 'prompt.md',
@@ -471,9 +480,9 @@ describe('Claude UI benchmark analysis', () => {
 
     const result = compareBenchmark(config, audit, runMetadata(10, 0, 1));
 
-    expect(result.failureMetric.pass).toBe(false);
-    expect(result.failureMetric.count).toBe(1);
-    expect(result.pass).toBe(false);
+    expect(result.completion.completed).toBe(false);
+    expect(result.completion.issueCount).toBe(1);
+    expect(result.completed).toBe(false);
   });
 
   it('returns no sequence hunks when expected and actual match', () => {

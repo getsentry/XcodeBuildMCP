@@ -7,40 +7,24 @@ import type {
   SequenceDiffLine,
   TranscriptAudit,
 } from './types.ts';
-import { DEFAULT_ALLOWED_VARIANCE } from './types.ts';
 
-function expectedWithinUpperVariance(
-  actual: number,
-  expected: number,
-  allowedVariance: number,
-): boolean {
-  return actual <= expected + allowedVariance;
-}
-
-function metric(
-  name: string,
-  actual: number,
-  expected: number,
-  allowedVariance: number,
-): MetricResult {
+function metric(name: string, actual: number, baseline: number): MetricResult {
   return {
     name,
     actual,
-    expected,
-    allowedVariance,
-    pass: expectedWithinUpperVariance(actual, expected, allowedVariance),
+    baseline,
   };
 }
 
-function lcsMatrix(expected: string[], actual: string[]): number[][] {
-  const matrix = Array.from({ length: expected.length + 1 }, () =>
+function lcsMatrix(baseline: string[], actual: string[]): number[][] {
+  const matrix = Array.from({ length: baseline.length + 1 }, () =>
     Array.from({ length: actual.length + 1 }, () => 0),
   );
 
-  for (let i = expected.length - 1; i >= 0; i -= 1) {
+  for (let i = baseline.length - 1; i >= 0; i -= 1) {
     for (let j = actual.length - 1; j >= 0; j -= 1) {
       matrix[i]![j] =
-        expected[i] === actual[j]
+        baseline[i] === actual[j]
           ? matrix[i + 1]![j + 1]! + 1
           : Math.max(matrix[i + 1]![j]!, matrix[i]![j + 1]!);
     }
@@ -49,19 +33,19 @@ function lcsMatrix(expected: string[], actual: string[]): number[][] {
   return matrix;
 }
 
-function rawSequenceDiff(expected: string[], actual: string[]): SequenceDiffLine[] {
-  const matrix = lcsMatrix(expected, actual);
+function rawSequenceDiff(baseline: string[], actual: string[]): SequenceDiffLine[] {
+  const matrix = lcsMatrix(baseline, actual);
   const lines: SequenceDiffLine[] = [];
   let i = 0;
   let j = 0;
 
-  while (i < expected.length && j < actual.length) {
-    if (expected[i] === actual[j]) {
-      lines.push({ kind: 'context', tool: expected[i]!, expectedIndex: i, actualIndex: j });
+  while (i < baseline.length && j < actual.length) {
+    if (baseline[i] === actual[j]) {
+      lines.push({ kind: 'context', tool: baseline[i]!, baselineIndex: i, actualIndex: j });
       i += 1;
       j += 1;
     } else if (matrix[i + 1]![j]! >= matrix[i]![j + 1]!) {
-      lines.push({ kind: 'missing', tool: expected[i]!, expectedIndex: i });
+      lines.push({ kind: 'missing', tool: baseline[i]!, baselineIndex: i });
       i += 1;
     } else {
       lines.push({ kind: 'additional', tool: actual[j]!, actualIndex: j });
@@ -69,8 +53,8 @@ function rawSequenceDiff(expected: string[], actual: string[]): SequenceDiffLine
     }
   }
 
-  while (i < expected.length) {
-    lines.push({ kind: 'missing', tool: expected[i]!, expectedIndex: i });
+  while (i < baseline.length) {
+    lines.push({ kind: 'missing', tool: baseline[i]!, baselineIndex: i });
     i += 1;
   }
 
@@ -83,11 +67,11 @@ function rawSequenceDiff(expected: string[], actual: string[]): SequenceDiffLine
 }
 
 export function diffToolSequence(
-  expected: string[],
+  baseline: string[],
   actual: string[],
   contextSize = 2,
 ): SequenceDiffHunk[] {
-  const raw = rawSequenceDiff(expected, actual);
+  const raw = rawSequenceDiff(baseline, actual);
   const changedIndexes = raw
     .map((line, index) => (line.kind === 'context' ? -1 : index))
     .filter((index) => index >= 0);
@@ -115,52 +99,53 @@ function buildMetrics(
   run: BenchmarkRunMetadata,
 ): MetricResult[] {
   const baseline = config.baseline ?? {};
-  const variance = { ...DEFAULT_ALLOWED_VARIANCE, ...(config.allowedVariance ?? {}) };
   const metrics: MetricResult[] = [];
 
   if (baseline.totalToolCalls !== undefined) {
-    metrics.push(
-      metric(
-        'totalToolCalls',
-        audit.totalToolCalls,
-        baseline.totalToolCalls,
-        variance.totalToolCalls,
-      ),
-    );
+    metrics.push(metric('totalToolCalls', audit.totalToolCalls, baseline.totalToolCalls));
   }
   if (baseline.mcpToolCalls !== undefined) {
-    metrics.push(
-      metric('mcpToolCalls', audit.mcpToolCalls, baseline.mcpToolCalls, variance.mcpToolCalls),
-    );
+    metrics.push(metric('mcpToolCalls', audit.mcpToolCalls, baseline.mcpToolCalls));
+  }
+  if (baseline.trackedToolCalls !== undefined) {
+    metrics.push(metric('trackedToolCalls', audit.trackedToolCalls, baseline.trackedToolCalls));
   }
   if (baseline.uiAutomationCalls !== undefined) {
-    metrics.push(
-      metric(
-        'uiAutomationCalls',
-        audit.uiAutomationCalls,
-        baseline.uiAutomationCalls,
-        variance.uiAutomationCalls,
-      ),
-    );
+    metrics.push(metric('uiAutomationCalls', audit.uiAutomationCalls, baseline.uiAutomationCalls));
   }
   if (baseline.wallClockSeconds !== undefined) {
-    metrics.push(
-      metric(
-        'wallClockSeconds',
-        run.wallClockSeconds,
-        baseline.wallClockSeconds,
-        variance.wallClockSeconds,
-      ),
-    );
+    metrics.push(metric('wallClockSeconds', run.wallClockSeconds, baseline.wallClockSeconds));
   }
 
-  for (const [tool, expected] of Object.entries(baseline.tools ?? {})) {
-    metrics.push(
-      metric(`tool:${tool}`, audit.mcpToolCallsByName[tool] ?? 0, expected, variance.toolCalls),
-    );
+  for (const [tool, recorded] of Object.entries(baseline.tools ?? {})) {
+    metrics.push(metric(`tool:${tool}`, audit.trackedToolCallsByName[tool] ?? 0, recorded));
   }
 
   return metrics;
+}
+
+function isTerminalClaudeFailure(failure: TranscriptAudit['failures'][number]): boolean {
+  return (
+    failure.id === undefined && failure.fullName === undefined && failure.shortName === undefined
+  );
+}
+
+function processCompleted(run: BenchmarkRunMetadata, audit: TranscriptAudit): boolean {
+  if (audit.parseErrors.length > 0) return false;
+  if (run.claudeExitCode !== 0) return false;
+  if (run.parserExitCode !== 0) return false;
+  return !audit.failures.some(isTerminalClaudeFailure);
+}
+
+function countCompletionIssues(audit: TranscriptAudit, run: BenchmarkRunMetadata): number {
+  const failureLines = new Set(audit.failures.map((failure) => failure.line));
+  const uniquePatternFailures = audit.patternFailures.filter(
+    (failure) => !failureLines.has(failure.line),
+  ).length;
+  let count = audit.parseErrors.length + audit.failures.length + uniquePatternFailures;
+  if (run.claudeExitCode !== 0) count += 1;
+  if (run.parserExitCode !== 0 && audit.parseErrors.length === 0) count += 1;
+  return count;
 }
 
 export function compareBenchmark(
@@ -169,41 +154,31 @@ export function compareBenchmark(
   run: BenchmarkRunMetadata,
 ): BenchmarkResult {
   const metrics = buildMetrics(audit, config, run);
-  const expected = config.expectedToolSequence ?? [];
-  const actual = audit.mcpSequence.map((call) => call.shortName);
-  const diff = expected.length > 0 ? diffToolSequence(expected, actual) : [];
+  const baselineSequence = config.baselineToolSequence ?? [];
+  const actual = audit.trackedSequence.map((call) => call.shortName);
+  const diff = baselineSequence.length > 0 ? diffToolSequence(baselineSequence, actual) : [];
   const missing = diff.flatMap((hunk) =>
     hunk.lines.filter((line) => line.kind === 'missing').map((line) => line.tool),
   );
   const additional = diff.flatMap((hunk) =>
     hunk.lines.filter((line) => line.kind === 'additional').map((line) => line.tool),
   );
-  const failureCount =
-    audit.parseErrors.length +
-    audit.failures.length +
-    audit.patternFailures.length +
-    (run.claudeExitCode === 0 ? 0 : 1) +
-    (run.parserExitCode === 0 || audit.parseErrors.length > 0 ? 0 : 1);
-  const sequenceMode = config.sequence?.mode ?? 'warn';
+  const failureCount = countCompletionIssues(audit, run);
   const sequenceMatched =
-    expected.length === 0 || (missing.length === 0 && additional.length === 0);
-  const sequencePass = sequenceMatched || sequenceMode === 'warn';
-  const failurePass = failureCount === 0;
-  const pass = metrics.every((item) => item.pass) && sequencePass && failurePass;
+    baselineSequence.length === 0 || (missing.length === 0 && additional.length === 0);
+  const completed = processCompleted(run, audit);
 
   return {
     name: config.name,
-    pass,
+    completed,
     metrics,
-    failureMetric: {
-      pass: failurePass,
-      count: failureCount,
+    completion: {
+      completed,
+      issueCount: failureCount,
     },
     sequence: {
-      mode: sequenceMode,
-      pass: sequencePass,
       matched: sequenceMatched,
-      expected,
+      baseline: baselineSequence,
       actual,
       diff,
       missing,

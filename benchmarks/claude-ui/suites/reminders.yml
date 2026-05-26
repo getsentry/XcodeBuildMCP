@@ -8,30 +8,28 @@ firstRunPromptDismissals:
   labels:
     - Continue
     - Not Now
-  timeoutSeconds: 12
+  timeoutSeconds: 30
 baseline:
-  totalToolCalls: 15
-  mcpToolCalls: 14
-  uiAutomationCalls: 12
-  wallClockSeconds: 85
+  totalToolCalls: 17
+  trackedToolCalls: 16
+  mcpToolCalls: 16
+  uiAutomationCalls: 14
+  wallClockSeconds: 92.79
   tools:
     session_show_defaults: 1
     launch_app_sim: 1
     snapshot_ui: 1
-    tap: 4
+    tap: 5
+    wait_for_ui: 1
     type_text: 4
     key_press: 2
     batch: 1
-allowedVariance:
-  totalToolCalls: 5
-  mcpToolCalls: 5
-  uiAutomationCalls: 5
-  wallClockSeconds: 60
-  toolCalls: 3
-expectedToolSequence:
+baselineToolSequence:
   - session_show_defaults
   - launch_app_sim
   - snapshot_ui
+  - tap
+  - wait_for_ui
   - tap
   - type_text
   - tap

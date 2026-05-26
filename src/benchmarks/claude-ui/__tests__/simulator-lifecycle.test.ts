@@ -8,9 +8,9 @@ import {
   requireFirstRunPreflightSimulatorId,
   resolveBenchmarkSimulatorId,
   writeMcpConfig,
-} from '../harness.ts';
+} from '../mcp-config.ts';
+import { deleteTemporarySimulator } from '../simulator-deletion.ts';
 import {
-  deleteTemporarySimulator,
   prepareTemporarySimulator,
   resolveTemporarySimulatorPlan,
   type CreatedTemporarySimulator,
@@ -128,6 +128,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
       enabled: false,
       reason: 'temporarySimulator is false',
       existingSimulatorId: undefined,
+      existingSimulatorName: undefined,
     });
   });
 
@@ -178,19 +179,13 @@ describe('Claude UI temporary simulator lifecycle', () => {
     });
     expect(simulator?.simulatorId).toBe('TEMP-SIM-123');
     expect(commands.map((item) => [item.command, ...item.args])).toEqual([
-      [
-        'xcrun',
-        'simctl',
-        'create',
-        'XcodeBuildMCP Claude UI weather 20260522T120000Z',
-        'iPhone 17 Pro Max',
-      ],
+      ['xcrun', 'simctl', 'create', 'Claude UI weather 20260522T120000Z', 'iPhone 17 Pro Max'],
       ['xcrun', 'simctl', 'boot', 'TEMP-SIM-123'],
       ['xcrun', 'simctl', 'bootstatus', 'TEMP-SIM-123', '-b'],
       ['open', '-a', 'Simulator', '--args', '-CurrentDeviceUDID', 'TEMP-SIM-123'],
     ]);
     expect(events).toEqual([
-      'creating simulator XcodeBuildMCP Claude UI weather 20260522T120000Z',
+      'creating simulator Claude UI weather 20260522T120000Z',
       'booting simulator TEMP-SIM-123',
       'waiting for simulator TEMP-SIM-123 bootstatus',
       'opening Simulator.app for TEMP-SIM-123',
@@ -278,13 +273,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
     ).rejects.toThrow('temporary simulator did not reach bootstatus');
 
     expect(commands.map((item) => [item.command, ...item.args])).toEqual([
-      [
-        'xcrun',
-        'simctl',
-        'create',
-        'XcodeBuildMCP Claude UI weather 20260522T120000Z',
-        'iPhone 17 Pro Max',
-      ],
+      ['xcrun', 'simctl', 'create', 'Claude UI weather 20260522T120000Z', 'iPhone 17 Pro Max'],
       ['xcrun', 'simctl', 'boot', 'TEMP-SIM-SETUP-FAIL'],
       ['xcrun', 'simctl', 'bootstatus', 'TEMP-SIM-SETUP-FAIL', '-b'],
       ['xcrun', 'simctl', 'delete', 'TEMP-SIM-SETUP-FAIL'],
@@ -300,7 +289,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
     const simulator: CreatedTemporarySimulator = {
       createdByHarness: true,
       simulatorId: 'TEMP-SIM-DELETE-FAIL',
-      name: 'XcodeBuildMCP Claude UI weather 20260522T120000Z',
+      name: 'Claude UI weather 20260522T120000Z',
       deviceTypeName: 'iPhone 17 Pro Max',
       logPath,
     };
@@ -332,7 +321,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
     const simulator: CreatedTemporarySimulator = {
       createdByHarness: true,
       simulatorId: 'TEMP-SIM-LOG-FAIL',
-      name: 'XcodeBuildMCP Claude UI weather 20260522T120000Z',
+      name: 'Claude UI weather 20260522T120000Z',
       deviceTypeName: 'iPhone 17 Pro Max',
       logPath,
     };
@@ -374,7 +363,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
       temporarySimulator: {
         createdByHarness: true,
         simulatorId: 'TEMP-SIM-123',
-        name: 'XcodeBuildMCP Claude UI weather 20260522T120000Z',
+        name: 'Claude UI weather 20260522T120000Z',
         deviceTypeName: 'iPhone 17 Pro Max',
         logPath: path.join(directory, 'simulator-lifecycle.log'),
       },
@@ -451,7 +440,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
       temporarySimulator: {
         createdByHarness: true,
         simulatorId: 'TEMP-SIM-123',
-        name: 'XcodeBuildMCP Claude UI weather 20260522T120000Z',
+        name: 'Claude UI weather 20260522T120000Z',
         deviceTypeName: 'iPhone 17 Pro Max',
         logPath: path.join(directory, 'simulator-lifecycle.log'),
       },

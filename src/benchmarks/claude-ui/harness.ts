@@ -1,23 +1,43 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { finished } from 'node:stream/promises';
-import { fileURLToPath } from 'node:url';
-import { stringify as stringifyYaml } from 'yaml';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
+import {
+  benchmarkContextEnv,
+  buildClaudeArgs,
+  parserToolArgs,
+  usesMcpServer,
+} from './claude-invocation.ts';
 import { compareBenchmark } from './compare.ts';
-import { loadSuite, sessionDefaultEnvNames, validateSessionDefaults } from './config.ts';
+import { loadSuite } from './config.ts';
+import {
+  bundledParserPath,
+  localSuitesDir,
+  mcpToolPrefix,
+  repoRoot,
+  suitesDir,
+} from './constants.ts';
 import { dismissFirstRunPrompts } from './first-run-preflight.ts';
+import {
+  claudeBenchmarkEnv,
+  requireFirstRunPreflightSimulatorId,
+  writeClaudeMcpConfig,
+} from './mcp-config.ts';
+import { runPreflightCommands } from './preflight-commands.ts';
 import { createProgressReporter, type ProgressReporter } from './progress.ts';
 import { renderAggregate, renderSuiteReport } from './render.ts';
+import { deleteTemporarySimulator } from './simulator-deletion.ts';
 import {
-  deleteTemporarySimulator,
   prepareTemporarySimulator,
   resolveTemporarySimulatorPlan,
   type CreatedTemporarySimulator,
   type LifecycleCommandExecutor,
+  type PreparedSimulator,
 } from './simulator-lifecycle.ts';
 import { analyzeClaudeJsonl } from './transcript.ts';
 import type {
@@ -26,23 +46,28 @@ import type {
   BenchmarkResult,
   BenchmarkRunMetadata,
   TemporarySimulatorRunMetadata,
+  ToolAnalysisConfig,
 } from './types.ts';
-import type { SessionDefaults } from '../../utils/session-store.ts';
 
-const sourceDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(sourceDir, '../../..');
-const suitesDir = path.join(repoRoot, 'benchmarks/claude-ui/suites');
-const bundledParserPath = path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py');
 const parserEnvName = 'CLAUDE_UI_BENCHMARK_PARSER';
-const serverName = 'xcodebuildmcp-dev';
-const mcpToolPrefix = `mcp__${serverName}__`;
-const sessionDefaultEnvNameSet = new Set(Object.values(sessionDefaultEnvNames));
 interface CommandResult {
   exitCode: number | null;
   durationSeconds: number;
 }
+interface StreamJsonResult {
+  type?: unknown;
+  is_error?: unknown;
+}
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-export function resolveSuitePath(suite: string): string {
+export async function resolveSuitePath(suite: string): Promise<string> {
   if (
     path.isAbsolute(suite) ||
     suite.includes(path.sep) ||
@@ -51,17 +76,45 @@ export function resolveSuitePath(suite: string): string {
   ) {
     return path.resolve(suite);
   }
-  return path.join(suitesDir, `${suite}.yml`);
+
+  const candidates = [
+    path.join(suitesDir, `${suite}.yml`),
+    path.join(localSuitesDir, `${suite}.yml`),
+  ];
+  const matches = [];
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) matches.push(candidate);
+  }
+  if (matches.length === 1) return matches[0]!;
+  if (matches.length > 1) {
+    throw new Error(
+      `suite name '${suite}' matches multiple suite files; pass an explicit path:\n${matches.join('\n')}`,
+    );
+  }
+  return candidates[0]!;
 }
 
-export async function listSuitePaths(): Promise<string[]> {
-  const entries = await readdir(suitesDir, { withFileTypes: true });
+async function listYamlFiles(directory: string, required: boolean): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (!required) return [];
+    throw error;
+  }
   return entries
     .filter(
       (entry) => entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml')),
     )
-    .map((entry) => path.join(suitesDir, entry.name))
+    .map((entry) => path.join(directory, entry.name))
     .sort();
+}
+
+export async function listSuitePaths(): Promise<string[]> {
+  return [
+    ...(await listYamlFiles(suitesDir, true)),
+    ...(await listYamlFiles(localSuitesDir, false)),
+  ];
 }
 
 export function requireSuitePaths(suitePaths: string[]): string[] {
@@ -91,6 +144,52 @@ function resolveFrom(baseDir: string, filePath: string): string {
   return path.isAbsolute(filePath) ? filePath : path.resolve(baseDir, filePath);
 }
 
+async function installProjectSkills(opts: {
+  skillDirs: string[] | undefined;
+  claudeWorkingDirectory: string;
+}): Promise<string[]> {
+  if (!opts.skillDirs || opts.skillDirs.length === 0) return [];
+  const projectSkillsDirectory = path.join(opts.claudeWorkingDirectory, '.claude', 'skills');
+  await mkdir(projectSkillsDirectory, { recursive: true });
+  const installed: string[] = [];
+  for (const skillDir of opts.skillDirs) {
+    const skillName = path.basename(skillDir);
+    const target = path.join(projectSkillsDirectory, skillName);
+    await cp(skillDir, target, { recursive: true, force: true });
+    installed.push(target);
+  }
+  return installed;
+}
+
+async function readActivatedSkillPrompt(opts: {
+  skillName: string;
+  installedSkillDirs: string[];
+}): Promise<{ prompt: string; skillPath: string }> {
+  const installedSkillDir = opts.installedSkillDirs.find(
+    (skillDir) => path.basename(skillDir) === opts.skillName,
+  );
+  if (!installedSkillDir) {
+    throw new Error(
+      `claude.activateSkill '${opts.skillName}' was not installed from claude.skillDirs`,
+    );
+  }
+  const skillPath = path.join(installedSkillDir, 'SKILL.md');
+  const skillBody = await readFile(skillPath, 'utf8');
+  return {
+    skillPath,
+    prompt: [
+      `Load this Claude Code skill for the benchmark session: ${opts.skillName}.`,
+      'Use these instructions as the active skill context for subsequent turns.',
+      'Do not begin the benchmark task yet; only acknowledge that the skill context is loaded.',
+      '',
+      `<skill name="${opts.skillName}" source="${skillPath}">`,
+      skillBody,
+      '</skill>',
+      '',
+    ].join('\n'),
+  };
+}
+
 export async function resolveParserPath(parserPath: string | undefined): Promise<string> {
   const configured = parserPath ?? process.env[parserEnvName] ?? bundledParserPath;
   const resolved = path.resolve(configured);
@@ -102,120 +201,6 @@ export async function resolveParserPath(parserPath: string | undefined): Promise
   return resolved;
 }
 
-function sessionDefaultsWithTemporarySimulator(
-  config: BenchmarkConfig,
-  temporarySimulator: CreatedTemporarySimulator | undefined,
-): SessionDefaults | undefined {
-  if (!temporarySimulator) return config.sessionDefaults;
-  const defaults = { ...config.sessionDefaults };
-  delete defaults.simulatorName;
-  return {
-    ...defaults,
-    simulatorId: temporarySimulator.simulatorId,
-  };
-}
-
-const sessionDefaultPathKeys = new Set(['workspacePath', 'projectPath', 'derivedDataPath']);
-
-function shouldResolveSessionDefaultPath(key: string, value: string): boolean {
-  if (!sessionDefaultPathKeys.has(key)) return false;
-  if (path.isAbsolute(value) || value.startsWith('~')) return false;
-  return !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
-}
-
-function isolatedSessionDefaults(
-  config: BenchmarkConfig,
-  workingDirectory: string,
-  temporarySimulator: CreatedTemporarySimulator | undefined,
-): SessionDefaults | undefined {
-  const defaults = validateSessionDefaults(
-    sessionDefaultsWithTemporarySimulator(config, temporarySimulator),
-  );
-  if (!defaults) return undefined;
-
-  const resolved = { ...defaults };
-  for (const [key, value] of Object.entries(defaults)) {
-    if (typeof value === 'string' && shouldResolveSessionDefaultPath(key, value)) {
-      if (key === 'workspacePath' || key === 'projectPath' || key === 'derivedDataPath') {
-        resolved[key] = path.resolve(workingDirectory, value);
-      }
-    }
-  }
-  return resolved;
-}
-
-export function resolveBenchmarkSimulatorId(
-  config: BenchmarkConfig,
-  temporarySimulator: CreatedTemporarySimulator | undefined,
-): string | undefined {
-  return (
-    temporarySimulator?.simulatorId ??
-    (typeof config.sessionDefaults?.simulatorId === 'string'
-      ? config.sessionDefaults.simulatorId
-      : undefined)
-  );
-}
-
-export function requireFirstRunPreflightSimulatorId(
-  config: BenchmarkConfig,
-  temporarySimulator: CreatedTemporarySimulator | undefined,
-): string | undefined {
-  const simulatorId = resolveBenchmarkSimulatorId(config, temporarySimulator);
-  if (config.firstRunPromptDismissals && !simulatorId) {
-    throw new Error(
-      'firstRunPromptDismissals requires a temporary simulator or sessionDefaults.simulatorId',
-    );
-  }
-  return simulatorId;
-}
-
-export async function writeMcpConfig(opts: {
-  config: BenchmarkConfig;
-  mcpConfigPath: string;
-  mcpWorkspaceDirectory: string;
-  mcpWorkspaceConfigPath: string;
-  workingDirectory: string;
-  temporarySimulator?: CreatedTemporarySimulator;
-}): Promise<void> {
-  const sessionDefaults = isolatedSessionDefaults(
-    opts.config,
-    opts.workingDirectory,
-    opts.temporarySimulator,
-  );
-  const isolatedConfig = {
-    schemaVersion: 1,
-    enabledWorkflows: ['simulator', 'ui-automation'],
-    debug: true,
-    sentryDisabled: true,
-    sessionDefaults: sessionDefaults ?? {},
-  };
-  const mcpConfig = {
-    mcpServers: {
-      [serverName]: {
-        type: 'stdio',
-        command: 'node',
-        args: [path.join(repoRoot, 'build/cli.js'), 'mcp'],
-        env: {
-          XCODEBUILDMCP_DEBUG: 'true',
-          XCODEBUILDMCP_SENTRY_DISABLED: 'true',
-          XCODEBUILDMCP_CWD: opts.mcpWorkspaceDirectory,
-        },
-      },
-    },
-  };
-
-  await mkdir(path.dirname(opts.mcpWorkspaceConfigPath), { recursive: true });
-  await writeFile(opts.mcpWorkspaceConfigPath, stringifyYaml(isolatedConfig), 'utf8');
-  await writeFile(opts.mcpConfigPath, `${JSON.stringify(mcpConfig, null, 2)}\n`, 'utf8');
-}
-
-export function claudeBenchmarkEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env = { ...source };
-  for (const name of sessionDefaultEnvNameSet) delete env[name];
-  delete env.XCODEBUILDMCP_CWD;
-  return env;
-}
-
 function runCommand(opts: {
   command: string;
   args: string[];
@@ -224,24 +209,131 @@ function runCommand(opts: {
   stdoutPath: string;
   stderrPath: string;
   env?: NodeJS.ProcessEnv;
+  terminalJsonResultGraceMs?: number;
+  timeoutMs?: number;
 }): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const stdout = createWriteStream(opts.stdoutPath);
     const stderr = createWriteStream(opts.stderrPath);
     const started = process.hrtime.bigint();
+    let stdoutBuffer = '';
+    let terminalResultExitCode: number | undefined;
+    let terminalResultTimer: NodeJS.Timeout | undefined;
+    let timeoutTimer: NodeJS.Timeout | undefined;
+    let hardKillTimer: NodeJS.Timeout | undefined;
+    let timedOut = false;
+    let settled = false;
     const child = spawn(opts.command, opts.args, {
       cwd: opts.cwd,
       env: opts.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: opts.terminalJsonResultGraceMs !== undefined,
     });
 
-    child.stdout.pipe(stdout);
-    child.stderr.pipe(stderr);
-    child.on('error', reject);
+    const clearTerminalResultTimer = (): void => {
+      if (terminalResultTimer) clearTimeout(terminalResultTimer);
+      terminalResultTimer = undefined;
+    };
+
+    const clearTimeoutTimer = (): void => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      timeoutTimer = undefined;
+    };
+
+    const clearHardKillTimer = (): void => {
+      if (hardKillTimer) clearTimeout(hardKillTimer);
+      hardKillTimer = undefined;
+    };
+
+    const killChild = (signal: NodeJS.Signals): void => {
+      if (child.exitCode !== null || child.killed || child.pid === undefined) return;
+      try {
+        process.kill(-child.pid, signal);
+      } catch {
+        try {
+          child.kill(signal);
+        } catch {
+          // Ignore termination races; the close handler will resolve once stdio closes.
+        }
+      }
+    };
+
+    const terminateChild = (): void => {
+      if (child.exitCode !== null || child.killed || child.pid === undefined) return;
+      killChild('SIGTERM');
+      if (hardKillTimer !== undefined) return;
+      hardKillTimer = setTimeout(() => {
+        killChild('SIGKILL');
+      }, 5_000);
+      hardKillTimer.unref();
+    };
+
+    const recordTerminalResult = (result: StreamJsonResult): void => {
+      if (terminalResultExitCode !== undefined || opts.terminalJsonResultGraceMs === undefined)
+        return;
+      terminalResultExitCode = result.is_error === true ? 1 : 0;
+      terminalResultTimer = setTimeout(terminateChild, opts.terminalJsonResultGraceMs);
+      terminalResultTimer.unref();
+    };
+
+    if (opts.timeoutMs !== undefined) {
+      timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        terminateChild();
+      }, opts.timeoutMs);
+      timeoutTimer.unref();
+    }
+
+    const scanStdoutForTerminalResult = (chunk: Buffer): void => {
+      if (opts.terminalJsonResultGraceMs === undefined || terminalResultExitCode !== undefined)
+        return;
+      stdoutBuffer += chunk.toString('utf8');
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (line.trim().length === 0) continue;
+        try {
+          const record = JSON.parse(line) as StreamJsonResult;
+          if (record.type === 'result') recordTerminalResult(record);
+        } catch {
+          // Claude stream-json records are newline-delimited JSON. Ignore non-JSON fragments.
+        }
+      }
+    };
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout.write(chunk);
+      scanStdoutForTerminalResult(chunk);
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr.write(chunk);
+    });
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      clearTerminalResultTimer();
+      clearTimeoutTimer();
+      clearHardKillTimer();
+      stdout.destroy();
+      stderr.destroy();
+      reject(error);
+    });
     child.on('close', (exitCode) => {
+      if (settled) return;
+      settled = true;
+      clearTerminalResultTimer();
+      clearTimeoutTimer();
+      clearHardKillTimer();
       const durationSeconds = Number(process.hrtime.bigint() - started) / 1_000_000_000;
+      stdout.end();
+      stderr.end();
       Promise.all([finished(stdout), finished(stderr)])
-        .then(() => resolve({ exitCode, durationSeconds }))
+        .then(() =>
+          resolve({
+            exitCode: timedOut ? 143 : (exitCode ?? terminalResultExitCode ?? null),
+            durationSeconds,
+          }),
+        )
         .catch(reject);
     });
 
@@ -253,9 +345,15 @@ function runCommand(opts: {
   });
 }
 
+function claudeTaskTimeoutMs(config: BenchmarkConfig): number | undefined {
+  if (config.claude?.maxClaudeSeconds !== undefined) return config.claude.maxClaudeSeconds * 1000;
+  return undefined;
+}
+
 async function runParser(
   artifacts: BenchmarkArtifacts,
   parserPath: string,
+  toolAnalysis: ToolAnalysisConfig | undefined,
 ): Promise<number | null> {
   const result = await runCommand({
     command: 'python3',
@@ -263,7 +361,7 @@ async function runParser(
       parserPath,
       artifacts.claudeJsonlPath,
       artifacts.parsedDirectory,
-      `--tool-prefix=${mcpToolPrefix}`,
+      ...parserToolArgs(toolAnalysis),
     ],
     cwd: repoRoot,
     stdoutPath: artifacts.parseLogPath,
@@ -283,20 +381,19 @@ function normalizeStoredResult(result: BenchmarkResult): BenchmarkResult {
     );
   }
 
-  const mode = result.sequence.mode ?? 'warn';
   const matched =
     result.sequence.matched ??
     (result.sequence.missing.length === 0 && result.sequence.additional.length === 0);
-  const sequencePass = matched || mode === 'warn';
+
+  if (typeof result.completed !== 'boolean' || !result.completion) {
+    throw new Error('unsupported result.json: expected completed and completion fields');
+  }
 
   return {
     ...result,
-    pass: result.metrics.every((item) => item.pass) && result.failureMetric.pass && sequencePass,
     sequence: {
       ...result.sequence,
-      mode,
       matched,
-      pass: sequencePass,
     },
   };
 }
@@ -311,7 +408,6 @@ async function readStoredResult(
   const raw = JSON.parse(await readFile(resultPath, 'utf8')) as BenchmarkResult | BenchmarkResult[];
   return Array.isArray(raw) ? raw.map(normalizeStoredResult) : normalizeStoredResult(raw);
 }
-
 function temporarySimulatorMetadata(
   temporarySimulator: CreatedTemporarySimulator | undefined,
   setupDurationSeconds: number,
@@ -374,7 +470,7 @@ export async function runSuite(
     resultJsonPath: path.join(runDirectory, 'result.json'),
   };
 
-  let temporarySimulator: CreatedTemporarySimulator | undefined;
+  let temporarySimulator: PreparedSimulator | undefined;
   let temporarySimulatorRun: TemporarySimulatorRunMetadata | undefined;
   let result: BenchmarkResult | undefined;
 
@@ -401,10 +497,10 @@ export async function runSuite(
     const simulatorSetupDurationSeconds =
       Number(process.hrtime.bigint() - simulatorSetupStarted) / 1_000_000_000;
     temporarySimulatorRun = temporarySimulatorMetadata(
-      temporarySimulator,
+      temporarySimulator?.createdByHarness === true ? temporarySimulator : undefined,
       simulatorSetupDurationSeconds,
     );
-    if (temporarySimulator) {
+    if (temporarySimulator?.createdByHarness === true) {
       progress?.event(`simulator setup took ${simulatorSetupDurationSeconds.toFixed(2)}s`);
     }
 
@@ -420,16 +516,46 @@ export async function runSuite(
       });
     }
 
-    const suiteDirectory = path.dirname(suitePath);
-    const promptPath = resolveFrom(suiteDirectory, config.prompt);
     const workingDirectory = config.workingDirectory
       ? resolveFrom(repoRoot, config.workingDirectory)
       : repoRoot;
+    const claudeWorkingDirectory = config.claude?.isolatedWorkingDirectory
+      ? path.join(tmpdir(), 'xcodebuildmcp-claude-ui-cwd', slug, runTimestamp)
+      : workingDirectory;
+    if (config.claude?.isolatedWorkingDirectory) {
+      await mkdir(claudeWorkingDirectory, { recursive: true });
+    }
+    if (config.claude?.skillDirs && config.claude.isolatedWorkingDirectory !== true) {
+      throw new Error(`${config.name}: claude.skillDirs requires claude.isolatedWorkingDirectory`);
+    }
+    const installedSkillDirs = await installProjectSkills({
+      skillDirs: config.claude?.skillDirs?.map((skillDir) => resolveFrom(repoRoot, skillDir)),
+      claudeWorkingDirectory,
+    });
+    const contextEnv = benchmarkContextEnv({
+      runDirectory,
+      workingDirectory,
+      simulatorId: effectiveSimulatorId,
+    });
+    const benchmarkEnv = claudeBenchmarkEnv(process.env, contextEnv);
+    await runPreflightCommands({
+      commands: config.preflightCommands,
+      cwd: workingDirectory,
+      env: benchmarkEnv,
+      logPath: artifacts.simulatorLifecycleLogPath,
+      simulatorId: effectiveSimulatorId,
+      onEvent: (message) => progress?.event(message),
+    });
+
+    const suiteDirectory = path.dirname(suitePath);
+    const promptPath = resolveFrom(suiteDirectory, config.prompt);
     const prompt = await readFile(promptPath, 'utf8');
 
     await writeFile(artifacts.promptPath, prompt, 'utf8');
-    await writeMcpConfig({
+    const useMcpServer = usesMcpServer(config);
+    await writeClaudeMcpConfig({
       config,
+      enabled: useMcpServer,
       mcpConfigPath: artifacts.mcpConfigPath,
       mcpWorkspaceDirectory: artifacts.mcpWorkspaceDirectory,
       mcpWorkspaceConfigPath: artifacts.mcpWorkspaceConfigPath,
@@ -437,34 +563,89 @@ export async function runSuite(
       temporarySimulator,
     });
 
-    const claudeArgs = [
-      '-p',
-      '--verbose',
-      '--output-format',
-      'stream-json',
-      '--mcp-config',
-      artifacts.mcpConfigPath,
-      '--strict-mcp-config',
-      '--permission-mode',
-      'bypassPermissions',
-      '--allowedTools',
-      `${mcpToolPrefix}*`,
-    ];
+    const claudeSessionId = config.claude?.activateSkill ? randomUUID() : undefined;
+    const baseClaudeArgs = {
+      config,
+      artifacts,
+      workingDirectory,
+      pluginDirs: config.claude?.pluginDirs?.map((pluginDir) => resolveFrom(repoRoot, pluginDir)),
+      simulatorId: effectiveSimulatorId,
+    };
+    const claudeArgs = buildClaudeArgs({
+      ...baseClaudeArgs,
+      resumeSessionId: claudeSessionId,
+    });
     await writeFile(
       artifacts.claudeCommandLogPath,
-      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${workingDirectory}\nMCP workspace: ${artifacts.mcpWorkspaceDirectory}\nMCP workspace config: ${artifacts.mcpWorkspaceConfigPath}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${effectiveSimulatorId ?? 'suite/default'}\nStarted: ${new Date().toISOString()}\n`,
+      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${claudeWorkingDirectory}\nBenchmark working directory: ${workingDirectory}\nMCP server enabled: ${String(useMcpServer)}\nMCP workspace: ${useMcpServer ? artifacts.mcpWorkspaceDirectory : 'disabled'}\nMCP workspace config: ${useMcpServer ? artifacts.mcpWorkspaceConfigPath : 'disabled'}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${effectiveSimulatorId ?? 'suite/default'}\nClaude session ID: ${claudeSessionId ?? 'new task session'}\nStarted: ${new Date().toISOString()}\n`,
       'utf8',
     );
+    if (installedSkillDirs.length > 0) {
+      await writeFile(
+        artifacts.claudeCommandLogPath,
+        `Installed project skills:\n${installedSkillDirs.map((skillDir) => `- ${skillDir}`).join('\n')}\n`,
+        { flag: 'a' },
+      );
+    }
+
+    if (config.claude?.activateSkill) {
+      const activationArgs = buildClaudeArgs({
+        ...baseClaudeArgs,
+        sessionId: claudeSessionId,
+      });
+      const activationStdoutPath = path.join(runDirectory, 'claude-skill-activation.jsonl');
+      const activationStderrPath = path.join(runDirectory, 'claude-skill-activation.stderr');
+      const activationPromptPath = path.join(runDirectory, 'claude-skill-activation.md');
+      const activationPrompt = await readActivatedSkillPrompt({
+        skillName: config.claude.activateSkill,
+        installedSkillDirs,
+      });
+      await writeFile(activationPromptPath, activationPrompt.prompt, 'utf8');
+      await writeFile(
+        artifacts.claudeCommandLogPath,
+        [
+          `Skill activation source: ${activationPrompt.skillPath}`,
+          `Skill activation prompt: ${activationPromptPath}`,
+          `Skill activation command: claude ${activationArgs.join(' ')} < ${activationPromptPath} > ${activationStdoutPath} 2> ${activationStderrPath}`,
+          '',
+        ].join('\n'),
+        { flag: 'a' },
+      );
+      progress?.event(`loading skill ${config.claude.activateSkill}`);
+      const activation = await runCommand({
+        command: 'claude',
+        args: activationArgs,
+        cwd: claudeWorkingDirectory,
+        stdin: activationPrompt.prompt,
+        stdoutPath: activationStdoutPath,
+        stderrPath: activationStderrPath,
+        env: benchmarkEnv,
+        terminalJsonResultGraceMs: 5_000,
+        timeoutMs: 60_000,
+      });
+      await writeFile(
+        artifacts.claudeCommandLogPath,
+        `Skill activation finished: ${new Date().toISOString()}\nSkill activation exit status: ${activation.exitCode}\nSkill activation wall clock seconds: ${activation.durationSeconds.toFixed(2)}\n`,
+        { flag: 'a' },
+      );
+      if (activation.exitCode !== 0) {
+        throw new Error(
+          `${config.name}: skill activation /${config.claude.activateSkill} failed with exit ${activation.exitCode}`,
+        );
+      }
+    }
 
     progress?.event('launching claude');
     const claude = await runCommand({
       command: 'claude',
       args: claudeArgs,
-      cwd: workingDirectory,
+      cwd: claudeWorkingDirectory,
       stdin: prompt,
       stdoutPath: artifacts.claudeJsonlPath,
       stderrPath: artifacts.claudeStderrPath,
-      env: claudeBenchmarkEnv(),
+      env: benchmarkEnv,
+      terminalJsonResultGraceMs: 5_000,
+      timeoutMs: claudeTaskTimeoutMs(config),
     });
     progress?.event(
       `claude finished in ${claude.durationSeconds.toFixed(2)}s (exit ${claude.exitCode ?? 'null'})`,
@@ -477,14 +658,17 @@ export async function runSuite(
     );
 
     progress?.event('parsing transcript');
-    const parserExitCode = await runParser(artifacts, parserPath);
+    const parserExitCode = await runParser(artifacts, parserPath, config.toolAnalysis);
     progress?.event(`parser finished (exit ${parserExitCode ?? 'null'})`);
 
     progress?.event('evaluating result');
     const jsonl = await readFile(artifacts.claudeJsonlPath, 'utf8');
     const audit = analyzeClaudeJsonl(jsonl, {
       mcpToolPrefix,
+      toolAnalysis: config.toolAnalysis,
       failurePatterns: config.failurePatterns,
+      failurePatternTargets: config.failurePatternTargets,
+      ignoredFailurePatterns: config.ignoredFailurePatterns,
     });
     const run: BenchmarkRunMetadata = {
       suitePath,
@@ -496,7 +680,7 @@ export async function runSuite(
     };
     result = compareBenchmark(config, audit, run);
   } finally {
-    if (temporarySimulator) {
+    if (temporarySimulator?.createdByHarness === true) {
       progress?.event(`cleaning up simulator ${temporarySimulator.simulatorId}`);
       try {
         const deletion = await deleteTemporarySimulator(temporarySimulator, {
@@ -564,7 +748,7 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
       for (const item of results) process.stdout.write(renderSuiteReport(item));
       if (results.length > 1) process.stdout.write(`\n${renderAggregate(results)}`);
     }
-    return results.every((item) => item.pass) ? 0 : 1;
+    return results.every((item) => item.completed) ? 0 : 1;
   }
 
   if ((args.all && args.suite) || (!args.all && !args.suite)) {
@@ -572,7 +756,7 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
   }
 
   const suitePaths = requireSuitePaths(
-    args.all ? await listSuitePaths() : [resolveSuitePath(args.suite as string)],
+    args.all ? await listSuitePaths() : [await resolveSuitePath(args.suite as string)],
   );
   const progress = createProgressReporter({ enabled: !args.json });
   const results: BenchmarkResult[] = [];
@@ -585,7 +769,7 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
     );
     const item = await runSuite(suitePath, { progress, parserPath: args.parser });
     results.push(item);
-    progress.event(`suite ${item.pass ? 'passed' : 'failed'}`);
+    progress.event(`suite ${item.completed ? 'completed' : 'incomplete'}`);
     if (!args.json) process.stdout.write(renderSuiteReport(item));
   }
 
@@ -595,5 +779,5 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
     process.stdout.write(`\n${renderAggregate(results)}`);
   }
 
-  return results.every((item) => item.pass) ? 0 : 1;
+  return results.every((item) => item.completed) ? 0 : 1;
 }

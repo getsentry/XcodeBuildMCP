@@ -39,17 +39,19 @@ function colorize(opts: ResolvedOptions, code: string, text: string): string {
   return opts.color ? `${code}${text}${ANSI.reset}` : text;
 }
 
-function statusLabel(status: 'PASS' | 'FAIL' | 'WARN', opts: ResolvedOptions): string {
-  if (status === 'PASS') return colorize(opts, ANSI.green, 'PASS');
-  if (status === 'FAIL') return colorize(opts, ANSI.red, 'FAIL');
-  return colorize(opts, ANSI.yellow, 'WARN');
+function statusLabel(
+  status: 'COMPLETED' | 'INCOMPLETE' | 'OBSERVED',
+  opts: ResolvedOptions,
+): string {
+  if (status === 'COMPLETED') return colorize(opts, ANSI.green, 'COMPLETED');
+  if (status === 'INCOMPLETE') return colorize(opts, ANSI.red, 'INCOMPLETE');
+  return colorize(opts, ANSI.dim, 'OBSERVED');
 }
 
-function statusGlyph(status: 'PASS' | 'FAIL' | 'WARN', opts: ResolvedOptions): string {
-  const glyph = status === 'PASS' ? '✓' : status === 'FAIL' ? '✗' : '!';
-  if (status === 'PASS') return colorize(opts, ANSI.green, glyph);
-  if (status === 'FAIL') return colorize(opts, ANSI.red, glyph);
-  return colorize(opts, ANSI.yellow, glyph);
+function statusGlyph(status: 'COMPLETED' | 'INCOMPLETE', opts: ResolvedOptions): string {
+  const glyph = status === 'COMPLETED' ? '✓' : '!';
+  if (status === 'COMPLETED') return colorize(opts, ANSI.green, glyph);
+  return colorize(opts, ANSI.red, glyph);
 }
 
 function rule(ch: string, width: number): string {
@@ -71,10 +73,8 @@ function suiteBanner(result: BenchmarkResult, opts: ResolvedOptions): string {
   return `${rule('─', opts.width)}\n${left}${' '.repeat(padWidth)}${right}`;
 }
 
-function overallStatus(result: BenchmarkResult): 'PASS' | 'FAIL' | 'WARN' {
-  if (!result.pass) return 'FAIL';
-  if (!result.sequence.matched) return 'WARN';
-  return 'PASS';
+function overallStatus(result: BenchmarkResult): 'COMPLETED' | 'INCOMPLETE' {
+  return result.completed ? 'COMPLETED' : 'INCOMPLETE';
 }
 
 function visibleLength(text: string): number {
@@ -100,8 +100,8 @@ function formatNumber(value: number, isWallClock: boolean): string {
   return value.toFixed(2);
 }
 
-function formatDelta(actual: number, expected: number, isWallClock: boolean): string {
-  const delta = actual - expected;
+function formatDelta(actual: number, baseline: number, isWallClock: boolean): string {
+  const delta = actual - baseline;
   const sign = delta > 0 ? '+' : delta < 0 ? '−' : ' ';
   const magnitude = Math.abs(delta);
   return `${sign}${isWallClock ? magnitude.toFixed(2) : magnitude.toString()}`;
@@ -121,10 +121,7 @@ interface MetricRow {
   name: string;
   actual: string;
   baseline: string;
-  variance: string;
   delta: string;
-  status: 'PASS' | 'FAIL';
-  isWallClock: boolean;
 }
 
 function metricToRow(metric: MetricResult): MetricRow {
@@ -133,11 +130,8 @@ function metricToRow(metric: MetricResult): MetricRow {
   return {
     name: isTool ? metric.name.slice('tool:'.length) : metric.name,
     actual: formatNumber(metric.actual, isWallClock),
-    baseline: formatNumber(metric.expected, isWallClock),
-    variance: `+${formatNumber(metric.allowedVariance, isWallClock)}`,
-    delta: formatDelta(metric.actual, metric.expected, isWallClock),
-    status: metric.pass ? 'PASS' : 'FAIL',
-    isWallClock,
+    baseline: formatNumber(metric.baseline, isWallClock),
+    delta: formatDelta(metric.actual, metric.baseline, isWallClock),
   };
 }
 
@@ -172,38 +166,25 @@ function renderMetricsSection(result: BenchmarkResult, opts: ResolvedOptions): s
     lines.push('', colorize(opts, ANSI.bold, 'Metrics'));
     const rows = headline
       .map(metricToRow)
-      .map((row) => [
-        row.name,
-        row.actual,
-        row.baseline,
-        row.variance,
-        row.delta,
-        row.status === 'PASS' ? statusLabel('PASS', opts) : statusLabel('FAIL', opts),
-      ]);
+      .map((row) => [row.name, row.actual, row.baseline, row.delta]);
     const table = renderTable(
-      ['METRIC', 'ACTUAL', 'BASELINE', 'VARIANCE', 'DELTA', 'STATUS'],
+      ['METRIC', 'ACTUAL', 'BASELINE', 'DELTA'],
       rows,
-      ['left', 'right', 'right', 'right', 'right', 'left'],
+      ['left', 'right', 'right', 'right'],
       opts,
     );
     for (const line of table) lines.push(`  ${line}`);
   }
 
   if (tools.length > 0) {
-    lines.push('', colorize(opts, ANSI.bold, 'Tool calls (baseline-tracked)'));
+    lines.push('', colorize(opts, ANSI.bold, 'Tool calls (baseline-observed)'));
     const rows = tools
       .map(metricToRow)
-      .map((row) => [
-        row.name,
-        row.actual,
-        row.baseline,
-        row.delta,
-        row.status === 'PASS' ? statusLabel('PASS', opts) : statusLabel('FAIL', opts),
-      ]);
+      .map((row) => [row.name, row.actual, row.baseline, row.delta]);
     const table = renderTable(
-      ['TOOL', 'ACTUAL', 'BASELINE', 'DELTA', 'STATUS'],
+      ['TOOL', 'ACTUAL', 'BASELINE', 'DELTA'],
       rows,
-      ['left', 'right', 'right', 'right', 'left'],
+      ['left', 'right', 'right', 'right'],
       opts,
     );
     for (const line of table) lines.push(`  ${line}`);
@@ -212,15 +193,18 @@ function renderMetricsSection(result: BenchmarkResult, opts: ResolvedOptions): s
   return lines;
 }
 
-function renderFailureSection(result: BenchmarkResult, opts: ResolvedOptions): string[] {
+function renderStumbleSection(result: BenchmarkResult, opts: ResolvedOptions): string[] {
   const { failures, patternFailures, parseErrors } = result.audit;
   const { claudeExitCode, parserExitCode } = result.run;
-  const total = result.failureMetric.count;
+  const total = result.completion.issueCount;
   if (total === 0) {
-    return ['', `${statusLabel('PASS', opts)}  failures/stumbles: 0`];
+    return ['', `${statusLabel('OBSERVED', opts)}  stumbles: 0`];
   }
 
-  const lines: string[] = ['', `${statusLabel('FAIL', opts)}  failures/stumbles: ${total}`];
+  const lines: string[] = [
+    '',
+    `${statusLabel(result.completion.completed ? 'OBSERVED' : 'INCOMPLETE', opts)}  stumbles: ${total}`,
+  ];
 
   if (claudeExitCode !== 0) {
     lines.push(`  • claude exit code: ${claudeExitCode ?? 'null'}`);
@@ -238,7 +222,7 @@ function renderFailureSection(result: BenchmarkResult, opts: ResolvedOptions): s
     }
   }
   if (failures.length > 0) {
-    lines.push(`  • tool failures: ${failures.length}`);
+    lines.push(`  • tool errors: ${failures.length}`);
     for (const failure of failures.slice(0, 5)) {
       const name = failure.shortName ?? failure.fullName ?? '(unknown)';
       const msg = truncate(failure.message, 100);
@@ -269,21 +253,14 @@ function truncate(text: string, max: number): string {
 }
 
 function renderSequenceSection(result: BenchmarkResult, opts: ResolvedOptions): string[] {
-  const expectedLen = result.sequence.expected.length;
-  if (expectedLen === 0) return [];
+  const baselineLen = result.sequence.baseline.length;
+  if (baselineLen === 0) return [];
 
   const lines: string[] = [''];
-  const sequenceStatus = result.sequence.matched
-    ? 'PASS'
-    : result.sequence.mode === 'warn'
-      ? 'WARN'
-      : 'FAIL';
-  const drift = result.sequence.matched
+  const comparison = result.sequence.matched
     ? 'matched'
-    : `drift: ${result.sequence.missing.length} missing, ${result.sequence.additional.length} additional`;
-  lines.push(
-    `${statusLabel(sequenceStatus, opts)}  tool sequence (${result.sequence.mode}): ${drift}`,
-  );
+    : `${result.sequence.missing.length} missing from baseline, ${result.sequence.additional.length} additional`;
+  lines.push(`${statusLabel('OBSERVED', opts)}  tool sequence: ${comparison}`);
 
   if (result.sequence.diff.length === 0) return lines;
 
@@ -294,20 +271,20 @@ function renderSequenceSection(result: BenchmarkResult, opts: ResolvedOptions): 
 }
 
 function renderHunk(hunk: SequenceDiffHunk, opts: ResolvedOptions): string[] {
-  const expectedIndexes = hunk.lines
-    .map((l) => l.expectedIndex)
+  const baselineIndexes = hunk.lines
+    .map((l) => l.baselineIndex)
     .filter((v): v is number => v !== undefined);
   const actualIndexes = hunk.lines
     .map((l) => l.actualIndex)
     .filter((v): v is number => v !== undefined);
-  const expectedRange = formatRange(expectedIndexes);
+  const baselineRange = formatRange(baselineIndexes);
   const actualRange = formatRange(actualIndexes);
-  const headerText = `  @@ expected[${expectedRange}] actual[${actualRange}] @@`;
+  const headerText = `  @@ baseline[${baselineRange}] actual[${actualRange}] @@`;
   const lines = [colorize(opts, ANSI.cyan, headerText)];
 
-  const expectedColWidth = Math.max(
+  const baselineColWidth = Math.max(
     3,
-    ...hunk.lines.map((l) => (l.expectedIndex !== undefined ? String(l.expectedIndex).length : 0)),
+    ...hunk.lines.map((l) => (l.baselineIndex !== undefined ? String(l.baselineIndex).length : 0)),
   );
   const actualColWidth = Math.max(
     3,
@@ -315,7 +292,7 @@ function renderHunk(hunk: SequenceDiffHunk, opts: ResolvedOptions): string[] {
   );
 
   for (const line of hunk.lines) {
-    lines.push(renderHunkLine(line, expectedColWidth, actualColWidth, opts));
+    lines.push(renderHunkLine(line, baselineColWidth, actualColWidth, opts));
   }
   return lines;
 }
@@ -329,21 +306,21 @@ function formatRange(indexes: number[]): string {
 
 function renderHunkLine(
   line: SequenceDiffLine,
-  expectedColWidth: number,
+  baselineColWidth: number,
   actualColWidth: number,
   opts: ResolvedOptions,
 ): string {
   const marker = line.kind === 'context' ? ' ' : line.kind === 'missing' ? '−' : '+';
-  const expectedIdx = line.expectedIndex !== undefined ? String(line.expectedIndex) : '';
+  const baselineIdx = line.baselineIndex !== undefined ? String(line.baselineIndex) : '';
   const actualIdx = line.actualIndex !== undefined ? String(line.actualIndex) : '';
-  const body = `${padStart(expectedIdx, expectedColWidth)}  ${padStart(actualIdx, actualColWidth)}  ${marker} ${line.tool}`;
+  const body = `${padStart(baselineIdx, baselineColWidth)}  ${padStart(actualIdx, actualColWidth)}  ${marker} ${line.tool}`;
   if (line.kind === 'missing') return `      ${colorize(opts, ANSI.red, body)}`;
   if (line.kind === 'additional') return `      ${colorize(opts, ANSI.green, body)}`;
   return `      ${colorize(opts, ANSI.dim, body)}`;
 }
 
 function renderInspectHints(result: BenchmarkResult, opts: ResolvedOptions): string[] {
-  if (result.pass && result.sequence.matched) return [];
+  if (result.completion.issueCount === 0) return [];
 
   const lines = ['', colorize(opts, ANSI.bold, 'Inspect')];
   const runDir = relativePath(result.run.artifacts.runDirectory, opts.cwd);
@@ -390,7 +367,7 @@ export function renderSuiteReport(result: BenchmarkResult, options?: RenderOptio
   sections.push(suiteBanner(result, opts));
   sections.push(...renderMetadata(result, opts));
   sections.push(...renderMetricsSection(result, opts));
-  sections.push(...renderFailureSection(result, opts));
+  sections.push(...renderStumbleSection(result, opts));
   sections.push(...renderSequenceSection(result, opts));
   sections.push(...renderInspectHints(result, opts));
   return `${sections.join('\n')}\n`;
@@ -416,9 +393,8 @@ export function renderAggregate(
 ): string {
   const opts = resolveOptions(options);
   const total = results.length;
-  const passed = results.filter((r) => r.pass).length;
-  const failed = total - passed;
-  const warned = results.filter((r) => r.pass && !r.sequence.matched).length;
+  const completed = results.filter((r) => r.completed).length;
+  const incomplete = total - completed;
   const wall = results.reduce((sum, r) => sum + r.run.wallClockSeconds, 0);
   const slowest = results.reduce<BenchmarkResult | undefined>(
     (acc, r) => (!acc || r.run.wallClockSeconds > acc.run.wallClockSeconds ? r : acc),
@@ -428,16 +404,12 @@ export function renderAggregate(
   const lines: string[] = [];
   lines.push(header('Claude UI Benchmarks · Summary', opts));
 
-  const passText = colorize(opts, ANSI.green, `${passed} passed`);
-  const failText =
-    failed > 0
-      ? colorize(opts, ANSI.red, `${failed} failed`)
-      : colorize(opts, ANSI.dim, '0 failed');
-  const warnText =
-    warned > 0
-      ? colorize(opts, ANSI.yellow, `${warned} sequence warnings`)
-      : colorize(opts, ANSI.dim, '0 sequence warnings');
-  lines.push(`  Suites:    ${total} total · ${passText} · ${failText} · ${warnText}`);
+  const completedText = colorize(opts, ANSI.green, `${completed} completed`);
+  const incompleteText =
+    incomplete > 0
+      ? colorize(opts, ANSI.red, `${incomplete} incomplete`)
+      : colorize(opts, ANSI.dim, '0 incomplete');
+  lines.push(`  Suites:    ${total} total · ${completedText} · ${incompleteText}`);
   const slowestText = slowest
     ? `${slowest.name} (${formatDuration(slowest.run.wallClockSeconds)})`
     : 'n/a';
@@ -451,17 +423,11 @@ export function renderAggregate(
   const rows = results.map((r) => {
     const status = overallStatus(r);
     const notes: string[] = [];
-    if (r.failureMetric.count > 0) {
-      notes.push(`${r.failureMetric.count} stumble${r.failureMetric.count === 1 ? '' : 's'}`);
+    if (r.completion.issueCount > 0) {
+      notes.push(`${r.completion.issueCount} stumble${r.completion.issueCount === 1 ? '' : 's'}`);
     }
     if (!r.sequence.matched) {
-      notes.push(
-        `sequence ${r.sequence.mode}: ${r.sequence.missing.length}m/${r.sequence.additional.length}a`,
-      );
-    }
-    const failedMetrics = r.metrics.filter((m) => !m.pass).map((m) => m.name);
-    if (failedMetrics.length > 0) {
-      notes.push(`metrics: ${failedMetrics.slice(0, 3).join(', ')}`);
+      notes.push(`sequence delta: ${r.sequence.missing.length}m/${r.sequence.additional.length}a`);
     }
     return [
       `${statusGlyph(status, opts)} ${statusLabel(status, opts)}`,

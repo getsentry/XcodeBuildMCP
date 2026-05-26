@@ -34,6 +34,7 @@ export interface TemporarySimulatorPlan {
   reason?: string;
   deviceTypeName?: string;
   existingSimulatorId?: string;
+  existingSimulatorName?: string;
 }
 
 export interface CreatedTemporarySimulator {
@@ -44,14 +45,16 @@ export interface CreatedTemporarySimulator {
   logPath: string;
 }
 
-export type LifecycleProgressReporter = (message: string) => void;
-
-export interface DeleteTemporarySimulatorResult {
-  attempted: boolean;
-  succeeded: boolean;
-  exitCode: number | null;
-  error?: string;
+export interface ExistingSimulator {
+  createdByHarness: false;
+  simulatorId: string;
+  name: string;
+  logPath: string;
 }
+
+export type PreparedSimulator = CreatedTemporarySimulator | ExistingSimulator;
+
+export type LifecycleProgressReporter = (message: string) => void;
 
 function sessionDefaultString(config: BenchmarkConfig, key: SessionDefaultKey): string | undefined {
   const value = config.sessionDefaults?.[key];
@@ -64,9 +67,15 @@ function sessionDefaultString(config: BenchmarkConfig, key: SessionDefaultKey): 
 
 export function resolveTemporarySimulatorPlan(config: BenchmarkConfig): TemporarySimulatorPlan {
   const existingSimulatorId = sessionDefaultString(config, 'simulatorId');
+  const deviceTypeName = sessionDefaultString(config, 'simulatorName');
 
   if (config.temporarySimulator === false) {
-    return { enabled: false, reason: 'temporarySimulator is false', existingSimulatorId };
+    return {
+      enabled: false,
+      reason: 'temporarySimulator is false',
+      existingSimulatorId,
+      existingSimulatorName: existingSimulatorId === undefined ? deviceTypeName : undefined,
+    };
   }
 
   if (existingSimulatorId !== undefined) {
@@ -82,7 +91,6 @@ export function resolveTemporarySimulatorPlan(config: BenchmarkConfig): Temporar
     };
   }
 
-  const deviceTypeName = sessionDefaultString(config, 'simulatorName');
   if (deviceTypeName === undefined) {
     throw new Error(
       `${config.name}: temporary simulator requires sessionDefaults.simulatorName or temporarySimulator: false`,
@@ -93,7 +101,7 @@ export function resolveTemporarySimulatorPlan(config: BenchmarkConfig): Temporar
 }
 
 export function temporarySimulatorName(suiteSlug: string, timestamp: string): string {
-  return `XcodeBuildMCP Claude UI ${suiteSlug} ${timestamp}`;
+  return `Claude UI ${suiteSlug} ${timestamp}`;
 }
 
 async function appendLifecycleLog(
@@ -128,6 +136,134 @@ function commandOutput(result: LoggedCommandResult): string {
 function isAlreadyBooted(result: LoggedCommandResult): boolean {
   if (result.exitCode === 0) return true;
   return /already booted|current state:\s*Booted|state:\s*Booted/i.test(commandOutput(result));
+}
+
+interface SimctlDevice {
+  name?: unknown;
+  udid?: unknown;
+  isAvailable?: unknown;
+}
+
+interface SimctlListDevices {
+  devices?: Record<string, SimctlDevice[]>;
+}
+
+function resolveSimulatorIdFromList(output: string, simulatorName: string): string {
+  const parsed = JSON.parse(output) as SimctlListDevices;
+  for (const devices of Object.values(parsed.devices ?? {})) {
+    for (const device of devices) {
+      if (
+        device.name === simulatorName &&
+        device.isAvailable !== false &&
+        typeof device.udid === 'string'
+      ) {
+        return device.udid;
+      }
+    }
+  }
+  throw new Error(`no available simulator found named '${simulatorName}'`);
+}
+
+async function bootAndOpenSimulator(opts: {
+  configName: string;
+  simulatorId: string;
+  cwd: string;
+  logPath: string;
+  executor: LifecycleCommandExecutor;
+  onEvent?: LifecycleProgressReporter;
+  readinessDelayMs?: number;
+  logWriter?: LifecycleLogWriter;
+  readyLogPrefix: string;
+  bootstatusSubject: string;
+}): Promise<void> {
+  const bootArgs = ['simctl', 'boot', opts.simulatorId];
+  opts.onEvent?.(`booting simulator ${opts.simulatorId}`);
+  const bootResult = await opts.executor({
+    command: 'xcrun',
+    args: bootArgs,
+    cwd: opts.cwd,
+    logPath: opts.logPath,
+  });
+  if (!isAlreadyBooted(bootResult)) {
+    throw new Error(
+      `${opts.configName}: failed to boot simulator with ${commandText('xcrun', bootArgs)} (exit ${bootResult.exitCode}); see ${opts.logPath}`,
+    );
+  }
+  if (bootResult.exitCode !== 0) {
+    await appendLifecycleLog(
+      opts.logPath,
+      'Boot command reported simulator was already booted; continuing',
+      opts.logWriter,
+    );
+  }
+
+  opts.onEvent?.(`waiting for simulator ${opts.simulatorId} bootstatus`);
+  const bootstatusArgs = ['simctl', 'bootstatus', opts.simulatorId, '-b'];
+  const bootstatusResult = await opts.executor({
+    command: 'xcrun',
+    args: bootstatusArgs,
+    cwd: opts.cwd,
+    logPath: opts.logPath,
+  });
+  if (bootstatusResult.exitCode !== 0) {
+    throw new Error(
+      `${opts.configName}: ${opts.bootstatusSubject} did not reach bootstatus with ${commandText('xcrun', bootstatusArgs)} (exit ${bootstatusResult.exitCode}); see ${opts.logPath}`,
+    );
+  }
+
+  opts.onEvent?.(`opening Simulator.app for ${opts.simulatorId}`);
+  const openArgs = ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', opts.simulatorId];
+  let openResult: LoggedCommandResult | undefined;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    openResult = await opts.executor({
+      command: 'open',
+      args: openArgs,
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (openResult.exitCode === 0) break;
+    if (attempt === 3) {
+      throw new Error(
+        `${opts.configName}: failed to open Simulator.app with ${commandText('open', openArgs)} (exit ${openResult.exitCode}); see ${opts.logPath}`,
+      );
+    }
+    const delayMs = attempt * 2_000;
+    await appendLifecycleLog(
+      opts.logPath,
+      `Open Simulator.app attempt ${attempt} failed with exit ${openResult.exitCode}; retrying in ${(delayMs / 1000).toFixed(1)}s`,
+      opts.logWriter,
+    );
+    if (/error -1712/i.test(commandOutput(openResult))) {
+      await appendLifecycleLog(
+        opts.logPath,
+        'Simulator.app did not respond to LaunchServices; terminating the UI process before retry',
+        opts.logWriter,
+      );
+      await opts.executor({
+        command: 'killall',
+        args: ['-9', 'Simulator'],
+        cwd: opts.cwd,
+        logPath: opts.logPath,
+      });
+    }
+    opts.onEvent?.(`Simulator.app open attempt ${attempt} failed; retrying`);
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, delayMs);
+    });
+  }
+
+  await waitForReadinessDelay({
+    logPath: opts.logPath,
+    milliseconds: opts.readinessDelayMs ?? 2_000,
+    onEvent: opts.onEvent,
+    logWriter: opts.logWriter,
+  });
+  await appendLifecycleLog(
+    opts.logPath,
+    `${opts.readyLogPrefix}: ${opts.simulatorId}`,
+    opts.logWriter,
+  );
+  opts.onEvent?.(`simulator ready ${opts.simulatorId}`);
 }
 
 async function waitForReadinessDelay(opts: {
@@ -217,7 +353,7 @@ export async function prepareTemporarySimulator(opts: {
   logWriter?: LifecycleLogWriter;
   onEvent?: LifecycleProgressReporter;
   readinessDelayMs?: number;
-}): Promise<CreatedTemporarySimulator | undefined> {
+}): Promise<PreparedSimulator | undefined> {
   const plan = resolveTemporarySimulatorPlan(opts.config);
   const logWriter = opts.logWriter ?? defaultLifecycleLogWriter;
 
@@ -235,7 +371,42 @@ export async function prepareTemporarySimulator(opts: {
         .join('\n'),
       logWriter,
     );
-    return undefined;
+    if (!plan.existingSimulatorName) return undefined;
+
+    const executor = opts.executor ?? runLoggedCommand;
+    opts.onEvent?.(`resolving simulator ${plan.existingSimulatorName}`);
+    const listResult = await executor({
+      command: 'xcrun',
+      args: ['simctl', 'list', 'devices', 'available', '--json'],
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+    });
+    if (listResult.exitCode !== 0) {
+      throw new Error(
+        `${opts.config.name}: failed to list simulators (exit ${listResult.exitCode}); see ${opts.logPath}`,
+      );
+    }
+
+    const simulatorId = resolveSimulatorIdFromList(listResult.stdout, plan.existingSimulatorName);
+    opts.onEvent?.(`using simulator ${simulatorId}`);
+    await bootAndOpenSimulator({
+      configName: opts.config.name,
+      simulatorId,
+      cwd: opts.cwd,
+      logPath: opts.logPath,
+      executor,
+      onEvent: opts.onEvent,
+      readinessDelayMs: opts.readinessDelayMs,
+      logWriter,
+      readyLogPrefix: 'Existing simulator ready',
+      bootstatusSubject: 'simulator',
+    });
+    return {
+      createdByHarness: false,
+      simulatorId,
+      name: plan.existingSimulatorName,
+      logPath: opts.logPath,
+    };
   }
 
   const executor = opts.executor ?? runLoggedCommand;
@@ -281,63 +452,18 @@ export async function prepareTemporarySimulator(opts: {
   } satisfies CreatedTemporarySimulator;
 
   try {
-    opts.onEvent?.(`booting simulator ${simulatorId}`);
-    const bootArgs = ['simctl', 'boot', simulatorId];
-    const bootResult = await executor({
-      command: 'xcrun',
-      args: bootArgs,
+    await bootAndOpenSimulator({
+      configName: opts.config.name,
+      simulatorId,
       cwd: opts.cwd,
       logPath: opts.logPath,
-    });
-    if (!isAlreadyBooted(bootResult)) {
-      throw new Error(
-        `${opts.config.name}: failed to boot temporary simulator with ${commandText('xcrun', bootArgs)} (exit ${bootResult.exitCode}); see ${opts.logPath}`,
-      );
-    }
-    if (bootResult.exitCode !== 0) {
-      await appendLifecycleLog(
-        opts.logPath,
-        'Boot command reported simulator was already booted; continuing',
-        logWriter,
-      );
-    }
-
-    opts.onEvent?.(`waiting for simulator ${simulatorId} bootstatus`);
-    const bootstatusArgs = ['simctl', 'bootstatus', simulatorId, '-b'];
-    const bootstatusResult = await executor({
-      command: 'xcrun',
-      args: bootstatusArgs,
-      cwd: opts.cwd,
-      logPath: opts.logPath,
-    });
-    if (bootstatusResult.exitCode !== 0) {
-      throw new Error(
-        `${opts.config.name}: temporary simulator did not reach bootstatus with ${commandText('xcrun', bootstatusArgs)} (exit ${bootstatusResult.exitCode}); see ${opts.logPath}`,
-      );
-    }
-
-    opts.onEvent?.(`opening Simulator.app for ${simulatorId}`);
-    const openArgs = ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', simulatorId];
-    const openResult = await executor({
-      command: 'open',
-      args: openArgs,
-      cwd: opts.cwd,
-      logPath: opts.logPath,
-    });
-    if (openResult.exitCode !== 0) {
-      throw new Error(
-        `${opts.config.name}: failed to open Simulator.app with ${commandText('open', openArgs)} (exit ${openResult.exitCode}); see ${opts.logPath}`,
-      );
-    }
-
-    await waitForReadinessDelay({
-      logPath: opts.logPath,
-      milliseconds: opts.readinessDelayMs ?? 2_000,
+      executor,
       onEvent: opts.onEvent,
+      readinessDelayMs: opts.readinessDelayMs,
       logWriter,
+      readyLogPrefix: 'Temporary simulator ready',
+      bootstatusSubject: 'temporary simulator',
     });
-    await appendLifecycleLog(opts.logPath, `Temporary simulator ready: ${simulatorId}`, logWriter);
-    opts.onEvent?.(`simulator ready ${simulatorId}`);
 
     return simulator;
   } catch (error) {
@@ -367,56 +493,5 @@ export async function prepareTemporarySimulator(opts: {
       );
     }
     throw error;
-  }
-}
-
-export async function deleteTemporarySimulator(
-  simulator: CreatedTemporarySimulator,
-  opts: {
-    cwd: string;
-    executor?: LifecycleCommandExecutor;
-    logWriter?: LifecycleLogWriter;
-  },
-): Promise<DeleteTemporarySimulatorResult> {
-  if (simulator.createdByHarness !== true) {
-    throw new Error('refusing to delete simulator not created by this harness');
-  }
-
-  const executor = opts.executor ?? runLoggedCommand;
-  const logWriter = opts.logWriter ?? defaultLifecycleLogWriter;
-  const logErrors: string[] = [];
-  const startLogError = await tryAppendLifecycleLog(
-    simulator.logPath,
-    `Deleting simulatorId: ${simulator.simulatorId}\nName: ${simulator.name}`,
-    logWriter,
-  );
-  if (startLogError) logErrors.push(startLogError);
-
-  try {
-    const result = await executor({
-      command: 'xcrun',
-      args: ['simctl', 'delete', simulator.simulatorId],
-      cwd: opts.cwd,
-      logPath: simulator.logPath,
-    });
-    const succeeded = result.exitCode === 0;
-    const resultLogError = await tryAppendLifecycleLog(
-      simulator.logPath,
-      `Delete ${succeeded ? 'succeeded' : 'failed'} for simulatorId: ${simulator.simulatorId}`,
-      logWriter,
-    );
-    if (resultLogError) logErrors.push(resultLogError);
-    const deletion = { attempted: true, succeeded, exitCode: result.exitCode };
-    return logErrors.length > 0 ? { ...deletion, error: logErrors.join('; ') } : deletion;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logErrors.push(message);
-    const failureLogError = await tryAppendLifecycleLog(
-      simulator.logPath,
-      `Delete failed for simulatorId: ${simulator.simulatorId}\nError: ${message}`,
-      logWriter,
-    );
-    if (failureLogError) logErrors.push(failureLogError);
-    return { attempted: true, succeeded: false, exitCode: null, error: logErrors.join('; ') };
   }
 }
