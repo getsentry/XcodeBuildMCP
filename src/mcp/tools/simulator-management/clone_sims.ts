@@ -15,16 +15,13 @@ import { toErrorMessage } from '../../../utils/errors.ts';
 import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
 
 const baseSchemaObject = z.object({
-  sourceSimulatorId: z.string().uuid().describe('UDID of the simulator to clone'),
-  newName: z
-    .string()
-    .optional()
-    .describe('Name for the cloned simulator. If omitted, simctl auto-generates one.'),
+  sourceSimulatorId: z.uuid().describe('UDID of the simulator to clone'),
+  newName: z.string().min(1).describe('Name for the cloned simulator.'),
 });
 
 const internalSchemaObject = z.object({
-  sourceSimulatorId: z.string().uuid(),
-  newName: z.string().optional(),
+  sourceSimulatorId: z.uuid(),
+  newName: z.string().min(1),
 });
 
 type CloneSimsParams = z.infer<typeof internalSchemaObject>;
@@ -51,9 +48,7 @@ function createCloneSimsResult(params: {
     ...(params.diagnosticMessage
       ? { diagnostics: createBasicDiagnostics({ errors: [params.diagnosticMessage] }) }
       : {}),
-    artifacts: {
-      simulatorId: params.clonedSimulatorId ?? params.sourceSimulatorId,
-    },
+    ...(params.clonedSimulatorId ? { artifacts: { simulatorId: params.clonedSimulatorId } } : {}),
   };
 }
 
@@ -70,12 +65,11 @@ export function createCloneSimsExecutor(
 ): NonStreamingExecutor<CloneSimsParams, CloneSimsResult> {
   return async (params) => {
     try {
-      const command = ['xcrun', 'simctl', 'clone', params.sourceSimulatorId];
-      if (params.newName) {
-        command.push(params.newName);
-      }
-
-      const result = await executor(command, 'Clone Simulator', false);
+      const result = await executor(
+        ['xcrun', 'simctl', 'clone', params.sourceSimulatorId, params.newName],
+        'Clone Simulator',
+        false,
+      );
 
       if (!result.success) {
         const diagnosticMessage = result.error ?? 'Unknown error';
@@ -109,10 +103,7 @@ export async function clone_simsLogic(
   params: CloneSimsParams,
   executor: CommandExecutor,
 ): Promise<void> {
-  log(
-    'info',
-    `Cloning simulator ${params.sourceSimulatorId}${params.newName ? ` as "${params.newName}"` : ''}`,
-  );
+  log('info', `Cloning simulator ${params.sourceSimulatorId} as "${params.newName}"`);
 
   const ctx = getHandlerContext();
   const executeCloneSims = createCloneSimsExecutor(executor);
