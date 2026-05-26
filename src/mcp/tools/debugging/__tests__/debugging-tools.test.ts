@@ -126,6 +126,12 @@ describe('debug_attach_sim', () => {
     it('should expose schema with expected shape', () => {
       expect(attachSchema).toBeDefined();
     });
+
+    it('documents PID attach argument constraints in the public schema', () => {
+      expect(attachSchema.pid.description).toContain('without bundleId');
+      expect(attachSchema.pid.description).toContain('without waitFor');
+      expect(attachSchema.waitFor.description).toContain('Only valid when attaching by bundleId');
+    });
   });
 
   describe('Handler Requirements', () => {
@@ -170,6 +176,34 @@ describe('debug_attach_sim', () => {
       expect(text).toContain('Mutually exclusive parameters provided');
       expect(text).toContain('bundleId');
       expect(text).toContain('pid');
+    });
+
+    it('rejects waitFor true when attaching by pid', async () => {
+      __setTestDebuggerToolContextOverride(createTestContext());
+      sessionStore.setDefaults({ simulatorId: 'test-sim-uuid' });
+
+      const result = await callHandler(attachHandler, {
+        pid: 1234,
+        waitFor: true,
+      });
+
+      expect(result.isError).toBe(true);
+      const text = result.content[0].text;
+      expect(text).toContain('waitFor is only valid when attaching by bundleId');
+      expect(text).toContain('For PID attach, omit waitFor or set it to false');
+    });
+
+    it('allows waitFor false when attaching by pid', async () => {
+      __setTestDebuggerToolContextOverride(createTestContext());
+      sessionStore.setDefaults({ simulatorId: 'test-sim-uuid' });
+
+      const result = await callHandler(attachHandler, {
+        pid: 1234,
+        waitFor: false,
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Attached');
     });
   });
 

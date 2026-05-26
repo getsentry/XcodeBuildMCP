@@ -19,6 +19,9 @@ import {
   type DebuggerToolContext,
 } from '../../../utils/debugger/index.ts';
 
+const DEBUG_ATTACH_MODE_HELP =
+  'Valid attach modes: provide bundleId without pid, or provide pid without bundleId and omit waitFor or set waitFor to false.';
+
 const baseSchemaObject = z.object({
   simulatorId: z
     .string()
@@ -32,9 +35,26 @@ const baseSchemaObject = z.object({
     .describe(
       "Name of the simulator (e.g., 'iPhone 17'). Provide EITHER this OR simulatorId, not both",
     ),
-  bundleId: z.string().optional(),
-  pid: z.number().int().positive().optional(),
-  waitFor: z.boolean().optional().describe('Wait for the process to appear when attaching'),
+  bundleId: z
+    .string()
+    .optional()
+    .describe(
+      'Attach by bundle identifier. Provide bundleId without pid; waitFor may be used with this mode.',
+    ),
+  pid: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Attach to an already-running process by PID. Provide pid without bundleId and without waitFor.',
+    ),
+  waitFor: z
+    .boolean()
+    .optional()
+    .describe(
+      'Only valid when attaching by bundleId. For PID attach, omit waitFor or set it to false.',
+    ),
   continueOnAttach: z.boolean().optional().default(true).describe('default: true'),
   makeCurrent: z
     .boolean()
@@ -47,10 +67,14 @@ const debugAttachSchema = z.preprocess(
   nullifyEmptyStrings,
   withSimulatorIdOrName(baseSchemaObject)
     .refine((val) => val.bundleId !== undefined || val.pid !== undefined, {
-      message: 'Provide either bundleId or pid to attach.',
+      message: `Provide either bundleId or pid to attach. ${DEBUG_ATTACH_MODE_HELP}`,
     })
     .refine((val) => !(val.bundleId && val.pid), {
-      message: 'bundleId and pid are mutually exclusive. Provide only one.',
+      message: 'Provide either bundleId or pid, not both.',
+    })
+    .refine((val) => !(val.pid !== undefined && val.waitFor === true), {
+      message:
+        'waitFor is only valid when attaching by bundleId. For PID attach, omit waitFor or set it to false.',
     }),
 );
 

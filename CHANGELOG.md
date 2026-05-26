@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- Clarified `debug_attach_sim` PID attach arguments so the schema documents that `pid` must be used without `bundleId` or `waitFor`, and invalid `pid` + `waitFor: true` calls now fail validation before LLDB is invoked ([#417](https://github.com/getsentry/XcodeBuildMCP/issues/417)).
 - Fixed Claude UI benchmark preflight so transient malformed or still-loading UI snapshots no longer crash the harness or finish before app UI is observable.
 - Fixed Claude UI benchmark preflight so configured first-run dismissals require a concrete simulator ID, suite-provided simulator IDs are recorded in command logs, and preflight-launched apps are terminated after post-launch failures.
 - Fixed Claude UI benchmark config handling so invalid `failurePatterns` regexes and runtime-incompatible `sessionDefaults` fail before a suite starts and partial `allowedVariance` overrides preserve defaults for omitted metrics.
