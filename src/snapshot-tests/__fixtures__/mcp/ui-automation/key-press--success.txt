@@ -1,4 +1,0 @@
-
-⌨️ Key Press
-
-✅ Key press (code: 4) simulated successfully.

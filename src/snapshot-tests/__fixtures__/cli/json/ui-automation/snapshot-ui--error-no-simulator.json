@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.capture-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to get accessibility hierarchy.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
+        }
+      ]
+    }
+  }
+}

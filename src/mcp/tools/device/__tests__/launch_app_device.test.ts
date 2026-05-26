@@ -6,7 +6,7 @@ import {
 } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, launch_app_deviceLogic } from '../launch_app_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('launch_app_device plugin (device-shared)', () => {
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('launch_app_device plugin (device-shared)', () => {
 
   describe('Handler Requirements', () => {
     it('should require deviceId and bundleId when not provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');

@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "deviceId": "<UUID>",
+      "bundleId": "io.sentry.calculatorapp",
+      "processId": 99999
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Stop the app: xcodebuildmcp device stop --device-id <UUID> --process-id <PID>"
+  ]
+}

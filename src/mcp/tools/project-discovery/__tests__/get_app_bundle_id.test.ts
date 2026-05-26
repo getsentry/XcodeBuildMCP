@@ -6,7 +6,7 @@ import {
   get_app_bundle_idLogic,
   createGetAppBundleIdExecutor,
 } from '../get_app_bundle_id.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 import {
   createMockFileSystemExecutor,
@@ -49,7 +49,7 @@ describe('get_app_bundle_id plugin', () => {
 
   describe('Handler behavior', () => {
     it('should return error when appPath validation fails', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Parameter validation failed');
@@ -189,7 +189,7 @@ describe('get_app_bundle_id plugin', () => {
     });
 
     it('should reject non-string appPath values through the handler', async () => {
-      const result = await handler({ appPath: 123 });
+      const result = await callHandler(handler, { appPath: 123 });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Parameter validation failed');

@@ -5,7 +5,11 @@ import {
   createMockFileSystemExecutor,
   createMockExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { runToolLogic, type MockToolHandlerResult } from '../../../../test-utils/test-helpers.ts';
+import {
+  runToolLogic,
+  type MockToolHandlerResult,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, build_run_deviceLogic } from '../build_run_device.ts';
@@ -50,11 +54,14 @@ describe('build_run_device tool', () => {
 
   describe('Handler Requirements', () => {
     it('requires scheme + deviceId and project/workspace via handler', async () => {
-      const missingAll = await handler({});
+      const missingAll = await callHandler(handler, {});
       expect(missingAll.isError).toBe(true);
       expect(missingAll.content[0].text).toContain('Provide scheme and deviceId');
 
-      const missingSource = await handler({ scheme: 'MyApp', deviceId: 'DEVICE-UDID' });
+      const missingSource = await callHandler(handler, {
+        scheme: 'MyApp',
+        deviceId: 'DEVICE-UDID',
+      });
       expect(missingSource.isError).toBe(true);
       expect(missingSource.content[0].text).toContain('Provide a project or workspace');
     });

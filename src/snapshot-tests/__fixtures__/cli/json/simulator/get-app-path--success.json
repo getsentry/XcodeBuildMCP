@@ -1,0 +1,29 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulator": "iPhone 17"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "simulator",
+      "durationMs": 1234
+    },
+    "artifacts": {
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+    }
+  },
+  "nextSteps": [
+    "Get bundle ID: xcodebuildmcp device get-app-bundle-id --app-path ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
+    "Boot simulator: xcodebuildmcp simulator-management boot --simulator-id SIMULATOR_UUID",
+    "Install app: xcodebuildmcp simulator install --simulator-id SIMULATOR_UUID --app-path ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
+    "Launch app: xcodebuildmcp simulator launch-app --simulator-id SIMULATOR_UUID --bundle-id BUNDLE_ID"
+  ]
+}

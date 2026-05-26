@@ -108,7 +108,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ShowBuildSettingsR
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.build-settings',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

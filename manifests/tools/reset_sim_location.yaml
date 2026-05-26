@@ -6,7 +6,7 @@ names:
 description: Reset sim location.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
-  version: "1"
+  version: "2"
 annotations:
   title: Reset Simulator Location
   readOnlyHint: true

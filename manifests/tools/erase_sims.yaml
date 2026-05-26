@@ -6,7 +6,7 @@ names:
 description: Erase simulator.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
-  version: "1"
+  version: "2"
 annotations:
   title: Erase Simulators
   readOnlyHint: false

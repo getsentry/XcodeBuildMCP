@@ -13,38 +13,75 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "type": { "type": "string" }
+        "type": {
+          "type": "string"
+        }
       },
-      "required": ["type"]
+      "required": [
+        "type"
+      ]
     },
     "artifacts": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "rawResponseJsonPath": { "type": "string" }
+        "rawResponseJsonPath": {
+          "type": "string"
+        }
       },
-      "required": ["rawResponseJsonPath"]
+      "required": [
+        "rawResponseJsonPath"
+      ]
     }
   },
   "properties": {
-    "schema": { "const": "xcodebuildmcp.output.xcode-bridge-call-result" },
-    "schemaVersion": { "const": "2" },
-    "didError": { "type": "boolean" },
-    "error": { "type": ["string", "null"] },
+    "schema": {
+      "const": "xcodebuildmcp.output.xcode-bridge-call-result"
+    },
+    "schemaVersion": {
+      "const": "2"
+    },
+    "didError": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "data": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "remoteTool": { "type": "string" },
-        "succeeded": { "type": "boolean" },
+        "remoteTool": {
+          "type": "string"
+        },
+        "succeeded": {
+          "type": "boolean"
+        },
         "content": {
           "type": "array",
-          "items": { "$ref": "#/$defs/relayedContentItem" }
+          "items": {
+            "$ref": "#/$defs/relayedContentItem"
+          }
         },
-        "artifacts": { "$ref": "#/$defs/artifacts" }
+        "artifacts": {
+          "$ref": "#/$defs/artifacts"
+        }
       },
-      "required": ["remoteTool", "succeeded", "content"]
+      "required": [
+        "remoteTool",
+        "succeeded",
+        "content"
+      ]
     }
   },
-  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+  "required": [
+    "schema",
+    "schemaVersion",
+    "didError",
+    "error",
+    "data"
+  ]
 }

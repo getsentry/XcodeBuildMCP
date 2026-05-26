@@ -11,7 +11,7 @@ import {
   get_coverage_reportLogic,
   createGetCoverageReportExecutor,
 } from '../get_coverage_report.ts';
-import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, runToolLogic, callHandler} from '../../../../test-utils/test-helpers.ts';
 
 
 
@@ -99,7 +99,7 @@ describe('get_coverage_report', () => {
       __setTestCommandExecutorOverride(mockExecutor);
       __setTestFileSystemExecutorOverride(missingFs);
 
-      const result = await handler({ xcresultPath: '/tmp/missing.xcresult', showFiles: false });
+      const result = await callHandler(handler, { xcresultPath: '/tmp/missing.xcresult', showFiles: false });
 
       expect(result.isError).toBe(true);
       const text = allText(result);
@@ -120,7 +120,7 @@ describe('get_coverage_report', () => {
       __setTestCommandExecutorOverride(mockExecutor);
       __setTestFileSystemExecutorOverride(existingFs);
 
-      const result = await handler({ xcresultPath: '/tmp/test.xcresult' });
+      const result = await callHandler(handler, { xcresultPath: '/tmp/test.xcresult' });
 
       expect(result.isError).toBeUndefined();
       expect(commands).toHaveLength(1);

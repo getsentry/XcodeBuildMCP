@@ -24,6 +24,9 @@ export interface RenderSession {
 
 export interface RenderHints {
   headerTitle?: string;
+  runtimeSnapshot?: {
+    suppressedTargetRefs?: readonly string[];
+  };
 }
 
 export interface StructuredToolOutput {

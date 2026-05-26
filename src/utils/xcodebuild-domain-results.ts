@@ -454,7 +454,7 @@ export function setXcodebuildStructuredOutput<K extends XcodebuildStructuredOutp
   ctx.structuredOutput = {
     result,
     schema: XCODEBUILD_STRUCTURED_OUTPUT_SCHEMAS[kind],
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

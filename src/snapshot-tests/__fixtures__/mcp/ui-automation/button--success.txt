@@ -1,4 +1,0 @@
-
-👆 Button
-
-✅ Hardware button 'home' pressed successfully.

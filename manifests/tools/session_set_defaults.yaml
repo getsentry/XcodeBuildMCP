@@ -6,7 +6,7 @@ names:
 description: Set session defaults for the active profile, or for a specified profile and make it active.
 outputSchema:
   schema: xcodebuildmcp.output.session-defaults
-  version: "1"
+  version: "2"
 annotations:
   title: Set Session Defaults
   readOnlyHint: false

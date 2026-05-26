@@ -6,7 +6,7 @@ names:
 description: Detach debugger.
 outputSchema:
   schema: xcodebuildmcp.output.debug-session-action
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

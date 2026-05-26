@@ -6,7 +6,7 @@ names:
 description: List connected devices.
 outputSchema:
   schema: xcodebuildmcp.output.device-list
-  version: "1"
+  version: "2"
 annotations:
   title: List Devices
   readOnlyHint: true

@@ -1,4 +1,4 @@
 import { registerProjectDiscoverySnapshotSuite } from '../suites/project-discovery-suite.ts';
 
-registerProjectDiscoverySnapshotSuite('cli');
-registerProjectDiscoverySnapshotSuite('mcp');
+registerProjectDiscoverySnapshotSuite('cli/text');
+registerProjectDiscoverySnapshotSuite('mcp/text');

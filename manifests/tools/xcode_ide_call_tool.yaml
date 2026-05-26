@@ -6,7 +6,7 @@ names:
 description: Call a remote Xcode IDE MCP tool.
 outputSchema:
   schema: xcodebuildmcp.output.xcode-bridge-call-result
-  version: '2'
+  version: "3"
 routing:
   stateful: true
 annotations:

@@ -24,7 +24,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ProcessListDomainR
   ctx.structuredOutput = {
     result,
     schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

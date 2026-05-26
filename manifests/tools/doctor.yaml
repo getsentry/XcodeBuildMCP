@@ -6,7 +6,7 @@ names:
 description: MCP environment info.
 outputSchema:
   schema: xcodebuildmcp.output.doctor-report
-  version: "1"
+  version: "2"
 annotations:
   title: Doctor
   readOnlyHint: true

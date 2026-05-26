@@ -3,14 +3,17 @@ title: UI Automation
 description: UI automation and accessibility testing tools for iOS simulators. Perform gestures, interactions, screenshots, and UI analysis for automated testing workflows.
 targetPlatforms: [iOS]
 tools:
+  - snapshot_ui
+  - wait_for_ui
+  - batch
   - tap
   - touch
   - long_press
   - swipe
+  - drag
   - gesture
   - button
   - key_press
   - key_sequence
   - type_text
   - screenshot
-  - snapshot_ui

@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.capture-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to capture screenshot.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Failed to capture screenshot: Invalid device: <UUID>"
+        }
+      ]
+    }
+  }
+}

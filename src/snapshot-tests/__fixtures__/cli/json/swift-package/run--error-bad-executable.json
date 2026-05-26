@@ -1,0 +1,30 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Build failed",
+  "data": {
+    "request": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "executableName": "nonexistent-executable",
+      "target": "swift-package"
+    },
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "no executable product named 'nonexistent-executable'"
+        }
+      ]
+    }
+  }
+}

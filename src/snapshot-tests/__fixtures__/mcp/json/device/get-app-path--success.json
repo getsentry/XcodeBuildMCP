@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "device"
+    },
+    "artifacts": {
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app"
+    }
+  },
+  "nextSteps": [
+    "Get bundle ID: get_app_bundle_id({ appPath: \"~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app\" })",
+    "Install app on device: install_app_device({ deviceId: \"DEVICE_UDID\", appPath: \"~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app\" })",
+    "Launch app on device: launch_app_device({ deviceId: \"DEVICE_UDID\", bundleId: \"BUNDLE_ID\" })"
+  ]
+}

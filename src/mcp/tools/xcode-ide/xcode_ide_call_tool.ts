@@ -56,7 +56,7 @@ export async function xcodeIdeCallToolLogic(params: Params): Promise<void> {
     executionContext,
     result,
     'xcodebuildmcp.output.xcode-bridge-call-result',
-    '2',
+    '3',
   );
 }
 

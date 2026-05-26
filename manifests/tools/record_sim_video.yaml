@@ -6,7 +6,7 @@ names:
 description: Record sim video.
 outputSchema:
   schema: xcodebuildmcp.output.capture-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

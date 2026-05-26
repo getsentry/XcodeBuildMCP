@@ -1,0 +1,47 @@
+{
+  "schema": "xcodebuildmcp.output.device-list",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "devices": [
+      {
+        "name": "Cameron’s iPhone 16 Pro Max",
+        "deviceId": "<UUID>",
+        "platform": "iOS",
+        "state": "connected",
+        "isAvailable": true,
+        "osVersion": "<OS_VERSION>"
+      },
+      {
+        "name": "iPhone",
+        "deviceId": "<UUID>",
+        "platform": "iOS",
+        "state": "disconnected",
+        "isAvailable": false,
+        "osVersion": "<OS_VERSION>"
+      },
+      {
+        "name": "Cameron’s Apple Watch",
+        "deviceId": "<UUID>",
+        "platform": "watchOS",
+        "state": "disconnected",
+        "isAvailable": false,
+        "osVersion": "<OS_VERSION>"
+      },
+      {
+        "name": "Cameron’s Apple Watch",
+        "deviceId": "<UUID>",
+        "platform": "watchOS",
+        "state": "connected",
+        "isAvailable": true,
+        "osVersion": "<OS_VERSION>"
+      }
+    ]
+  },
+  "nextSteps": [
+    "Build for device: build_device({ scheme: \"YOUR_SCHEME\" })",
+    "Run tests on device: test_device()",
+    "Get app path: get_device_app_path()"
+  ]
+}

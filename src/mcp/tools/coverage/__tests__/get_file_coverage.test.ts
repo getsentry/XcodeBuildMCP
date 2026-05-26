@@ -15,7 +15,7 @@ import {
   get_file_coverageLogic,
   createGetFileCoverageExecutor,
 } from '../get_file_coverage.ts';
-import { allText, runLogic, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, runToolLogic, callHandler} from '../../../../test-utils/test-helpers.ts';
 
 
 
@@ -98,7 +98,7 @@ describe('get_file_coverage', () => {
       __setTestCommandExecutorOverride(mockExecutor);
       __setTestFileSystemExecutorOverride(missingFs);
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         xcresultPath: '/tmp/missing.xcresult',
         file: 'ViewModel.swift',
         showLines: false,
@@ -123,7 +123,7 @@ describe('get_file_coverage', () => {
       __setTestCommandExecutorOverride(mockExecutor);
       __setTestFileSystemExecutorOverride(existingFs);
 
-      const result = await handler({ xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift' });
+      const result = await callHandler(handler, { xcresultPath: '/tmp/test.xcresult', file: 'ViewModel.swift' });
 
       expect(result.isError).toBeUndefined();
       expect(commands).toHaveLength(1);

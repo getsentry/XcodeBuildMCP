@@ -6,7 +6,7 @@ names:
 description: Set sim status bar network.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
-  version: "1"
+  version: "2"
 annotations:
   title: Simulator Statusbar
   readOnlyHint: true

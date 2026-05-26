@@ -1,0 +1,58 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Tests failed",
+  "data": {
+    "request": {
+      "scheme": "spm",
+      "configuration": "debug",
+      "platform": "Swift Package",
+      "target": "swift-package"
+    },
+    "summary": {
+      "status": "FAILED",
+      "durationMs": 1234,
+      "counts": {
+        "passed": 5,
+        "failed": 2,
+        "skipped": 0
+      },
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/swift_package_test_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [],
+      "testFailures": [
+        {
+          "suite": "CalculatorAppTests",
+          "test": "testCalculatorServiceFailure",
+          "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
+          "location": "<ROOT>/example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49"
+        },
+        {
+          "suite": "(Unknown Suite)",
+          "test": "test",
+          "message": "Expectation failed: Bool(false)\nTest failed",
+          "location": "SimpleTests.swift:57"
+        }
+      ]
+    },
+    "testCases": [
+      {
+        "test": "test",
+        "status": "failed",
+        "durationMs": 0
+      },
+      {
+        "suite": "CalculatorAppTests",
+        "test": "testCalculatorServiceFailure",
+        "status": "failed",
+        "durationMs": 0
+      }
+    ]
+  }
+}

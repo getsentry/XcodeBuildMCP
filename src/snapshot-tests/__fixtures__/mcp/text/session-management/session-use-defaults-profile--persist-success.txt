@@ -1,0 +1,7 @@
+
+⚙️ Use Defaults Profile
+
+Notices
+  Persisted active profile selection.
+
+✅ Activated profile (MyCustomProfile profile)

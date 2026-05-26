@@ -1,0 +1,17 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "open"
+    }
+  },
+  "nextSteps": [
+    "Boot a simulator for manual workflows: boot_sim({ simulatorId: \"UUID_FROM_LIST_SIMS\" })"
+  ]
+}

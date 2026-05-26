@@ -3,7 +3,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
-import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import type {
+  SnapshotInvokeOptions,
+  SnapshotResult,
+  WorkflowSnapshotHarness,
+} from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
@@ -86,6 +90,21 @@ function createSnapshotHarnessEnv(overrides: Record<string, string>): Record<str
   return { ...env, ...overrides };
 }
 
+export function resolveMcpSnapshotErrorState(
+  transportDidError: boolean | undefined,
+  envelopeDidError: boolean | undefined,
+  label: string,
+): boolean {
+  const didTransportError = transportDidError ?? false;
+  if (envelopeDidError !== undefined && didTransportError !== envelopeDidError) {
+    throw new Error(
+      `MCP result.isError (${String(transportDidError)}) disagrees with structuredContent.didError (${envelopeDidError}) for ${label}.`,
+    );
+  }
+
+  return didTransportError;
+}
+
 export async function createMcpSnapshotHarness(
   opts: CreateMcpSnapshotHarnessOptions = {},
 ): Promise<McpSnapshotHarness> {
@@ -112,8 +131,11 @@ export async function createMcpSnapshotHarness(
     const rawText = extractSnapshotTextContent(result);
     const text = normalizeSnapshotOutput(rawText);
     const structuredEnvelope = extractStructuredEnvelope(result);
-    const isError =
-      structuredEnvelope?.didError ?? (result as { isError?: boolean }).isError ?? false;
+    const isError = resolveMcpSnapshotErrorState(
+      (result as { isError?: boolean }).isError,
+      structuredEnvelope?.didError,
+      name,
+    );
 
     return { text, rawText, isError, structuredEnvelope };
   }
@@ -122,6 +144,7 @@ export async function createMcpSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    _options: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
     const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
     if (!resolved) {

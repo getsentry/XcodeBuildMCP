@@ -556,6 +556,14 @@
         "xcodePid",
         "xcodeSessionId"
       ]
+    },
+    "nextSteps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
     }
   }
 }

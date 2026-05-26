@@ -1,0 +1,21 @@
+{
+  "schema": "xcodebuildmcp.output.scheme-list",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace"
+    },
+    "schemes": [
+      "CalculatorApp",
+      "CalculatorAppFeature"
+    ]
+  },
+  "nextSteps": [
+    "Build for macOS: build_macos({ workspacePath: \"example_projects/iOS_Calculator/CalculatorApp.xcworkspace\", scheme: \"CalculatorApp\" })",
+    "Build and run on iOS Simulator (default for run intent): build_run_sim({ workspacePath: \"example_projects/iOS_Calculator/CalculatorApp.xcworkspace\", scheme: \"CalculatorApp\", simulatorName: \"iPhone 17\" })",
+    "Build for iOS Simulator (compile-only): build_sim({ workspacePath: \"example_projects/iOS_Calculator/CalculatorApp.xcworkspace\", scheme: \"CalculatorApp\", simulatorName: \"iPhone 17\" })",
+    "Show build settings: show_build_settings({ workspacePath: \"example_projects/iOS_Calculator/CalculatorApp.xcworkspace\", scheme: \"CalculatorApp\" })"
+  ]
+}

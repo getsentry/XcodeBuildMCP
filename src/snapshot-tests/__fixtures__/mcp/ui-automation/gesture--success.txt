@@ -1,4 +1,0 @@
-
-👆 Gesture
-
-✅ Gesture 'scroll-down' executed successfully.

@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import {
-  createMockCommandResponse,
-  createMockExecutor,
-  createNoopExecutor,
-  mockProcess,
-} from '../../../../test-utils/mock-executors.ts';
+import { createMockExecutor, createNoopExecutor } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler, key_pressLogic } from '../key_press.ts';
+import { schema, handler, key_pressLogic, createKeyPressExecutor } from '../key_press.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import {
+  createMockAxeHelpers,
+  createTrackingExecutor,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
 function createDefaultMockAxeHelpers() {
   return {
@@ -18,9 +19,20 @@ function createDefaultMockAxeHelpers() {
   };
 }
 
+function createImmediatePostActionTiming() {
+  let nowMs = 0;
+  return {
+    now: () => nowMs,
+    sleep: async (durationMs: number) => {
+      nowMs += durationMs;
+    },
+  };
+}
+
 describe('Key Press Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Schema Validation', () => {
@@ -36,6 +48,9 @@ describe('Key Press Tool', () => {
       expect(schemaObj.safeParse({ keyCode: 'invalid' }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCode: -1 }).success).toBe(false);
       expect(schemaObj.safeParse({ keyCode: 256 }).success).toBe(false);
+      expect(schemaObj.safeParse({ keyCode: 40, duration: 0 }).success).toBe(true);
+      expect(schemaObj.safeParse({ keyCode: 40, duration: 10 }).success).toBe(true);
+      expect(schemaObj.safeParse({ keyCode: 40, duration: 10.1 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',
@@ -50,7 +65,7 @@ describe('Key Press Tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({ keyCode: 40 });
+      const result = await callHandler(handler, { keyCode: 40 });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -62,7 +77,7 @@ describe('Key Press Tool', () => {
     it('should surface validation errors once simulator default exists', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -73,17 +88,7 @@ describe('Key Press Tool', () => {
 
   describe('Command Generation', () => {
     it('should generate correct axe command for basic key press', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -92,12 +97,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 40,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '40',
@@ -107,17 +112,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command for key press with duration', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -127,12 +122,12 @@ describe('Key Press Tool', () => {
             keyCode: 42,
             duration: 1.5,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '42',
@@ -144,17 +139,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command for different key codes', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = createDefaultMockAxeHelpers();
 
       await runLogic(() =>
@@ -163,12 +148,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 255,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/usr/local/bin/axe',
         'key',
         '255',
@@ -178,17 +163,7 @@ describe('Key Press Tool', () => {
     });
 
     it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return createMockCommandResponse({
-          success: true,
-          output: 'key press completed',
-          error: undefined,
-          process: mockProcess,
-        });
-      };
-
+      const { calls, executor } = createTrackingExecutor();
       const mockAxeHelpers = {
         getAxePath: () => '/path/to/bundled/axe',
         getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
@@ -200,12 +175,12 @@ describe('Key Press Tool', () => {
             simulatorId: '12345678-1234-4234-8234-123456789012',
             keyCode: 44,
           },
-          trackingExecutor,
+          executor,
           mockAxeHelpers,
         ),
       );
 
-      expect(capturedCommand).toEqual([
+      expect(calls.find((call) => call.command[1] !== 'describe-ui')?.command).toEqual([
         '/path/to/bundled/axe',
         'key',
         '44',
@@ -218,6 +193,22 @@ describe('Key Press Tool', () => {
   describe('Handler Behavior (Complete Literal Returns)', () => {
     // Note: Parameter validation is now handled by Zod schema validation in createTypedTool wrapper.
     // The key_pressLogic function expects valid parameters and focuses on business logic testing.
+
+    it('captures a fresh runtime snapshot after a successful key press', async () => {
+      const { calls, executor } = createTrackingExecutor();
+      const executeKeyPress = createKeyPressExecutor(
+        executor,
+        createMockAxeHelpers(),
+        undefined,
+        createImmediatePostActionTiming(),
+      );
+
+      const result = await executeKeyPress({ simulatorId, keyCode: 40 });
+
+      expect(result.didError).toBe(false);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.map((call) => call.command[1])).toEqual(['key', 'describe-ui', 'describe-ui']);
+    });
 
     it('should return success for valid key press execution', async () => {
       const mockExecutor = createMockExecutor({

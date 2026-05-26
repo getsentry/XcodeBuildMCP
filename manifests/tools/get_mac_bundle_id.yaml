@@ -6,7 +6,7 @@ names:
 description: Extract bundle id from macOS .app.
 outputSchema:
   schema: xcodebuildmcp.output.bundle-id
-  version: "1"
+  version: "2"
 annotations:
   title: Get Mac Bundle ID
   readOnlyHint: true

@@ -51,7 +51,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
     })
     .option('style', {
       type: 'string',
-      describe: 'Output verbosity (minimal hides next steps)',
+      describe: 'Output style (normal is detailed; minimal is compact MCP-like output)',
       choices: ['normal', 'minimal'] as const,
       default: 'normal',
     })

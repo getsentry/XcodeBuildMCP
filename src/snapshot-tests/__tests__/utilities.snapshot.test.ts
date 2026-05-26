@@ -1,4 +1,4 @@
 import { registerUtilitiesSnapshotSuite } from '../suites/utilities-suite.ts';
 
-registerUtilitiesSnapshotSuite('cli');
-registerUtilitiesSnapshotSuite('mcp');
+registerUtilitiesSnapshotSuite('cli/text');
+registerUtilitiesSnapshotSuite('mcp/text');

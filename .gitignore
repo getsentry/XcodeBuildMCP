@@ -116,3 +116,6 @@ DerivedData
 .derivedData
 /.pr-learning
 /repros
+/.xcodebuildmcp
+/out.nosync
+/benchmarks/claude-ui/local/

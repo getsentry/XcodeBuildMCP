@@ -6,7 +6,7 @@ import { sessionStore } from '../../../../utils/session-store.ts';
 import { createMockFileSystemExecutor } from '../../../../test-utils/mock-executors.ts';
 import { schema, handler, sessionSetDefaultsLogic } from '../session_set_defaults.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('session-set-defaults tool', () => {
   beforeEach(() => {
@@ -80,7 +80,7 @@ describe('session-set-defaults tool', () => {
     });
 
     it('should validate parameter types via Zod', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         useLatestOS: 'yes' as unknown as boolean,
       });
 
@@ -89,7 +89,7 @@ describe('session-set-defaults tool', () => {
     });
 
     it('should reject env values that are not strings', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         env: {
           STAGING_ENABLED: 1 as unknown as string,
         },
@@ -100,7 +100,7 @@ describe('session-set-defaults tool', () => {
     });
 
     it('should reject empty string defaults for required string fields', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: '',
       });
 

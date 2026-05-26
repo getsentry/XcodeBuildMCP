@@ -6,7 +6,7 @@ names:
 description: Test macOS target.
 outputSchema:
   schema: xcodebuildmcp.output.test-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

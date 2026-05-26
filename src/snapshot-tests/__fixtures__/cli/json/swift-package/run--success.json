@@ -1,0 +1,48 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "request": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "executableName": "spm",
+      "target": "swift-package"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "swift-package"
+    },
+    "artifacts": {
+      "packagePath": "<ROOT>/example_projects/spm",
+      "executablePath": "<ROOT>/example_projects/spm/.build/arm64-apple-macosx/debug/spm",
+      "processId": 99999,
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
+    },
+    "output": {
+      "stdout": [
+        "Hello, world!"
+      ],
+      "stderr": [
+        "Building for debugging...",
+        "[<STEP>] Applying spm",
+        "[<STEP>] Compiling spm main.swift",
+        "[<STEP>] Emitting module spm",
+        "[<STEP>] Linking spm",
+        "[<STEP>] Write Objects.LinkFileList",
+        "[<STEP>] Write sources",
+        "[<STEP>] Write spm-entitlement.plist",
+        "[<STEP>] Write swift-version--6988338F2F200930.txt",
+        "Build of product 'spm' complete! (<DURATION>)"
+      ]
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Stop Swift package run: xcodebuildmcp swift-package stop"
+  ]
+}

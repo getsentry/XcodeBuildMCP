@@ -1,0 +1,26 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "bundleId": "io.sentry.calculatorapp",
+      "processId": 99999,
+      "runtimeLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_<TIMESTAMP>_pid<PID>.log",
+      "osLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Open Simulator app to see it: open_sim()",
+    "Stop app in simulator: stop_app_sim({ simulatorId: \"<UUID>\", bundleId: \"io.sentry.calculatorapp\" })"
+  ]
+}

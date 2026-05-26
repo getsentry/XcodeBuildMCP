@@ -13,33 +13,67 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "type": { "type": "string" }
+        "type": {
+          "type": "string"
+        }
       },
-      "required": ["type"]
+      "required": [
+        "type"
+      ]
     }
   },
   "properties": {
-    "schema": { "const": "xcodebuildmcp.output.xcode-bridge-call-result" },
-    "schemaVersion": { "const": "1" },
-    "didError": { "type": "boolean" },
-    "error": { "type": ["string", "null"] },
+    "schema": {
+      "const": "xcodebuildmcp.output.xcode-bridge-call-result"
+    },
+    "schemaVersion": {
+      "const": "1"
+    },
+    "didError": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "data": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "remoteTool": { "type": "string" },
-        "succeeded": { "type": "boolean" },
+        "remoteTool": {
+          "type": "string"
+        },
+        "succeeded": {
+          "type": "boolean"
+        },
         "content": {
           "type": "array",
-          "items": { "$ref": "#/$defs/relayedContentItem" }
+          "items": {
+            "$ref": "#/$defs/relayedContentItem"
+          }
         },
         "structuredContent": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": true
         }
       },
-      "required": ["remoteTool", "succeeded", "content"]
+      "required": [
+        "remoteTool",
+        "succeeded",
+        "content"
+      ]
     }
   },
-  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+  "required": [
+    "schema",
+    "schemaVersion",
+    "didError",
+    "error",
+    "data"
+  ]
 }

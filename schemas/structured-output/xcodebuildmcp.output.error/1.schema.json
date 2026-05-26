@@ -27,15 +27,28 @@
       "additionalProperties": false,
       "properties": {
         "category": {
-          "enum": ["runtime", "validation", "schema"]
+          "enum": [
+            "runtime",
+            "validation",
+            "schema"
+          ]
         },
         "code": {
           "type": "string",
           "minLength": 1
         }
       },
-      "required": ["category", "code"]
+      "required": [
+        "category",
+        "code"
+      ]
     }
   },
-  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+  "required": [
+    "schema",
+    "schemaVersion",
+    "didError",
+    "error",
+    "data"
+  ]
 }

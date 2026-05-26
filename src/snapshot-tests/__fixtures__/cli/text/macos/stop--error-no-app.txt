@@ -1,0 +1,10 @@
+
+🛑 Stop macOS App
+
+   App: PID <PID>
+
+Errors (1):
+
+  ✗ kill: <PID>: No such process
+
+❌ Failed to stop macOS app.

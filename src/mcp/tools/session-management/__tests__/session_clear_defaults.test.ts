@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, sessionClearDefaultsLogic } from '../session_clear_defaults.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('session-clear-defaults tool', () => {
   beforeEach(() => {
@@ -122,7 +122,7 @@ describe('session-clear-defaults tool', () => {
     });
 
     it('should validate keys enum', async () => {
-      const result = (await handler({ keys: ['invalid' as any] })) as any;
+      const result = (await callHandler(handler, { keys: ['invalid' as any] })) as any;
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('keys');
     });

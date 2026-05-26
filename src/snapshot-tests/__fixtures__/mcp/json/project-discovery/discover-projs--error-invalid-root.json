@@ -1,0 +1,26 @@
+{
+  "schema": "xcodebuildmcp.output.project-list",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to discover projects.",
+  "data": {
+    "summary": {
+      "status": "FAILED",
+      "maxDepth": 3
+    },
+    "artifacts": {
+      "workspaceRoot": "/nonexistent/path/Fake.app",
+      "scanPath": "/nonexistent/path"
+    },
+    "projects": [],
+    "workspaces": [],
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Failed to access scan path: /nonexistent/path. Error: ENOENT: no such file or directory, stat '/nonexistent/path'"
+        }
+      ]
+    }
+  }
+}

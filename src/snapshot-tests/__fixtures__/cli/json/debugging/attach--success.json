@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "attach",
+    "session": {
+      "debugSessionId": "<UUID>",
+      "connectionState": "attached",
+      "executionState": "paused"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "processId": 99999
+    }
+  },
+  "nextSteps": [
+    "Add a breakpoint: xcodebuildmcp debugging add-breakpoint --debug-session-id <UUID> --file ... --line 123",
+    "Continue execution: xcodebuildmcp debugging continue --debug-session-id <UUID>",
+    "Show call stack: xcodebuildmcp debugging stack --debug-session-id <UUID>"
+  ]
+}

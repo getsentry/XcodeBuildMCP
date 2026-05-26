@@ -56,7 +56,7 @@ function bridgeResultToDaemonResult(
   return {
     structuredOutput: {
       schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
-      schemaVersion: '2',
+      schemaVersion: '3',
       result,
     },
     isError: result.didError,

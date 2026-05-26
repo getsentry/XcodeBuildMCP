@@ -6,7 +6,7 @@ names:
 description: Capture screenshot.
 outputSchema:
   schema: xcodebuildmcp.output.capture-result
-  version: "1"
+  version: "2"
 annotations:
   title: Screenshot
   readOnlyHint: true

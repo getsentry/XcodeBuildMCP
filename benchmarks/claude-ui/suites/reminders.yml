@@ -1,0 +1,47 @@
+name: reminders
+prompt: ../prompts/reminders.md
+workingDirectory: .
+sessionDefaults:
+  bundleId: com.apple.reminders
+  simulatorName: iPhone 17 Pro Max
+firstRunPromptDismissals:
+  labels:
+    - Continue
+    - Not Now
+  timeoutSeconds: 30
+baseline:
+  totalToolCalls: 17
+  trackedToolCalls: 16
+  mcpToolCalls: 16
+  uiAutomationCalls: 14
+  wallClockSeconds: 92.79
+  tools:
+    session_show_defaults: 1
+    launch_app_sim: 1
+    snapshot_ui: 1
+    tap: 5
+    wait_for_ui: 1
+    type_text: 4
+    key_press: 2
+    batch: 1
+baselineToolSequence:
+  - session_show_defaults
+  - launch_app_sim
+  - snapshot_ui
+  - tap
+  - wait_for_ui
+  - tap
+  - type_text
+  - tap
+  - tap
+  - type_text
+  - key_press
+  - type_text
+  - key_press
+  - type_text
+  - tap
+  - batch
+failurePatterns:
+  - STALE_ELEMENT_REF
+  - SNAPSHOT_MISSING
+  - WAIT_TIMEOUT

@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.install-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Open the Simulator app: open_sim()",
+    "Launch the app: launch_app_sim({ simulatorId: \"<UUID>\", bundleId: \"io.sentry.calculatorapp\" })"
+  ]
+}

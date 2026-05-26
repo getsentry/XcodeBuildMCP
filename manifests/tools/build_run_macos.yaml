@@ -6,7 +6,7 @@ names:
 description: Build and run macOS app.
 outputSchema:
   schema: xcodebuildmcp.output.build-run-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

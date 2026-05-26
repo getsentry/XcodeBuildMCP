@@ -1,4 +1,4 @@
 import { registerSwiftPackageSnapshotSuite } from '../suites/swift-package-suite.ts';
 
-registerSwiftPackageSnapshotSuite('cli');
-registerSwiftPackageSnapshotSuite('mcp');
+registerSwiftPackageSnapshotSuite('cli/text');
+registerSwiftPackageSnapshotSuite('mcp/text');

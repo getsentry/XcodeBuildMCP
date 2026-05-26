@@ -1,0 +1,26 @@
+
+🚀 Build & Run
+
+   Scheme: CalculatorApp
+   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+   Configuration: Debug
+   Platform: iOS
+   Device: <DEVICE> (<UUID>)
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+
+ℹ️ Resolving app path
+✅ Resolving app path
+ℹ️ Installing app
+✅ Installing app
+ℹ️ Launching app
+
+✅ Build succeeded. (⏱️ <DURATION>)
+✅ Build & Run complete
+  ├ Bundle ID: io.sentry.calculatorapp
+  ├ Process ID: <PID>
+  └ Files:
+     ├ App Path: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app
+     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_device_<TIMESTAMP>_pid<PID>.log
+
+Next steps:
+1. Stop app on device: xcodebuildmcp device stop --device-id <UUID> --process-id <PID>

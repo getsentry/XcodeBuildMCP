@@ -28,6 +28,7 @@ export type RuntimeConfigOverrides = Partial<{
   dapLogEvents: boolean;
   launchJsonWaitMs: number;
   axePath: string;
+  axeSourcePath: string;
   iosTemplatePath: string;
   iosTemplateVersion: string;
   macosTemplatePath: string;
@@ -54,6 +55,7 @@ export type ResolvedRuntimeConfig = {
   dapLogEvents: boolean;
   launchJsonWaitMs: number;
   axePath?: string;
+  axeSourcePath?: string;
   iosTemplatePath?: string;
   iosTemplateVersion?: string;
   macosTemplatePath?: string;
@@ -226,6 +228,9 @@ function readEnvConfig(env: NodeJS.ProcessEnv): RuntimeConfigOverrides {
 
   const axePath = env.XCODEBUILDMCP_AXE_PATH ?? env.AXE_PATH;
   if (axePath) config.axePath = axePath;
+
+  const axeSourcePath = env.XCODEBUILDMCP_AXE_SOURCE_PATH ?? env.AXE_SOURCE_PATH;
+  if (axeSourcePath) config.axeSourcePath = axeSourcePath;
 
   const iosTemplatePath = env.XCODEBUILDMCP_IOS_TEMPLATE_PATH;
   if (iosTemplatePath) config.iosTemplatePath = iosTemplatePath;
@@ -553,6 +558,12 @@ function resolveConfig(opts: {
     }),
     axePath: resolveFromLayers<string>({
       key: 'axePath',
+      overrides: opts.overrides,
+      fileConfig: opts.fileConfig,
+      envConfig,
+    }),
+    axeSourcePath: resolveFromLayers<string>({
+      key: 'axeSourcePath',
       overrides: opts.overrides,
       fileConfig: opts.fileConfig,
       envConfig,

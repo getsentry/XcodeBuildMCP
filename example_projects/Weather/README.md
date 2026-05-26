@@ -2,20 +2,12 @@
 
 Atmos Weather is a native SwiftUI weather app prototype for iOS.
 
-## Launch with mock weather data
+## Launch
 
-Build and run the app with XcodeBuildMCP first:
+Build and run the app with XcodeBuildMCP:
 
 ```bash
 ../../build/cli.js simulator build-and-run
-```
-
-Then relaunch the installed app with the mock API argument:
-
-```bash
-../../build/cli.js simulator launch-app \
-  --bundle-id com.sentry.weather.Weather \
-  --args=--mock-weather-api
 ```
 
 ## JSON fixtures
@@ -98,4 +90,4 @@ Run the app test suite through XcodeBuildMCP:
 ../../build/cli.js simulator test
 ```
 
-UI tests inject `--mock-weather-api` themselves so they do not depend on the production API endpoint.
+The app uses bundled deterministic weather data so UI tests do not depend on the production API endpoint.

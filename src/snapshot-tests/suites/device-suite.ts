@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { isDeviceAvailable } from '../device-availability.ts';
 import {
-  extractAppPathFromSnapshotOutput,
-  extractProcessIdFromSnapshotOutput,
+  extractAppPathFromSnapshotResult,
+  extractProcessIdFromSnapshotResult,
 } from '../output-parsers.ts';
 import {
   compilerErrorExtraArgs,
@@ -174,7 +174,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(appPathResult.isError).toBe(false);
 
-        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
+        const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
         const { text, isError } = await harness.invoke('device', 'install', {
           deviceId: DEVICE_ID,
@@ -204,7 +204,7 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(launchResult.isError).toBe(false);
 
-        const pid = extractProcessIdFromSnapshotOutput(launchResult.rawText);
+        const pid = extractProcessIdFromSnapshotResult(launchResult);
         expect(pid).toBeGreaterThan(0);
 
         await new Promise((resolve) => setTimeout(resolve, 2000));

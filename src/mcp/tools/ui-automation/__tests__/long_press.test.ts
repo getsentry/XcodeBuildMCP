@@ -1,457 +1,222 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { createMockExecutor, mockProcess } from '../../../../test-utils/mock-executors.ts';
+import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
 import { schema, handler, long_pressLogic } from '../long_press.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  createFailingExecutor,
+  createMockAxeHelpers,
+  createNode,
+  createTrackingExecutor,
+  recordSnapshot,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
+
+async function runLongPress(
+  params: Parameters<typeof long_pressLogic>[0],
+  executor = createTrackingExecutor().executor,
+): Promise<UiActionResultDomainResult> {
+  const { ctx, run } = createMockToolHandlerContext();
+  await run(() => long_pressLogic(params, executor, createMockAxeHelpers()));
+  expect(ctx.structuredOutput?.schemaVersion).toBe('2');
+  return ctx.structuredOutput?.result as UiActionResultDomainResult;
+}
 
 describe('Long Press Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
-  describe('Export Field Validation (Literal)', () => {
-    it('should have handler function', () => {
+  describe('Schema Validation', () => {
+    it('exposes elementRef and duration without coordinate fields', () => {
       expect(typeof handler).toBe('function');
-    });
+      expect(schema).toHaveProperty('elementRef');
+      expect(schema).toHaveProperty('duration');
+      expect(schema).not.toHaveProperty('x');
+      expect(schema).not.toHaveProperty('y');
 
-    it('should validate schema fields with safeParse', () => {
       const schemaObject = z.object(schema);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          duration: 1500,
-        }).success,
-      ).toBe(true);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100.5,
-          y: 200,
-          duration: 1500,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200.5,
-          duration: 1500,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          duration: 0,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          duration: -100,
-        }).success,
-      ).toBe(false);
-
-      const withSimId = schemaObject.safeParse({
-        simulatorId: '12345678-1234-4234-8234-123456789012',
-        x: 100,
-        y: 200,
-        duration: 1500,
-      });
-      expect(withSimId.success).toBe(true);
-      expect('simulatorId' in (withSimId.data as Record<string, unknown>)).toBe(false);
-    });
-  });
-
-  describe('Handler Requirements', () => {
-    it('should require simulatorId session default', async () => {
-      const result = await handler({ x: 100, y: 200, duration: 1500 });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Missing required session defaults');
-      expect(message).toContain('simulatorId is required');
-      expect(message).toContain('session-set-defaults');
-    });
-
-    it('should surface validation errors once simulator default exists', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({ x: 100, y: 200, duration: 0 });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('duration: Duration of the long press in milliseconds');
+      expect(schemaObject.safeParse({ elementRef: 'e1', duration: 1500 }).success).toBe(true);
+      expect(schemaObject.safeParse({ elementRef: 'e1', duration: 1500.5 }).success).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: 'e1', duration: 0 }).success).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: 'e1', duration: 10_001 }).success).toBe(false);
+      expect(schemaObject.safeParse({ duration: 1500 }).success).toBe(false);
     });
   });
 
   describe('Command Generation', () => {
-    it('should generate correct axe command for basic long press', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'long press completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('long presses the referenced element center and converts milliseconds to AXe seconds', async () => {
+      recordSnapshot([createNode({ frame: { x: 10, y: 20, width: 100, height: 40 } })]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1500 },
+        executor,
       );
 
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'long-press', elementRef: 'e1', durationMs: 1500, x: 60, y: 40 },
+        capture: { type: 'runtime-snapshot', simulatorId },
+      });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '100',
+        '60',
         '-y',
-        '200',
+        '40',
         '--down',
         '--up',
         '--delay',
         '1.5',
         '--udid',
-        '12345678-1234-4234-8234-123456789012',
+        simulatorId,
       ]);
     });
 
-    it('should generate correct axe command for long press with different coordinates', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'long press completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('does not suggest tapping the same element after a successful long press on an unchanged screen', async () => {
+      recordSnapshot([createNode()]);
+      const { ctx, run } = createMockToolHandlerContext();
+      const { executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      await runLogic(() =>
+      await run(() =>
         long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 50,
-            y: 75,
-            duration: 2000,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
+          { simulatorId, elementRef: 'e1', duration: 1500 },
+          executor,
+          createMockAxeHelpers(),
         ),
       );
 
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'touch',
-        '-x',
-        '50',
-        '-y',
-        '75',
-        '--down',
-        '--up',
-        '--delay',
-        '2',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
-      ]);
+      expect(ctx.nextSteps).not.toContainEqual({
+        label: 'Tap an elementRef',
+        tool: 'tap',
+        params: { simulatorId, elementRef: 'e1' },
+      });
     });
 
-    it('should generate correct axe command for short duration long press', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'long press completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 300,
-            y: 400,
-            duration: 500,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'touch',
-        '-x',
-        '300',
-        '-y',
-        '400',
-        '--down',
-        '--up',
-        '--delay',
-        '0.5',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
+    it('uses the switch activation point for wide switch rows', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Switch',
+          role: 'AXSwitch',
+          frame: { x: 42.57, y: 889.68, width: 316.87, height: 26.89 },
+        }),
       ]);
-    });
+      const { calls, executor } = createTrackingExecutor();
 
-    it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'long press completed',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/path/to/bundled/axe',
-        getBundledAxeEnvironment: () => ({ AXE_PATH: '/some/path' }),
-      };
-
-      await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 150,
-            y: 250,
-            duration: 3000,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1000 },
+        executor,
       );
 
-      expect(capturedCommand).toEqual([
-        '/path/to/bundled/axe',
+      expect(result.action).toMatchObject({
+        type: 'long-press',
+        elementRef: 'e1',
+        durationMs: 1000,
+        x: 307,
+        y: 903,
+      });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
         'touch',
         '-x',
-        '150',
+        '307',
         '-y',
-        '250',
+        '903',
         '--down',
         '--up',
         '--delay',
-        '3',
+        '1',
         '--udid',
-        '12345678-1234-4234-8234-123456789012',
+        simulatorId,
       ]);
     });
   });
 
-  describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should return success for valid long press execution', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'long press completed',
-        error: '',
+  describe('Resolution failures', () => {
+    it('returns SNAPSHOT_MISSING without calling AXe', async () => {
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1000 },
+        executor,
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_MISSING');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns SNAPSHOT_EXPIRED without calling AXe', async () => {
+      recordSnapshot([createNode()], Date.now() - 61_000);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1000 },
+        executor,
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_EXPIRED');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns ELEMENT_REF_NOT_FOUND without calling AXe', async () => {
+      recordSnapshot([createNode()]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e404', duration: 1000 },
+        executor,
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'ELEMENT_REF_NOT_FOUND', elementRef: 'e404' });
+      expect(calls).toEqual([]);
+    });
+
+    it('returns TARGET_NOT_ACTIONABLE without calling AXe', async () => {
+      recordSnapshot([createNode({ role: 'AXApplication', type: 'Application' })]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1000 },
+        executor,
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'TARGET_NOT_ACTIONABLE', elementRef: 'e1' });
+      expect(calls).toEqual([]);
+    });
+  });
+
+  describe('Handler Behavior', () => {
+    it('requires simulatorId session default', async () => {
+      const result = await callHandler(handler, { elementRef: 'e1', duration: 1500 });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Missing required session defaults');
+      expect(result.content[0].text).toContain('simulatorId is required');
+    });
+
+    it('returns ACTION_FAILED when AXe fails after ref resolution', async () => {
+      recordSnapshot([createNode()]);
+
+      const result = await runLongPress(
+        { simulatorId, elementRef: 'e1', duration: 1500 },
+        createFailingExecutor('long press failed'),
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain(
-        'Long press at (100, 200) for 1500ms simulated successfully.',
-      );
-    });
-
-    it('should handle DependencyError when axe is not available', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: '',
-        error: undefined,
-        process: mockProcess,
-      });
-
-      const mockAxeHelpers = {
-        getAxePath: () => null, // Mock axe not found
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle AxeError from failed command execution', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'axe command failed',
-        process: mockProcess,
-      });
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('Failed to simulate long press at (100, 200).');
-      expect(text).toContain('axe command failed');
-    });
-
-    it('should handle SystemError from command execution', async () => {
-      const mockExecutor = () => {
-        throw new Error('ENOENT: no such file or directory');
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected Error objects', async () => {
-      const mockExecutor = () => {
-        throw new Error('Unexpected error');
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected string errors', async () => {
-      const mockExecutor = () => {
-        throw 'String error';
-      };
-
-      const mockAxeHelpers = {
-        getAxePath: () => '/usr/local/bin/axe',
-        getBundledAxeEnvironment: () => ({}),
-      };
-
-      const result = await runLogic(() =>
-        long_pressLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            duration: 1500,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('System error executing axe command.');
-      expect(text).toContain('Failed to execute axe command: String error');
     });
   });
 });

@@ -247,7 +247,7 @@ export async function cleanLogic(params: CleanParams, executor: CommandExecutor)
   const executeClean = createCleanExecutor(executor);
   const result = await executeClean(params);
 
-  ctx.structuredOutput = { result, schema: STRUCTURED_OUTPUT_SCHEMA, schemaVersion: '1' };
+  ctx.structuredOutput = { result, schema: STRUCTURED_OUTPUT_SCHEMA, schemaVersion: '2' };
 }
 
 const publicSchemaObject = baseSchemaObject.omit({

@@ -6,7 +6,7 @@ names:
 description: Stop SwiftPM run.
 outputSchema:
   schema: xcodebuildmcp.output.stop-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

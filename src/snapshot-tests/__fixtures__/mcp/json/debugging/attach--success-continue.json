@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "attach",
+    "session": {
+      "debugSessionId": "<UUID>",
+      "connectionState": "attached",
+      "executionState": "running"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "processId": 99999
+    }
+  },
+  "nextSteps": [
+    "Add a breakpoint: debug_breakpoint_add({ debugSessionId: \"<UUID>\", file: \"...\", line: 123 })",
+    "Continue execution: debug_continue({ debugSessionId: \"<UUID>\" })",
+    "Show call stack: debug_stack({ debugSessionId: \"<UUID>\" })"
+  ]
+}

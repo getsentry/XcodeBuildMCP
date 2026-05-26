@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.scaffold-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "platform": "iOS"
+    },
+    "artifacts": {
+      "projectName": "SnapshotTestApp",
+      "outputPath": "<TMPDIR>/ios",
+      "workspacePath": "<TMPDIR>/ios/SnapshotTestApp.xcworkspace"
+    }
+  },
+  "nextSteps": [
+    "Important: Before working on the project make sure to read the README.md file in the workspace root directory.",
+    "Build for simulator: build_sim({ workspacePath: \"<TMPDIR>/ios/SnapshotTestApp.xcworkspace\", scheme: \"SnapshotTestApp\", simulatorName: \"iPhone 17\" })",
+    "Build and run on simulator: build_run_sim({ workspacePath: \"<TMPDIR>/ios/SnapshotTestApp.xcworkspace\", scheme: \"SnapshotTestApp\", simulatorName: \"iPhone 17\" })"
+  ]
+}

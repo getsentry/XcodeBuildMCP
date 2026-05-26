@@ -1,0 +1,27 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Element ref 'e3' does not support 'swipeWithin'.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "swipe",
+      "withinElementRef": "e3",
+      "direction": "up"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "uiError": {
+      "code": "TARGET_NOT_ACTIONABLE",
+      "message": "Element ref 'e3' does not support 'swipeWithin'.",
+      "recoveryHint": "Choose an elementRef that lists the required action, or refresh with snapshot_ui.",
+      "elementRef": "e3",
+      "candidates": [],
+      "snapshotAgeMs": 1234
+    }
+  }
+}

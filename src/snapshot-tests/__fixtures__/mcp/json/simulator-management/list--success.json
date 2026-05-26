@@ -1,0 +1,93 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-list",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "simulators": [
+      {
+        "name": "iPhone 17 Pro",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17e",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone Air",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPhone 17",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Pro 13-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Pro 11-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad mini (A17 Pro)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Air 13-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad Air 11-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      },
+      {
+        "name": "iPad (A16)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS 26.4"
+      }
+    ]
+  },
+  "nextSteps": [
+    "Boot a simulator: boot_sim({ simulatorId: \"UUID_FROM_ABOVE\" })",
+    "Open the simulator UI: open_sim()",
+    "Build for simulator: build_sim({ scheme: \"YOUR_SCHEME\", simulatorId: \"UUID_FROM_ABOVE\" })",
+    "Get app path: get_sim_app_path({ scheme: \"YOUR_SCHEME\", platform: \"iOS Simulator\", simulatorId: \"UUID_FROM_ABOVE\" })"
+  ]
+}

@@ -206,7 +206,7 @@ function normalizeCustomWorkflows(value: unknown): Record<string, string[]> {
 
 function resolveRelativeTopLevelPaths(config: ProjectConfig, cwd: string): ProjectConfig {
   const resolved: ProjectConfig = { ...config };
-  const pathKeys = ['axePath', 'iosTemplatePath', 'macosTemplatePath'] as const;
+  const pathKeys = ['axePath', 'axeSourcePath', 'iosTemplatePath', 'macosTemplatePath'] as const;
 
   for (const key of pathKeys) {
     const value = resolved[key];

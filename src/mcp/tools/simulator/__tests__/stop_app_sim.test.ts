@@ -13,7 +13,7 @@ import {
 } from '../../../../utils/log-capture/simulator-launch-oslog-sessions.ts';
 import { setSimulatorLaunchOsLogRecordActiveOverrideForTests } from '../../../../utils/log-capture/simulator-launch-oslog-registry.ts';
 import { schema, handler, stop_app_simLogic } from '../stop_app_sim.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 import { EventEmitter } from 'node:events';
 import { mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
@@ -21,6 +21,12 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { setRuntimeInstanceForTests } from '../../../../utils/runtime-instance.ts';
+
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
 
 function createTrackedChild(options?: {
   pid?: number;
@@ -112,7 +118,7 @@ describe('stop_app_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulator identifier when not provided', async () => {
-      const result = await handler({ bundleId: 'io.sentry.app' });
+      const result = await callHandler(handler, { bundleId: 'io.sentry.app' });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -123,7 +129,7 @@ describe('stop_app_sim tool', () => {
     it('should require bundleId when simulatorId default exists', async () => {
       sessionStore.setDefaults({ simulatorId: 'SIM-UUID' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -131,7 +137,7 @@ describe('stop_app_sim tool', () => {
     });
 
     it('should reject mutually exclusive simulator parameters', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'SIM-UUID',
         simulatorName: 'iPhone 17',
         bundleId: 'io.sentry.app',
@@ -189,6 +195,33 @@ describe('stop_app_sim tool', () => {
       expect(child.kill).toHaveBeenCalledWith('SIGTERM');
       expect(text).toContain('stopped successfully');
       expect(text).not.toContain('Tracked OSLog sessions cleaned up');
+    });
+
+    it('should resolve simulatorName before stopping', async () => {
+      const calls: string[][] = [];
+      const mockExecutor: CommandExecutor = async (command) => {
+        calls.push(command);
+        if (command.includes('list')) {
+          return createMockCommandResponse({ success: true, output: availableSimulatorsJson });
+        }
+        return createMockCommandResponse({ success: true, output: '' });
+      };
+
+      const result = await runLogic(() =>
+        stop_app_simLogic(
+          {
+            simulatorName: 'iPhone 17',
+            bundleId: 'io.sentry.App',
+          },
+          mockExecutor,
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(calls).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'terminate', 'resolved-uuid', 'io.sentry.App'],
+      ]);
     });
 
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {

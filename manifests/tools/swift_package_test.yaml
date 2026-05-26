@@ -6,7 +6,7 @@ names:
 description: Run swift package target tests.
 outputSchema:
   schema: xcodebuildmcp.output.test-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

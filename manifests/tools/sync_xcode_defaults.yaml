@@ -6,7 +6,7 @@ names:
 description: Sync session defaults (scheme, simulator) from Xcode's current IDE selection.
 outputSchema:
   schema: xcodebuildmcp.output.session-defaults
-  version: "1"
+  version: "2"
 predicates:
   - xcodeAutoSyncDisabled
 annotations:

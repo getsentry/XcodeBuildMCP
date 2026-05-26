@@ -1,15 +1,38 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { expectMatchesFixture } from '../fixture-io.ts';
+import { expectMatchesFixture, fixturePathFor } from '../fixture-io.ts';
 
 const workflow = '__fixture_diff_test__';
 const scenario = 'block-diff';
-const fixtureDir = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__/cli', workflow);
+const fixtureDir = path.resolve(
+  process.cwd(),
+  'src/snapshot-tests/__fixtures__/cli/text',
+  workflow,
+);
 const fixturePath = path.join(fixtureDir, `${scenario}.txt`);
 
 afterEach(() => {
   fs.rmSync(fixtureDir, { recursive: true, force: true });
+});
+
+describe('fixture path routing', () => {
+  it.each([
+    ['cli/text', 'cli/text/example/build--success.txt'],
+    ['cli/json', 'cli/json/example/build--success.json'],
+    ['mcp/text', 'mcp/text/example/build--success.txt'],
+    ['mcp/json', 'mcp/json/example/build--success.json'],
+  ] as const)('routes %s fixtures through transport and format directories', (runtime, suffix) => {
+    const fixturePath = fixturePathFor({
+      runtime,
+      workflow: 'example',
+      scenario: 'build--success',
+    });
+
+    expect(
+      fixturePath.split(path.sep).join('/').endsWith(`src/snapshot-tests/__fixtures__/${suffix}`),
+    ).toBe(true);
+  });
 });
 
 describe('fixture diff formatting', () => {
@@ -24,7 +47,7 @@ describe('fixture diff formatting', () => {
     expect(() => {
       expectMatchesFixture(
         ['before', 'new one', 'new two', 'new three', 'after'].join('\n'),
-        { runtime: 'cli', workflow, scenario },
+        { runtime: 'cli/text', workflow, scenario },
         { allowUpdate: false },
       );
     }).toThrowError(
@@ -39,7 +62,7 @@ describe('fixture diff formatting', () => {
     expect(() => {
       expectMatchesFixture(
         ['before', 'same', 'after'].join('\n'),
-        { runtime: 'cli', workflow, scenario },
+        { runtime: 'cli/text', workflow, scenario },
         { allowUpdate: false },
       );
     }).toThrowError(/-\s+3 same\n-\s+4 same/);
@@ -52,7 +75,7 @@ describe('fixture diff formatting', () => {
     expect(() => {
       expectMatchesFixture(
         ['before', 'same', 'same', 'same', 'after'].join('\n'),
-        { runtime: 'cli', workflow, scenario },
+        { runtime: 'cli/text', workflow, scenario },
         { allowUpdate: false },
       );
     }).toThrowError(/\+\s+3 same\n\+\s+4 same/);

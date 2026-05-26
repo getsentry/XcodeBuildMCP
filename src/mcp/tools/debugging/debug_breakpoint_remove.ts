@@ -49,7 +49,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugBreakpointRem
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.debug-breakpoint-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

@@ -6,7 +6,7 @@ names:
 description: Get device built app path.
 outputSchema:
   schema: xcodebuildmcp.output.app-path
-  version: "1"
+  version: "2"
 annotations:
   title: Get Device App Path
   readOnlyHint: true

@@ -5,7 +5,11 @@ import {
   createMockExecutor,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  expectPendingBuildResponse,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { schema, handler, testDeviceLogic } from '../test_device.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 
@@ -104,7 +108,7 @@ describe('test_device plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme and device defaults', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -114,7 +118,7 @@ describe('test_device plugin', () => {
     it('should require project or workspace when defaults provide scheme and device', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme', deviceId: 'test-device-123' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -123,7 +127,7 @@ describe('test_device plugin', () => {
     it('should reject mutually exclusive project inputs when defaults satisfy requirements', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme', deviceId: 'test-device-123' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
       });

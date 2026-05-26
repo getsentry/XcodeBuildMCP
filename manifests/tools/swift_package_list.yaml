@@ -6,7 +6,7 @@ names:
 description: List SwiftPM processes.
 outputSchema:
   schema: xcodebuildmcp.output.process-list
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

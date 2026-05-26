@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { computeScopedDerivedDataPath } from '../../../../utils/derived-data-path.ts';
 import * as z from 'zod';
 import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
-import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  expectPendingBuildResponse,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, buildMacOSLogic } from '../build_macos.ts';
 
@@ -53,7 +57,7 @@ describe('build_macos plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme when no defaults provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('scheme is required');
@@ -63,7 +67,7 @@ describe('build_macos plugin', () => {
     it('should require project or workspace once scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -72,7 +76,7 @@ describe('build_macos plugin', () => {
     it('should reject when both projectPath and workspacePath provided explicitly', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
       });
@@ -377,13 +381,13 @@ describe('build_macos plugin', () => {
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({ scheme: 'MyScheme' });
+      const result = await callHandler(handler, { scheme: 'MyScheme' });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
         scheme: 'MyScheme',

@@ -47,6 +47,9 @@ struct WeatherTests {
 
         let byCountry = try await service.searchLocations(matching: "gb")
         #expect(byCountry.map(\.name).contains("London"))
+
+        let savedLocationByName = try await service.searchLocations(matching: "tokyo")
+        #expect(savedLocationByName.contains { $0.name == "Tokyo" })
     }
 
     @Test func emptySearchReturnsNoResults() async throws {

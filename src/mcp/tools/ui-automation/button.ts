@@ -12,6 +12,14 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import {
+  clearRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
+import {
+  captureRuntimeSnapshotAfterActionSafely,
+  type PostActionSnapshotTiming,
+} from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -20,6 +28,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const buttonSchema = z.object({
@@ -30,6 +39,7 @@ const buttonSchema = z.object({
   duration: z
     .number()
     .min(0, { message: 'Duration must be non-negative' })
+    .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });
@@ -38,47 +48,81 @@ type ButtonParams = z.infer<typeof buttonSchema>;
 type ButtonResult = UiActionResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
+const DEFAULT_BUTTON_SETTLE_DELAY_MS = 750;
+
+function delayMs(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
+}
 
 export function createButtonExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
+  postActionSnapshotTiming?: PostActionSnapshotTiming,
 ): NonStreamingExecutor<ButtonParams, ButtonResult> {
-  return async (params) => {
-    const toolName = 'button';
-    const { simulatorId, buttonType, duration } = params;
-    const action = { type: 'button' as const, button: buttonType };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'button';
+      const { simulatorId, buttonType, duration } = params;
+      const action = { type: 'button' as const, button: buttonType };
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = ['button', buttonType];
+      if (duration !== undefined) {
+        commandArgs.push('--duration', String(duration));
+      }
+
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting ${buttonType} button press on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'button', executor, axeHelpers);
+        if (settleDelayMs > 0) {
+          await delayMs(settleDelayMs);
+        }
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+          timing: postActionSnapshotTiming,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+        });
+      }
     });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = ['button', buttonType];
-    if (duration !== undefined) {
-      commandArgs.push('--duration', String(duration));
-    }
-
-    log('info', `${LOG_PREFIX}/${toolName}: Starting ${buttonType} button press on ${simulatorId}`);
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'button', executor, axeHelpers);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
-    } catch (error) {
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to press button '${buttonType}'.`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-      });
-    }
-  };
 }
 
 export async function buttonLogic(
@@ -86,9 +130,10 @@ export async function buttonLogic(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
 ): Promise<void> {
   const ctx = getHandlerContext();
-  const executeButton = createButtonExecutor(executor, axeHelpers, debuggerManager);
+  const executeButton = createButtonExecutor(executor, axeHelpers, debuggerManager, settleDelayMs);
   const result = await executeButton(params);
 
   setUiActionStructuredOutput(ctx, result);

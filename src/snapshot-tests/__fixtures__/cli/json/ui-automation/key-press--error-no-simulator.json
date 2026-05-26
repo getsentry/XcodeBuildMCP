@@ -1,0 +1,26 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to simulate key press (code: 4).",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "key-press",
+      "keyCode": 4
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "CLIError(errorDescription: \"Simulator with UDID <UUID> not found in set.\")"
+        }
+      ]
+    }
+  }
+}

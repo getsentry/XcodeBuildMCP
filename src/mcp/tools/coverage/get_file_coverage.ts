@@ -129,7 +129,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetFileCoverageRes
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.coverage-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

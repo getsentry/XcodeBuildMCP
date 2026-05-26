@@ -3,10 +3,12 @@ module: mcp/tools/ui-automation/long_press
 names:
   mcp: long_press
   cli: long-press
-description: Long press at coords.
+description: Long press a UI element by elementRef from a current rs/1 runtime snapshot.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
-  version: "1"
+  version: "2"
+routing:
+  stateful: true
 annotations:
   title: Long Press
   readOnlyHint: true

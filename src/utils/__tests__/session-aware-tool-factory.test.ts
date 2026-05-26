@@ -376,6 +376,126 @@ describe('createSessionAwareTool', () => {
     expect(parsed).toEqual({ API_KEY: 'abc123', DEBUG: 'true', VERBOSE: '0' });
   });
 
+  it('only merges session defaults that exist in the schema before strict validation', async () => {
+    const strictSchema = z.strictObject({
+      bundleId: z.string(),
+    });
+
+    const strictHandler = createSessionAwareTool<z.infer<typeof strictSchema>>({
+      internalSchema: strictSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['bundleId'] }],
+    });
+
+    sessionStore.setDefaults({
+      scheme: 'App',
+      projectPath: '/a.xcodeproj',
+      simulatorId: 'SIM-123',
+      bundleId: 'com.example.app',
+    });
+
+    const result = await invokeAndCollect(strictHandler, {});
+    expect(result.isError).toBe(false);
+
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\{.*\}).*$/, '$1'));
+    expect(parsed).toEqual({ bundleId: 'com.example.app' });
+  });
+
+  it('uses filtered session defaults to satisfy required fields on strict schemas', async () => {
+    const strictSchema = z.strictObject({
+      scheme: z.string(),
+      projectPath: z.string(),
+    });
+
+    const strictHandler = createSessionAwareTool<z.infer<typeof strictSchema>>({
+      internalSchema: strictSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['scheme', 'projectPath'] }],
+    });
+
+    sessionStore.setDefaults({
+      scheme: 'App',
+      projectPath: '/a.xcodeproj',
+      simulatorId: 'SIM-123',
+    });
+
+    const result = await invokeAndCollect(strictHandler, {});
+    expect(result.isError).toBe(false);
+
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\{.*\}).*$/, '$1'));
+    expect(parsed).toEqual({ scheme: 'App', projectPath: '/a.xcodeproj' });
+  });
+
+  it('rejects explicit unknown args on strict schemas after filtering session defaults', async () => {
+    const strictSchema = z.strictObject({
+      bundleId: z.string(),
+    });
+
+    const strictHandler = createSessionAwareTool<z.infer<typeof strictSchema>>({
+      internalSchema: strictSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['bundleId'] }],
+    });
+
+    sessionStore.setDefaults({
+      bundleId: 'com.example.app',
+      simulatorId: 'SIM-123',
+    });
+
+    const result = await invokeAndCollect(strictHandler, { simulatorName: 'iPhone 17' });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Parameter validation failed');
+    expect(result.text).toContain('simulatorName');
+  });
+
+  it('applies refinements after filtering unrelated session defaults', async () => {
+    const refinedSchema = z
+      .strictObject({
+        scheme: z.string(),
+        projectPath: z.string().optional(),
+        workspacePath: z.string().optional(),
+      })
+      .refine((params) => !!params.projectPath !== !!params.workspacePath, {
+        message: 'provide exactly one projectPath or workspacePath',
+        path: ['projectPath'],
+      });
+
+    const refinedHandler = createSessionAwareTool<z.infer<typeof refinedSchema>>({
+      internalSchema: refinedSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['scheme'] }],
+    });
+
+    sessionStore.setDefaults({
+      scheme: 'App',
+      projectPath: '/a.xcodeproj',
+      workspacePath: '/a.xcworkspace',
+      simulatorId: 'SIM-123',
+    });
+
+    const result = await invokeAndCollect(refinedHandler, {});
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Parameter validation failed');
+    expect(result.text).toContain('provide exactly one projectPath or workspacePath');
+    expect(result.text).not.toContain('simulatorId');
+  });
+
   it('rejects array passed as env instead of deep-merging it', async () => {
     const envSchema = z.object({
       scheme: z.string(),

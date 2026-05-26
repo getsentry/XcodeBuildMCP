@@ -1,7 +1,8 @@
+import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { clearAllProcesses } from '../../mcp/tools/swift-package/active-processes.ts';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
-import { createJsonSnapshotHarness } from '../json-harness.ts';
+import { createMcpJsonSnapshotHarness } from '../json-harness.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const PACKAGE_PATH = 'example_projects/spm';
@@ -13,7 +14,7 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
     let harness: WorkflowSnapshotHarness;
 
     async function stopAllRunningSwiftPackageProcesses(): Promise<void> {
-      const jsonHarness = await createJsonSnapshotHarness();
+      const jsonHarness = await createMcpJsonSnapshotHarness();
 
       try {
         while (true) {
@@ -39,7 +40,6 @@ export function registerSwiftPackageSnapshotSuite(runtime: SnapshotRuntime): voi
 
     async function resetSwiftPackageState(): Promise<void> {
       try {
-        const { execSync } = await import('node:child_process');
         execSync('node build/cli.js daemon stop 2>/dev/null || true', {
           encoding: 'utf8',
           cwd: process.cwd(),

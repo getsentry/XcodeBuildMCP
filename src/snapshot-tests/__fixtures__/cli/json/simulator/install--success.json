@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.install-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>",
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Open the Simulator app: xcodebuildmcp simulator-management open",
+    "Launch the app: xcodebuildmcp simulator launch-app --simulator-id <UUID> --bundle-id io.sentry.calculatorapp"
+  ]
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler } from '../session_show_defaults.ts';
-import { allText } from '../../../../test-utils/test-helpers.ts';
+import { allText, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('session-show-defaults tool', () => {
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('session-show-defaults tool', () => {
       sessionStore.setActiveProfile('ios');
       sessionStore.setDefaults({ scheme: 'IOSScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
       expect(result.isError).toBeFalsy();
       expect(allText(result)).toContain('scheme: IOSScheme');
     });

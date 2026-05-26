@@ -53,7 +53,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugLldbCommandRe
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.debug-command-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

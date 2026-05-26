@@ -47,6 +47,7 @@ ESM TypeScript project (`type: module`). Key layers:
 - **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports.
 - NEVER remove or downgrade code to fix type errors from outdated dependencies; upgrade the dependency instead
 - Always ask before removing functionality or code that appears to be intentional
+- Do not add fallback behavior by default. If required context, configuration, runtime state, or dependencies are missing, fail loudly and fix the caller/setup instead of silently switching to an alternate path. Add a fallback only when explicitly requested or when it is a documented product requirement.
 - Follow TypeScript best practices
 
 ## Import Conventions
@@ -69,6 +70,7 @@ ESM TypeScript project (`type: module`). Key layers:
 
 ## Tool Development
 - Tool manifests in `manifests/tools/*.yaml` define `id`, `module`, `names.mcp` (snake_case), optional `names.cli` (kebab-case), predicates, and annotations
+- MCP `readOnlyHint` describes whether a tool mutates host/project state such as files, build artifacts, configuration, or external services. Simulator HID/UI actions that only tap, type, press, or gesture inside the simulator may remain `readOnlyHint: true`; do not flip them to `false` merely because app UI state changes.
 - Workflow manifests in `manifests/workflows/*.yaml` group tools and define exposure rules
 - Tool modules export a Zod `schema`, a pure `*Logic` function, and a `handler` built with `createTypedTool` or `createSessionAwareTool`
 - Resource modules export a `handler` (and a pure `*Logic` function); `uri`, `name`, `description`, and `mimeType` are declared in `manifests/resources/*.yaml`
@@ -94,6 +96,12 @@ When reading issues:
 - Use shared lock and atomic-write helpers for mutable shared files.
 - Prefer one-record-per-file registries over shared aggregate files.
 - Cleanup must verify ownership before deleting shared artifacts.
+- Multi-process safety means concurrent processes must not corrupt or delete each other's state.
+  It does not mean ephemeral runtime handles should become portable between invocation surfaces.
+- Keep runtime/session-scoped handles isolated unless the product explicitly defines a cross-process
+  contract. For example, UI automation `elementRef` values from runtime snapshots are handles for
+  the runtime/session that produced them, not durable IDs to share between separate MCP and CLI
+  invocations.
 - User-facing artifact/log paths in final text or structured output must use `displayPath()` from `src/utils/build-preflight.ts`, so paths are cwd-relative when possible or `~/...` instead of absolute home paths. Keep stored files at their real absolute paths; only normalize response/display values.
 
 ## Style

@@ -1,0 +1,23 @@
+{
+  "schema": "xcodebuildmcp.output.stop-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to stop macOS app.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "processId": 99999,
+      "appName": "PID <PID>"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "kill: <PID>: No such process"
+        }
+      ]
+    }
+  }
+}

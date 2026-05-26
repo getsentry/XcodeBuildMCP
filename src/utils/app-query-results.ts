@@ -61,7 +61,7 @@ export function setAppPathStructuredOutput(
   ctx.structuredOutput = {
     result,
     schema: APP_PATH_STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 
@@ -91,7 +91,7 @@ export function setBundleIdStructuredOutput(
   ctx.structuredOutput = {
     result,
     schema: BUNDLE_ID_STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    schemaVersion: '2',
     ...(renderHints ? { renderHints } : {}),
   };
 }

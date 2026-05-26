@@ -68,6 +68,7 @@ describe('project-config', () => {
         '    - SCREENSHOT',
         'debug: true',
         'axePath: "./bin/axe"',
+        'axeSourcePath: "../AXe"',
         'sessionDefaults:',
         '  projectPath: "./App.xcodeproj"',
         '  workspacePath: "./App.xcworkspace"',
@@ -89,6 +90,7 @@ describe('project-config', () => {
       });
       expect(result.config.debug).toBe(true);
       expect(result.config.axePath).toBe(path.join(cwd, 'bin', 'axe'));
+      expect(result.config.axeSourcePath).toBe(path.join(cwd, '..', 'AXe'));
       expect(defaults.workspacePath).toBe(path.join(cwd, 'App.xcworkspace'));
       expect(defaults.projectPath).toBeUndefined();
       expect(defaults.simulatorId).toBe('SIM-1');
@@ -154,6 +156,7 @@ describe('project-config', () => {
       const yaml = [
         'schemaVersion: 1',
         'axePath: "file:///repo/bin/axe"',
+        'axeSourcePath: "file:///repo/AXe"',
         'sessionDefaults:',
         '  workspacePath: "file:///repo/App.xcworkspace"',
         '  derivedDataPath: "file:///repo/.derivedData"',
@@ -166,6 +169,7 @@ describe('project-config', () => {
       if (!result.found) throw new Error('expected config to be found');
 
       expect(result.config.axePath).toBe('/repo/bin/axe');
+      expect(result.config.axeSourcePath).toBe('/repo/AXe');
       const defaults = result.config.sessionDefaults ?? {};
       expect(defaults.workspacePath).toBe('/repo/App.xcworkspace');
       expect(defaults.derivedDataPath).toBe('/repo/.derivedData');
@@ -193,6 +197,7 @@ describe('project-config', () => {
       const yaml = [
         'schemaVersion: 1',
         'axePath: "~/tools/axe"',
+        'axeSourcePath: "~/Code/AXe"',
         'iosTemplatePath: "~/templates/ios"',
         '',
       ].join('\n');
@@ -202,6 +207,7 @@ describe('project-config', () => {
       if (!result.found) throw new Error('expected config to be found');
 
       expect(result.config.axePath).toBe(path.join(homedir(), 'tools/axe'));
+      expect(result.config.axeSourcePath).toBe(path.join(homedir(), 'Code/AXe'));
       expect(result.config.iosTemplatePath).toBe(path.join(homedir(), 'templates/ios'));
     });
 

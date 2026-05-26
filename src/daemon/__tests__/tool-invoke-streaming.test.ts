@@ -246,7 +246,7 @@ describe('daemon tool.invoke streaming', () => {
     expect(result.isError).toBe(true);
     expect(result.structuredOutput).toEqual({
       schema: 'xcodebuildmcp.output.xcode-bridge-call-result',
-      schemaVersion: '2',
+      schemaVersion: '3',
       result: {
         kind: 'xcode-bridge-call-result',
         remoteTool: 'FailingRemote',

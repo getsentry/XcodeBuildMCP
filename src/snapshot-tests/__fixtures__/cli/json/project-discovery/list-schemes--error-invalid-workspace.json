@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.scheme-list",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to list schemes.",
+  "data": {
+    "artifacts": {
+      "workspacePath": "/nonexistent/path/Fake.xcworkspace"
+    },
+    "schemes": [],
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "'/nonexistent/path/Fake.xcworkspace' does not exist."
+        }
+      ]
+    }
+  }
+}

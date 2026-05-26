@@ -6,7 +6,7 @@ names:
 description: swift package clean.
 outputSchema:
   schema: xcodebuildmcp.output.build-result
-  version: "1"
+  version: "2"
 annotations:
   title: Swift Package Clean
   readOnlyHint: false

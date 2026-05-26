@@ -1,0 +1,14 @@
+{
+  "schema": "xcodebuildmcp.output.xcode-bridge-call-result",
+  "schemaVersion": "3",
+  "didError": false,
+  "error": null,
+  "data": {
+    "remoteTool": "DocumentationSearch",
+    "succeeded": true,
+    "content": [],
+    "artifacts": {
+      "rawResponseJsonPath": "<RAW_RESPONSE_JSON_PATH>"
+    }
+  }
+}

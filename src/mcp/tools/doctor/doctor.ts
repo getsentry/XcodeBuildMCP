@@ -423,7 +423,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DoctorResult): voi
   ctx.structuredOutput = {
     result,
     schema: STRUCTURED_OUTPUT_SCHEMA,
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

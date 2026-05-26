@@ -6,7 +6,7 @@ names:
 description: Get sim built app path.
 outputSchema:
   schema: xcodebuildmcp.output.app-path
-  version: "1"
+  version: "2"
 annotations:
   title: Get Simulator App Path
   readOnlyHint: true

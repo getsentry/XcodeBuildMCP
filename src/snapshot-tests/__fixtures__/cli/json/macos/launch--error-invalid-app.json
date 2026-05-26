@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.launch-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to launch macOS app.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "artifacts": {
+      "appPath": "<TMPDIR>/NonExistent.app"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "File not found: '<TMPDIR>/NonExistent.app'. Please check the path and try again."
+        }
+      ]
+    }
+  }
+}

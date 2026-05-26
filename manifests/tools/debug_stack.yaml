@@ -6,7 +6,7 @@ names:
 description: Get backtrace.
 outputSchema:
   schema: xcodebuildmcp.output.debug-stack-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

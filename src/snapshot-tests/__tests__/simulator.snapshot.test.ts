@@ -1,4 +1,4 @@
 import { registerSimulatorSnapshotSuite } from '../suites/simulator-suite.ts';
 
-registerSimulatorSnapshotSuite('cli');
-registerSimulatorSnapshotSuite('mcp');
+registerSimulatorSnapshotSuite('cli/text');
+registerSimulatorSnapshotSuite('mcp/text');

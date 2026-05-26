@@ -6,7 +6,7 @@ names:
 description: Launch app on device.
 outputSchema:
   schema: xcodebuildmcp.output.launch-result
-  version: "1"
+  version: "2"
 annotations:
   title: Launch App Device
   readOnlyHint: false

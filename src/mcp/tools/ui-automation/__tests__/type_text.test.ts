@@ -1,481 +1,465 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import {
-  createMockExecutor,
-  createNoopExecutor,
-  mockProcess,
-} from '../../../../test-utils/mock-executors.ts';
+import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
 import { schema, handler, type_textLogic } from '../type_text.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  createMockAxeHelpers,
+  createNode,
+  createSequencedExecutor,
+  createTrackingExecutor,
+  recordSnapshot,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
-// Mock axe helpers for dependency injection
-function createMockAxeHelpers(
-  overrides: {
-    getAxePathReturn?: string | null;
-    getBundledAxeEnvironmentReturn?: Record<string, string>;
-  } = {},
-) {
-  return {
-    getAxePath: () =>
-      overrides.getAxePathReturn !== undefined ? overrides.getAxePathReturn : '/usr/local/bin/axe',
-    getBundledAxeEnvironment: () => overrides.getBundledAxeEnvironmentReturn ?? {},
-  };
+function actionCommands(calls: Array<{ command: string[] }>): string[][] {
+  return calls.map((call) => call.command).filter((command) => command[1] !== 'describe-ui');
 }
 
-// Mock executor that tracks rejections for testing
-function createRejectingExecutor(error: any) {
-  return async () => {
-    throw error;
-  };
+async function runTypeText(
+  params: Parameters<typeof type_textLogic>[0],
+  executor = createTrackingExecutor().executor,
+): Promise<UiActionResultDomainResult> {
+  const { ctx, run } = createMockToolHandlerContext();
+  await run(() => type_textLogic(params, executor, createMockAxeHelpers()));
+  expect(ctx.structuredOutput?.schemaVersion).toBe('2');
+  return ctx.structuredOutput?.result as UiActionResultDomainResult;
 }
 
 describe('Type Text Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Schema Validation', () => {
-    it('should have handler function', () => {
+    it('requires elementRef and text', () => {
       expect(typeof handler).toBe('function');
-    });
+      expect(schema).toHaveProperty('elementRef');
+      expect(schema).toHaveProperty('text');
+      expect(schema).toHaveProperty('replaceExisting');
 
-    it('should validate schema fields with safeParse', () => {
       const schemaObject = z.object(schema);
-
+      expect(schemaObject.safeParse({ elementRef: 'e1', text: 'Hello World' }).success).toBe(true);
       expect(
-        schemaObject.safeParse({
-          text: 'Hello World',
-        }).success,
+        schemaObject.safeParse({ elementRef: 'e1', text: 'Hello World', replaceExisting: true })
+          .success,
       ).toBe(true);
-
-      expect(
-        schemaObject.safeParse({
-          text: '',
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          text: 123,
-        }).success,
-      ).toBe(false);
-
-      expect(schemaObject.safeParse({}).success).toBe(false);
-
-      const withSimId = schemaObject.safeParse({
-        simulatorId: '12345678-1234-4234-8234-123456789012',
-        text: 'Hello World',
-      });
-      expect(withSimId.success).toBe(true);
-      expect('simulatorId' in (withSimId.data as Record<string, unknown>)).toBe(false);
-    });
-  });
-
-  describe('Handler Requirements', () => {
-    it('should require simulatorId session default', async () => {
-      const result = await handler({ text: 'Hello' });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Missing required session defaults');
-      expect(message).toContain('simulatorId is required');
-      expect(message).toContain('session-set-defaults');
-    });
-
-    it('should surface validation errors when defaults exist', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({});
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('text: Invalid input: expected string, received undefined');
+      expect(schemaObject.safeParse({ elementRef: 'e1', text: '' }).success).toBe(false);
+      expect(schemaObject.safeParse({ text: 'Hello World' }).success).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: 'e1' }).success).toBe(false);
     });
   });
 
   describe('Command Generation', () => {
-    it('should generate correct axe command for basic text typing', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'Text typed successfully',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('focuses the referenced text field by identifier, then types text', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXLabel: 'Email',
+          AXUniqueId: 'email-field',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-
-      await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
+      const result = await runTypeText(
+        { simulatorId, elementRef: 'e1', text: 'user@example.com' },
+        executor,
       );
 
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'type',
-        'Hello World',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'type-text', elementRef: 'e1', textLength: 16 },
+      });
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'email-field',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'type', 'user@example.com', '--udid', simulatorId],
       ]);
     });
 
-    it('should generate correct axe command for text with special characters', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'Text typed successfully',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('types all AXe-supported US keyboard punctuation characters', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXLabel: 'Search',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+      const text = 'Az09 !@#$%^&*()_+-={}[]|\\:";\'<>?,./`~';
 
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text }, executor);
+
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'type-text', elementRef: 'e1', textLength: text.length },
       });
-
-      await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'user@example.com',
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'type',
-        'user@example.com',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--label',
+          'Search',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'type', text, '--udid', simulatorId],
       ]);
     });
 
-    it('should generate correct axe command for text with numbers and symbols', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'Text typed successfully',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('rejects unsupported AXe typing characters before focusing or typing', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          AXLabel: 'Search',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+      const text = 'Tokyo Reykjavík 42';
 
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        message: expect.stringContaining('US keyboard characters'),
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('US keyboard'),
       });
+      expect(result.action).toEqual({
+        type: 'type-text',
+        elementRef: 'e1',
+        textLength: text.length,
+      });
+      expect(calls).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain('Tokyo');
+      expect(JSON.stringify(result)).not.toContain('Reykjavík');
+    });
 
-      await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Password123!@#',
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
+    it('includes text field type when focusing a referenced field with a shared identifier', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Group',
+          role: 'AXGroup',
+          AXUniqueId: 'locationSearchField',
+          children: [
+            createNode({
+              type: 'TextField',
+              role: 'AXTextField',
+              AXUniqueId: 'locationSearchField',
+              AXLabel: 'Search for a city',
+            }),
+          ],
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'type',
-        'Password123!@#',
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
+      const result = await runTypeText({ simulatorId, elementRef: 'e2', text: 'London' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'locationSearchField',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'type', 'London', '--udid', simulatorId],
       ]);
     });
 
-    it('should generate correct axe command for long text', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'Text typed successfully',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
+    it('focuses by coordinates immediately when the snapshot already has duplicate selector matches', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: 'locationSearchField',
+          AXLabel: 'Search',
+        }),
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 40, y: 200, width: 180, height: 40 },
+          AXUniqueId: 'locationSearchField',
+          AXLabel: 'Search',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
+      const result = await runTypeText({ simulatorId, elementRef: 'e2', text: 'London' }, executor);
 
-      const longText =
-        'This is a very long text that needs to be typed into the simulator for testing purposes.';
-
-      await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: longText,
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(capturedCommand).toEqual([
-        '/usr/local/bin/axe',
-        'type',
-        longText,
-        '--udid',
-        '12345678-1234-4234-8234-123456789012',
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        ['/mocked/axe/path', 'tap', '-x', '130', '-y', '220', '--udid', simulatorId],
+        ['/mocked/axe/path', 'type', 'London', '--udid', simulatorId],
       ]);
     });
 
-    it('should generate correct axe command with bundled axe path', async () => {
-      let capturedCommand: string[] = [];
-      const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
-        return {
-          success: true,
-          output: 'Text typed successfully',
-          error: undefined,
-          process: mockProcess,
-        };
-      };
-
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/path/to/bundled/axe',
-        getBundledAxeEnvironmentReturn: { AXE_PATH: '/some/path' },
-      });
-
-      await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: 'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
-            text: 'Test message',
-          },
-          trackingExecutor,
-          mockAxeHelpers,
-        ),
+    it('falls back to the resolved center when selector focus is ambiguous', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: 'locationSearchField',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          { success: false, error: 'Multiple 2 accessibility elements matched selector' },
+          { success: true, output: 'focused by coordinate' },
+          { success: true, output: 'typed' },
+        ],
+        { describeUiAfterSequence: true },
       );
 
-      expect(capturedCommand).toEqual([
-        '/path/to/bundled/axe',
-        'type',
-        'Test message',
-        '--udid',
-        'ABCDEF12-3456-7890-ABCD-ABCDEFABCDEF',
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text: 'London' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'locationSearchField',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+        ['/mocked/axe/path', 'type', 'London', '--udid', simulatorId],
+      ]);
+    });
+
+    it('falls back to the resolved center when selector focus reports no match', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: undefined,
+          AXIdentifier: undefined,
+          AXLabel: 'Search for a city',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "No accessibility element matched --label 'Search for a city'. No tap performed.",
+          },
+          { success: true, output: 'focused by coordinate' },
+          { success: true, output: 'typed' },
+        ],
+        { describeUiAfterSequence: true },
+      );
+
+      const result = await runTypeText(
+        { simulatorId, elementRef: 'e1', text: 'Portland' },
+        executor,
+      );
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--label',
+          'Search for a city',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+        ['/mocked/axe/path', 'type', 'Portland', '--udid', simulatorId],
+      ]);
+    });
+
+    it('selects existing text before typing when replaceExisting is true', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXValue: 'Tokyo',
+          AXLabel: undefined,
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+
+      await runTypeText(
+        { simulatorId, elementRef: 'e1', text: 'Portland', replaceExisting: true },
+        executor,
+      );
+
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--value',
+          'Tokyo',
+          '--element-type',
+          'TextField',
+          '--udid',
+          simulatorId,
+        ],
+        [
+          '/mocked/axe/path',
+          'key-combo',
+          '--modifiers',
+          '227',
+          '--key',
+          '4',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'type', 'Portland', '--udid', simulatorId],
+      ]);
+    });
+
+    it('focuses the referenced text field by center when no identifier exists', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'TextField',
+          role: 'AXTextField',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXLabel: undefined,
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+
+      await runTypeText({ simulatorId, elementRef: 'e1', text: 'Hello' }, executor);
+
+      expect(actionCommands(calls)).toEqual([
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+        ['/mocked/axe/path', 'type', 'Hello', '--udid', simulatorId],
       ]);
     });
   });
 
-  describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should handle axe dependency error', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: null,
-      });
+  describe('Resolution failures', () => {
+    it('returns SNAPSHOT_MISSING without calling AXe', async () => {
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          createNoopExecutor(),
-          mockAxeHelpers,
-        ),
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text: 'Hello' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_MISSING');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns SNAPSHOT_EXPIRED without calling AXe', async () => {
+      recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })], Date.now() - 61_000);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text: 'Hello' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_EXPIRED');
+      expect(calls).toEqual([]);
+    });
+
+    it('returns ELEMENT_REF_NOT_FOUND without calling AXe', async () => {
+      recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTypeText(
+        { simulatorId, elementRef: 'e404', text: 'Hello' },
+        executor,
       );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'ELEMENT_REF_NOT_FOUND', elementRef: 'e404' });
+      expect(calls).toEqual([]);
+    });
+
+    it('returns TARGET_NOT_ACTIONABLE without calling AXe', async () => {
+      recordSnapshot([createNode({ type: 'Button', role: 'AXButton' })]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTypeText({ simulatorId, elementRef: 'e1', text: 'Hello' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'TARGET_NOT_ACTIONABLE', elementRef: 'e1' });
+      expect(calls).toEqual([]);
+    });
+  });
+
+  describe('Handler Behavior', () => {
+    it('requires simulatorId session default', async () => {
+      const result = await callHandler(handler, { elementRef: 'e1', text: 'Hello' });
 
       expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
+      expect(result.content[0].text).toContain('Missing required session defaults');
+      expect(result.content[0].text).toContain('simulatorId is required');
     });
 
-    it('should successfully type text', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Text typed successfully',
-        error: undefined,
-      });
+    it('returns ACTION_FAILED when focusing the resolved field fails', async () => {
+      recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
+      const { calls, executor } = createSequencedExecutor([
+        { success: false, error: 'focus failed' },
+      ]);
 
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
+      const result = await runTypeText(
+        { simulatorId, elementRef: 'e1', text: 'Secret123' },
+        executor,
       );
 
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain('Text typing simulated successfully.');
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
+      });
+      expect(calls).toHaveLength(1);
+      expect(JSON.stringify(result)).not.toContain('Secret123');
+      expect(result.action).toEqual({ type: 'type-text', elementRef: 'e1', textLength: 9 });
     });
 
-    it('should return success for valid text typing', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
+    it('returns ACTION_FAILED when typing fails after focus succeeds', async () => {
+      recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
+      const { calls, executor } = createSequencedExecutor([
+        { success: true, output: 'focused' },
+        { success: false, error: 'typing failed' },
+      ]);
 
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Text typed successfully',
-        error: undefined,
-      });
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
+      const result = await runTypeText(
+        { simulatorId, elementRef: 'e1', text: 'Secret123' },
+        executor,
       );
 
-      expect(result.isError).toBeFalsy();
-      expect(allText(result)).toContain('Text typing simulated successfully.');
-    });
-
-    it('should handle DependencyError when axe binary not found', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: null,
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          createNoopExecutor(),
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle AxeError from command execution', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'Text field not found',
-      });
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('Failed to simulate text typing.');
-      expect(text).toContain('Text field not found');
-    });
-
-    it('should handle SystemError from command execution', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-
-      const mockExecutor = createRejectingExecutor(new Error('ENOENT: no such file or directory'));
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected Error objects', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-
-      const mockExecutor = createRejectingExecutor(new Error('Unexpected error'));
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-    });
-
-    it('should handle unexpected string errors', async () => {
-      const mockAxeHelpers = createMockAxeHelpers({
-        getAxePathReturn: '/usr/local/bin/axe',
-        getBundledAxeEnvironmentReturn: {},
-      });
-
-      const mockExecutor = createRejectingExecutor('String error');
-
-      const result = await runLogic(() =>
-        type_textLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            text: 'Hello World',
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      const text = allText(result);
-      expect(text).toContain('System error executing axe command.');
-      expect(text).toContain('Failed to execute axe command: String error');
+      expect(calls).toHaveLength(2);
+      expect(JSON.stringify(result)).not.toContain('Secret123');
+      expect(result.action).toEqual({ type: 'type-text', elementRef: 'e1', textLength: 9 });
     });
   });
 });

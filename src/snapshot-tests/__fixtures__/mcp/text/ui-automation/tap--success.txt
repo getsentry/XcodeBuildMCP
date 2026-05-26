@@ -1,0 +1,8 @@
+
+👆 Tap
+
+✅ Tap on elementRef e14 simulated successfully.
+
+Next steps:
+1. Batch same-screen taps: batch({ simulatorId: "<UUID>", steps: [{"action":"tap","elementRef":"e14"},{"action":"tap","elementRef":"e15"}] })
+2. Tap an elementRef: tap({ simulatorId: "<UUID>", elementRef: "e14" })

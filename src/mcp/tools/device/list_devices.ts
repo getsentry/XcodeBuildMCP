@@ -114,7 +114,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ListDevicesResult)
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.device-list',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

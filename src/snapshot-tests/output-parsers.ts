@@ -1,3 +1,4 @@
+import type { SnapshotResult } from './contracts.ts';
 import { expandHomePrefix } from '../utils/path.ts';
 
 export interface SnapshotSimulatorEntry {
@@ -10,42 +11,75 @@ export function expandSnapshotPath(pathValue: string): string {
   return expandHomePrefix(pathValue);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getStructuredArtifact(result: SnapshotResult, key: string): unknown {
+  const data = result.structuredEnvelope?.data;
+  if (!isRecord(data) || !isRecord(data.artifacts)) {
+    return undefined;
+  }
+  return data.artifacts[key];
+}
+
+function firstMatchGroup(output: string, patterns: RegExp[]): string | undefined {
+  for (const pattern of patterns) {
+    const match = output.match(pattern);
+    const group = match?.slice(1).find(Boolean);
+    if (group) return group;
+  }
+  return undefined;
+}
+
 export function extractAppPathFromSnapshotOutput(output: string): string {
-  const detailMatch = output.match(/App Path:\s+(.+\.app)$/m);
-  if (detailMatch?.[1]) {
-    return expandSnapshotPath(detailMatch[1].trim());
-  }
-
-  const mcpArgMatch = output.match(/appPath:\s*"([^"]+\.app)"/);
-  if (mcpArgMatch?.[1]) {
-    return expandSnapshotPath(mcpArgMatch[1]);
-  }
-
-  const cliArgMatch = output.match(/--app-path\s+"([^"]+\.app)"/);
-  if (cliArgMatch?.[1]) {
-    return expandSnapshotPath(cliArgMatch[1]);
+  const appPath = firstMatchGroup(output, [
+    /App Path:\s+(.+\.app)$/m,
+    /appPath:\s*"([^"]+\.app)"/,
+    /--app-path\s+(?:"([^"]+\.app)"|'([^']+\.app)'|(\S+\.app))/,
+  ]);
+  if (appPath) {
+    return expandSnapshotPath(appPath.trim());
   }
 
   throw new Error('Could not extract app path from snapshot output.');
 }
 
+export function extractAppPathFromSnapshotResult(result: SnapshotResult): string {
+  const appPath = getStructuredArtifact(result, 'appPath');
+  if (typeof appPath === 'string') {
+    return expandSnapshotPath(appPath);
+  }
+
+  return extractAppPathFromSnapshotOutput(result.rawText);
+}
+
 export function extractProcessIdFromSnapshotOutput(output: string): number {
-  const detailMatch = output.match(/Process ID:\s+(\d+)/);
-  if (detailMatch?.[1]) {
-    return Number(detailMatch[1]);
-  }
-
-  const mcpArgMatch = output.match(/processId:\s*(\d+)/);
-  if (mcpArgMatch?.[1]) {
-    return Number(mcpArgMatch[1]);
-  }
-
-  const cliArgMatch = output.match(/--process-id\s+"(\d+)"/);
-  if (cliArgMatch?.[1]) {
-    return Number(cliArgMatch[1]);
+  const processId = firstMatchGroup(output, [
+    /Process ID:\s+(\d+)/,
+    /processId:\s*(\d+)/,
+    /--process-id\s+(?:"(\d+)"|'(\d+)'|(\d+))/,
+  ]);
+  if (processId) {
+    return Number(processId);
   }
 
   throw new Error('Could not extract process ID from snapshot output.');
+}
+
+export function extractProcessIdFromSnapshotResult(result: SnapshotResult): number {
+  const processId = getStructuredArtifact(result, 'processId');
+  if (typeof processId === 'number') {
+    return processId;
+  }
+  if (typeof processId === 'string') {
+    const parsedProcessId = Number(processId);
+    if (Number.isFinite(parsedProcessId)) {
+      return parsedProcessId;
+    }
+  }
+
+  return extractProcessIdFromSnapshotOutput(result.rawText);
 }
 
 export function parseSimulatorListOutput(output: string): SnapshotSimulatorEntry[] {

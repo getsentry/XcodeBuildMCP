@@ -340,38 +340,74 @@ describe('text render parity', () => {
     expect(rendered).not.toContain('❌ Build failed. (⏱️ 9.9s)');
   });
 
-  it('omits header frontmatter for MCP runtime text transcripts', () => {
-    const output = renderTranscript(
-      {
-        items: [],
-        structuredOutput: {
-          schema: 'xcodebuildmcp.output.build-run-result',
-          schemaVersion: '1.0.0',
-          result: {
-            kind: 'build-run-result',
-            request: {
-              scheme: 'MyApp',
-              projectPath: '/tmp/MyApp.xcodeproj',
-              configuration: 'Debug',
-              platform: 'iOS Simulator',
-            },
-            didError: false,
-            error: null,
-            summary: { status: 'SUCCEEDED', durationMs: 5000 },
-            artifacts: { appPath: '/tmp/build/MyApp.app', buildLogPath: '/tmp/build.log' },
-            diagnostics: { warnings: [], errors: [] },
+  it('omits header frontmatter for minimal style text transcripts', () => {
+    const input = {
+      items: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.build-run-result',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'build-run-result' as const,
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+            configuration: 'Debug',
+            platform: 'iOS Simulator',
           },
+          didError: false,
+          error: null,
+          summary: { status: 'SUCCEEDED' as const, durationMs: 5000 },
+          artifacts: { appPath: '/tmp/build/MyApp.app', buildLogPath: '/tmp/build.log' },
+          diagnostics: { warnings: [], errors: [] },
         },
       },
-      'text',
-      { runtime: 'mcp' },
-    );
+    };
 
-    expect(output).toContain('🚀 Build & Run');
-    expect(output).not.toContain('Scheme: MyApp');
-    expect(output).not.toContain('Project: /tmp/MyApp.xcodeproj');
-    expect(output).not.toContain('Configuration: Debug');
-    expect(output).toContain('✅ Build succeeded. (⏱️ 5.0s)');
+    const output = renderTranscript(input, 'text', { outputStyle: 'minimal' });
+    const mcpDefaultOutput = renderTranscript(input, 'text', { runtime: 'mcp' });
+    const cliOverrideOutput = renderTranscript(input, 'text', {
+      runtime: 'cli',
+      outputStyle: 'minimal',
+    });
+
+    for (const rendered of [output, mcpDefaultOutput, cliOverrideOutput]) {
+      expect(rendered).toContain('🚀 Build & Run');
+      expect(rendered).not.toContain('Scheme: MyApp');
+      expect(rendered).not.toContain('Project: /tmp/MyApp.xcodeproj');
+      expect(rendered).not.toContain('Configuration: Debug');
+      expect(rendered).toContain('✅ Build succeeded. (⏱️ 5.0s)');
+    }
+  });
+
+  it('defaults minimal style text transcripts to tree artifact paths unless explicitly overridden', () => {
+    const input = {
+      items: [],
+      structuredOutput: {
+        schema: 'xcodebuildmcp.output.app-path',
+        schemaVersion: '1.0.0',
+        result: {
+          kind: 'app-path' as const,
+          request: {
+            scheme: 'MyApp',
+            projectPath: '/tmp/MyApp.xcodeproj',
+          },
+          didError: false,
+          error: null,
+          artifacts: { appPath: '/tmp/build/MyApp.app' },
+        },
+      },
+    };
+
+    const minimalOutput = renderTranscript(input, 'text', { outputStyle: 'minimal' });
+    const overriddenOutput = renderTranscript(input, 'text', {
+      outputStyle: 'minimal',
+      filePathRenderStyle: 'list',
+    });
+
+    expect(minimalOutput).toContain('└── /tmp/build/MyApp.app — App Path');
+    expect(minimalOutput).not.toContain('└ App Path: /tmp/build/MyApp.app');
+    expect(overriddenOutput).toContain('└ App Path: /tmp/build/MyApp.app');
+    expect(overriddenOutput).not.toContain('└── /tmp/build/MyApp.app — App Path');
   });
 
   it('renders next steps in MCP tool-call syntax for MCP runtime text transcripts', () => {
@@ -621,7 +657,7 @@ describe('text render parity', () => {
       'text',
     );
     expect(output).toBe(captureCliText(fixture));
-    expect(output).toContain('xcodebuildmcp macos get-app-path --scheme "MCPTest"');
+    expect(output).toContain('xcodebuildmcp macos get-app-path --scheme MCPTest');
     expect(output).not.toContain('get_mac_app_path({');
   });
 });

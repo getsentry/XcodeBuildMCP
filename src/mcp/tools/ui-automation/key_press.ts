@@ -12,6 +12,14 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import {
+  clearRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
+import {
+  captureRuntimeSnapshotAfterActionSafely,
+  type PostActionSnapshotTiming,
+} from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -20,6 +28,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const keyPressSchema = z.object({
@@ -29,10 +38,11 @@ const keyPressSchema = z.object({
     .int({ message: 'HID keycode to press (0-255)' })
     .min(0)
     .max(255)
-    .describe('HID keycode'),
+    .describe('HID keycode. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.'),
   duration: z
     .number()
     .min(0, { message: 'Duration must be non-negative' })
+    .max(10, { message: 'Duration must be at most 10 seconds' })
     .optional()
     .describe('seconds'),
 });
@@ -46,42 +56,62 @@ export function createKeyPressExecutor(
   executor: CommandExecutor,
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
+  postActionSnapshotTiming?: PostActionSnapshotTiming,
 ): NonStreamingExecutor<KeyPressParams, KeyPressResult> {
-  return async (params) => {
-    const toolName = 'key_press';
-    const { simulatorId, keyCode, duration } = params;
-    const action = { type: 'key-press' as const, keyCode };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'key_press';
+      const { simulatorId, keyCode, duration } = params;
+      const action = { type: 'key-press' as const, keyCode };
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = ['key', String(keyCode)];
+      if (duration !== undefined) {
+        commandArgs.push('--duration', String(duration));
+      }
+
+      log('info', `${LOG_PREFIX}/${toolName}: Starting key press ${keyCode} on ${simulatorId}`);
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'key', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+          timing: postActionSnapshotTiming,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => `Failed to simulate key press (code: ${keyCode}).`,
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+        });
+      }
     });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = ['key', String(keyCode)];
-    if (duration !== undefined) {
-      commandArgs.push('--duration', String(duration));
-    }
-
-    log('info', `${LOG_PREFIX}/${toolName}: Starting key press ${keyCode} on ${simulatorId}`);
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'key', executor, axeHelpers);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
-    } catch (error) {
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => `Failed to simulate key press (code: ${keyCode}).`,
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-      });
-    }
-  };
 }
 
 export async function key_pressLogic(

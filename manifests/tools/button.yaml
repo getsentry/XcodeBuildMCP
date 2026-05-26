@@ -6,7 +6,9 @@ names:
 description: Press simulator hardware button.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
-  version: "1"
+  version: "2"
+routing:
+  stateful: true
 annotations:
   title: Hardware Button
   readOnlyHint: true

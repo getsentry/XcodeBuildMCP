@@ -76,7 +76,7 @@ async function buildLightweightYargsApp(): Promise<ReturnType<typeof import('yar
     })
     .option('style', {
       type: 'string',
-      describe: 'Output verbosity (minimal hides next steps)',
+      describe: 'Output style (normal is detailed; minimal is compact MCP-like output)',
       choices: ['normal', 'minimal'] as const,
       default: 'normal',
     })

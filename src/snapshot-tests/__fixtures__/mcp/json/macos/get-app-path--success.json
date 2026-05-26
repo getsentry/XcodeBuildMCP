@@ -1,0 +1,19 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "target": "macos"
+    },
+    "artifacts": {
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app"
+    }
+  },
+  "nextSteps": [
+    "Get bundle ID: get_mac_bundle_id({ appPath: \"~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app\" })",
+    "Launch app: launch_mac_app({ appPath: \"~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>/Build/Products/Debug/MCPTest.app\" })"
+  ]
+}

@@ -53,7 +53,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SetSimAppearanceRe
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.simulator-action-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

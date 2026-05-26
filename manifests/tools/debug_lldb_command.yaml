@@ -6,7 +6,7 @@ names:
 description: Run LLDB command.
 outputSchema:
   schema: xcodebuildmcp.output.debug-command-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

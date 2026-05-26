@@ -6,6 +6,7 @@ import {
   createMockCommandResponse,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
+import { callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('test_sim tool', () => {
   beforeEach(() => {
@@ -40,7 +41,7 @@ describe('test_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme when not provided', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('scheme is required');
@@ -49,7 +50,7 @@ describe('test_sim tool', () => {
     it('should require project or workspace when scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -61,7 +62,7 @@ describe('test_sim tool', () => {
         projectPath: '/path/to/project.xcodeproj',
       });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide simulatorId or simulatorName');
@@ -73,7 +74,7 @@ describe('test_sim tool', () => {
         workspacePath: '/path/to/workspace.xcworkspace',
       });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'SIM-UUID',
         simulatorName: 'iPhone 17',
       });

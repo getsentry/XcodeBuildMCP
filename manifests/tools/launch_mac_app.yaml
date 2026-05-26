@@ -6,7 +6,7 @@ names:
 description: Launch macOS app.
 outputSchema:
   schema: xcodebuildmcp.output.launch-result
-  version: "1"
+  version: "2"
 annotations:
   title: Launch macOS App
   readOnlyHint: false

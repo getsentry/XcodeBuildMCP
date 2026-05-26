@@ -1,0 +1,20 @@
+{
+  "schema": "xcodebuildmcp.output.debug-session-action",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to attach debugger.",
+  "data": {
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "Invalid device: <UUID>"
+        }
+      ]
+    },
+    "action": "attach",
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  }
+}

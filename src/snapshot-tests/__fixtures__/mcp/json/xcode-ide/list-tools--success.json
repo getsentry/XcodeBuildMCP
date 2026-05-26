@@ -1,0 +1,12 @@
+{
+  "schema": "xcodebuildmcp.output.xcode-bridge-tool-list",
+  "schemaVersion": "3",
+  "didError": false,
+  "error": null,
+  "data": {
+    "toolCount": 99999,
+    "artifacts": {
+      "rawResponseJsonPath": "<RAW_RESPONSE_JSON_PATH>"
+    }
+  }
+}

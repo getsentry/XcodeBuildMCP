@@ -1,0 +1,27 @@
+{
+  "schema": "xcodebuildmcp.output.app-path",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "Failed to get app path.",
+  "data": {
+    "request": {
+      "scheme": "NONEXISTENT",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulator": "iPhone 17"
+    },
+    "summary": {
+      "status": "FAILED",
+      "target": "simulator"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [
+        {
+          "message": "The workspace named \"CalculatorApp\" does not contain a scheme named \"NONEXISTENT\". The \"-list\" option can be used to find the names of the schemes in the workspace."
+        }
+      ]
+    }
+  }
+}

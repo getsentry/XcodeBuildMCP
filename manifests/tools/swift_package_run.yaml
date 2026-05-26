@@ -6,7 +6,7 @@ names:
 description: swift package target run.
 outputSchema:
   schema: xcodebuildmcp.output.build-run-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:
@@ -14,3 +14,8 @@ annotations:
   readOnlyHint: false
   destructiveHint: false
   openWorldHint: false
+nextSteps:
+  - label: Stop Swift package run
+    toolId: swift_package_stop
+    priority: 1
+    when: success

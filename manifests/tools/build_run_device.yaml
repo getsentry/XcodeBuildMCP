@@ -6,7 +6,7 @@ names:
 description: Build, install, and launch on physical device. Preferred single-step run tool when defaults are set.
 outputSchema:
   schema: xcodebuildmcp.output.build-run-result
-  version: '1'
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

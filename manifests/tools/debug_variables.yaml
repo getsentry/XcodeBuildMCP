@@ -6,7 +6,7 @@ names:
 description: Get frame variables.
 outputSchema:
   schema: xcodebuildmcp.output.debug-variables-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

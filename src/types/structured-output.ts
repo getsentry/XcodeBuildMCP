@@ -4,4 +4,5 @@ export interface StructuredOutputEnvelope<TData> {
   didError: boolean;
   error: string | null;
   data: TData | null;
+  nextSteps?: string[];
 }

@@ -6,7 +6,7 @@ names:
 description: Show build settings.
 outputSchema:
   schema: xcodebuildmcp.output.build-settings
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

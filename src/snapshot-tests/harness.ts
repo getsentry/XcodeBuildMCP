@@ -1,8 +1,13 @@
 import { spawnSync, execSync } from 'node:child_process';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { formatStructuredEnvelopeFixture } from './json-normalize.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
-import type { SnapshotResult, WorkflowSnapshotHarness } from './contracts.ts';
+import type {
+  SnapshotInvokeOptions,
+  SnapshotResult,
+  WorkflowSnapshotHarness,
+} from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
@@ -34,6 +39,7 @@ function runSnapshotCli(
   args: Record<string, unknown>,
   output: 'text' | 'json' = 'text',
   options: CreateSnapshotHarnessOptions = {},
+  invokeOptions: SnapshotInvokeOptions = {},
 ): ReturnType<typeof spawnSync> {
   const commandArgs = [
     CLI_PATH,
@@ -46,6 +52,9 @@ function runSnapshotCli(
   if (output !== 'text') {
     commandArgs.push('--output', output);
   }
+  if (invokeOptions.verbose === true) {
+    commandArgs.push('--verbose');
+  }
 
   return spawnSync('node', commandArgs, {
     encoding: 'utf8',
@@ -55,6 +64,67 @@ function runSnapshotCli(
   });
 }
 
+function readProcessOutput(output: string | Buffer | null | undefined): string {
+  return typeof output === 'string' ? output : (output?.toString('utf8') ?? '');
+}
+
+export function assertCliSnapshotProcessResult(
+  result: Pick<ReturnType<typeof spawnSync>, 'error' | 'signal' | 'status' | 'stderr'>,
+  label: string,
+): void {
+  if (result.error) {
+    throw new Error(`CLI process failed for ${label}: ${result.error.message}`);
+  }
+
+  if (result.signal) {
+    throw new Error(`CLI process for ${label} was terminated by signal ${result.signal}.`);
+  }
+
+  if (result.status === null) {
+    throw new Error(
+      `CLI process exit status was null for ${label}; the process may have timed out or been killed by a signal.`,
+    );
+  }
+
+  const stderr = readProcessOutput(result.stderr).trim();
+  if (stderr.length > 0) {
+    throw new Error(`CLI process emitted unexpected stderr for ${label}:\n${stderr}`);
+  }
+}
+
+function parseStructuredEnvelope(
+  stdout: string,
+  label: string,
+): NonNullable<SnapshotResult['structuredEnvelope']> {
+  try {
+    return JSON.parse(stdout) as NonNullable<SnapshotResult['structuredEnvelope']>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse CLI JSON output for ${label}: ${message}`);
+  }
+}
+
+export function resolveCliJsonSnapshotErrorState(
+  status: number | null,
+  envelope: NonNullable<SnapshotResult['structuredEnvelope']>,
+  label: string,
+): boolean {
+  if (status === null) {
+    throw new Error(
+      `CLI process exit status was null for ${label}; the process may have timed out or been killed by a signal.`,
+    );
+  }
+
+  const processDidError = status !== 0;
+  if (processDidError !== envelope.didError) {
+    throw new Error(
+      `${label}: CLI process exit status (${status ?? 'null'}) disagrees with envelope.didError (${envelope.didError}).`,
+    );
+  }
+
+  return processDidError;
+}
+
 export async function createSnapshotHarness(
   options: CreateSnapshotHarnessOptions = {},
 ): Promise<SnapshotHarness> {
@@ -62,6 +132,7 @@ export async function createSnapshotHarness(
     workflow: string,
     cliToolName: string,
     args: Record<string, unknown>,
+    invokeOptions: SnapshotInvokeOptions = {},
   ): Promise<SnapshotResult> {
     const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
 
@@ -73,14 +144,53 @@ export async function createSnapshotHarness(
       throw new Error(`Tool '${cliToolName}' in workflow '${workflow}' is not CLI-available`);
     }
 
-    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options);
-    const stdout =
-      typeof result.stdout === 'string' ? result.stdout : (result.stdout?.toString('utf8') ?? '');
+    const label = `${workflow}/${cliToolName}`;
+    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options, invokeOptions);
+    assertCliSnapshotProcessResult(result, label);
+    const stdout = readProcessOutput(result.stdout);
 
     return {
       text: normalizeSnapshotOutput(stdout),
       rawText: stdout,
       isError: result.status !== 0,
+    };
+  }
+
+  async function cleanup(): Promise<void> {}
+
+  return { invoke, cleanup };
+}
+
+export async function createCliJsonSnapshotHarness(
+  options: CreateSnapshotHarnessOptions = {},
+): Promise<SnapshotHarness> {
+  async function invoke(
+    workflow: string,
+    cliToolName: string,
+    args: Record<string, unknown>,
+    invokeOptions: SnapshotInvokeOptions = {},
+  ): Promise<SnapshotResult> {
+    const resolved = resolveSnapshotToolManifest(workflow, cliToolName);
+
+    if (!resolved) {
+      throw new Error(`Tool '${cliToolName}' not found in workflow '${workflow}'`);
+    }
+
+    if (resolved.isMcpOnly) {
+      throw new Error(`Tool '${cliToolName}' in workflow '${workflow}' is not CLI-available`);
+    }
+
+    const label = `${workflow}/${cliToolName}`;
+    const result = runSnapshotCli(workflow, cliToolName, args, 'json', options, invokeOptions);
+    assertCliSnapshotProcessResult(result, label);
+    const stdout = readProcessOutput(result.stdout);
+    const envelope = parseStructuredEnvelope(stdout, label);
+
+    return {
+      text: formatStructuredEnvelopeFixture(envelope),
+      rawText: stdout,
+      isError: resolveCliJsonSnapshotErrorState(result.status, envelope, label),
+      structuredEnvelope: envelope,
     };
   }
 

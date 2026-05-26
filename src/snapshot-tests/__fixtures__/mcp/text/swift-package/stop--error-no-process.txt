@@ -1,0 +1,8 @@
+
+🛑 Swift Package Stop
+
+Errors (1):
+
+  ✗ No running process found with PID <PID>. Use swift_package_list to check active processes.
+
+❌ Swift package stop failed.

@@ -1,0 +1,37 @@
+{
+  "schema": "xcodebuildmcp.output.build-run-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "request": {
+      "scheme": "CalculatorApp",
+      "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
+      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
+      "configuration": "Debug",
+      "platform": "iOS Simulator",
+      "simulatorName": "iPhone 17"
+    },
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "simulator"
+    },
+    "artifacts": {
+      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
+      "bundleId": "io.sentry.calculatorapp",
+      "processId": 99999,
+      "simulatorId": "<UUID>",
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_sim_<TIMESTAMP>_pid<PID>.log",
+      "runtimeLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_<TIMESTAMP>_pid<PID>.log",
+      "osLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log"
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Stop app in simulator: xcodebuildmcp simulator stop --simulator-id <UUID> --bundle-id io.sentry.calculatorapp"
+  ]
+}

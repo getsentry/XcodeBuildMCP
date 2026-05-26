@@ -19,7 +19,13 @@ beforeAll(async () => {
       'axe type': { success: true, output: 'Type performed' },
       'axe describe-ui': {
         success: true,
-        output: JSON.stringify({ type: 'application', children: [] }),
+        output: JSON.stringify({
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          AXLabel: 'Scrollable content',
+          children: [],
+        }),
       },
       'simctl io': { success: true, output: '/tmp/screenshot.png' },
       'simctl list devices': {
@@ -104,26 +110,33 @@ describe('MCP UI Automation Tools (e2e)', () => {
   });
 
   describe('swipe', () => {
-    it('responds via MCP with swipe coordinates', async () => {
+    it('responds via MCP with semantic swipe target', async () => {
       await setSimulatorDefaults();
+      await harness.client.callTool({ name: 'snapshot_ui', arguments: {} });
       harness.resetCapturedCommands();
 
       const result = await harness.client.callTool({
         name: 'swipe',
-        arguments: { x1: 100, y1: 200, x2: 100, y2: 600 },
+        arguments: { withinElementRef: 'e1', direction: 'up' },
       });
 
       const content = getContent(result);
       expect(content.length).toBeGreaterThan(0);
     });
 
-    it('responds via MCP with optional duration and delta', async () => {
+    it('responds via MCP with optional duration and distance', async () => {
       await setSimulatorDefaults();
+      await harness.client.callTool({ name: 'snapshot_ui', arguments: {} });
       harness.resetCapturedCommands();
 
       const result = await harness.client.callTool({
         name: 'swipe',
-        arguments: { x1: 50, y1: 100, x2: 50, y2: 500, duration: 0.5, delta: 10 },
+        arguments: {
+          withinElementRef: 'e1',
+          direction: 'up',
+          duration: 0.5,
+          distance: 0.6,
+        },
       });
 
       const content = getContent(result);
@@ -324,7 +337,7 @@ describe('MCP UI Automation Tools (e2e)', () => {
 
       const result = await harness.client.callTool({
         name: 'tap',
-        arguments: { x: 100, y: 200 },
+        arguments: { elementRef: 'e1' },
       });
 
       expect(isErrorResponse(result)).toBe(true);
@@ -380,7 +393,7 @@ describe('MCP UI Automation Tools (e2e)', () => {
       expect(isErrorResponse(result)).toBe(true);
     });
 
-    it('returns error for swipe with missing coordinates', async () => {
+    it('returns error for swipe with missing semantic target', async () => {
       await setSimulatorDefaults();
       harness.resetCapturedCommands();
 

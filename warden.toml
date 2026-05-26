@@ -120,7 +120,6 @@ actions = ["opened", "synchronize", "reopened"]
 [[skills]]
 name = "xcodebuildmcp-snapshot-fixture-review"
 paths = [
-  "src/snapshot-tests/__fixtures__/**",
   "src/snapshot-tests/contracts.ts",
   "src/snapshot-tests/fixture-io.ts",
   "src/snapshot-tests/__tests__/fixture-io.test.ts",
@@ -159,6 +158,9 @@ paths = [
   "xcodebuildmcp.com/app/docs/_content/testing.mdx",
   "xcodebuildmcp.com/app/docs/_content/contributing.mdx",
 ]
+ignorePaths = [
+  "src/snapshot-tests/__fixtures__/**",
+]
 
 [[skills.triggers]]
 type = "pull_request"
@@ -187,6 +189,9 @@ actions = ["opened", "synchronize", "reopened"]
 name = "wrdn-pii"
 remote = "getsentry/warden-skills"
 paths = ["**/*"]
+ignorePaths = [
+  "src/snapshot-tests/__fixtures__/**",
+]
 
 [[skills.triggers]]
 type = "pull_request"

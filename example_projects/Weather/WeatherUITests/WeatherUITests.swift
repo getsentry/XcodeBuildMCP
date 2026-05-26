@@ -69,7 +69,6 @@ final class WeatherUITests: XCTestCase {
     @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments.append("--mock-weather-api")
         app.launch()
         return app
     }

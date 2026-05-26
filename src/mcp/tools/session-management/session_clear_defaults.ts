@@ -83,7 +83,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SessionClearDefaul
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-defaults',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

@@ -36,6 +36,7 @@ export async function xcodeToolsBridgeSyncLogic(params: Params): Promise<void> {
     executionContext,
     result,
     'xcodebuildmcp.output.xcode-bridge-sync',
+    '2',
   );
 }
 

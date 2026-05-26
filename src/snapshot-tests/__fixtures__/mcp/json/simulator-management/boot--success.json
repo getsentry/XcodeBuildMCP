@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "boot"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  },
+  "nextSteps": [
+    "Open the Simulator app (makes it visible): open_sim()",
+    "Install an app: install_app_sim({ simulatorId: \"<UUID>\", appPath: \"PATH_TO_YOUR_APP\" })",
+    "Launch an app: launch_app_sim({ simulatorId: \"<UUID>\", bundleId: \"YOUR_APP_BUNDLE_ID\" })"
+  ]
+}

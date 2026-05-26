@@ -6,7 +6,7 @@ names:
 description: Install app on device.
 outputSchema:
   schema: xcodebuildmcp.output.install-result
-  version: "1"
+  version: "2"
 annotations:
   title: Install App Device
   readOnlyHint: false

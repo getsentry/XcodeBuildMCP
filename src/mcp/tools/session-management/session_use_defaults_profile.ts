@@ -56,7 +56,7 @@ function setStructuredOutput(
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.session-profile',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

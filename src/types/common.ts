@@ -15,6 +15,14 @@
 /**
  * Represents a suggested next step that can be rendered for CLI or MCP.
  */
+export type NextStepParamValue =
+  | string
+  | number
+  | boolean
+  | null
+  | NextStepParamValue[]
+  | { [key: string]: NextStepParamValue };
+
 export interface NextStep {
   /** Optional MCP tool name (e.g., "boot_sim") */
   tool?: string;
@@ -25,20 +33,20 @@ export interface NextStep {
   /** Human-readable description of the action (optional when manifest template provides it) */
   label?: string;
   /** Optional parameters to pass to the tool */
-  params?: Record<string, string | number | boolean>;
+  params?: Record<string, NextStepParamValue>;
   /** Optional ordering hint for merged steps */
   priority?: number;
   /** When to show this step: 'always' (default), 'success', or 'failure' */
   when?: 'always' | 'success' | 'failure';
 }
 
-export type NextStepParams = Record<string, string | number | boolean>;
+export type NextStepParams = Record<string, NextStepParamValue>;
 export type NextStepParamsMap = Record<string, NextStepParams | NextStepParams[]>;
 
 /**
- * Output style controls verbosity of tool responses.
- * - 'normal': Full output including next steps
- * - 'minimal': Essential result only, no next steps
+ * Output style controls compactness of final tool output.
+ * - 'normal': Detailed, human-friendly CLI text and JSON output
+ * - 'minimal': Compact MCP-like text and JSON output while preserving next steps
  */
 export type OutputStyle = 'normal' | 'minimal';
 

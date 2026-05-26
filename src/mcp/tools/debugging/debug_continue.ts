@@ -54,7 +54,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DebugContinueResul
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.debug-session-action',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

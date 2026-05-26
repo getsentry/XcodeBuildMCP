@@ -6,7 +6,7 @@ names:
 description: swift package target build.
 outputSchema:
   schema: xcodebuildmcp.output.build-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

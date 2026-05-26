@@ -4,13 +4,11 @@ sessionDefaultsProfiles:
     workspacePath: ./iOS_Calculator/CalculatorApp.xcworkspace
     scheme: CalculatorApp
     simulatorName: iPhone 17 Pro
-    simulatorId: B38FE93D-578B-454B-BE9A-C6FA0CE5F096
     simulatorPlatform: iOS Simulator
   ios-test:
     projectPath: ./iOS/MCPTest.xcodeproj
     scheme: MCPTest
     simulatorName: iPhone 17 Pro
-    simulatorId: B38FE93D-578B-454B-BE9A-C6FA0CE5F096
     simulatorPlatform: iOS Simulator
   macos-test:
     projectPath: ./macOS/MCPTest.xcodeproj

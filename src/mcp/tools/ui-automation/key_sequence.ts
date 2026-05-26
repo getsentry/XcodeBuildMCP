@@ -18,6 +18,11 @@ import {
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import {
+  clearRuntimeSnapshot,
+  withSimulatorUiAutomationTransaction,
+} from './shared/snapshot-ui-state.ts';
+import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -26,6 +31,7 @@ import {
   createUiActionSuccessResult,
   mapAxeCommandError,
   setUiActionStructuredOutput,
+  shouldInvalidateRuntimeSnapshotAfterActionError,
 } from './shared/domain-result.ts';
 
 const keySequenceSchema = z.object({
@@ -33,8 +39,13 @@ const keySequenceSchema = z.object({
   keyCodes: z
     .array(z.number().int().min(0).max(255))
     .min(1, { message: 'At least one key code required' })
-    .describe('HID keycodes'),
-  delay: z.number().min(0, { message: 'Delay must be non-negative' }).optional(),
+    .max(100, { message: 'At most 100 key codes are supported' })
+    .describe('HID keycodes. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.'),
+  delay: z
+    .number()
+    .min(0, { message: 'Delay must be non-negative' })
+    .max(5, { message: 'Delay must be at most 5 seconds' })
+    .optional(),
 });
 
 type KeySequenceParams = z.infer<typeof keySequenceSchema>;
@@ -47,44 +58,62 @@ export function createKeySequenceExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
 ): NonStreamingExecutor<KeySequenceParams, KeySequenceResult> {
-  return async (params) => {
-    const toolName = 'key_sequence';
-    const { simulatorId, keyCodes, delay } = params;
-    const action = { type: 'key-sequence' as const, keyCodes };
+  return async (params) =>
+    withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
+      const toolName = 'key_sequence';
+      const { simulatorId, keyCodes, delay } = params;
+      const action = { type: 'key-sequence' as const, keyCodes };
 
-    const guard = await guardUiAutomationAgainstStoppedDebugger({
-      debugger: debuggerManager,
-      simulatorId,
-      toolName,
+      const guard = await guardUiAutomationAgainstStoppedDebugger({
+        debugger: debuggerManager,
+        simulatorId,
+        toolName,
+      });
+      if (guard.blockedMessage) {
+        return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      const commandArgs = ['key-sequence', '--keycodes', keyCodes.join(',')];
+      if (delay !== undefined) {
+        commandArgs.push('--delay', String(delay));
+      }
+
+      log(
+        'info',
+        `${LOG_PREFIX}/${toolName}: Starting key sequence [${keyCodes.join(',')}] on ${simulatorId}`,
+      );
+
+      try {
+        await executeAxeCommand(commandArgs, simulatorId, 'key-sequence', executor, axeHelpers);
+        clearRuntimeSnapshot(simulatorId);
+        log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
+      } catch (error) {
+        if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
+          clearRuntimeSnapshot(simulatorId);
+        }
+        const failure = mapAxeCommandError(error, {
+          axeFailureMessage: () => 'Failed to execute key sequence.',
+        });
+        log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
+        return createUiActionFailureResult(action, simulatorId, failure.message, {
+          details: failure.diagnostics?.errors.map((entry) => entry.message),
+        });
+      }
     });
-    if (guard.blockedMessage) {
-      return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-    }
-
-    const commandArgs = ['key-sequence', '--keycodes', keyCodes.join(',')];
-    if (delay !== undefined) {
-      commandArgs.push('--delay', String(delay));
-    }
-
-    log(
-      'info',
-      `${LOG_PREFIX}/${toolName}: Starting key sequence [${keyCodes.join(',')}] on ${simulatorId}`,
-    );
-
-    try {
-      await executeAxeCommand(commandArgs, simulatorId, 'key-sequence', executor, axeHelpers);
-      log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-      return createUiActionSuccessResult(action, simulatorId, [guard.warningText]);
-    } catch (error) {
-      const failure = mapAxeCommandError(error, {
-        axeFailureMessage: () => 'Failed to execute key sequence.',
-      });
-      log('error', `${LOG_PREFIX}/${toolName}: Failed - ${failure.message}`);
-      return createUiActionFailureResult(action, simulatorId, failure.message, {
-        details: failure.diagnostics?.errors.map((entry) => entry.message),
-      });
-    }
-  };
 }
 
 export async function key_sequenceLogic(

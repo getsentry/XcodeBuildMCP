@@ -1,0 +1,10 @@
+
+🐛 LLDB Command
+
+   Command: breakpoint list
+
+Errors (1):
+
+  ✗ No active debug session. Provide debugSessionId or attach first.
+
+❌ Failed to run LLDB command.

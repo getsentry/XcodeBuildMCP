@@ -3,7 +3,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { SnapshotResult, SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import {
+  isCliSnapshotRuntime,
+  type SnapshotResult,
+  type SnapshotRuntime,
+  type WorkflowSnapshotHarness,
+} from '../contracts.ts';
 import { getSnapshotHarnessEnv } from '../harness.ts';
 import { isXcodeIdeBridgeAvailable } from '../xcode-ide-availability.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
@@ -97,7 +102,7 @@ export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
     let documentationSearchReady = false;
 
     beforeAll(async () => {
-      if (runtime === 'cli') {
+      if (isCliSnapshotRuntime(runtime)) {
         tempDir = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-xcode-ide-snapshot-'));
         socketPath = join(tempDir, 'daemon.sock');
         daemonEnv = {
@@ -138,7 +143,7 @@ export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
 
     afterAll(async () => {
       await harness.cleanup();
-      if (runtime === 'cli') {
+      if (isCliSnapshotRuntime(runtime)) {
         try {
           execFileSync('node', [CLI_PATH, '--socket', socketPath, 'daemon', 'stop'], {
             env: getSnapshotHarnessEnv(daemonEnv),

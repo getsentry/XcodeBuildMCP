@@ -51,7 +51,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: ToggleSoftwareKeyb
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.simulator-action-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

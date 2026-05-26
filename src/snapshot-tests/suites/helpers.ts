@@ -1,7 +1,11 @@
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { createFixtureMatcher, type FixtureMatchOptions } from '../fixture-io.ts';
-import { createSnapshotHarness, type CreateSnapshotHarnessOptions } from '../harness.ts';
-import { createJsonSnapshotHarness } from '../json-harness.ts';
+import {
+  createCliJsonSnapshotHarness,
+  createSnapshotHarness,
+  type CreateSnapshotHarnessOptions,
+} from '../harness.ts';
+import { createMcpJsonSnapshotHarness } from '../json-harness.ts';
 import { createMcpSnapshotHarness, type CreateMcpSnapshotHarnessOptions } from '../mcp-harness.ts';
 
 const COMPILER_ERROR_EXTRA_ARGS = ['OTHER_SWIFT_FLAGS=$(inherited) -D SNAPSHOT_COMPILER_ERROR'];
@@ -14,15 +18,16 @@ export function createHarnessForRuntime(
   runtime: SnapshotRuntime,
   options: CreateHarnessForRuntimeOptions = {},
 ): Promise<WorkflowSnapshotHarness> {
-  if (runtime === 'mcp') {
-    return createMcpSnapshotHarness(options);
+  switch (runtime) {
+    case 'cli/text':
+      return createSnapshotHarness(options);
+    case 'cli/json':
+      return createCliJsonSnapshotHarness(options);
+    case 'mcp/text':
+      return createMcpSnapshotHarness(options);
+    case 'mcp/json':
+      return createMcpJsonSnapshotHarness(options);
   }
-
-  if (runtime === 'json') {
-    return createJsonSnapshotHarness(options);
-  }
-
-  return createSnapshotHarness(options);
 }
 
 export interface WorkflowFixtureMatcherOptions extends FixtureMatchOptions {

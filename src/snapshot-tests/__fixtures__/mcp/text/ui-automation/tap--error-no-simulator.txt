@@ -1,0 +1,9 @@
+
+👆 Tap
+
+Recovery
+  Code: SNAPSHOT_MISSING
+  Message: No runtime UI snapshot is available for this simulator.
+  Hint: Run snapshot_ui for this simulator, then retry with an elementRef from that snapshot.
+
+❌ No runtime UI snapshot is available for this simulator.

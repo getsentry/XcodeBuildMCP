@@ -6,7 +6,7 @@ names:
 description: Build for iOS sim (compile-only, no launch).
 outputSchema:
   schema: xcodebuildmcp.output.build-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

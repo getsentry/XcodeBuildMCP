@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
-import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
+import { extractAppPathFromSnapshotResult } from '../output-parsers.ts';
 import {
   compilerErrorExtraArgs,
   createHarnessForRuntime,
@@ -192,7 +192,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(appPathResult.isError).toBe(false);
 
-        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
+        const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
         const { text, isError } = await harness.invoke('macos', 'launch', {
           appPath,
@@ -220,7 +220,7 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         });
         expect(appPathResult.isError).toBe(false);
 
-        const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
+        const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
         await harness.invoke('macos', 'launch', { appPath });
 

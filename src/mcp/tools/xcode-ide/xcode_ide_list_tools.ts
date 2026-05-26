@@ -43,7 +43,7 @@ export async function xcodeIdeListToolsLogic(params: Params): Promise<void> {
     executionContext,
     result,
     'xcodebuildmcp.output.xcode-bridge-tool-list',
-    '2',
+    '3',
   );
 }
 

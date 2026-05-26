@@ -6,7 +6,7 @@ names:
 description: Add breakpoint.
 outputSchema:
   schema: xcodebuildmcp.output.debug-breakpoint-result
-  version: "1"
+  version: "2"
 routing:
   stateful: true
 annotations:

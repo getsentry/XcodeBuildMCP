@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
-import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import {
+  isJsonSnapshotRuntime,
+  isMcpSnapshotRuntime,
+  type SnapshotRuntime,
+  type WorkflowSnapshotHarness,
+} from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
@@ -35,7 +40,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
     describe('shared snapshots', () => {
       beforeEach(async () => {
-        if (runtime === 'json') {
+        if (isJsonSnapshotRuntime(runtime)) {
           await harness.invoke('session-management', 'clear-defaults', { all: true });
           return;
         }
@@ -57,7 +62,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-show-defaults', () => {
         it('success', async () => {
-          if (runtime === 'json') {
+          if (isJsonSnapshotRuntime(runtime)) {
             await seedSessionDefaults();
           }
 
@@ -69,7 +74,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-clear-defaults', () => {
         it('success', async () => {
-          if (runtime === 'json') {
+          if (isJsonSnapshotRuntime(runtime)) {
             await harness.invoke('session-management', 'set-defaults', {
               workspacePath: WORKSPACE,
               scheme: 'CalculatorApp',
@@ -88,7 +93,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-use-defaults-profile', () => {
         it('success', async () => {
-          if (runtime === 'json') {
+          if (isJsonSnapshotRuntime(runtime)) {
             await seedSessionDefaults();
           }
 
@@ -102,7 +107,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-sync-xcode-defaults', () => {
         it('success', async () => {
-          if (runtime === 'json') {
+          if (isJsonSnapshotRuntime(runtime)) {
             await seedSessionDefaults();
             await harness.invoke('project-discovery', 'show-build-settings', {
               workspacePath: WORKSPACE,
@@ -117,10 +122,17 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
       });
     });
 
-    if (runtime !== 'cli') {
+    if (isMcpSnapshotRuntime(runtime)) {
       describe('mcp-only extras', () => {
         beforeEach(async () => {
           await harness.invoke('session-management', 'clear-defaults', { all: true });
+        });
+
+        afterEach(async () => {
+          await harness.invoke('session-management', 'use-defaults-profile', {
+            global: true,
+            persist: true,
+          });
         });
 
         it('session-show-defaults -- empty', async () => {
@@ -135,6 +147,27 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
           });
           expect(isError).toBe(false);
           expectFixture(text, 'session-set-defaults--scheme');
+        });
+
+        it('session-use-defaults-profile -- persist success', async () => {
+          await harness.invoke('session-management', 'set-defaults', {
+            profile: 'MyCustomProfile',
+            createIfNotExists: true,
+            workspacePath: WORKSPACE,
+            scheme: 'CalculatorApp',
+          });
+          await harness.invoke('session-management', 'use-defaults-profile', { global: true });
+
+          const { text, isError } = await harness.invoke(
+            'session-management',
+            'use-defaults-profile',
+            {
+              profile: 'MyCustomProfile',
+              persist: true,
+            },
+          );
+          expect(isError).toBe(false);
+          expectFixture(text, 'session-use-defaults-profile--persist-success');
         });
       });
     }

@@ -9,6 +9,8 @@ const APPLE_DEVICE_UDID_REGEX = /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}/g;
 const UUID_REGEX = /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/g;
 const DURATION_REGEX = /\d+\.\d+s\b/g;
 const PID_NUMBER_REGEX = /(pid:\s*)\d+/gi;
+const PID_NAME_REGEX = /\bPID \d+\b/g;
+const KILL_PID_REGEX = /(\bkill:\s*)\d+(?=:)/g;
 const PID_FILENAME_SUFFIX_REGEX = /_pid\d+(?:_[0-9a-f]{8})?\.log/g;
 const XCRESULT_FILENAME_PID_SUFFIX_REGEX = /_pid\d+_[0-9a-f]{8}\.xcresult/g;
 const HELPER_PID_FILENAME_SUFFIX_REGEX =
@@ -16,12 +18,13 @@ const HELPER_PID_FILENAME_SUFFIX_REGEX =
 const PID_JSON_REGEX = /"pid"\s*:\s*\d+/g;
 const PROCESS_ID_REGEX = /Process ID: \d+/g;
 const PROCESS_INLINE_PID_REGEX = /process \d+/g;
-const CLI_PROCESS_ID_ARG_REGEX = /--process-id "\d+"/g;
+const CLI_PROCESS_ID_ARG_REGEX = /--process-id (["']?)\d+\1/g;
 const MCP_PROCESS_ID_ARG_REGEX = /(processId:\s*)\d+/g;
 const THREAD_ID_REGEX = /Thread \d{5,}/g;
 const HEX_ADDRESS_REGEX = /0x[0-9a-fA-F]{8,}/g;
 
 const LLDB_FRAME_OFFSET_REGEX = /(`[^`\n]+):(\d+)$/gm;
+const LLDB_BREAKPOINT_BYTE_OFFSET_REGEX = /\+ \d+ at /g;
 const LLDB_SYS_FRAME_FUNC_REGEX =
   /(frame #\d+: )\S+( at (?:\/usr\/lib\/|\/Library\/Developer\/CoreSimulator\/)[^`\n]*`)[^:\n]+(:<OFFSET>)/gm;
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
@@ -38,6 +41,26 @@ const UPTIME_REGEX = /Uptime: \d+s/g;
 const RESULT_BUNDLE_LINE_REGEX = /\S+\[\d+:\d+\] Writing error result bundle to \S+/g;
 const DEVICE_TRANSPORT_TYPE_REGEX = /\b(wired|localNetwork)\b/g;
 const TARGET_DEVICE_IDENTIFIER_REGEX = /(TARGET_DEVICE_IDENTIFIER = )([0-9A-Fa-f]{24,40})/g;
+const TARGET_DEVICE_MODEL_REGEX =
+  /((?:TARGET_DEVICE_MODEL|ASSETCATALOG_FILTER_FOR_DEVICE_MODEL) = ).+$/gm;
+const TARGET_DEVICE_OS_VERSION_REGEX =
+  /((?:TARGET_DEVICE_OS_VERSION|ASSETCATALOG_FILTER_FOR_DEVICE_OS_VERSION) = ).+$/gm;
+const DEVICE_OS_VERSION_LINE_REGEX = /(\bOS: )\d+(?:\.\d+)*(?:\s*\([^)]*\))?/g;
+const XCODE_APPLICATION_PATH_REGEX = /\/Applications\/Xcode(?:[^/\s]+)?\.app/g;
+const APPLE_SDK_BUNDLE_REGEX =
+  /\b(?:iPhoneOS|iPhoneSimulator|AppleTVOS|AppleTVSimulator|WatchOS|WatchSimulator|XROS|XRSimulator|MacOSX)\d+(?:\.\d+)*\.sdk/g;
+const XCODE_CACHE_ROOT_REGEX = /((?:CACHE_ROOT|CCHROOT) = ).+$/gm;
+const BUILD_SETTINGS_GROUP_REGEX = /^(\s*(?:ALTERNATE_GROUP|GROUP|INSTALL_GROUP) = ).+$/gm;
+const BUILD_SETTINGS_GID_REGEX = /^(\s*GID = )\d+$/gm;
+const SDK_PATH_REGEX =
+  /^(\s*(?:CORRESPONDING_SIMULATOR_SDK_DIR|SDKROOT|SDK_DIR(?:_[A-Za-z0-9_]+)?) = ).+$/gm;
+const SDK_DIR_PLACEHOLDER_KEY_REGEX = /^(\s*)SDK_DIR_[A-Za-z0-9_]+ = <SDK_PATH>$/gm;
+const SDK_NAME_REGEX = /^(\s*(?:CORRESPONDING_SIMULATOR_SDK_NAME|SDK_NAMES?) = ).+$/gm;
+const SDK_BUILD_VERSION_REGEX =
+  /^(\s*(?:PLATFORM_PRODUCT_BUILD_VERSION|SDK_PRODUCT_BUILD_VERSION|MAC_OS_X_PRODUCT_BUILD_VERSION) = ).+$/gm;
+const SDK_STAT_CACHE_PATH_REGEX = /^(\s*SDK_STAT_CACHE_PATH = ).+$/gm;
+const SDK_VERSION_REGEX =
+  /^(\s*(?:SDK_VERSION|SDK_VERSION_ACTUAL|SDK_VERSION_MAJOR|SDK_VERSION_MINOR|MAC_OS_X_VERSION_ACTUAL|MAC_OS_X_VERSION_MAJOR|MAC_OS_X_VERSION_MINOR) = ).+$/gm;
 const CODEX_ARG0_PATH_REGEX = /<HOME>\/\.codex\/tmp\/arg0\/codex-arg0[A-Za-z0-9]+/g;
 const CODEX_WORKTREE_NODE_MODULES_REGEX =
   /<HOME>\/\.codex\/worktrees\/[^/:]+\/node_modules\/\.bin/g;
@@ -49,6 +72,7 @@ const XCODE_IDE_ARTIFACT_HASH_REGEX =
   /(\/state\/xcode-ide\/call-tool\/[^/\n]+\/[^/\n]+-)[0-9a-f]{8}(?=\.json)/g;
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
+const UI_SNAPSHOT_TIME_TEXT_ROW_REGEX = /\b(e\d+\|text\|text\|)\d{1,2}:\d{2}(\|\|)/g;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
 const SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX =
@@ -159,13 +183,18 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(DEVICE_TRANSPORT_TYPE_REGEX, '<CONNECTION>');
   normalized = normalized.replace(DURATION_REGEX, '<DURATION>');
   normalized = normalized.replace(PID_NUMBER_REGEX, '$1<PID>');
+  normalized = normalized.replace(PID_NAME_REGEX, 'PID <PID>');
+  normalized = normalized.replace(KILL_PID_REGEX, '$1<PID>');
   normalized = normalized.replace(HELPER_PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(XCRESULT_FILENAME_PID_SUFFIX_REGEX, '_pid<PID>.xcresult');
   normalized = normalized.replace(PID_JSON_REGEX, '"pid" : <PID>');
   normalized = normalized.replace(PROCESS_ID_REGEX, 'Process ID: <PID>');
   normalized = normalized.replace(PROCESS_INLINE_PID_REGEX, 'process <PID>');
-  normalized = normalized.replace(CLI_PROCESS_ID_ARG_REGEX, '--process-id "<PID>"');
+  normalized = normalized.replace(
+    CLI_PROCESS_ID_ARG_REGEX,
+    (_match: string, quote: string) => `--process-id ${quote}<PID>${quote}`,
+  );
   normalized = normalized.replace(MCP_PROCESS_ID_ARG_REGEX, '$1<PID>');
   normalized = normalized.replace(UPTIME_REGEX, 'Uptime: <UPTIME>');
 
@@ -178,6 +207,7 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
   normalized = normalized.replace(LLDB_FRAME_OFFSET_REGEX, '$1:<OFFSET>');
+  normalized = normalized.replace(LLDB_BREAKPOINT_BYTE_OFFSET_REGEX, '+ <OFFSET> at ');
   normalized = normalized.replace(LLDB_SYS_FRAME_FUNC_REGEX, '$1<FUNC>$2<FUNC>$3');
   normalized = normalized.replace(LLDB_FRAME_NUMBER_REGEX, '  frame #<N>:');
   normalized = normalized.replace(LLDB_BREAKPOINT_LOCATIONS_REGEX, 'locations = <LOCATIONS>');
@@ -189,9 +219,30 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(TEST_SUMMARY_COUNTS_REGEX, '(<TEST_COUNTS>, ');
 
   normalized = normalized.replace(TARGET_DEVICE_IDENTIFIER_REGEX, '$1<UUID>');
+  normalized = normalized.replace(TARGET_DEVICE_MODEL_REGEX, '$1<DEVICE_MODEL>');
+  normalized = normalized.replace(TARGET_DEVICE_OS_VERSION_REGEX, '$1<OS_VERSION>');
+  normalized = normalized.replace(DEVICE_OS_VERSION_LINE_REGEX, '$1<OS_VERSION>');
+  normalized = normalized.replace(
+    XCODE_APPLICATION_PATH_REGEX,
+    '/Applications/Xcode-<VERSION>.app',
+  );
+  normalized = normalized.replace(APPLE_SDK_BUNDLE_REGEX, '<SDK_NAME>.sdk');
+  normalized = normalized.replace(XCODE_CACHE_ROOT_REGEX, '$1<XCODE_CACHE_ROOT>');
+  normalized = normalized.replace(BUILD_SETTINGS_GROUP_REGEX, '$1<GROUP>');
+  normalized = normalized.replace(BUILD_SETTINGS_GID_REGEX, '$1<GID>');
+  normalized = normalized.replace(SDK_PATH_REGEX, '$1<SDK_PATH>');
+  normalized = normalized.replace(
+    SDK_DIR_PLACEHOLDER_KEY_REGEX,
+    '$1SDK_DIR_<SDK_NAME> = <SDK_PATH>',
+  );
+  normalized = normalized.replace(SDK_NAME_REGEX, '$1<SDK_NAME>');
+  normalized = normalized.replace(SDK_BUILD_VERSION_REGEX, '$1<SDK_BUILD_VERSION>');
+  normalized = normalized.replace(SDK_STAT_CACHE_PATH_REGEX, '$1<SDK_STAT_CACHE_PATH>');
+  normalized = normalized.replace(SDK_VERSION_REGEX, '$1<SDK_VERSION>');
   normalized = normalized.replace(BUILD_SETTINGS_PATH_REGEX, '$1<PATH>');
   normalized = normalized.replace(CODEX_ARG0_PATH_REGEX, '<HOME>/.codex/tmp/arg0/codex-arg0<ARG0>');
   normalized = normalized.replace(ACQUIRED_USAGE_ASSERTION_TIME_REGEX, '$1<TIME>$2');
+  normalized = normalized.replace(UI_SNAPSHOT_TIME_TEXT_ROW_REGEX, '$1<TIME>$2');
   normalized = normalized.replace(
     CODEX_WORKTREE_NODE_MODULES_REGEX,
     '<HOME>/.codex/worktrees/<WORKTREE>/node_modules/.bin',
@@ -252,7 +303,7 @@ export function normalizeSnapshotOutput(text: string): string {
     '  selectedXcode: <XCODE_PATH>',
   );
   normalized = normalized.replace(/  xcrunVersion: xcrun version .+/g, '  xcrunVersion: <VERSION>');
-  normalized = normalized.replace(/  axe: v?[\d.]+[^\n]*/g, '  axe: <VERSION>');
+  normalized = normalized.replace(/  axe: .+/g, '  axe: <VERSION>');
   normalized = normalized.replace(/  mise: v?[\d.]+[^\n]*/g, '  mise: <VERSION>');
   normalized = normalized.replace(
     /  mcpbridge path: \/Applications\/Xcode[^\n]+/g,

@@ -9,6 +9,7 @@ import { groupToolsByWorkflow } from '../runtime/tool-catalog.ts';
 import { getWorkflowMetadataFromManifest } from '../core/manifest/load-manifest.ts';
 import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
 import type { ToolHandlerContext } from '../rendering/types.ts';
+import type { OutputStyle } from '../types/common.ts';
 import type { FilePathRenderStyle } from '../utils/runtime-config-types.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';
 import { transcriptEmitterStorage } from '../utils/transcript-context.ts';
@@ -16,6 +17,7 @@ import {
   getCliSessionDefaultsForTool,
   isKnownCliSessionDefaultsProfile,
   mergeCliSessionDefaults,
+  resolveCliSessionDefaults,
 } from './session-defaults.ts';
 import { createRenderSession } from '../rendering/render.ts';
 import { toStructuredEnvelope } from '../utils/structured-output-envelope.ts';
@@ -25,6 +27,8 @@ import {
   STRUCTURED_ERROR_SCHEMA_VERSION,
 } from '../utils/structured-error.ts';
 import { toCliJsonlEvent } from './jsonl-event.ts';
+import { resolveSimulatorNameToId } from '../utils/simulator-resolver.ts';
+import { getDefaultCommandExecutor } from '../utils/execution/index.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -92,14 +96,28 @@ function createBufferedHandlerContext(
   };
 }
 
-function writeJsonOutput(handlerContext: ToolHandlerContext): boolean {
-  const structuredOutput = handlerContext.structuredOutput;
+const UI_ACTION_RESULT_SCHEMA = 'xcodebuildmcp.output.ui-action-result';
+const UI_ACTION_RESULT_VERBOSE_SCHEMA_VERSION = '3';
 
+function writeJsonOutput(
+  handlerContext: ToolHandlerContext,
+  session: ReturnType<typeof createRenderSession>,
+  options: { outputStyle: OutputStyle; verbose?: boolean },
+): boolean {
+  const { structuredOutput } = handlerContext;
   const envelope = structuredOutput
     ? toStructuredEnvelope(
         structuredOutput.result,
         structuredOutput.schema,
-        structuredOutput.schemaVersion,
+        structuredOutput.schema === UI_ACTION_RESULT_SCHEMA && options.verbose === true
+          ? UI_ACTION_RESULT_VERBOSE_SCHEMA_VERSION
+          : structuredOutput.schemaVersion,
+        {
+          nextSteps: session.getNextSteps?.(),
+          nextStepRuntime: session.getNextStepsRuntime?.(),
+          outputStyle: options.outputStyle,
+          runtimeSnapshot: options.verbose ? 'full' : 'compact',
+        },
       )
     : toStructuredEnvelope(
         createStructuredErrorOutput({
@@ -109,6 +127,7 @@ function writeJsonOutput(handlerContext: ToolHandlerContext): boolean {
         }).result,
         STRUCTURED_ERROR_SCHEMA,
         STRUCTURED_ERROR_SCHEMA_VERSION,
+        { outputStyle: options.outputStyle },
       );
 
   process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
@@ -242,12 +261,18 @@ function registerToolSubcommand(
         describe: 'Output format',
       });
 
+      subYargs.option('verbose', {
+        type: 'boolean',
+        default: false,
+        describe: 'Render verbose output data when supported',
+      });
+
       // Group options for cleaner help display
       if (toolArgNames.length > 0) {
         subYargs.group(toolArgNames, 'Tool Arguments:');
       }
       subYargs.group(['profile'], 'Session Defaults:');
-      subYargs.group(['json', 'output'], 'Output Options:');
+      subYargs.group(['json', 'output', 'verbose'], 'Output Options:');
 
       // Add note about unsupported keys if any
       if (unsupportedKeys.length > 0) {
@@ -275,9 +300,11 @@ function registerToolSubcommand(
       const jsonArg = argv.json as string | undefined;
       const profileOverride = argv.profile as string | undefined;
       const outputFormat = (argv.output as OutputFormat) ?? 'text';
+      const outputStyle: OutputStyle = argv.style === 'minimal' ? 'minimal' : 'normal';
       const socketPath = argv.socket as string;
       const logLevel = argv['log-level'] as string | undefined;
       const filePathRenderStyle = argv.filePathRenderStyle as FilePathRenderStyle | undefined;
+      const verboseOutput = argv.verbose === true;
 
       if (
         profileOverride &&
@@ -312,6 +339,7 @@ function registerToolSubcommand(
         'logLevel',
         'file-path-render-style',
         'filePathRenderStyle',
+        'verbose',
         '_',
         '$0',
       ]);
@@ -325,6 +353,10 @@ function registerToolSubcommand(
 
       // Merge: flag args first, then JSON overrides
       const explicitArgs = { ...toolParams, ...jsonArgs };
+      const rawDefaults = resolveCliSessionDefaults({
+        runtimeConfig: opts.runtimeConfig,
+        profileOverride,
+      });
       const args = mergeCliSessionDefaults({
         defaults: getCliSessionDefaultsForTool({
           tool,
@@ -333,6 +365,39 @@ function registerToolSubcommand(
         }),
         explicitArgs,
       });
+
+      if (
+        args.simulatorId === undefined &&
+        tool.cliSchema.simulatorId !== undefined &&
+        tool.cliSchema.simulatorName === undefined &&
+        typeof rawDefaults.simulatorName === 'string'
+      ) {
+        const resolvedSimulator = await resolveSimulatorNameToId(
+          getDefaultCommandExecutor(),
+          rawDefaults.simulatorName,
+        );
+        if (!resolvedSimulator.success) {
+          if (outputFormat === 'json') {
+            const errorOutput = createStructuredErrorOutput({
+              category: 'runtime',
+              code: 'SIMULATOR_RESOLUTION_FAILED',
+              message: resolvedSimulator.error,
+            });
+            const envelope = toStructuredEnvelope(
+              errorOutput.result,
+              errorOutput.schema,
+              errorOutput.schemaVersion,
+              { outputStyle },
+            );
+            process.stdout.write(JSON.stringify(envelope, null, 2) + '\n');
+          } else {
+            console.error(`Error: ${resolvedSimulator.error}`);
+          }
+          process.exitCode = 1;
+          return;
+        }
+        args.simulatorId = resolvedSimulator.simulatorId;
+      }
 
       const missingRequiredFlags = requiredFlagNames.filter((flagName) => {
         const camelKey = convertArgvToToolParams({ [flagName]: true });
@@ -361,7 +426,9 @@ function registerToolSubcommand(
         const session = createRenderSession(renderStrategy, {
           interactive: outputFormat === 'text' && process.stdout.isTTY === true,
           runtime: 'cli',
+          outputStyle,
           filePathRenderStyle,
+          includeNextSteps: outputStyle !== 'minimal',
         });
         const writeJsonlFragment =
           outputFormat === 'jsonl'
@@ -395,7 +462,7 @@ function registerToolSubcommand(
         }
 
         if (outputFormat === 'json') {
-          if (writeJsonOutput(handlerContext)) {
+          if (writeJsonOutput(handlerContext, session, { outputStyle, verbose: verboseOutput })) {
             process.exitCode = 1;
           }
           return;

@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as z from 'zod';
-import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import { createMockCommandResponse } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, launch_app_simLogic, type SimulatorLauncher } from '../launch_app_sim.ts';
 import type { LaunchWithLoggingResult } from '../../../../utils/simulator-steps.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+
+const availableSimulatorsJson = JSON.stringify({
+  devices: {
+    'iOS 26.0': [{ name: 'iPhone 17', udid: 'resolved-uuid', isAvailable: true }],
+  },
+});
 
 function createMockLauncher(overrides?: Partial<LaunchWithLoggingResult>): SimulatorLauncher {
   return async (_uuid, _bundleId, _executor, _opts?) => ({
@@ -48,7 +54,7 @@ describe('launch_app_sim tool', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulator identifier when not provided', async () => {
-      const result = await handler({ bundleId: 'io.sentry.testapp' });
+      const result = await callHandler(handler, { bundleId: 'io.sentry.testapp' });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -59,7 +65,7 @@ describe('launch_app_sim tool', () => {
     it('should require bundleId when simulatorId default exists', async () => {
       sessionStore.setDefaults({ simulatorId: 'SIM-UUID' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
@@ -67,7 +73,7 @@ describe('launch_app_sim tool', () => {
     });
 
     it('should reject when both simulatorId and simulatorName provided explicitly', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         simulatorId: 'SIM-UUID',
         simulatorName: 'iPhone 17',
         bundleId: 'io.sentry.testapp',
@@ -141,6 +147,75 @@ describe('launch_app_sim tool', () => {
 
       expect(capturedArgs).toEqual(['--debug', '--verbose']);
       expect(capturedEnv).toEqual({ STAGING_ENABLED: '1' });
+    });
+
+    it('should resolve simulatorName before checking install and launching', async () => {
+      const executorCalls: string[][] = [];
+      const installCheckExecutor = async (command: string[]) => {
+        executorCalls.push(command);
+        if (command.includes('list')) {
+          return createMockCommandResponse({ success: true, output: availableSimulatorsJson });
+        }
+        return createMockCommandResponse({ success: true, output: '/path/to/app/container' });
+      };
+      let launchedUuid: string | undefined;
+      const trackingLauncher: SimulatorLauncher = async (uuid, _bundleId, _executor, _opts?) => {
+        launchedUuid = uuid;
+        return { success: true, processId: 12345, logFilePath: '/tmp/test.log' };
+      };
+
+      const result = await runLogic(() =>
+        launch_app_simLogic(
+          {
+            simulatorName: 'iPhone 17',
+            bundleId: 'io.sentry.testapp',
+          },
+          installCheckExecutor,
+          trackingLauncher,
+        ),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(launchedUuid).toBe('resolved-uuid');
+      expect(executorCalls).toEqual([
+        ['xcrun', 'simctl', 'list', 'devices', 'available', '-j'],
+        ['xcrun', 'simctl', 'get_app_container', 'resolved-uuid', 'io.sentry.testapp', 'app'],
+      ]);
+      expect(result.nextStepParams).toEqual({
+        open_sim: {},
+        stop_app_sim: { simulatorId: 'resolved-uuid', bundleId: 'io.sentry.testapp' },
+      });
+    });
+
+    it('should report simulatorName resolution failures as simulator launch failures', async () => {
+      const executorCalls: string[][] = [];
+      const unavailableSimulatorsJson = JSON.stringify({ devices: { 'iOS 26.0': [] } });
+      const simulatorListExecutor = async (command: string[]) => {
+        executorCalls.push(command);
+        return createMockCommandResponse({ success: true, output: unavailableSimulatorsJson });
+      };
+      const unexpectedLauncher: SimulatorLauncher = async () => {
+        throw new Error('launch should not run when simulator resolution fails');
+      };
+
+      const result = await runLogic(() =>
+        launch_app_simLogic(
+          {
+            simulatorName: 'Missing Phone',
+            bundleId: 'io.sentry.testapp',
+          },
+          simulatorListExecutor,
+          unexpectedLauncher,
+        ),
+      );
+
+      const text = result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+      expect(result.isError).toBe(true);
+      expect(text).toContain('Launch App');
+      expect(text).not.toContain('Launch macOS App');
+      expect(text).toContain('Failed to launch app');
+      expect(text).toContain('Failed to resolve simulator');
+      expect(executorCalls).toEqual([['xcrun', 'simctl', 'list', 'devices', 'available', '-j']]);
     });
 
     it('should display friendly name when simulatorName is provided alongside resolved simulatorId', async () => {

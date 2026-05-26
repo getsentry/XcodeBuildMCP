@@ -1,0 +1,16 @@
+{
+  "schema": "xcodebuildmcp.output.bundle-id",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "appPath": "<TMPDIR>/BundleTest.app",
+      "bundleId": "com.test.snapshot-macos"
+    }
+  },
+  "nextSteps": [
+    "Launch the app: launch_mac_app({ appPath: \"<TMPDIR>/BundleTest.app\" })",
+    "Build again: build_macos({ scheme: \"SCHEME_NAME\" })"
+  ]
+}

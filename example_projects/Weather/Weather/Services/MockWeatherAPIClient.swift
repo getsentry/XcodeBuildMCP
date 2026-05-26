@@ -29,8 +29,10 @@ struct MockWeatherAPIClient: WeatherAPIClient, Sendable {
         guard !trimmed.isEmpty else { return [] }
 
         let needle = trimmed.localizedLowercase
-        return fixtures.searchPool.filter { location in
-            location.name.localizedLowercase.contains(needle)
+        var seenLocationIDs = Set<WeatherLocation.ID>()
+        return (fixtures.locations + fixtures.searchPool).filter { location in
+            guard seenLocationIDs.insert(location.id).inserted else { return false }
+            return location.name.localizedLowercase.contains(needle)
                 || location.subtitle.localizedLowercase.contains(needle)
                 || (location.country?.localizedLowercase.contains(needle) ?? false)
         }

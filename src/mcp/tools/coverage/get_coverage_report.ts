@@ -120,7 +120,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: GetCoverageReportR
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.coverage-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

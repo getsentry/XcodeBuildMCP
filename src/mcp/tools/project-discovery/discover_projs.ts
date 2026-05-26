@@ -301,7 +301,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: DiscoverProjsResul
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.project-list',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

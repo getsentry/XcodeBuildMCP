@@ -1,0 +1,32 @@
+{
+  "schema": "xcodebuildmcp.output.project-list",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "projectCount": 1,
+      "workspaceCount": 1,
+      "maxDepth": 3
+    },
+    "artifacts": {
+      "workspaceRoot": "<ROOT>/example_projects/iOS_Calculator",
+      "scanPath": "example_projects/iOS_Calculator"
+    },
+    "projects": [
+      {
+        "path": "example_projects/iOS_Calculator/CalculatorApp.xcodeproj"
+      }
+    ],
+    "workspaces": [
+      {
+        "path": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace"
+      }
+    ]
+  },
+  "nextSteps": [
+    "Save discovered project/workspace as session defaults: session_set_defaults()",
+    "Build and run once defaults are set: build_run_sim()"
+  ]
+}

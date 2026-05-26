@@ -6,7 +6,7 @@ names:
 description: One-shot connect + tools/list sync (manual retry; avoids background prompt spam).
 outputSchema:
   schema: xcodebuildmcp.output.xcode-bridge-sync
-  version: "1"
+  version: "2"
 predicates:
   - debugEnabled
 annotations:

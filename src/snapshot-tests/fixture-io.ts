@@ -1,6 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { FixtureKey, SnapshotRuntime } from './contracts.ts';
+import {
+  snapshotRuntimeFormat,
+  snapshotRuntimeTransport,
+  type FixtureKey,
+  type SnapshotRuntime,
+} from './contracts.ts';
 
 const FIXTURES_DIR = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
 
@@ -17,11 +22,11 @@ function shouldUpdateSnapshots(options?: FixtureMatchOptions): boolean {
 }
 
 export function fixturePathFor(key: FixtureKey): string {
-  if (key.runtime === 'json') {
-    return path.join(FIXTURES_DIR, 'json', key.workflow, `${key.scenario}.json`);
-  }
+  const transport = snapshotRuntimeTransport(key.runtime);
+  const format = snapshotRuntimeFormat(key.runtime);
+  const extension = format === 'json' ? 'json' : 'txt';
 
-  return path.join(FIXTURES_DIR, key.runtime, key.workflow, `${key.scenario}.txt`);
+  return path.join(FIXTURES_DIR, transport, format, key.workflow, `${key.scenario}.${extension}`);
 }
 
 function findCommonPrefixLength(left: string, right: string): number {

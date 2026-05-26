@@ -1,0 +1,24 @@
+{
+  "schema": "xcodebuildmcp.output.ui-action-result",
+  "schemaVersion": "2",
+  "didError": true,
+  "error": "No runtime UI snapshot is available for this simulator.",
+  "data": {
+    "summary": {
+      "status": "FAILED"
+    },
+    "action": {
+      "type": "type-text",
+      "elementRef": "e3",
+      "textLength": 5
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    },
+    "uiError": {
+      "code": "SNAPSHOT_MISSING",
+      "message": "No runtime UI snapshot is available for this simulator.",
+      "recoveryHint": "Run snapshot_ui for this simulator, then retry with an elementRef from that snapshot."
+    }
+  }
+}

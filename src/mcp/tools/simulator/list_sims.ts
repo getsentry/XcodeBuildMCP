@@ -176,7 +176,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: SimulatorListResul
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.simulator-list',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

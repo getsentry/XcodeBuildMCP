@@ -5,6 +5,13 @@ import type {
   TestDiagnostics,
   ToolDomainResult,
 } from '../../types/domain-results.ts';
+import type {
+  RuntimeElementV1,
+  RuntimeSnapshotUnchangedV1,
+  RuntimeSnapshotV1,
+  UiAutomationRecoverableError,
+  UiWaitMatch,
+} from '../../types/ui-snapshot.ts';
 import type { RenderHints } from '../../rendering/types.ts';
 import type { XcodebuildOperation } from '../../types/domain-fragments.ts';
 import type {
@@ -160,6 +167,8 @@ type CaptureResultWithVideo = Extract<ToolDomainResult, { kind: 'capture-result'
   capture?:
     | { format: string; width: number; height: number }
     | { type: 'ui-hierarchy'; uiHierarchy: unknown[] }
+    | RuntimeSnapshotV1
+    | RuntimeSnapshotUnchangedV1
     | VideoCapturePayload;
 };
 
@@ -787,7 +796,7 @@ function createLaunchResultItems(
 ): TextRenderableItem[] {
   const isSimulator = typeof result.artifacts.simulatorId === 'string';
   const isDevice = typeof result.artifacts.deviceId === 'string';
-  const isMac = !isSimulator && !isDevice;
+  const isMac = !isSimulator && !isDevice && typeof result.artifacts.appPath === 'string';
   const title = isMac ? 'Launch macOS App' : 'Launch App';
   const params: HeaderRenderItem['params'] = [];
 
@@ -806,7 +815,9 @@ function createLaunchResultItems(
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
   } else {
-    params.push({ label: 'Simulator', value: result.artifacts.simulatorId! });
+    if (result.artifacts.simulatorId) {
+      params.push({ label: 'Simulator', value: result.artifacts.simulatorId });
+    }
     if (result.artifacts.bundleId) {
       params.push({ label: 'Bundle ID', value: result.artifacts.bundleId });
     }
@@ -1157,6 +1168,255 @@ function createSessionProfileItems(
   return items;
 }
 
+const HIDDEN_RUNTIME_TARGET_LABELS = new Set(['sheet grabber']);
+
+const LOW_PRIORITY_RUNTIME_TARGET_LABELS = new Set([
+  'sheet grabber',
+  'close',
+  'clear search',
+  'remove',
+  'delete',
+  'clear',
+  'c',
+  'ac',
+  '±',
+  '%',
+  '÷',
+  '×',
+  '-',
+  '+',
+  '=',
+]);
+
+function compactRuntimeSnapshotText(value: string | undefined): string {
+  return (value ?? '').replace(/\s+/g, ' ').replace(/\|/g, '/').trim();
+}
+
+function normalizedRuntimeSnapshotText(value: string | undefined): string {
+  return compactRuntimeSnapshotText(value).toLowerCase();
+}
+
+function isHiddenRuntimeTarget(element: RuntimeElementV1): boolean {
+  return HIDDEN_RUNTIME_TARGET_LABELS.has(normalizedRuntimeSnapshotText(element.label));
+}
+
+function isLowPriorityRuntimeTarget(element: RuntimeElementV1): boolean {
+  return LOW_PRIORITY_RUNTIME_TARGET_LABELS.has(normalizedRuntimeSnapshotText(element.label));
+}
+
+function isContentRichTapTarget(element: RuntimeElementV1): boolean {
+  if (!element.actions.includes('tap')) {
+    return false;
+  }
+
+  const label = compactRuntimeSnapshotText(element.label);
+  const identifier = compactRuntimeSnapshotText(element.identifier);
+  return label.includes(',') || label.length >= 24 || /card$/i.test(identifier);
+}
+
+function isAlreadySelectedRuntimeTarget(element: RuntimeElementV1): boolean {
+  return (
+    element.state?.selected === true || normalizedRuntimeSnapshotText(element.value) === 'selected'
+  );
+}
+
+function getRuntimeTargetDisplayPriority(element: RuntimeElementV1): number {
+  if (isLowPriorityRuntimeTarget(element)) {
+    return 90;
+  }
+  if (isAlreadySelectedRuntimeTarget(element)) {
+    return 70;
+  }
+  if (isContentRichTapTarget(element)) {
+    return 0;
+  }
+  if (element.actions.includes('typeText')) {
+    return 10;
+  }
+  if (element.actions.includes('tap')) {
+    return 20;
+  }
+  return 50;
+}
+
+function sortRuntimeTargetsForDisplay(elements: RuntimeElementV1[]): RuntimeElementV1[] {
+  return elements
+    .map((element, index) => ({ element, index }))
+    .sort((left, right) => {
+      const priorityDelta =
+        getRuntimeTargetDisplayPriority(left.element) -
+        getRuntimeTargetDisplayPriority(right.element);
+      return priorityDelta === 0 ? left.index - right.index : priorityDelta;
+    })
+    .map(({ element }) => element);
+}
+
+function getPrimaryRuntimeElementAction(element: RuntimeElementV1, action?: string): string {
+  if (action) {
+    return action;
+  }
+  if (element.actions.includes('typeText')) {
+    return 'typeText';
+  }
+  if (element.actions.includes('tap')) {
+    return 'tap';
+  }
+  if (element.actions.includes('swipeWithin')) {
+    return 'swipe';
+  }
+  return 'none';
+}
+
+function formatRuntimeElementLine(element: RuntimeElementV1, action?: string): string {
+  const primaryAction = getPrimaryRuntimeElementAction(element, action);
+  return [
+    element.ref,
+    primaryAction,
+    element.role ?? '',
+    compactRuntimeSnapshotText(element.label),
+    compactRuntimeSnapshotText(element.value),
+    compactRuntimeSnapshotText(element.identifier),
+  ].join('|');
+}
+
+function formatSuppressedRuntimeEvidenceLine(element: RuntimeElementV1): string {
+  return [
+    element.role ?? '',
+    compactRuntimeSnapshotText(element.label),
+    compactRuntimeSnapshotText(element.value),
+    compactRuntimeSnapshotText(element.identifier),
+  ].join('|');
+}
+
+function getSuppressedRuntimeTargetRefs(hints?: RenderHints): Set<string> {
+  return new Set(hints?.runtimeSnapshot?.suppressedTargetRefs ?? []);
+}
+
+function hasRuntimeTextEvidence(element: RuntimeElementV1): boolean {
+  return (
+    compactRuntimeSnapshotText(element.label).length > 0 ||
+    compactRuntimeSnapshotText(element.value).length > 0
+  );
+}
+
+function isLikelyRuntimeTarget(
+  element: RuntimeElementV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): boolean {
+  return (
+    !suppressedTargetRefs.has(element.ref) &&
+    !isHiddenRuntimeTarget(element) &&
+    element.actions.some((action) => action === 'tap' || action === 'typeText')
+  );
+}
+
+function isSuppressedRuntimeTextEvidenceElement(
+  element: RuntimeElementV1,
+  suppressedTargetRefs: ReadonlySet<string>,
+): boolean {
+  return (
+    suppressedTargetRefs.has(element.ref) &&
+    element.state?.visible !== false &&
+    !isHiddenRuntimeTarget(element) &&
+    !isLowPriorityRuntimeTarget(element) &&
+    hasRuntimeTextEvidence(element)
+  );
+}
+
+function isScrollableRuntimeArea(element: RuntimeElementV1): boolean {
+  return element.actions.includes('swipeWithin') && !isLikelyRuntimeTarget(element);
+}
+
+function countLikelyRuntimeTargets(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): number {
+  return snapshot.elements.filter((element) => isLikelyRuntimeTarget(element, suppressedTargetRefs))
+    .length;
+}
+
+function countScrollableRuntimeAreas(snapshot: RuntimeSnapshotV1): number {
+  return snapshot.elements.filter(isScrollableRuntimeArea).length;
+}
+
+function createRuntimeSnapshotTargetsSection(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string> = new Set<string>(),
+): SectionTextBlock {
+  const likelyTargets = sortRuntimeTargetsForDisplay(
+    snapshot.elements.filter((element) => isLikelyRuntimeTarget(element, suppressedTargetRefs)),
+  );
+  const lines = likelyTargets.map((element) => formatRuntimeElementLine(element));
+
+  return createSection(
+    `Targets (${likelyTargets.length}) — ref|action|role|label|value|id`,
+    lines.length > 0 ? lines : ['(no likely interaction targets found)'],
+  );
+}
+
+function createRuntimeSnapshotEvidenceSection(
+  snapshot: RuntimeSnapshotV1,
+  suppressedTargetRefs: ReadonlySet<string>,
+): SectionTextBlock | null {
+  const evidenceElements = snapshot.elements.filter((element) =>
+    isSuppressedRuntimeTextEvidenceElement(element, suppressedTargetRefs),
+  );
+  if (evidenceElements.length === 0) {
+    return null;
+  }
+
+  return createSection(
+    `Evidence (${evidenceElements.length}) — role|label|value|id`,
+    evidenceElements.map((element) => formatSuppressedRuntimeEvidenceLine(element)),
+  );
+}
+
+function createRuntimeSnapshotScrollAreasSection(
+  snapshot: RuntimeSnapshotV1,
+): SectionTextBlock | null {
+  const scrollAreas = snapshot.elements.filter(isScrollableRuntimeArea);
+  if (scrollAreas.length === 0) {
+    return null;
+  }
+
+  return createSection(
+    `Scroll (${scrollAreas.length}) — ref|action|role|label|value|id`,
+    scrollAreas.map((element) => formatRuntimeElementLine(element, 'swipe')),
+  );
+}
+
+function createWaitMatchSection(waitMatch: UiWaitMatch): SectionTextBlock {
+  return createSection(
+    `Matched ${waitMatch.predicate} (${waitMatch.matches.length}) — ref|action|role|label|value|id`,
+    waitMatch.matches.length > 0
+      ? waitMatch.matches.map((element) => formatRuntimeElementLine(element))
+      : ['(no matching elements found)'],
+  );
+}
+
+function createUiErrorItems(uiError?: UiAutomationRecoverableError): TextRenderableItem[] {
+  if (!uiError) {
+    return [];
+  }
+
+  const lines = [
+    `Code: ${uiError.code}`,
+    `Message: ${uiError.message}`,
+    ...(uiError.elementRef ? [`Element: ${uiError.elementRef}`] : []),
+    ...(typeof uiError.timeoutMs === 'number' ? [`Timeout: ${uiError.timeoutMs}ms`] : []),
+    `Hint: ${uiError.recoveryHint}`,
+  ];
+
+  if (uiError.candidates && uiError.candidates.length > 0) {
+    lines.push(
+      `Candidates (${uiError.candidates.length}):`,
+      ...uiError.candidates.map((candidate) => `  ${formatRuntimeElementLine(candidate)}`),
+    );
+  }
+
+  return [createSection('Recovery', lines)];
+}
+
 function createSimulatorActionItems(
   result: Extract<ToolDomainResult, { kind: 'simulator-action-result' }>,
 ): TextRenderableItem[] {
@@ -1221,6 +1481,7 @@ function createSimulatorActionItems(
 
 function createCaptureResultItems(
   rawResult: Extract<ToolDomainResult, { kind: 'capture-result' }>,
+  hints?: RenderHints,
 ): TextRenderableItem[] {
   const result = rawResult as CaptureResultWithVideo;
 
@@ -1260,10 +1521,18 @@ function createCaptureResultItems(
     return items;
   }
 
+  const capture = result.capture;
+  const isRuntimeSnapshot =
+    capture !== undefined && 'type' in capture && capture.type === 'runtime-snapshot';
+  const isRuntimeSnapshotUnchanged =
+    capture !== undefined && 'type' in capture && capture.type === 'runtime-snapshot-unchanged';
   const isUiHierarchy =
-    (result.capture && 'type' in result.capture && result.capture.type === 'ui-hierarchy') ||
-    result.error?.includes('accessibility hierarchy') === true;
-  const title = isUiHierarchy ? 'Snapshot UI' : 'Screenshot';
+    (capture !== undefined && 'type' in capture && capture.type === 'ui-hierarchy') ||
+    isRuntimeSnapshot ||
+    isRuntimeSnapshotUnchanged ||
+    result.error?.includes('accessibility hierarchy') === true ||
+    result.error?.includes('runtime UI snapshot') === true;
+  const title = hints?.headerTitle ?? (isUiHierarchy ? 'Snapshot UI' : 'Screenshot');
   const items: TextRenderableItem[] = [
     createHeader(title, [
       ...(result.artifacts.simulatorId
@@ -1273,10 +1542,63 @@ function createCaptureResultItems(
   ];
 
   if (result.didError) {
+    items.push(...createStandardDiagnosticSections(result.diagnostics));
+    items.push(...createUiErrorItems(result.uiError));
+    let fallbackError = 'Failed to capture screenshot.';
+    if (isRuntimeSnapshot) {
+      fallbackError = 'Failed to get runtime UI snapshot.';
+    } else if (isUiHierarchy) {
+      fallbackError = 'Failed to get accessibility hierarchy.';
+    }
+
+    items.push(createStatus('error', result.error ?? fallbackError));
+    return items;
+  }
+
+  if (isRuntimeSnapshotUnchanged) {
+    const unchangedCapture = result.capture as RuntimeSnapshotUnchangedV1;
     items.push(
-      ...createFailureStatusWithDiagnostics(
-        result,
-        isUiHierarchy ? 'Failed to get accessibility hierarchy.' : 'Failed to capture screenshot.',
+      ...createStandardDiagnosticSections(result.diagnostics),
+      createStatus(
+        'success',
+        `Runtime UI snapshot unchanged (screenHash: ${unchangedCapture.screenHash}, seq: ${unchangedCapture.seq}).`,
+      ),
+    );
+    return items;
+  }
+
+  if (isRuntimeSnapshot) {
+    const snapshot = result.capture as RuntimeSnapshotV1;
+    const suppressedTargetRefs = getSuppressedRuntimeTargetRefs(hints);
+    const likelyTargetCount = countLikelyRuntimeTargets(snapshot, suppressedTargetRefs);
+    const scrollAreaCount = countScrollableRuntimeAreas(snapshot);
+    const evidenceSection = createRuntimeSnapshotEvidenceSection(snapshot, suppressedTargetRefs);
+    const scrollAreasSection = createRuntimeSnapshotScrollAreasSection(snapshot);
+    if (title === 'Wait for UI' && result.waitMatch) {
+      items.push(createWaitMatchSection(result.waitMatch));
+    }
+    items.push(createRuntimeSnapshotTargetsSection(snapshot, suppressedTargetRefs));
+    if (evidenceSection) {
+      items.push(evidenceSection);
+    }
+    if (scrollAreasSection) {
+      items.push(scrollAreasSection);
+    }
+    items.push(
+      createSection('Tips', [
+        '- Use target refs with tap, type_text, long_press, and touch.',
+        ...(scrollAreaCount > 0 ? ['- Use scroll refs with swipe.'] : []),
+        '- Refs are snapshot-specific; after snapshot_ui or wait_for_ui, use refs from the latest output.',
+        '- Use wait_for_ui for text/assertions or changing UI.',
+      ]),
+    );
+    items.push(
+      ...createStandardDiagnosticSections(result.diagnostics),
+      createStatus(
+        'success',
+        title === 'Wait for UI'
+          ? `Wait completed; runtime UI snapshot refreshed with ${pluralize(snapshot.elements.length, 'element')}, ${pluralize(likelyTargetCount, 'likely target')}, and ${pluralize(scrollAreaCount, 'scroll area')}.`
+          : `Runtime UI snapshot captured with ${pluralize(snapshot.elements.length, 'element')}, ${pluralize(likelyTargetCount, 'likely target')}, and ${pluralize(scrollAreaCount, 'scroll area')}.`,
       ),
     );
     return items;
@@ -1289,7 +1611,8 @@ function createCaptureResultItems(
     items.push(createSection('Accessibility Hierarchy', ['```json', ...uiHierarchyLines, '```']));
     items.push(
       createSection('Tips', [
-        '- Use frame coordinates for tap/swipe (center: x+width/2, y+height/2)',
+        '- Prefer runtime snapshot refs from snapshot_ui or wait_for_ui for UI actions',
+        '- Avoid guessing frame coordinates from screenshots or raw accessibility output',
         '- If a debugger is attached, ensure the app is running (not stopped on breakpoints)',
         '- Screenshots are for visual verification only',
       ]),
@@ -2063,7 +2386,7 @@ function createSpecialCaseItems(
     case 'simulator-action-result':
       return createSimulatorActionItems(result);
     case 'capture-result':
-      return createCaptureResultItems(result);
+      return createCaptureResultItems(result, hints);
     case 'process-list':
       return createProcessListItems(result);
     case 'coverage-result':
@@ -2092,6 +2415,7 @@ function createSpecialCaseItems(
       const headerTitleMap: Record<typeof result.action.type, string> = {
         tap: 'Tap',
         swipe: 'Swipe',
+        drag: 'Drag',
         touch: 'Touch',
         'long-press': 'Long Press',
         button: 'Button',
@@ -2099,6 +2423,7 @@ function createSpecialCaseItems(
         'type-text': 'Type Text',
         'key-press': 'Key Press',
         'key-sequence': 'Key Sequence',
+        batch: 'Batch UI Actions',
       };
       const items: TextRenderableItem[] = [
         createHeader(headerTitleMap[result.action.type], [
@@ -2106,40 +2431,41 @@ function createSpecialCaseItems(
         ]),
       ];
       if (result.didError) {
-        items.push(...createFailureStatusWithDiagnostics(result, 'UI action failed.'));
+        items.push(...createStandardDiagnosticSections(result.diagnostics));
+        items.push(...createUiErrorItems(result.uiError));
+        items.push(createStatus('error', result.error ?? 'UI action failed.'));
         return items;
       }
       let successMessage = 'UI action completed successfully.';
       switch (result.action.type) {
         case 'tap':
-          successMessage =
-            typeof result.action.x === 'number' && typeof result.action.y === 'number'
-              ? `Tap at (${result.action.x}, ${result.action.y}) simulated successfully.`
-              : result.action.id
-                ? `Tap on element id "${result.action.id}" simulated successfully.`
-                : result.action.label
-                  ? `Tap on element label "${result.action.label}" simulated successfully.`
-                  : successMessage;
+          successMessage = `Tap on elementRef ${result.action.elementRef} simulated successfully.`;
           break;
         case 'swipe': {
           const durationText =
             typeof result.action.durationSeconds === 'number'
               ? ` duration=${result.action.durationSeconds}s`
               : '';
-          if (result.action.from && result.action.to) {
-            successMessage =
-              `Swipe from (${result.action.from.x}, ${result.action.from.y}) to (${result.action.to.x}, ${result.action.to.y})` +
-              `${durationText} simulated successfully.`;
-          }
+          successMessage =
+            `Swipe ${result.action.direction} within elementRef ${result.action.withinElementRef}` +
+            `${durationText} simulated successfully.`;
+          break;
+        }
+        case 'drag': {
+          const durationText =
+            typeof result.action.durationSeconds === 'number'
+              ? ` duration=${result.action.durationSeconds}s`
+              : '';
+          successMessage =
+            `Drag ${result.action.direction} from elementRef ${result.action.elementRef}` +
+            `${durationText} simulated successfully.`;
           break;
         }
         case 'touch':
-          if (typeof result.action.x === 'number' && typeof result.action.y === 'number') {
-            successMessage = `Touch event (${result.action.event ?? 'touch'}) at (${result.action.x}, ${result.action.y}) executed successfully.`;
-          }
+          successMessage = `Touch event (${result.action.event ?? 'touch'}) on elementRef ${result.action.elementRef} executed successfully.`;
           break;
         case 'long-press':
-          successMessage = `Long press at (${result.action.x}, ${result.action.y}) for ${result.action.durationMs}ms simulated successfully.`;
+          successMessage = `Long press on elementRef ${result.action.elementRef} for ${result.action.durationMs}ms simulated successfully.`;
           break;
         case 'button':
           successMessage = `Hardware button '${result.action.button}' pressed successfully.`;
@@ -2147,14 +2473,25 @@ function createSpecialCaseItems(
         case 'gesture':
           successMessage = `Gesture '${result.action.gesture}' executed successfully.`;
           break;
-        case 'type-text':
-          successMessage = 'Text typing simulated successfully.';
+        case 'type-text': {
+          const targetText = result.action.elementRef
+            ? ` into elementRef ${result.action.elementRef}`
+            : '';
+          const lengthText =
+            typeof result.action.textLength === 'number'
+              ? ` (${pluralize(result.action.textLength, 'character')})`
+              : '';
+          successMessage = `Text typed${targetText}${lengthText} successfully.`;
           break;
+        }
         case 'key-press':
           successMessage = `Key press (code: ${result.action.keyCode}) simulated successfully.`;
           break;
         case 'key-sequence':
           successMessage = `Key sequence [${result.action.keyCodes.join(',')}] executed successfully.`;
+          break;
+        case 'batch':
+          successMessage = `Batch UI automation completed successfully (${pluralize(result.action.stepCount, 'step')}).`;
           break;
       }
       items.push(

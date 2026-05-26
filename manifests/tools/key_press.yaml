@@ -3,10 +3,12 @@ module: mcp/tools/ui-automation/key_press
 names:
   mcp: key_press
   cli: key-press
-description: Press key by keycode.
+description: Press one hardware key using an AXe HID key code. Prefer type_text for text entry. Common values include 40 Return/Enter, 42 Backspace, 43 Tab, and 44 Space.
 outputSchema:
   schema: xcodebuildmcp.output.ui-action-result
-  version: "1"
+  version: '2'
+routing:
+  stateful: true
 annotations:
   title: Key Press
   readOnlyHint: true

@@ -3,7 +3,7 @@ import { invokeResource } from '../resource-harness.ts';
 import { createWorkflowFixtureMatcher } from './helpers.ts';
 import { ensureSimulatorBooted } from '../harness.ts';
 export function registerResourcesSnapshotSuite(): void {
-  const expectFixture = createWorkflowFixtureMatcher('mcp', 'resources');
+  const expectFixture = createWorkflowFixtureMatcher('mcp/text', 'resources');
 
   describe('mcp resources', () => {
     beforeAll(async () => {

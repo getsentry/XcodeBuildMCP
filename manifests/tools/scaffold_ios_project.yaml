@@ -6,7 +6,7 @@ names:
 description: Scaffold iOS project.
 outputSchema:
   schema: xcodebuildmcp.output.scaffold-result
-  version: "1"
+  version: "2"
 predicates:
   - hideWhenXcodeAgentMode
 annotations:

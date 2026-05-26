@@ -6,13 +6,23 @@ import {
   mockProcess,
 } from '../../../../test-utils/mock-executors.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { schema, handler, gestureLogic } from '../gesture.ts';
+import { schema, handler, gestureLogic, createGestureExecutor } from '../gesture.ts';
 import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import { allText, runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
+import {
+  __resetRuntimeSnapshotStoreForTests,
+  getRuntimeSnapshot,
+} from '../shared/snapshot-ui-state.ts';
+import {
+  createMockAxeHelpers,
+  createTrackingExecutor,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
 describe('Gesture Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Export Field Validation (Literal)', () => {
@@ -37,7 +47,12 @@ describe('Gesture Plugin', () => {
       ).toBe(true);
       expect(schemaObj.safeParse({ preset: 'invalid-preset' }).success).toBe(false);
       expect(schemaObj.safeParse({ preset: 'scroll-up', screenWidth: 0 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', screenWidth: 2001 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', screenHeight: 3001 }).success).toBe(false);
       expect(schemaObj.safeParse({ preset: 'scroll-up', duration: -1 }).success).toBe(false);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', duration: 0 }).success).toBe(true);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', delta: 0 }).success).toBe(true);
+      expect(schemaObj.safeParse({ preset: 'scroll-up', delta: 201 }).success).toBe(false);
 
       const withSimId = schemaObj.safeParse({
         simulatorId: '12345678-1234-4234-8234-123456789012',
@@ -50,7 +65,7 @@ describe('Gesture Plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({ preset: 'scroll-up' });
+      const result = await callHandler(handler, { preset: 'scroll-up' });
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -62,7 +77,7 @@ describe('Gesture Plugin', () => {
     it('should surface validation errors once simulator defaults exist', async () => {
       sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       const message = result.content[0].text;
@@ -77,7 +92,9 @@ describe('Gesture Plugin', () => {
     it('should generate correct axe command for basic gesture', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'gesture completed',
@@ -114,7 +131,9 @@ describe('Gesture Plugin', () => {
     it('should generate correct axe command for gesture with screen dimensions', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'gesture completed',
@@ -157,7 +176,9 @@ describe('Gesture Plugin', () => {
     it('should generate correct axe command for gesture with all parameters', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'gesture completed',
@@ -212,7 +233,9 @@ describe('Gesture Plugin', () => {
     it('should generate correct axe command with different gesture presets', async () => {
       let capturedCommand: string[] = [];
       const trackingExecutor = async (command: string[]) => {
-        capturedCommand = command;
+        if (command[1] !== 'describe-ui') {
+          capturedCommand = command;
+        }
         return {
           success: true,
           output: 'gesture completed',
@@ -278,6 +301,21 @@ describe('Gesture Plugin', () => {
 
       expect(result.isError).toBeFalsy();
       expect(allText(result)).toContain("Gesture 'scroll-up' executed successfully.");
+    });
+
+    it('captures a fresh runtime snapshot after successful gesture execution', async () => {
+      const { calls, executor } = createTrackingExecutor();
+      const executeGesture = createGestureExecutor(executor, createMockAxeHelpers());
+
+      const result = await executeGesture({
+        simulatorId,
+        preset: 'scroll-up',
+      });
+
+      expect(result.didError).toBe(false);
+      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
+      expect(calls.some((call) => call.command[1] === 'describe-ui')).toBe(true);
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
 
     it('should return success for gesture execution with all optional parameters', async () => {

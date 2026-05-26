@@ -12,7 +12,7 @@ import {
   createGetDeviceAppPathExecutor,
 } from '../get_device_app_path.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
-import { runLogic } from '../../../../test-utils/test-helpers.ts';
+import { runLogic, callHandler } from '../../../../test-utils/test-helpers.ts';
 
 describe('get_device_app_path plugin', () => {
   beforeEach(() => {
@@ -41,7 +41,7 @@ describe('get_device_app_path plugin', () => {
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
       });
       expect(result.isError).toBe(true);
@@ -50,7 +50,7 @@ describe('get_device_app_path plugin', () => {
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
         scheme: 'MyScheme',
@@ -63,7 +63,7 @@ describe('get_device_app_path plugin', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme when missing', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
       });
       expect(result.isError).toBe(true);
@@ -74,7 +74,7 @@ describe('get_device_app_path plugin', () => {
     it('should require project or workspace when scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
     });

@@ -1,4 +1,4 @@
 import { registerProjectScaffoldingSnapshotSuite } from '../suites/project-scaffolding-suite.ts';
 
-registerProjectScaffoldingSnapshotSuite('cli');
-registerProjectScaffoldingSnapshotSuite('mcp');
+registerProjectScaffoldingSnapshotSuite('cli/text');
+registerProjectScaffoldingSnapshotSuite('mcp/text');

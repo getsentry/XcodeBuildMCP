@@ -1,4 +1,4 @@
 import { registerDebuggingSnapshotSuite } from '../suites/debugging-suite.ts';
 
-registerDebuggingSnapshotSuite('cli');
-registerDebuggingSnapshotSuite('mcp');
+registerDebuggingSnapshotSuite('cli/text');
+registerDebuggingSnapshotSuite('mcp/text');

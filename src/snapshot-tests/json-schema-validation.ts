@@ -4,7 +4,8 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { globSync } from 'glob';
 
-const FIXTURE_ROOT = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__/json');
+const FIXTURE_ROOT = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
+const JSON_FIXTURE_BUCKETS = ['cli/json', 'mcp/json'] as const;
 const SCHEMA_ROOT = path.resolve(process.cwd(), 'schemas/structured-output');
 const SCHEMA_PATTERN = /^xcodebuildmcp\.output\.[a-z0-9-]+$/;
 const SCHEMA_VERSION_PATTERN = /^[0-9]+$/;
@@ -124,18 +125,30 @@ function discoverSchemaDocuments(): DiscoveredSchemaDocument[] {
   });
 }
 
-function discoverJsonFixtures(knownSchemaPaths: Set<string>): DiscoveredJsonFixture[] {
-  const relativePaths = globSync('**/*.json', {
-    cwd: FIXTURE_ROOT,
-    nodir: true,
-  }).sort();
+function discoverJsonFixturePaths(): Array<{ absolutePath: string; relativePath: string }> {
+  return JSON_FIXTURE_BUCKETS.flatMap((bucket) => {
+    const bucketRoot = path.join(FIXTURE_ROOT, bucket);
+    if (!fs.existsSync(bucketRoot)) {
+      return [];
+    }
 
-  return relativePaths.map((relativePath) => {
-    const absolutePath = path.join(FIXTURE_ROOT, relativePath);
-    const repoRelativePath = toRelative(absolutePath);
-    const parsed = readJsonDocument(absolutePath, `fixture ${repoRelativePath}`);
-    const envelope = assertBootstrapEnvelope(parsed, repoRelativePath);
-    assertValidSchemaRoute(envelope, repoRelativePath);
+    return globSync('**/*.json', {
+      cwd: bucketRoot,
+      nodir: true,
+    })
+      .sort()
+      .map((bucketRelativePath) => ({
+        absolutePath: path.join(bucketRoot, bucketRelativePath),
+        relativePath: path.join(bucket, bucketRelativePath).split(path.sep).join('/'),
+      }));
+  }).sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+}
+
+function discoverJsonFixtures(knownSchemaPaths: Set<string>): DiscoveredJsonFixture[] {
+  return discoverJsonFixturePaths().map(({ absolutePath, relativePath }) => {
+    const parsed = readJsonDocument(absolutePath, `fixture ${relativePath}`);
+    const envelope = assertBootstrapEnvelope(parsed, relativePath);
+    assertValidSchemaRoute(envelope, relativePath);
 
     const schemaPath = path.join(
       SCHEMA_ROOT,
@@ -145,13 +158,13 @@ function discoverJsonFixtures(knownSchemaPaths: Set<string>): DiscoveredJsonFixt
 
     if (!knownSchemaPaths.has(schemaPath)) {
       throw new Error(
-        `${repoRelativePath}: declared schema ${envelope.schema}@${envelope.schemaVersion} maps to missing schema file ${toRelative(schemaPath)}.`,
+        `${relativePath}: declared schema ${envelope.schema}@${envelope.schemaVersion} maps to missing schema file ${toRelative(schemaPath)}.`,
       );
     }
 
     return {
       absolutePath,
-      relativePath: relativePath.split(path.sep).join('/'),
+      relativePath,
       envelope,
       schemaPath,
     };
@@ -228,10 +241,7 @@ export function createStructuredFixtureSchemaValidator(): StructuredFixtureSchem
     },
     validateFixture(fixture: DiscoveredJsonFixture): void {
       const validate = validatorForSchemaPath(fixture.schemaPath);
-      const parsed = readJsonDocument(
-        fixture.absolutePath,
-        `fixture ${toRelative(fixture.absolutePath)}`,
-      );
+      const parsed = readJsonDocument(fixture.absolutePath, `fixture ${fixture.relativePath}`);
 
       if (validate(parsed)) {
         return;

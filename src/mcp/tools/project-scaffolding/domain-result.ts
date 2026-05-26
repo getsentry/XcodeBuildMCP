@@ -36,6 +36,6 @@ export function setScaffoldStructuredOutput(
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.scaffold-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }

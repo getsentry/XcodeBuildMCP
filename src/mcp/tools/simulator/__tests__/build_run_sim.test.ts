@@ -6,7 +6,11 @@ import {
   createMockCommandResponse,
   mockProcess,
 } from '../../../../test-utils/mock-executors.ts';
-import { runToolLogic, type MockToolHandlerResult } from '../../../../test-utils/test-helpers.ts';
+import {
+  runToolLogic,
+  type MockToolHandlerResult,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, build_run_simLogic, type SimulatorLauncher } from '../build_run_sim.ts';
@@ -712,7 +716,7 @@ describe('build_run_sim tool', () => {
 
   describe('XOR Validation', () => {
     it('should error when neither projectPath nor workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
         simulatorName: 'iPhone 17',
       });
@@ -722,7 +726,7 @@ describe('build_run_sim tool', () => {
     });
 
     it('should error when both projectPath and workspacePath provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/project.xcodeproj',
         workspacePath: '/path/workspace.xcworkspace',
         scheme: 'MyScheme',

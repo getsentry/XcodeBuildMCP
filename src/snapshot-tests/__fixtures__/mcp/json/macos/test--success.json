@@ -1,0 +1,54 @@
+{
+  "schema": "xcodebuildmcp.output.test-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "target": "macos"
+    },
+    "artifacts": {
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log",
+      "xcresultPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult"
+    },
+    "tests": {
+      "selected": [
+        "MCPTestTests/MCPTestTests/appNameIsCorrect",
+        "MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect"
+      ],
+      "discovered": {
+        "total": 2,
+        "items": [
+          "MCPTestTests/MCPTestTests/appNameIsCorrect",
+          "MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect"
+        ]
+      }
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": [],
+      "testFailures": []
+    },
+    "testCases": [
+      {
+        "suite": "MCPTestsXCTests",
+        "test": "testAppNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      },
+      {
+        "suite": "MCPTestTests",
+        "test": "appNameIsCorrect()",
+        "status": "passed",
+        "durationMs": 0
+      }
+    ]
+  }
+}

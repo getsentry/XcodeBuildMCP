@@ -1,0 +1,23 @@
+import { registerCoverageSnapshotSuite } from '../suites/coverage-suite.ts';
+import { registerDebuggingSnapshotSuite } from '../suites/debugging-suite.ts';
+import { registerDeviceSnapshotSuite } from '../suites/device-suite.ts';
+import { registerMacosSnapshotSuite } from '../suites/macos-suite.ts';
+import { registerProjectDiscoverySnapshotSuite } from '../suites/project-discovery-suite.ts';
+import { registerProjectScaffoldingSnapshotSuite } from '../suites/project-scaffolding-suite.ts';
+import { registerSimulatorManagementSnapshotSuite } from '../suites/simulator-management-suite.ts';
+import { registerSimulatorSnapshotSuite } from '../suites/simulator-suite.ts';
+import { registerSwiftPackageSnapshotSuite } from '../suites/swift-package-suite.ts';
+import { registerUiAutomationSnapshotSuite } from '../suites/ui-automation-suite.ts';
+import { registerUtilitiesSnapshotSuite } from '../suites/utilities-suite.ts';
+
+registerCoverageSnapshotSuite('cli/json');
+registerDebuggingSnapshotSuite('cli/json');
+registerDeviceSnapshotSuite('cli/json');
+registerMacosSnapshotSuite('cli/json');
+registerProjectDiscoverySnapshotSuite('cli/json');
+registerProjectScaffoldingSnapshotSuite('cli/json');
+registerSimulatorManagementSnapshotSuite('cli/json');
+registerSimulatorSnapshotSuite('cli/json');
+registerSwiftPackageSnapshotSuite('cli/json');
+registerUiAutomationSnapshotSuite('cli/json');
+registerUtilitiesSnapshotSuite('cli/json');

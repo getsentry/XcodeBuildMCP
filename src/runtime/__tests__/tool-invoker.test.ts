@@ -661,7 +661,51 @@ describe('DefaultToolInvoker next steps post-processing', () => {
     const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
     expect(text).toContain('Next steps:');
     expect(text).toContain('Take screenshot');
-    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id "123"');
+    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id 123');
+  });
+
+  it('prefers the current workflow when normalizing duplicate next-step tool names', async () => {
+    const directHandler = emitNextStepsHandler('ok', [
+      {
+        tool: 'screenshot',
+        label: 'Take screenshot',
+        params: { simulatorId: '123' },
+      },
+    ]);
+
+    const catalog = createToolCatalog([
+      makeTool({
+        id: 'snapshot_ui',
+        cliName: 'snapshot-ui',
+        mcpName: 'snapshot_ui',
+        workflow: 'ui-automation',
+        stateful: false,
+        handler: directHandler,
+      }),
+      makeTool({
+        id: 'screenshot',
+        cliName: 'screenshot',
+        mcpName: 'screenshot',
+        workflow: 'simulator',
+        stateful: false,
+        handler: emitHandler('simulator screenshot'),
+      }),
+      makeTool({
+        id: 'screenshot',
+        cliName: 'screenshot',
+        mcpName: 'screenshot',
+        workflow: 'ui-automation',
+        stateful: false,
+        handler: emitHandler('ui screenshot'),
+      }),
+    ]);
+
+    const invoker = new DefaultToolInvoker(catalog);
+    const response = await invokeAndFinalize(invoker, 'snapshot-ui', {}, { runtime: 'cli' });
+
+    const text = response.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n');
+    expect(text).toContain('xcodebuildmcp ui-automation screenshot --simulator-id 123');
+    expect(text).not.toContain('xcodebuildmcp simulator screenshot --simulator-id 123');
   });
 
   it('injects manifest template next steps from dynamic nextStepParams when response omits nextSteps', async () => {

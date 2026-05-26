@@ -1,198 +1,86 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { createMockExecutor } from '../../../../test-utils/mock-executors.ts';
+import type { UiActionResultDomainResult } from '../../../../types/domain-results.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
+import { callHandler, createMockToolHandlerContext } from '../../../../test-utils/test-helpers.ts';
+import {
+  __resetRuntimeSnapshotStoreForTests,
+  getRuntimeSnapshot,
+} from '../shared/snapshot-ui-state.ts';
+import { schema, handler, tapLogic } from '../tap.ts';
+import {
+  createFailingExecutor,
+  createMockAxeHelpers,
+  createNode,
+  createSequencedExecutor,
+  createTrackingExecutor,
+  recordSnapshot,
+  simulatorId,
+} from './ui-action-test-helpers.ts';
 
-import { schema, handler, type AxeHelpers, tapLogic } from '../tap.ts';
-import { AXE_NOT_AVAILABLE_MESSAGE } from '../../../../utils/axe-helpers.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
-
-function createMockAxeHelpers(): AxeHelpers {
-  return {
-    getAxePath: () => '/mocked/axe/path',
-    getBundledAxeEnvironment: () => ({ SOME_ENV: 'value' }),
-  };
+function actionCommands(calls: Array<{ command: string[] }>): string[][] {
+  return calls.map((call) => call.command).filter((command) => command[1] !== 'describe-ui');
 }
 
-function createMockAxeHelpersWithNullPath(): AxeHelpers {
-  return {
-    getAxePath: () => null,
-    getBundledAxeEnvironment: () => ({ SOME_ENV: 'value' }),
-  };
+async function runTap(
+  params: Parameters<typeof tapLogic>[0],
+  executor = createTrackingExecutor().executor,
+): Promise<UiActionResultDomainResult> {
+  const { ctx, run } = createMockToolHandlerContext();
+  await run(() => tapLogic(params, executor, createMockAxeHelpers()));
+  expect(ctx.structuredOutput?.schemaVersion).toBe('2');
+  return ctx.structuredOutput?.result as UiActionResultDomainResult;
 }
 
 describe('Tap Plugin', () => {
   beforeEach(() => {
     sessionStore.clear();
+    __resetRuntimeSnapshotStoreForTests();
   });
 
   describe('Schema Validation', () => {
-    it('should have handler function', () => {
+    it('exposes elementRef-only targeting fields', () => {
       expect(typeof handler).toBe('function');
-    });
+      expect(schema).toHaveProperty('elementRef');
+      expect(schema).not.toHaveProperty('x');
+      expect(schema).not.toHaveProperty('y');
+      expect(schema).not.toHaveProperty('id');
+      expect(schema).not.toHaveProperty('label');
 
-    it('should validate schema fields with safeParse', () => {
       const schemaObject = z.object(schema);
-
-      expect(schemaObject.safeParse({ x: 100, y: 200 }).success).toBe(true);
-
-      expect(schemaObject.safeParse({ id: 'loginButton' }).success).toBe(true);
-
-      expect(schemaObject.safeParse({ label: 'Log in' }).success).toBe(true);
-
-      expect(schemaObject.safeParse({ x: 100, y: 200, id: 'loginButton' }).success).toBe(true);
-
+      expect(schemaObject.safeParse({ elementRef: 'e1' }).success).toBe(true);
+      expect(schemaObject.safeParse({}).success).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: '' }).success).toBe(false);
       expect(
-        schemaObject.safeParse({ x: 100, y: 200, id: 'loginButton', label: 'Log in' }).success,
+        schemaObject.safeParse({ elementRef: 'e1', preDelay: 0.5, postDelay: 1 }).success,
       ).toBe(true);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          preDelay: 0.5,
-          postDelay: 1,
-        }).success,
-      ).toBe(true);
-
-      expect(
-        schemaObject.safeParse({
-          x: 3.14,
-          y: 200,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 3.14,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          preDelay: -1,
-        }).success,
-      ).toBe(false);
-
-      expect(
-        schemaObject.safeParse({
-          x: 100,
-          y: 200,
-          postDelay: -1,
-        }).success,
-      ).toBe(false);
-
-      const withSimId = schemaObject.safeParse({
-        simulatorId: '12345678-1234-4234-8234-123456789012',
-        x: 100,
-        y: 200,
-      });
-      expect(withSimId.success).toBe(true);
-      expect('simulatorId' in (withSimId.data as Record<string, unknown>)).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: 'e1', preDelay: 10.1 }).success).toBe(false);
+      expect(schemaObject.safeParse({ elementRef: 'e1', postDelay: 10.1 }).success).toBe(false);
     });
   });
 
   describe('Command Generation', () => {
-    let callHistory: Array<{
-      command: string[];
-      logPrefix?: string;
-      useShell?: boolean;
-      opts?: { env?: Record<string, string>; cwd?: string };
-    }>;
+    it('uses AXe id targeting when the referenced element has an identifier', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { calls, executor } = createTrackingExecutor();
 
-    beforeEach(() => {
-      callHistory = [];
-    });
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-    it('should generate correct axe command with minimal parameters', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
+      expect(result).toMatchObject({
+        didError: false,
+        action: { type: 'tap', elementRef: 'e1', x: 60, y: 40 },
       });
-
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
-          '/mocked/axe/path',
-          'tap',
-          '-x',
-          '100',
-          '-y',
-          '200',
-          '--udid',
-          '12345678-1234-4234-8234-123456789012',
-        ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
-    });
-
-    it('should generate correct axe command with element id target', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            id: 'loginButton',
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
+      expect(actionCommands(calls)).toHaveLength(1);
+      expect(calls[0]).toEqual({
         command: [
           '/mocked/axe/path',
           'tap',
           '--id',
-          'loginButton',
+          'continue-button',
+          '--element-type',
+          'Button',
           '--udid',
-          '12345678-1234-4234-8234-123456789012',
+          simulatorId,
         ],
         logPrefix: '[AXe]: tap',
         useShell: false,
@@ -200,515 +88,406 @@ describe('Tap Plugin', () => {
       });
     });
 
-    it('should generate correct axe command with element label target', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
+    it('preserves the cached runtime snapshot after a successful tap', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { executor } = createTrackingExecutor();
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
+    });
+
+    it('reports post-action snapshot parse failures without failing the tap action', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { calls, executor } = createSequencedExecutor([
+        { success: true, output: 'tap succeeded' },
+        { success: true, output: 'not json' },
+      ]);
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(result.uiError).toMatchObject({
+        code: 'SNAPSHOT_PARSE_FAILED',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
+      expect(result.diagnostics?.warnings?.[0]?.message).toContain(
+        'UI action succeeded, but the refreshed runtime snapshot could not be parsed.',
+      );
+      expect(result.capture).toBeUndefined();
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+      expect(actionCommands(calls)).toHaveLength(1);
+    });
 
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
+    it('reports post-action snapshot capture failures without failing the tap action', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+      const { executor } = createSequencedExecutor([
+        { success: true, output: 'tap succeeded' },
+        { success: false, error: 'describe-ui failed' },
+      ]);
 
-      const mockAxeHelpers = createMockAxeHelpers();
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            label: 'Log in',
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
+      expect(result.didError).toBe(false);
+      expect(result.uiError).toMatchObject({
+        code: 'SNAPSHOT_CAPTURE_FAILED',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
+      });
+      expect(result.error).toBeNull();
+      expect(result.capture).toBeUndefined();
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
+    });
+
+    it('includes element type when tapping a referenced element with a shared identifier', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Group',
+          role: 'AXGroup',
+          AXUniqueId: 'shared-action',
+          children: [
+            createNode({
+              type: 'Button',
+              role: 'AXButton',
+              AXUniqueId: 'shared-action',
+              AXLabel: 'Continue',
+            }),
+          ],
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTap({ simulatorId, elementRef: 'e2' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'shared-action',
+          '--element-type',
+          'Button',
+          '--udid',
+          simulatorId,
+        ],
+      ]);
+    });
+
+    it('uses coordinates immediately when the snapshot already has duplicate selector matches', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 10, y: 20, width: 100, height: 40 },
+          AXUniqueId: 'trash',
+          AXLabel: 'Remove',
+        }),
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 300, y: 400, width: 50, height: 80 },
+          AXUniqueId: 'trash',
+          AXLabel: 'Remove',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
+
+      const result = await runTap({ simulatorId, elementRef: 'e2' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        ['/mocked/axe/path', 'tap', '-x', '325', '-y', '440', '--udid', simulatorId],
+      ]);
+    });
+
+    it('falls back to the resolved center when selector tap is ambiguous', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: 'shared-action',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          { success: false, error: 'Multiple accessibility elements matched selector' },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
       );
 
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'shared-action',
+          '--element-type',
+          'Button',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+      ]);
+    });
+
+    it('falls back to the resolved center when selector tap reports a parenthesized match count', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: 'weather.locationsSheet',
+          AXLabel: 'Clear search',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "Multiple (2) accessibility elements matched --id 'weather.locationsSheet'. No tap performed.",
+          },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
+      );
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
+          '/mocked/axe/path',
+          'tap',
+          '--id',
+          'weather.locationsSheet',
+          '--element-type',
+          'Button',
+          '--udid',
+          simulatorId,
+        ],
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+      ]);
+    });
+
+    it('falls back to the resolved center when selector tap reports no match', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: undefined,
+          AXIdentifier: undefined,
+          AXLabel: 'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor(
+        [
+          {
+            success: false,
+            error:
+              "No accessibility element matched --label 'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°'. No tap performed.",
+          },
+          { success: true, output: 'tapped by coordinate' },
+        ],
+        { describeUiAfterSequence: true },
+      );
+
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(false);
+      expect(actionCommands(calls)).toEqual([
+        [
           '/mocked/axe/path',
           'tap',
           '--label',
-          'Log in',
+          'Portland, 1:24 PM · Light Rain, 52°, H:55° L:48°',
+          '--element-type',
+          'Button',
           '--udid',
-          '12345678-1234-4234-8234-123456789012',
+          simulatorId,
         ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
+        ['/mocked/axe/path', 'tap', '-x', '120', '-y', '55', '--udid', simulatorId],
+      ]);
     });
 
-    it('should prefer coordinates over id/label when both are provided', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
+    it('does not fall back for unrelated failures that mention multiple', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Button',
+          role: 'AXButton',
+          frame: { x: 20, y: 30, width: 200, height: 50 },
+          AXUniqueId: 'shared-action',
+        }),
+      ]);
+      const { calls, executor } = createSequencedExecutor([
+        { success: false, error: 'Failed after multiple retry attempts' },
+        { success: true, output: 'should not run' },
+      ]);
 
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 120,
-            y: 240,
-            id: 'loginButton',
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
-          '/mocked/axe/path',
-          'tap',
-          '-x',
-          '120',
-          '-y',
-          '240',
-          '--udid',
-          '12345678-1234-4234-8234-123456789012',
-        ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
+      expect(result.didError).toBe(true);
+      expect(actionCommands(calls)).toHaveLength(1);
+      expect(actionCommands(calls)[0]).toEqual([
+        '/mocked/axe/path',
+        'tap',
+        '--id',
+        'shared-action',
+        '--element-type',
+        'Button',
+        '--udid',
+        simulatorId,
+      ]);
     });
 
-    it('should generate correct axe command with pre-delay', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
+    it('falls back to the referenced element center when no identifier exists', async () => {
+      recordSnapshot([
+        createNode({ frame: { x: 10, y: 20, width: 100, height: 40 }, AXLabel: undefined }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
+      await runTap({ simulatorId, elementRef: 'e1', preDelay: 0.25, postDelay: 0.5 }, executor);
 
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 150,
-            y: 300,
-            preDelay: 0.5,
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
-          '/mocked/axe/path',
-          'tap',
-          '-x',
-          '150',
-          '-y',
-          '300',
-          '--pre-delay',
-          '0.5',
-          '--udid',
-          '12345678-1234-4234-8234-123456789012',
-        ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
+      expect(actionCommands(calls)).toHaveLength(1);
+      expect(actionCommands(calls)[0]).toEqual([
+        '/mocked/axe/path',
+        'tap',
+        '-x',
+        '60',
+        '-y',
+        '40',
+        '--pre-delay',
+        '0.25',
+        '--post-delay',
+        '0.5',
+        '--udid',
+        simulatorId,
+      ]);
     });
 
-    it('should generate correct axe command with post-delay', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
+    it('uses a touch down/up activation for wide switch rows', async () => {
+      recordSnapshot([
+        createNode({
+          type: 'Switch',
+          role: 'AXSwitch',
+          frame: { x: 42.57, y: 889.68, width: 316.87, height: 26.89 },
+          AXLabel: 'Reduce transparency',
+        }),
+      ]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 250,
-            y: 400,
-            postDelay: 1.0,
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
-          '/mocked/axe/path',
-          'tap',
-          '-x',
-          '250',
-          '-y',
-          '400',
-          '--post-delay',
-          '1',
-          '--udid',
-          '12345678-1234-4234-8234-123456789012',
-        ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
-    });
-
-    it('should generate correct axe command with both delays', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-      });
-
-      const wrappedExecutor = async (
-        command: string[],
-        logPrefix?: string,
-        useShell?: boolean,
-        opts?: { env?: Record<string, string>; cwd?: string },
-      ) => {
-        callHistory.push({ command, logPrefix, useShell, opts });
-        return mockExecutor(command, logPrefix, useShell, opts);
-      };
-
-      const mockAxeHelpers = createMockAxeHelpers();
-
-      await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 350,
-            y: 500,
-            preDelay: 0.3,
-            postDelay: 0.7,
-          },
-          wrappedExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(callHistory).toHaveLength(1);
-      expect(callHistory[0]).toEqual({
-        command: [
-          '/mocked/axe/path',
-          'tap',
-          '-x',
-          '350',
-          '-y',
-          '500',
-          '--pre-delay',
-          '0.3',
-          '--post-delay',
-          '0.7',
-          '--udid',
-          '12345678-1234-4234-8234-123456789012',
-        ],
-        logPrefix: '[AXe]: tap',
-        useShell: false,
-        opts: { env: { SOME_ENV: 'value' } },
-      });
+      expect(result.action).toMatchObject({ type: 'tap', elementRef: 'e1', x: 307, y: 903 });
+      expect(calls[0]?.command).toEqual([
+        '/mocked/axe/path',
+        'touch',
+        '-x',
+        '307',
+        '-y',
+        '903',
+        '--down',
+        '--up',
+        '--udid',
+        simulatorId,
+      ]);
     });
   });
 
-  describe('Plugin Handler Validation', () => {
-    it('should require simulatorId session default when not provided', async () => {
-      const result = await handler({
-        x: 100,
-        y: 200,
-      });
+  describe('Resolution failures', () => {
+    it('returns SNAPSHOT_MISSING without calling AXe', async () => {
+      const { calls, executor } = createTrackingExecutor();
 
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Missing required session defaults');
-      expect(message).toContain('simulatorId is required');
-      expect(message).toContain('session-set-defaults');
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_MISSING');
+      expect(calls).toEqual([]);
     });
 
-    it('should return validation error for missing x coordinate', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
+    it('returns SNAPSHOT_EXPIRED without calling AXe', async () => {
+      recordSnapshot([createNode()], Date.now() - 61_000);
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await handler({
-        y: 200,
-      });
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('x: X coordinate is required when y is provided.');
+      expect(result.didError).toBe(true);
+      expect(result.uiError?.code).toBe('SNAPSHOT_EXPIRED');
+      expect(calls).toEqual([]);
     });
 
-    it('should return validation error for missing y coordinate', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
+    it('returns ELEMENT_REF_NOT_FOUND without calling AXe', async () => {
+      recordSnapshot([createNode()]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await handler({
-        x: 100,
-      });
+      const result = await runTap({ simulatorId, elementRef: 'e404' }, executor);
 
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('y: Y coordinate is required when x is provided.');
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'ELEMENT_REF_NOT_FOUND', elementRef: 'e404' });
+      expect(calls).toEqual([]);
     });
 
-    it('should return validation error when both id and label are provided without coordinates', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
+    it('returns TARGET_NOT_ACTIONABLE without calling AXe', async () => {
+      recordSnapshot([createNode({ enabled: false })]);
+      const { calls, executor } = createTrackingExecutor();
 
-      const result = await handler({
-        id: 'loginButton',
-        label: 'Log in',
-      });
+      const result = await runTap({ simulatorId, elementRef: 'e1' }, executor);
 
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('id: Provide either id or label, not both.');
-    });
-
-    it('should return validation error for non-integer x coordinate', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({
-        x: 3.14,
-        y: 200,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('x: X coordinate must be an integer');
-    });
-
-    it('should return validation error for non-integer y coordinate', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({
-        x: 100,
-        y: 3.14,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('y: Y coordinate must be an integer');
-    });
-
-    it('should return validation error for negative preDelay', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({
-        x: 100,
-        y: 200,
-        preDelay: -1,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('preDelay: Pre-delay must be non-negative');
-    });
-
-    it('should return validation error for negative postDelay', async () => {
-      sessionStore.setDefaults({ simulatorId: '12345678-1234-4234-8234-123456789012' });
-
-      const result = await handler({
-        x: 100,
-        y: 200,
-        postDelay: -1,
-      });
-
-      expect(result.isError).toBe(true);
-      const message = result.content[0].text;
-      expect(message).toContain('Parameter validation failed');
-      expect(message).toContain('postDelay: Post-delay must be non-negative');
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({ code: 'TARGET_NOT_ACTIONABLE', elementRef: 'e1' });
+      expect(calls).toEqual([]);
+      expect(getRuntimeSnapshot(simulatorId)).not.toBeNull();
     });
   });
 
-  describe('Handler Behavior (Complete Literal Returns)', () => {
-    it('should return DependencyError when axe binary is not found', async () => {
-      const mockExecutor = createMockExecutor({
-        success: true,
-        output: 'Tap completed',
-        error: undefined,
+  describe('Handler Behavior', () => {
+    it('requires simulatorId session default before validation', async () => {
+      const result = await callHandler(handler, { elementRef: 'e1' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Missing required session defaults');
+      expect(result.content[0].text).toContain('simulatorId is required');
+    });
+
+    it('returns UI_STATE_CHANGED when identifier-based AXe tap fails after ref resolution', async () => {
+      recordSnapshot([createNode({ AXUniqueId: 'continue-button' })]);
+
+      const result = await runTap(
+        { simulatorId, elementRef: 'e1' },
+        createFailingExecutor('element not found'),
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'UI_STATE_CHANGED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-            preDelay: 0.5,
-            postDelay: 1.0,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
     });
 
-    it('should handle DependencyError when axe binary not found (second test)', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'Coordinates out of bounds',
+    it('returns ACTION_FAILED when coordinate-based AXe tap fails after ref resolution', async () => {
+      recordSnapshot([createNode({ AXLabel: undefined })]);
+
+      const result = await runTap(
+        { simulatorId, elementRef: 'e1' },
+        createFailingExecutor('tap failed'),
+      );
+
+      expect(result.didError).toBe(true);
+      expect(result.uiError).toMatchObject({
+        code: 'ACTION_FAILED',
+        elementRef: 'e1',
+        recoveryHint: expect.stringContaining('snapshot_ui'),
       });
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle DependencyError when axe binary not found (third test)', async () => {
-      const mockExecutor = createMockExecutor({
-        success: false,
-        output: '',
-        error: 'System error occurred',
-      });
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle DependencyError when axe binary not found (fourth test)', async () => {
-      const mockExecutor = async () => {
-        throw new Error('ENOENT: no such file or directory');
-      };
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle DependencyError when axe binary not found (fifth test)', async () => {
-      const mockExecutor = async () => {
-        throw new Error('Unexpected error');
-      };
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
-    });
-
-    it('should handle DependencyError when axe binary not found (sixth test)', async () => {
-      const mockExecutor = async () => {
-        throw 'String error';
-      };
-
-      const mockAxeHelpers = createMockAxeHelpersWithNullPath();
-
-      const result = await runLogic(() =>
-        tapLogic(
-          {
-            simulatorId: '12345678-1234-4234-8234-123456789012',
-            x: 100,
-            y: 200,
-          },
-          mockExecutor,
-          mockAxeHelpers,
-        ),
-      );
-
-      expect(result.isError).toBe(true);
-      expect(allText(result)).toContain(AXE_NOT_AVAILABLE_MESSAGE);
+      expect(getRuntimeSnapshot(simulatorId)).toBeNull();
     });
   });
 });

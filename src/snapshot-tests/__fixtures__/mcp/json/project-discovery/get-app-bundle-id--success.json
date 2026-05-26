@@ -1,0 +1,18 @@
+{
+  "schema": "xcodebuildmcp.output.bundle-id",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "artifacts": {
+      "appPath": "<TMPDIR>/BundleTest.app",
+      "bundleId": "com.test.snapshot"
+    }
+  },
+  "nextSteps": [
+    "Install on simulator: install_app_sim({ simulatorId: \"SIMULATOR_UUID\", appPath: \"<TMPDIR>/BundleTest.app\" })",
+    "Launch on simulator: launch_app_sim({ simulatorId: \"SIMULATOR_UUID\", bundleId: \"com.test.snapshot\" })",
+    "Install on device: install_app_device({ deviceId: \"DEVICE_UDID\", appPath: \"<TMPDIR>/BundleTest.app\" })",
+    "Launch on device: launch_app_device({ deviceId: \"DEVICE_UDID\", bundleId: \"com.test.snapshot\" })"
+  ]
+}

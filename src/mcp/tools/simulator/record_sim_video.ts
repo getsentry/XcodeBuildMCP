@@ -93,7 +93,7 @@ function setStructuredOutput(ctx: ToolHandlerContext, result: RecordSimVideoResu
   ctx.structuredOutput = {
     result,
     schema: 'xcodebuildmcp.output.capture-result',
-    schemaVersion: '1',
+    schemaVersion: '2',
   };
 }
 

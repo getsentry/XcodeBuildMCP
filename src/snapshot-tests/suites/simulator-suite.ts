@@ -3,8 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ensureSimulatorBooted } from '../harness.ts';
-import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
-import { extractAppPathFromSnapshotOutput } from '../output-parsers.ts';
+import {
+  isJsonSnapshotRuntime,
+  isMcpSnapshotRuntime,
+  type SnapshotRuntime,
+  type WorkflowSnapshotHarness,
+} from '../contracts.ts';
+import { extractAppPathFromSnapshotResult } from '../output-parsers.ts';
 import {
   compilerErrorExtraArgs,
   createHarnessForRuntime,
@@ -248,7 +253,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
           });
           expect(appPathResult.isError).toBe(false);
 
-          const appPath = extractAppPathFromSnapshotOutput(appPathResult.rawText);
+          const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
           const { text, isError } = await harness.invoke('simulator', 'install', {
             simulatorId: simulatorUdid,
@@ -370,7 +375,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       );
     });
 
-    if (runtime !== 'cli') {
+    if (isMcpSnapshotRuntime(runtime)) {
       describe('mcp-only extras', () => {
         beforeEach(async () => {
           await harness.invoke('session-management', 'clear-defaults', { all: true });
@@ -380,7 +385,7 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
         // validates and hydrates arguments differently. This makes the empty-args build failure
         // a transport-specific MCP snapshot rather than a shared CLI/MCP parity case.
         it('build -- error missing params', async () => {
-          if (runtime === 'json') {
+          if (isJsonSnapshotRuntime(runtime)) {
             await expect(harness.invoke('simulator', 'build', {})).rejects.toThrow(
               'Structured output missing for simulator/build',
             );

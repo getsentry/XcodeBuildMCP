@@ -6,7 +6,7 @@ names:
 description: Stop sim app.
 outputSchema:
   schema: xcodebuildmcp.output.stop-result
-  version: "1"
+  version: "2"
 annotations:
   title: Stop App Simulator
   readOnlyHint: false

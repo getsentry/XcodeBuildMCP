@@ -134,7 +134,7 @@ describe('list_sims tool', () => {
       expect(text).toContain('Shutdown');
       expect(result.structuredOutput).toEqual({
         schema: 'xcodebuildmcp.output.simulator-list',
-        schemaVersion: '1',
+        schemaVersion: '2',
         result: {
           kind: 'simulator-list',
           didError: false,
@@ -214,7 +214,7 @@ describe('list_sims tool', () => {
       expect(result.isError).toBe(true);
       expect(result.structuredOutput).toEqual({
         schema: 'xcodebuildmcp.output.simulator-list',
-        schemaVersion: '1',
+        schemaVersion: '2',
         result: {
           kind: 'simulator-list',
           didError: true,

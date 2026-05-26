@@ -1,0 +1,10 @@
+{
+  "schema": "xcodebuildmcp.output.session-profile",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "previousProfile": "(default)",
+    "currentProfile": "MyCustomProfile"
+  }
+}

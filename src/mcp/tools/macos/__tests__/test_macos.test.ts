@@ -5,7 +5,11 @@ import {
   createMockExecutor,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
-import { expectPendingBuildResponse, runToolLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  expectPendingBuildResponse,
+  runToolLogic,
+  callHandler,
+} from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 import { schema, handler, testMacosLogic } from '../test_macos.ts';
 
@@ -56,7 +60,7 @@ describe('test_macos plugin (unified)', () => {
 
   describe('Handler Requirements', () => {
     it('should require scheme before running', async () => {
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('scheme is required');
@@ -65,7 +69,7 @@ describe('test_macos plugin (unified)', () => {
     it('should require project or workspace when scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({});
+      const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Provide a project or workspace');
@@ -74,7 +78,7 @@ describe('test_macos plugin (unified)', () => {
     it('should reject when both projectPath and workspacePath provided explicitly', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
       });
@@ -86,7 +90,7 @@ describe('test_macos plugin (unified)', () => {
 
   describe('XOR Parameter Validation', () => {
     it('should validate that either projectPath or workspacePath is provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         scheme: 'MyScheme',
       });
 
@@ -95,7 +99,7 @@ describe('test_macos plugin (unified)', () => {
     });
 
     it('should validate that both projectPath and workspacePath cannot be provided', async () => {
-      const result = await handler({
+      const result = await callHandler(handler, {
         projectPath: '/path/to/project.xcodeproj',
         workspacePath: '/path/to/workspace.xcworkspace',
         scheme: 'MyScheme',

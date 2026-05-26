@@ -1,0 +1,22 @@
+{
+  "schema": "xcodebuildmcp.output.simulator-action-result",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED"
+    },
+    "action": {
+      "type": "boot"
+    },
+    "artifacts": {
+      "simulatorId": "<UUID>"
+    }
+  },
+  "nextSteps": [
+    "Open the Simulator app (makes it visible): xcodebuildmcp simulator-management open",
+    "Install an app: xcodebuildmcp simulator install --simulator-id <UUID> --app-path PATH_TO_YOUR_APP",
+    "Launch an app: xcodebuildmcp simulator launch-app --simulator-id <UUID> --bundle-id YOUR_APP_BUNDLE_ID"
+  ]
+}

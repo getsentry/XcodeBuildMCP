@@ -11,45 +11,103 @@
   "$defs": {
     "schemaValue": {
       "oneOf": [
-        { "type": "object", "additionalProperties": true },
-        { "type": "boolean" },
-        { "type": "null" }
+        {
+          "type": "object",
+          "additionalProperties": true
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "toolDescriptor": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "title": { "type": ["string", "null"] },
-        "description": { "type": ["string", "null"] },
-        "inputSchema": { "$ref": "#/$defs/schemaValue" },
-        "outputSchema": { "$ref": "#/$defs/schemaValue" },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputSchema": {
+          "$ref": "#/$defs/schemaValue"
+        },
+        "outputSchema": {
+          "$ref": "#/$defs/schemaValue"
+        },
         "annotations": {
-          "type": ["object", "null"],
+          "type": [
+            "object",
+            "null"
+          ],
           "additionalProperties": true
         }
       },
-      "required": ["name", "title", "description", "inputSchema", "outputSchema", "annotations"]
+      "required": [
+        "name",
+        "title",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "annotations"
+      ]
     }
   },
   "properties": {
-    "schema": { "const": "xcodebuildmcp.output.xcode-bridge-tool-list" },
-    "schemaVersion": { "const": "1" },
-    "didError": { "type": "boolean" },
-    "error": { "type": ["string", "null"] },
+    "schema": {
+      "const": "xcodebuildmcp.output.xcode-bridge-tool-list"
+    },
+    "schemaVersion": {
+      "const": "1"
+    },
+    "didError": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "data": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "toolCount": { "type": "integer", "minimum": 0 },
+        "toolCount": {
+          "type": "integer",
+          "minimum": 0
+        },
         "tools": {
           "type": "array",
-          "items": { "$ref": "#/$defs/toolDescriptor" }
+          "items": {
+            "$ref": "#/$defs/toolDescriptor"
+          }
         }
       },
-      "required": ["toolCount", "tools"]
+      "required": [
+        "toolCount",
+        "tools"
+      ]
     }
   },
-  "required": ["schema", "schemaVersion", "didError", "error", "data"]
+  "required": [
+    "schema",
+    "schemaVersion",
+    "didError",
+    "error",
+    "data"
+  ]
 }
