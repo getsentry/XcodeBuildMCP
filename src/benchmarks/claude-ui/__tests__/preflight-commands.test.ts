@@ -22,6 +22,20 @@ describe('Claude UI benchmark preflight commands', () => {
     expect(preflightCommandsWithFocusResign({ commands })).toBe(commands);
   });
 
+  it('detects simple and path-based RocketSim launch commands', () => {
+    expect(
+      preflightCommandsWithFocusResign({
+        commands: ['open RocketSim', 'open /Applications/RocketSim.app'],
+        simulatorId: 'SIM-123',
+      }),
+    ).toEqual([
+      'open RocketSim',
+      "open -a Simulator --args -CurrentDeviceUDID 'SIM-123'",
+      'open /Applications/RocketSim.app',
+      "open -a Simulator --args -CurrentDeviceUDID 'SIM-123'",
+    ]);
+  });
+
   it('shell-quotes simulator IDs used by the focus command', () => {
     expect(
       preflightCommandsWithFocusResign({

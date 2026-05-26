@@ -17,7 +17,7 @@ function shellSingleQuote(value: string): string {
 }
 
 function isRocketSimAppLaunchCommand(command: string): boolean {
-  return /^\s*open\s+.*(?:^|\s)RocketSim(?:\.app)?\s*$/.test(command);
+  return /^\s*open\s+(?:.*(?:\s|\/))?RocketSim(?:\.app)?\s*$/.test(command);
 }
 
 export function preflightCommandsWithFocusResign(opts: {

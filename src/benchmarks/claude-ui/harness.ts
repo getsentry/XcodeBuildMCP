@@ -228,7 +228,7 @@ function runCommand(opts: {
       cwd: opts.cwd,
       env: opts.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
-      detached: opts.terminalJsonResultGraceMs !== undefined,
+      detached: opts.terminalJsonResultGraceMs !== undefined || opts.timeoutMs !== undefined,
     });
 
     const clearTerminalResultTimer = (): void => {
