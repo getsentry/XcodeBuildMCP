@@ -25,7 +25,7 @@ export type LifecycleCommandExecutor = (
 
 export type LifecycleLogWriter = (logPath: string, message: string) => Promise<void>;
 
-const defaultLifecycleLogWriter: LifecycleLogWriter = async (logPath, message) => {
+export const defaultLifecycleLogWriter: LifecycleLogWriter = async (logPath, message) => {
   await appendFile(logPath, `${message}\n`, 'utf8');
 };
 
@@ -112,7 +112,7 @@ async function appendLifecycleLog(
   await logWriter(logPath, message);
 }
 
-async function tryAppendLifecycleLog(
+export async function tryAppendLifecycleLog(
   logPath: string,
   message: string,
   logWriter: LifecycleLogWriter = defaultLifecycleLogWriter,

@@ -359,6 +359,42 @@ describe('Claude UI benchmark analysis', () => {
     ).toThrow('weather.yml.claude.activateSkill: requires skillDirs');
   });
 
+  it('rejects activateSkill that does not match skillDirs when loading config', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          claude: {
+            skillDirs: ['benchmarks/claude-ui/local/skills/vendor-cli'],
+            activateSkill: 'other-skill',
+            isolatedWorkingDirectory: true,
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow('weather.yml.claude.activateSkill: must match a basename from skillDirs');
+  });
+
+  it('rejects duplicate skillDir basenames when loading config', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          claude: {
+            skillDirs: [
+              'benchmarks/claude-ui/local/skills/vendor-cli',
+              'benchmarks/claude-ui/fixtures/skills/vendor-cli',
+            ],
+            isolatedWorkingDirectory: true,
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow("weather.yml.claude.skillDirs: duplicate basename 'vendor-cli'");
+  });
+
   it('rejects invalid session defaults when loading config', () => {
     expect(() =>
       readConfig(

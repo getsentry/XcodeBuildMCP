@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import * as z from 'zod';
 import { sessionDefaultsSchema } from '../../utils/session-defaults-schema.ts';
@@ -116,9 +117,26 @@ function readClaudeInvocationConfig(
     throw new Error(`${source}.permissionMode: expected 'default' or 'bypassPermissions'`);
   }
   const skillDirs = readOptionalStringArray(raw, 'skillDirs', source);
+  if (skillDirs !== undefined) {
+    const basenames = new Set<string>();
+    for (const skillDir of skillDirs) {
+      const basename = path.basename(skillDir);
+      if (basenames.has(basename)) {
+        throw new Error(`${source}.skillDirs: duplicate basename '${basename}'`);
+      }
+      basenames.add(basename);
+    }
+  }
   const activateSkill = readOptionalString(raw, 'activateSkill', source);
   if (activateSkill !== undefined && (!skillDirs || skillDirs.length === 0)) {
     throw new Error(`${source}.activateSkill: requires skillDirs`);
+  }
+  if (
+    activateSkill !== undefined &&
+    skillDirs !== undefined &&
+    !skillDirs.some((skillDir) => path.basename(skillDir) === activateSkill)
+  ) {
+    throw new Error(`${source}.activateSkill: must match a basename from skillDirs`);
   }
 
   return {

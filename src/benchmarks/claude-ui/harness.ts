@@ -218,6 +218,7 @@ function runCommand(opts: {
     const started = process.hrtime.bigint();
     let stdoutBuffer = '';
     let terminalResultExitCode: number | undefined;
+    let terminalResultRequestedTermination = false;
     let terminalResultTimer: NodeJS.Timeout | undefined;
     let timeoutTimer: NodeJS.Timeout | undefined;
     let hardKillTimer: NodeJS.Timeout | undefined;
@@ -272,13 +273,20 @@ function runCommand(opts: {
       if (terminalResultExitCode !== undefined || opts.terminalJsonResultGraceMs === undefined)
         return;
       terminalResultExitCode = result.is_error === true ? 1 : 0;
-      terminalResultTimer = setTimeout(terminateChild, opts.terminalJsonResultGraceMs);
+      terminalResultTimer = setTimeout(() => {
+        terminalResultRequestedTermination = true;
+        terminateChild();
+      }, opts.terminalJsonResultGraceMs);
       terminalResultTimer.unref();
     };
 
     if (opts.timeoutMs !== undefined) {
       timeoutTimer = setTimeout(() => {
-        timedOut = true;
+        if (terminalResultExitCode === undefined) {
+          timedOut = true;
+        } else {
+          terminalResultRequestedTermination = true;
+        }
         terminateChild();
       }, opts.timeoutMs);
       timeoutTimer.unref();
@@ -325,12 +333,19 @@ function runCommand(opts: {
       clearTimeoutTimer();
       clearHardKillTimer();
       const durationSeconds = Number(process.hrtime.bigint() - started) / 1_000_000_000;
+      const resolvedExitCode =
+        terminalResultExitCode !== undefined &&
+        (terminalResultRequestedTermination || exitCode === 0 || exitCode === null)
+          ? terminalResultExitCode
+          : timedOut
+            ? 143
+            : (exitCode ?? null);
       stdout.end();
       stderr.end();
       Promise.all([finished(stdout), finished(stderr)])
         .then(() =>
           resolve({
-            exitCode: timedOut ? 143 : (exitCode ?? terminalResultExitCode ?? null),
+            exitCode: resolvedExitCode,
             durationSeconds,
           }),
         )

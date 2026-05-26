@@ -1,33 +1,17 @@
-import { appendFile } from 'node:fs/promises';
 import {
+  defaultLifecycleLogWriter,
   runLoggedCommand,
+  tryAppendLifecycleLog,
   type CreatedTemporarySimulator,
   type LifecycleCommandExecutor,
   type LifecycleLogWriter,
 } from './simulator-lifecycle.ts';
-
-const defaultLifecycleLogWriter: LifecycleLogWriter = async (logPath, message) => {
-  await appendFile(logPath, `${message}\n`, 'utf8');
-};
 
 export interface DeleteTemporarySimulatorResult {
   attempted: boolean;
   succeeded: boolean;
   exitCode: number | null;
   error?: string;
-}
-
-async function tryAppendLifecycleLog(
-  logPath: string,
-  message: string,
-  logWriter: LifecycleLogWriter = defaultLifecycleLogWriter,
-): Promise<string | undefined> {
-  try {
-    await logWriter(logPath, message);
-    return undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
 }
 
 export async function deleteTemporarySimulator(

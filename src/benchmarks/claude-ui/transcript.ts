@@ -85,7 +85,7 @@ function parseEmbeddedJson(value: unknown): unknown {
 
 function stringifyContent(value: unknown): string {
   if (typeof value === 'string') return value;
-  return JSON.stringify(value);
+  return JSON.stringify(value) ?? '';
 }
 
 function extractContentBlocks(entry: Record<string, unknown>): unknown[] {
@@ -269,6 +269,7 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
   const trackedToolsById = new Map<string, Array<ToolClassification & { fullName: string }>>();
   const parseErrors: string[] = [];
   const failures: ToolFailureRecord[] = [];
+  const failureKeys = new Set<string>();
   const patternFailures: PatternFailureRecord[] = [];
   const trackedSequence: ToolCallRecord[] = [];
   const mcpSequence: ToolCallRecord[] = [];
@@ -407,6 +408,11 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
         if (matchesAnyPattern(message, ignoredFailureMatchers)) continue;
 
         for (const trackedTool of trackedTools) {
+          const failureKey = [id, trackedTool.fullName, trackedTool.shortName, line, message].join(
+            '\0',
+          );
+          if (failureKeys.has(failureKey)) continue;
+          failureKeys.add(failureKey);
           failures.push({
             id,
             fullName: trackedTool.fullName,

@@ -1,15 +1,9 @@
-import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { buildClaudeArgs } from '../claude-invocation.ts';
 import { compareBenchmark } from '../compare.ts';
 import { readConfig } from '../config.ts';
 import { analyzeClaudeJsonl } from '../transcript.ts';
 import type { BenchmarkArtifacts, BenchmarkRunMetadata } from '../types.ts';
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 function line(value: unknown): string {
   return JSON.stringify(value);
@@ -40,28 +34,6 @@ function runMetadata(wallClockSeconds: number): BenchmarkRunMetadata {
     parserExitCode: 0,
     artifacts: artifacts('/tmp/run'),
   };
-}
-
-function runParserScript(args: string[]): Promise<{
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('python3', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    child.on('error', reject);
-    child.on('close', (exitCode) => {
-      resolve({
-        exitCode,
-        stdout: Buffer.concat(stdout).toString('utf8'),
-        stderr: Buffer.concat(stderr).toString('utf8'),
-      });
-    });
-  });
 }
 
 describe('Claude UI benchmark tool configuration', () => {
@@ -612,6 +584,120 @@ describe('Claude UI benchmark tool configuration', () => {
     });
   });
 
+  it('handles tracked tool results without content', () => {
+    const config = readConfig(
+      {
+        name: 'private CLI weather',
+        prompt: 'weather.md',
+        failurePatterns: ['WAIT_TIMEOUT'],
+        toolAnalysis: {
+          matchers: [
+            {
+              kind: 'bashCommand',
+              commandPrefix: 'privatecli',
+              shortName: 'privatecli.other',
+            },
+          ],
+        },
+      },
+      'private-cli.yml',
+    );
+    const transcript = [
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-1',
+              name: 'Bash',
+              input: { command: 'privatecli --version' },
+            },
+          ],
+        },
+      }),
+      line({
+        type: 'user',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 'tool-1', is_error: true }],
+        },
+      }),
+    ].join('\n');
+
+    const audit = analyzeClaudeJsonl(transcript, {
+      toolAnalysis: config.toolAnalysis,
+      failurePatterns: config.failurePatterns,
+    });
+
+    expect(audit.failures).toEqual([
+      {
+        id: 'tool-1',
+        fullName: 'Bash',
+        shortName: 'privatecli.other',
+        line: 2,
+        message: '',
+      },
+    ]);
+    expect(audit.patternFailures).toEqual([]);
+  });
+
+  it('counts repeated matches in one Bash failure result once', () => {
+    const config = readConfig(
+      {
+        name: 'private CLI weather',
+        prompt: 'weather.md',
+        toolAnalysis: {
+          matchers: [
+            {
+              kind: 'bashCommand',
+              commandPrefix: 'privatecli',
+              shortName: 'privatecli.other',
+            },
+          ],
+        },
+      },
+      'private-cli.yml',
+    );
+    const transcript = [
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-1',
+              name: 'Bash',
+              input: { command: 'privatecli one && privatecli two' },
+            },
+          ],
+        },
+      }),
+      line({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              is_error: true,
+              content: 'Exit code 1',
+            },
+          ],
+        },
+      }),
+    ].join('\n');
+
+    const audit = analyzeClaudeJsonl(transcript, { toolAnalysis: config.toolAnalysis });
+    const result = compareBenchmark(config, audit, runMetadata(600));
+
+    expect(audit.trackedSequence.map((call) => call.shortName)).toEqual([
+      'privatecli.other',
+      'privatecli.other',
+    ]);
+    expect(audit.failures).toHaveLength(1);
+    expect(result.completion.issueCount).toBe(1);
+  });
+
   it('marks the benchmark incomplete when Claude exits non-zero', () => {
     const config = readConfig(
       {
@@ -633,53 +719,55 @@ describe('Claude UI benchmark tool configuration', () => {
     });
   });
 
-  it('lets the parser include configured non-MCP tool names', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'claude-ui-parser-'));
-    try {
-      const jsonlPath = path.join(dir, 'claude.jsonl');
-      const outputPath = path.join(dir, 'parsed');
-      await writeFile(
-        jsonlPath,
-        [
-          line({
-            type: 'assistant',
-            message: {
-              content: [
-                {
-                  type: 'tool_use',
-                  id: 'tool-1',
-                  name: 'Bash',
-                  input: { command: 'vendorcli ui screen --json' },
-                },
-              ],
+  it('keeps configured non-MCP tool names in transcript analysis', () => {
+    const config = readConfig(
+      {
+        name: 'vendor CLI weather',
+        prompt: 'weather.md',
+        toolAnalysis: {
+          matchers: [
+            {
+              kind: 'bashCommand',
+              commandPrefix: 'vendorcli ui screen',
+              shortName: 'vendorcli.screen',
             },
-          }),
-          line({
-            type: 'user',
-            message: { content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }] },
-          }),
-        ].join('\n'),
-        'utf8',
-      );
+          ],
+        },
+      },
+      'vendor-cli.yml',
+    );
+    const transcript = [
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-1',
+              name: 'Bash',
+              input: { command: 'vendorcli ui screen --json' },
+            },
+          ],
+        },
+      }),
+    ].join('\n');
 
-      const result = await runParserScript([
-        path.join(repoRoot, 'benchmarks/claude-ui/parse_claude_conversation.py'),
-        jsonlPath,
-        outputPath,
-        '--tool-prefix=mcp__xcodebuildmcp',
-        '--tool-name=Bash',
-      ]);
+    const audit = analyzeClaudeJsonl(transcript, { toolAnalysis: config.toolAnalysis });
 
-      expect(result.exitCode).toBe(0);
-      expect(await readdir(outputPath)).toEqual([
-        '0001_tool_call_Bash.md',
-        '0002_tool_result_Bash.md',
-      ]);
-      expect(await readFile(path.join(outputPath, '0001_tool_call_Bash.md'), 'utf8')).toContain(
-        'vendorcli ui screen --json',
-      );
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    expect(
+      audit.trackedSequence.map((call) => ({
+        fullName: call.fullName,
+        shortName: call.shortName,
+        isUiAutomation: call.isUiAutomation,
+        line: call.line,
+      })),
+    ).toEqual([
+      {
+        fullName: 'Bash',
+        shortName: 'vendorcli.screen',
+        isUiAutomation: false,
+        line: 1,
+      },
+    ]);
   });
 });
