@@ -255,17 +255,6 @@ function runCommand(opts: {
       hardKillTimer = undefined;
     };
 
-    const rejectCommand = (error: Error): void => {
-      if (settled) return;
-      settled = true;
-      clearTerminalResultTimer();
-      clearTimeoutTimer();
-      clearHardKillTimer();
-      stdout.destroy();
-      stderr.destroy();
-      reject(error);
-    };
-
     const killChild = (signal: NodeJS.Signals): void => {
       if (child.exitCode !== null || child.killed || child.pid === undefined) return;
       try {
@@ -287,6 +276,18 @@ function runCommand(opts: {
         killChild('SIGKILL');
       }, 5_000);
       hardKillTimer.unref();
+    };
+
+    const rejectCommand = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTerminalResultTimer();
+      clearTimeoutTimer();
+      clearHardKillTimer();
+      terminateChild();
+      stdout.destroy();
+      stderr.destroy();
+      reject(error);
     };
 
     const recordTerminalResult = (result: StreamJsonResult): void => {
@@ -330,10 +331,12 @@ function runCommand(opts: {
     };
 
     child.stdout.on('data', (chunk: Buffer) => {
+      if (settled) return;
       stdout.write(chunk);
       scanStdoutForTerminalResult(chunk);
     });
     child.stderr.on('data', (chunk: Buffer) => {
+      if (settled) return;
       stderr.write(chunk);
     });
     child.on('error', (error) => {
