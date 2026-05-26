@@ -231,6 +231,52 @@ describe('Claude UI benchmark analysis', () => {
     );
 
     expect(result.completion.issueCount).toBe(1);
+    expect(result.completion.completed).toBe(false);
+    expect(result.completed).toBe(false);
+  });
+
+  it('marks the benchmark incomplete when configured failure patterns match', () => {
+    const transcript = [
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', id: 'tool-1', name: `${toolPrefix}wait_for_ui`, input: {} },
+          ],
+        },
+      }),
+      line({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              is_error: false,
+              content: 'BUILD FAILED',
+            },
+          ],
+        },
+      }),
+    ].join('\n');
+
+    const audit = analyzeClaudeJsonl(transcript, {
+      mcpToolPrefix: toolPrefix,
+      failurePatterns: ['BUILD FAILED'],
+    });
+
+    expect(audit.failures).toEqual([]);
+    expect(audit.patternFailures).toHaveLength(1);
+
+    const result = compareBenchmark(
+      { name: 'weather', prompt: 'prompt.md' },
+      audit,
+      runMetadata(10),
+    );
+
+    expect(result.completion.issueCount).toBe(1);
+    expect(result.completion.completed).toBe(false);
+    expect(result.completed).toBe(false);
   });
 
   it('counts parser failures once when malformed JSONL also records parse errors', () => {
@@ -282,6 +328,22 @@ describe('Claude UI benchmark analysis', () => {
         'weather.yml',
       ),
     ).toThrow('weather.yml.failurePatterns[1]: invalid regular expression');
+  });
+
+  it('rejects activateSkill without skillDirs when loading config', () => {
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          claude: {
+            activateSkill: 'vendor-cli',
+            isolatedWorkingDirectory: true,
+          },
+        },
+        'weather.yml',
+      ),
+    ).toThrow('weather.yml.claude.activateSkill: requires skillDirs');
   });
 
   it('rejects invalid session defaults when loading config', () => {

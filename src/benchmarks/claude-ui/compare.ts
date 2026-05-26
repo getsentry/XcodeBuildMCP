@@ -134,6 +134,7 @@ function processCompleted(run: BenchmarkRunMetadata, audit: TranscriptAudit): bo
   if (audit.parseErrors.length > 0) return false;
   if (run.claudeExitCode !== 0) return false;
   if (run.parserExitCode !== 0) return false;
+  if (audit.patternFailures.length > 0) return false;
   return !audit.failures.some(isTerminalClaudeFailure);
 }
 

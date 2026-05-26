@@ -115,6 +115,12 @@ function readClaudeInvocationConfig(
   ) {
     throw new Error(`${source}.permissionMode: expected 'default' or 'bypassPermissions'`);
   }
+  const skillDirs = readOptionalStringArray(raw, 'skillDirs', source);
+  const activateSkill = readOptionalString(raw, 'activateSkill', source);
+  if (activateSkill !== undefined && (!skillDirs || skillDirs.length === 0)) {
+    throw new Error(`${source}.activateSkill: requires skillDirs`);
+  }
+
   return {
     useMcpServer: readOptionalBoolean(raw, 'useMcpServer', source),
     permissionMode,
@@ -123,8 +129,8 @@ function readClaudeInvocationConfig(
     appendSystemPrompt: readOptionalString(raw, 'appendSystemPrompt', source),
     extraArgs: readOptionalStringArray(raw, 'extraArgs', source),
     pluginDirs: readOptionalStringArray(raw, 'pluginDirs', source),
-    skillDirs: readOptionalStringArray(raw, 'skillDirs', source),
-    activateSkill: readOptionalString(raw, 'activateSkill', source),
+    skillDirs,
+    activateSkill,
     isolatedWorkingDirectory: readOptionalBoolean(raw, 'isolatedWorkingDirectory', source),
     maxClaudeSeconds: readOptionalNumber(raw, 'maxClaudeSeconds', source),
   };
