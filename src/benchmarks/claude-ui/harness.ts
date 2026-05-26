@@ -246,6 +246,17 @@ function runCommand(opts: {
       hardKillTimer = undefined;
     };
 
+    const rejectCommand = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTerminalResultTimer();
+      clearTimeoutTimer();
+      clearHardKillTimer();
+      stdout.destroy();
+      stderr.destroy();
+      reject(error);
+    };
+
     const killChild = (signal: NodeJS.Signals): void => {
       if (child.exitCode !== null || child.killed || child.pid === undefined) return;
       try {
@@ -317,14 +328,11 @@ function runCommand(opts: {
       stderr.write(chunk);
     });
     child.on('error', (error) => {
-      if (settled) return;
-      settled = true;
-      clearTerminalResultTimer();
-      clearTimeoutTimer();
-      clearHardKillTimer();
-      stdout.destroy();
-      stderr.destroy();
-      reject(error);
+      rejectCommand(error);
+    });
+    child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EPIPE') return;
+      rejectCommand(error);
     });
     child.on('close', (exitCode) => {
       if (settled) return;
