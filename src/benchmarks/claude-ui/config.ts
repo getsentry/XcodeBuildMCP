@@ -91,6 +91,19 @@ function readOptionalNumber(
   return raw;
 }
 
+function readOptionalPositiveFiniteNumber(
+  value: Record<string, unknown>,
+  key: string,
+  source: string,
+): number | undefined {
+  const raw = readOptionalNumber(value, key, source);
+  if (raw === undefined) return undefined;
+  if (!Number.isFinite(raw) || raw <= 0) {
+    throw new Error(`${source}.${key}: expected finite positive number`);
+  }
+  return raw;
+}
+
 function readNumberMap(value: unknown, source: string): Record<string, number> | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new Error(`${source}: expected object`);
@@ -150,7 +163,7 @@ function readClaudeInvocationConfig(
     skillDirs,
     activateSkill,
     isolatedWorkingDirectory: readOptionalBoolean(raw, 'isolatedWorkingDirectory', source),
-    maxClaudeSeconds: readOptionalNumber(raw, 'maxClaudeSeconds', source),
+    maxClaudeSeconds: readOptionalPositiveFiniteNumber(raw, 'maxClaudeSeconds', source),
   };
 }
 

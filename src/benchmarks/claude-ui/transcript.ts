@@ -148,6 +148,24 @@ function matchesAnyPattern(
   return matchers.some((matcher) => matcher.regex.test(text));
 }
 
+function patternMatcherIsIgnored(
+  matcher: { pattern: string },
+  ignoredFailureMatchers: Array<{ pattern: string; regex: RegExp }>,
+): boolean {
+  return matchesAnyPattern(matcher.pattern, ignoredFailureMatchers);
+}
+
+function hasReportablePatternMatch(
+  text: string,
+  patternMatchers: Array<{ pattern: string; regex: RegExp }>,
+  ignoredFailureMatchers: Array<{ pattern: string; regex: RegExp }>,
+): boolean {
+  return patternMatchers.some(
+    (matcher) =>
+      matcher.regex.test(text) && !patternMatcherIsIgnored(matcher, ignoredFailureMatchers),
+  );
+}
+
 function appendPatternFailures(opts: {
   text: string;
   line: number;
@@ -156,8 +174,8 @@ function appendPatternFailures(opts: {
   ignoredFailureMatchers: Array<{ pattern: string; regex: RegExp }>;
   patternFailures: PatternFailureRecord[];
 }): void {
-  if (matchesAnyPattern(opts.text, opts.ignoredFailureMatchers)) return;
   for (const matcher of opts.patternMatchers) {
+    if (patternMatcherIsIgnored(matcher, opts.ignoredFailureMatchers)) continue;
     if (matcher.regex.test(opts.text)) {
       opts.patternFailures.push({
         pattern: matcher.pattern,
@@ -405,7 +423,12 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
         }
         if (!resultDidError(block, structured)) continue;
 
-        if (matchesAnyPattern(message, ignoredFailureMatchers)) continue;
+        if (
+          matchesAnyPattern(message, ignoredFailureMatchers) &&
+          !hasReportablePatternMatch(message, patternMatchers, ignoredFailureMatchers)
+        ) {
+          continue;
+        }
 
         for (const trackedTool of trackedTools) {
           const failureKey = [id, trackedTool.fullName, trackedTool.shortName, line, message].join(

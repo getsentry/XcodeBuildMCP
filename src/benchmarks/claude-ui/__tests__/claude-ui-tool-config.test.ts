@@ -322,6 +322,73 @@ describe('Claude UI benchmark tool configuration', () => {
     ]);
   });
 
+  it('reports real failures when ignored and reportable patterns share a result', () => {
+    const config = readConfig(
+      {
+        name: 'private CLI weather',
+        prompt: 'weather.md',
+        failurePatterns: ['WAIT_TIMEOUT'],
+        ignoredFailurePatterns: ['element_disabled'],
+        toolAnalysis: {
+          matchers: [
+            {
+              kind: 'bashCommand',
+              commandPrefix: 'privatecli wait',
+              shortName: 'privatecli.wait',
+              uiAutomation: true,
+            },
+          ],
+        },
+      },
+      'private-cli.yml',
+    );
+    const transcript = [
+      line({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-1',
+              name: 'Bash',
+              input: { command: 'privatecli wait element --label Weather --timeout 1' },
+            },
+          ],
+        },
+      }),
+      line({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              is_error: true,
+              content: 'Exit code 1\n{"error":{"code":"element_disabled"}}\nWAIT_TIMEOUT',
+            },
+          ],
+        },
+      }),
+    ].join('\n');
+
+    const audit = analyzeClaudeJsonl(transcript, {
+      toolAnalysis: config.toolAnalysis,
+      failurePatterns: config.failurePatterns,
+      ignoredFailurePatterns: config.ignoredFailurePatterns,
+    });
+    const result = compareBenchmark(config, audit, runMetadata(10));
+
+    expect(audit.failures).toHaveLength(1);
+    expect(audit.patternFailures).toEqual([
+      {
+        pattern: 'WAIT_TIMEOUT',
+        line: 2,
+        excerpt: 'Exit code 1\n{"error":{"code":"element_disabled"}}\nWAIT_TIMEOUT',
+      },
+    ]);
+    expect(result.completed).toBe(false);
+  });
+
   it('ignores configured non-terminal tool failures', () => {
     const config = readConfig(
       {

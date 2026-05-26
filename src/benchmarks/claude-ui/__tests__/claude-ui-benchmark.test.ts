@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
+import { renderAggregate } from '../render.ts';
 import { readConfig } from '../config.ts';
 import {
   listSuitePaths,
@@ -336,6 +337,21 @@ describe('Claude UI benchmark analysis', () => {
     );
   });
 
+  it('rejects invalid Claude timeout values when loading config', () => {
+    for (const maxClaudeSeconds of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        readConfig(
+          {
+            name: 'weather',
+            prompt: 'prompt.md',
+            claude: { maxClaudeSeconds },
+          },
+          'weather.yml',
+        ),
+      ).toThrow('weather.yml.claude.maxClaudeSeconds: expected finite positive number');
+    }
+  });
+
   it('rejects malformed failure pattern regexes when loading config', () => {
     expect(() =>
       readConfig(
@@ -600,6 +616,35 @@ describe('Claude UI benchmark analysis', () => {
     expect(result.completion.completed).toBe(false);
     expect(result.completion.issueCount).toBe(1);
     expect(result.completed).toBe(false);
+  });
+
+  it('renders path-aware aggregate artifact roots', () => {
+    const first = compareBenchmark(
+      { name: 'first', prompt: 'prompt.md' },
+      analyzeClaudeJsonl('', { mcpToolPrefix: toolPrefix }),
+      {
+        ...runMetadata(10),
+        artifacts: {
+          ...runMetadata(10).artifacts,
+          runDirectory: '/tmp/run/first/20260101T000000Z',
+        },
+      },
+    );
+    const second = compareBenchmark(
+      { name: 'second', prompt: 'prompt.md' },
+      analyzeClaudeJsonl('', { mcpToolPrefix: toolPrefix }),
+      {
+        ...runMetadata(20),
+        artifacts: {
+          ...runMetadata(20).artifacts,
+          runDirectory: '/tmp/run-extra/second/20260101T000000Z',
+        },
+      },
+    );
+
+    expect(renderAggregate([first, second], { color: false, cwd: '/tmp' })).toContain(
+      'Artifacts: /tmp/',
+    );
   });
 
   it('returns no sequence hunks when expected and actual match', () => {

@@ -373,12 +373,17 @@ export function renderSuiteReport(result: BenchmarkResult, options?: RenderOptio
   return `${sections.join('\n')}\n`;
 }
 
+function pathContainsOrEquals(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 function commonArtifactRoot(results: readonly BenchmarkResult[]): string | undefined {
   if (results.length === 0) return undefined;
   const dirs = results.map((r) => path.dirname(r.run.artifacts.runDirectory));
   let root = dirs[0]!;
   for (const dir of dirs.slice(1)) {
-    while (!dir.startsWith(root)) {
+    while (!pathContainsOrEquals(root, dir)) {
       const next = path.dirname(root);
       if (next === root) return root;
       root = next;
