@@ -247,6 +247,7 @@ function rejectRemovedConfigKeys(raw: Record<string, unknown>, source: string): 
     allowedVariance: 'removed; baselines are observed data only',
     expectedFailures: 'removed; benchmark stumbles are observed data',
     expectedToolSequence: 'renamed to baselineToolSequence',
+    sequence: 'removed; use baselineToolSequence for observed sequence reporting',
   };
   for (const [key, message] of Object.entries(removedKeys)) {
     if (raw[key] !== undefined) throw new Error(`${source}.${key}: ${message}`);

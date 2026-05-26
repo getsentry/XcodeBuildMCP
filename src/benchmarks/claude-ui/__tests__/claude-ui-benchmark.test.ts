@@ -315,6 +315,19 @@ describe('Claude UI benchmark analysis', () => {
         'weather.yml',
       ),
     ).toThrow('weather.yml.allowedVariance: removed; baselines are observed data only');
+
+    expect(() =>
+      readConfig(
+        {
+          name: 'weather',
+          prompt: 'prompt.md',
+          sequence: { mode: 'fail' },
+        },
+        'weather.yml',
+      ),
+    ).toThrow(
+      'weather.yml.sequence: removed; use baselineToolSequence for observed sequence reporting',
+    );
   });
 
   it('rejects malformed failure pattern regexes when loading config', () => {
