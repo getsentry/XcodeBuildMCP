@@ -69,8 +69,70 @@ async function defaultExecutor(
 
     const childProcess = spawn(executable, args, spawnOpts);
 
-    let stdout = '';
-    let stderr = '';
+    // Accumulate child process output as raw Buffers (not concatenated strings)
+    // so we never trip V8's max-string-length limit (~512MB on 64-bit), which
+    // previously surfaced as an uncaught `RangeError: Invalid string length`
+    // thrown synchronously from the 'data' handler when xcodebuild emitted
+    // very large verbose logs.
+    const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024 * 1024; // 64 MiB per stream
+    const envCap = Number.parseInt(process.env.XCODEBUILDMCP_MAX_OUTPUT_BYTES ?? '', 10);
+    const maxOutputBytes =
+      opts?.maxOutputBytes ??
+      (Number.isFinite(envCap) && envCap > 0 ? envCap : DEFAULT_MAX_OUTPUT_BYTES);
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
+
+    const appendChunk = (
+      chunks: Buffer[],
+      currentBytes: number,
+      truncated: boolean,
+      data: Buffer,
+    ): { bytes: number; truncated: boolean } => {
+      if (truncated) {
+        return { bytes: currentBytes, truncated: true };
+      }
+      const remaining = maxOutputBytes - currentBytes;
+      if (data.byteLength <= remaining) {
+        chunks.push(data);
+        return { bytes: currentBytes + data.byteLength, truncated: false };
+      }
+      if (remaining > 0) {
+        chunks.push(data.subarray(0, remaining));
+      }
+      return { bytes: maxOutputBytes, truncated: true };
+    };
+
+    const finalizeStream = (
+      chunks: Buffer[],
+      totalBytes: number,
+      truncated: boolean,
+    ): string => {
+      try {
+        const text = Buffer.concat(chunks, totalBytes).toString('utf8');
+        return truncated
+          ? `${text}\n[output truncated after ${totalBytes} bytes]`
+          : text;
+      } catch (err) {
+        // Defensive: if the concatenated string still somehow exceeds V8's
+        // string limit, fall back to a heavily truncated slice rather than
+        // crashing the MCP process.
+        log(
+          'error',
+          `Failed to finalize captured output (${totalBytes} bytes): ${(err as Error).message}`,
+        );
+        const safeSlice = Math.min(totalBytes, 1 * 1024 * 1024);
+        const safeText = Buffer.concat(chunks, totalBytes)
+          .subarray(0, safeSlice)
+          .toString('utf8');
+        return `${safeText}
+[output truncated after ${safeSlice} bytes due to size]`;
+      }
+    };
 
     const streamClosers: Array<() => void> = [];
     const streamDetachers: Array<() => void> = [];
@@ -114,6 +176,8 @@ async function defaultExecutor(
       detachStreamListeners();
 
       const success = code === 0;
+      const stdout = finalizeStream(stdoutChunks, stdoutBytes, stdoutTruncated);
+      const stderr = finalizeStream(stderrChunks, stderrBytes, stderrTruncated);
       const response: CommandResponse = {
         success,
         output: stdout,
@@ -143,7 +207,7 @@ async function defaultExecutor(
 
     const attachStream = (
       stream: NodeJS.ReadableStream | null | undefined,
-      onChunk: (chunk: string) => void,
+      onChunk: (chunk: Buffer) => void,
     ): void => {
       if (!stream) {
         return;
@@ -165,8 +229,16 @@ async function defaultExecutor(
         if (settled) {
           return;
         }
-        const chunk = data.toString();
-        onChunk(chunk);
+        try {
+          const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+          onChunk(buf);
+        } catch (err) {
+          // Any failure inside the data handler (including a future
+          // RangeError) must reject the promise rather than escape as an
+          // uncaught exception (which previously crashed the MCP process via
+          // mechanism=auto.node.onuncaughtexception).
+          handleError(err as Error);
+        }
       };
 
       stream.on('data', handleData);
@@ -212,25 +284,47 @@ async function defaultExecutor(
     }
 
     attachStream(childProcess.stdout, (chunk) => {
-      stdout += chunk;
-      opts?.onStdout?.(chunk);
-      emitTranscript?.({
-        kind: 'transcript',
-        fragment: 'process-line',
-        stream: 'stdout',
-        line: chunk,
-      });
+      const result = appendChunk(stdoutChunks, stdoutBytes, stdoutTruncated, chunk);
+      stdoutBytes = result.bytes;
+      if (!stdoutTruncated && result.truncated) {
+        log(
+          'warning',
+          `stdout exceeded maxOutputBytes (${maxOutputBytes}); truncating further output`,
+        );
+      }
+      stdoutTruncated = result.truncated;
+      if (opts?.onStdout || emitTranscript) {
+        const text = chunk.toString('utf8');
+        opts?.onStdout?.(text);
+        emitTranscript?.({
+          kind: 'transcript',
+          fragment: 'process-line',
+          stream: 'stdout',
+          line: text,
+        });
+      }
     });
 
     attachStream(childProcess.stderr, (chunk) => {
-      stderr += chunk;
-      opts?.onStderr?.(chunk);
-      emitTranscript?.({
-        kind: 'transcript',
-        fragment: 'process-line',
-        stream: 'stderr',
-        line: chunk,
-      });
+      const result = appendChunk(stderrChunks, stderrBytes, stderrTruncated, chunk);
+      stderrBytes = result.bytes;
+      if (!stderrTruncated && result.truncated) {
+        log(
+          'warning',
+          `stderr exceeded maxOutputBytes (${maxOutputBytes}); truncating further output`,
+        );
+      }
+      stderrTruncated = result.truncated;
+      if (opts?.onStderr || emitTranscript) {
+        const text = chunk.toString('utf8');
+        opts?.onStderr?.(text);
+        emitTranscript?.({
+          kind: 'transcript',
+          fragment: 'process-line',
+          stream: 'stderr',
+          line: text,
+        });
+      }
     });
 
     childProcess.once('error', handleError);

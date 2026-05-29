@@ -8,6 +8,14 @@ export interface CommandExecOptions {
   cwd?: string;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
+  /**
+   * Maximum number of bytes to accumulate per stream (stdout/stderr) before
+   * truncating. Prevents `RangeError: Invalid string length` when very large
+   * outputs (e.g. verbose xcodebuild logs) exceed V8's maximum string length
+   * (~512MB on 64-bit). Defaults to XCODEBUILDMCP_MAX_OUTPUT_BYTES env var or
+   * 64 MiB.
+   */
+  maxOutputBytes?: number;
 }
 
 /**
