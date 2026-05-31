@@ -8,6 +8,7 @@ import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { createTypedTool, getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
 import { createBasicDiagnostics } from '../../../utils/diagnostics.ts';
+import { buildOpenSimulatorAppCommand } from '../../../utils/focus-policy.ts';
 
 const openSimSchema = z.object({});
 
@@ -48,7 +49,12 @@ export function createOpenSimExecutor(
 ): NonStreamingExecutor<OpenSimParams, OpenSimResult> {
   return async (_params) => {
     try {
-      const result = await executor(['open', '-a', 'Simulator'], 'Open Simulator', false);
+      const command = buildOpenSimulatorAppCommand();
+      if (command === null) {
+        return createOpenSimResult({ didError: false });
+      }
+
+      const result = await executor(command, 'Open Simulator', false);
 
       if (!result.success) {
         const diagnosticMessage = result.error ?? 'Unknown error';

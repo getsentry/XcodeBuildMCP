@@ -175,8 +175,6 @@ function isScrollableNextStepElement(element: {
     (element.role === 'scroll-view' ||
       element.role === 'list' ||
       element.role === 'cell' ||
-      element.role === 'application' ||
-      element.role === 'window' ||
       (element.role === 'other' && hasScrollSemanticIdentity(element)))
   );
 }
@@ -190,11 +188,8 @@ function getScrollRolePriority(element: RuntimeElementV1): number {
       return 1;
     case 'cell':
       return 2;
-    case 'application':
-    case 'window':
-      return 3;
     default:
-      return 4;
+      return 3;
   }
 }
 
@@ -570,8 +565,8 @@ function findForegroundIncompleteCompletionTapElement(
  *   generic suggestions.
  * - Batch examples include multiple visible switches because settings screens often require several
  *   same-screen toggles and batch is the efficient, app-agnostic primitive for that workflow.
- * - Scroll examples prefer real list/scroll-view targets, then semantic containers, with
- *   application/window root scrolling used last as a fallback.
+ * - Scroll examples prefer real list/scroll-view targets, then semantic containers with
+ *   semantic identity. Application/window roots are omitted because they are too broad for stable guidance.
  * - Refresh/wait examples are included for fresh snapshot captures, but not after every action.
  */
 export function getForegroundCompletionSuppressedRuntimeTargetRefs(params: {

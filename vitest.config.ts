@@ -22,7 +22,7 @@ export default defineConfig({
       '**/__pycache__/**',
       '**/dist/**',
       'src/smoke-tests/**',
-      'src/snapshot-tests/**',
+      'src/snapshot-tests/__tests__/**/*.snapshot.test.ts',
     ],
     pool: 'threads',
     poolOptions: {

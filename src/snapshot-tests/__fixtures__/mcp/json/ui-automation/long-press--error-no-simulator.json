@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "long-press",
-      "elementRef": "e3",
+      "elementRef": "<ELEMENT_REF>",
       "durationMs": 500
     },
     "artifacts": {

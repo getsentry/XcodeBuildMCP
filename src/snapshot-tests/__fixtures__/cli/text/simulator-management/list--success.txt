@@ -3,7 +3,7 @@
 
 iOS Simulators:
 
-  iOS 26.4:
+  iOS <VERSION>:
 
     📱 [<STATUS>] iPhone 17 Pro (<SIM_STATE>)
       UDID: <UUID>

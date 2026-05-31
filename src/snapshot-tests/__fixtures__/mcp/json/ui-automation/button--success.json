@@ -14,37 +14,16 @@
     "artifacts": {
       "simulatorId": "<UUID>"
     },
-    "capture": {
-      "type": "runtime-snapshot",
-      "rs": "1",
-      "screenHash": "<SCREEN_HASH>",
-      "seq": 1,
-      "count": 206,
-      "targets": [
-        "e22|tap|button|Fitness||Fitness",
-        "e31|tap|button|Watch||Watch",
-        "e40|tap|button|Contacts||Contacts",
-        "e49|tap|button|Files||Files",
-        "e58|tap|button|Preview||Preview",
-        "e67|tap|button|Utilities folder|2 apps|Utilities",
-        "e70|tap|button|Weather||Weather",
-        "e79|tap|button|Calculator||Calculator",
-        "e98|tap|button|Safari||Safari",
-        "e103|tap|button|Messages||Messages"
+    "diagnostics": {
+      "warnings": [
+        {
+          "message": "Hardware button actions can change system UI. Run snapshot_ui again before reusing elementRefs from the previous snapshot."
+        }
       ],
-      "scroll": [
-        "e6|swipe|other|||Home screen icons"
-      ],
-      "text": [
-        "e8|text|text|<TIME>||",
-        "e93|text|text|Search||"
-      ],
-      "udid": "<UUID>"
+      "errors": []
     }
   },
   "nextSteps": [
-    "Batch same-screen taps: batch({ simulatorId: \"<UUID>\", steps: [{\"action\":\"tap\",\"elementRef\":\"e22\"},{\"action\":\"tap\",\"elementRef\":\"e31\"}] })",
-    "Tap an elementRef: tap({ simulatorId: \"<UUID>\", elementRef: \"e22\" })",
-    "Scroll visible content: swipe({ simulatorId: \"<UUID>\", withinElementRef: \"e6\", direction: \"up\", distance: 0.5 })"
+    "Refresh after UI action: snapshot_ui({ simulatorId: \"<UUID>\" })"
   ]
 }

@@ -16,10 +16,6 @@ import {
   clearRuntimeSnapshot,
   withSimulatorUiAutomationTransaction,
 } from './shared/snapshot-ui-state.ts';
-import {
-  captureRuntimeSnapshotAfterActionSafely,
-  type PostActionSnapshotTiming,
-} from './shared/post-action-snapshot.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -49,6 +45,8 @@ type ButtonResult = UiActionResultDomainResult;
 
 const LOG_PREFIX = '[AXe]';
 const DEFAULT_BUTTON_SETTLE_DELAY_MS = 750;
+const BUTTON_REFRESH_WARNING =
+  'Hardware button actions can change system UI. Run snapshot_ui again before reusing elementRefs from the previous snapshot.';
 
 function delayMs(durationMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -61,7 +59,6 @@ export function createButtonExecutor(
   axeHelpers: AxeHelpers = defaultAxeHelpers,
   debuggerManager: DebuggerManager = getDefaultDebuggerManager(),
   settleDelayMs = DEFAULT_BUTTON_SETTLE_DELAY_MS,
-  postActionSnapshotTiming?: PostActionSnapshotTiming,
 ): NonStreamingExecutor<ButtonParams, ButtonResult> {
   return async (params) =>
     withSimulatorUiAutomationTransaction(params.simulatorId, async () => {
@@ -95,21 +92,10 @@ export function createButtonExecutor(
         }
         clearRuntimeSnapshot(simulatorId);
         log('info', `${LOG_PREFIX}/${toolName}: Success for ${simulatorId}`);
-        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-          simulatorId,
-          executor,
-          axeHelpers,
-          timing: postActionSnapshotTiming,
-        });
-        return createUiActionSuccessResult(
-          action,
-          simulatorId,
-          [guard.warningText, captureResult.warning],
-          {
-            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-          },
-        );
+        return createUiActionSuccessResult(action, simulatorId, [
+          guard.warningText,
+          BUTTON_REFRESH_WARNING,
+        ]);
       } catch (error) {
         if (shouldInvalidateRuntimeSnapshotAfterActionError(error)) {
           clearRuntimeSnapshot(simulatorId);

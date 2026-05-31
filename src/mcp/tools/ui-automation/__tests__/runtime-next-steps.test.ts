@@ -158,7 +158,7 @@ describe('runtime snapshot next steps', () => {
     });
   });
 
-  it('uses a cell as a fallback scroll surface before whole-application scrolling', () => {
+  it('uses a cell as a fallback scroll surface when roots are too broad', () => {
     const snapshot: RuntimeSnapshotV1 = {
       type: 'runtime-snapshot',
       protocol: 'rs/1',
@@ -217,9 +217,10 @@ describe('runtime snapshot next steps', () => {
       elements: [
         {
           ref: 'e1',
-          role: 'application',
-          label: 'Example',
-          frame: { x: 0, y: 0, width: 390, height: 844 },
+          role: 'scroll-view',
+          label: 'Main content',
+          identifier: 'example.mainScroll',
+          frame: { x: 0, y: 120, width: 390, height: 724 },
           actions: ['swipeWithin'],
         },
         {

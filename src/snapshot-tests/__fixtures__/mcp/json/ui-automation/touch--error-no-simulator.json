@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "touch",
-      "elementRef": "e3",
+      "elementRef": "<ELEMENT_REF>",
       "event": "touch down+up"
     },
     "artifacts": {

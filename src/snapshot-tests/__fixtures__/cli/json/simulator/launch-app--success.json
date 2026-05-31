@@ -20,7 +20,7 @@
     }
   },
   "nextSteps": [
-    "Open Simulator app to see it: xcodebuildmcp simulator-management open",
+    "Open Simulator app to see it: xcodebuildmcp simulator open",
     "Stop app in simulator: xcodebuildmcp simulator stop --simulator-id <UUID> --bundle-id io.sentry.calculatorapp"
   ]
 }

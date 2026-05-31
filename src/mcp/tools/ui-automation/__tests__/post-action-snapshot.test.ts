@@ -56,6 +56,35 @@ describe('post-action runtime snapshots', () => {
     expect(nowMs).toBe(300);
   });
 
+  it('waits briefly for a settled post-action snapshot by default', async () => {
+    let nowMs = 0;
+    const timing = {
+      now: () => nowMs,
+      sleep: async (durationMs: number) => {
+        nowMs += durationMs;
+      },
+    };
+    const settledSnapshot = JSON.stringify({
+      elements: [createNode({ frame: { x: 10, y: 220, width: 100, height: 40 } })],
+    });
+    const { calls, executor } = createSequencedExecutor([
+      { success: true, output: settledSnapshot },
+      { success: true, output: settledSnapshot },
+    ]);
+
+    const result = await captureRuntimeSnapshotAfterActionSafely({
+      simulatorId,
+      executor,
+      axeHelpers: createMockAxeHelpers(),
+      timing,
+    });
+
+    expect(result.uiError).toBeUndefined();
+    expect(result.capture).toBeDefined();
+    expect(calls).toHaveLength(2);
+    expect(nowMs).toBe(100);
+  });
+
   it('reports a recoverable error when the refreshed snapshot never settles', async () => {
     let nowMs = 0;
     const timing = {

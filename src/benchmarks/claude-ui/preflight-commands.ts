@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
+import { buildOpenSimulatorAppCommand } from '../../utils/focus-policy.ts';
 
 interface CapturedCommandResult {
   exitCode: number | null;
@@ -16,6 +17,12 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+function shellCommandFromArgs(args: string[]): string {
+  return args
+    .map((arg) => (/^[A-Za-z0-9_./:-]+$/.test(arg) ? arg : shellSingleQuote(arg)))
+    .join(' ');
+}
+
 function isRocketSimAppLaunchCommand(command: string): boolean {
   return /^\s*open\s+(?:.*(?:\s|\/))?RocketSim(?:\.app)?\s*$/.test(command);
 }
@@ -27,9 +34,12 @@ export function preflightCommandsWithFocusResign(opts: {
   const commands = opts.commands ?? [];
   if (!opts.simulatorId) return commands;
 
-  const focusSimulatorCommand = `open -a Simulator --args -CurrentDeviceUDID ${shellSingleQuote(opts.simulatorId)}`;
+  const focusSimulatorCommand = buildOpenSimulatorAppCommand({ simulatorId: opts.simulatorId });
+  if (focusSimulatorCommand === null) return commands;
+
+  const focusSimulatorShellCommand = shellCommandFromArgs(focusSimulatorCommand);
   return commands.flatMap((command) =>
-    isRocketSimAppLaunchCommand(command) ? [command, focusSimulatorCommand] : [command],
+    isRocketSimAppLaunchCommand(command) ? [command, focusSimulatorShellCommand] : [command],
   );
 }
 

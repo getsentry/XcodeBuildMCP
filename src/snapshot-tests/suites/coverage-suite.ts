@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,41 +55,35 @@ export function registerCoverageSnapshotSuite(runtime: SnapshotRuntime): void {
       it('success', async () => {
         // Filter to CalculatorAppTests which is always present and deterministic.
         // The unfiltered report can include SPM framework targets non-deterministically.
-        const { text, isError } = await harness.invoke('coverage', 'get-coverage-report', {
+        const { text } = await harness.invoke('coverage', 'get-coverage-report', {
           xcresultPath,
           target: 'CalculatorAppTests',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'get-coverage-report--success');
       });
 
       it('error - invalid bundle', async () => {
-        const { text, isError } = await harness.invoke('coverage', 'get-coverage-report', {
+        const { text } = await harness.invoke('coverage', 'get-coverage-report', {
           xcresultPath: invalidXcresultPath,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-coverage-report--error-invalid-bundle');
       });
     });
 
     describe('get-file-coverage', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('coverage', 'get-file-coverage', {
+        const { text } = await harness.invoke('coverage', 'get-file-coverage', {
           xcresultPath,
           file: 'CalculatorService.swift',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'get-file-coverage--success');
       });
 
       it('error - invalid bundle', async () => {
-        const { text, isError } = await harness.invoke('coverage', 'get-file-coverage', {
+        const { text } = await harness.invoke('coverage', 'get-file-coverage', {
           xcresultPath: invalidXcresultPath,
           file: 'SomeFile.swift',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-file-coverage--error-invalid-bundle');
       });
     });

@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "tap",
-      "elementRef": "e3"
+      "elementRef": "<ELEMENT_REF>"
     },
     "artifacts": {
       "simulatorId": "<UUID>"

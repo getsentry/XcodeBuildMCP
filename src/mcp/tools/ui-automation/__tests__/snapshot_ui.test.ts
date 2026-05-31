@@ -431,7 +431,7 @@ describe('Snapshot UI Plugin', () => {
       });
     });
 
-    it('should include root viewport scroll guidance for semantic vertical overflow', async () => {
+    it('should omit root viewport scroll guidance for broad application containers', async () => {
       const uiHierarchy = JSON.stringify({
         elements: [
           {
@@ -488,22 +488,18 @@ describe('Snapshot UI Plugin', () => {
       expect(rootElement).toEqual(
         expect.objectContaining({
           role: 'application',
-          actions: expect.arrayContaining(['swipeWithin']),
         }),
       );
-      expect(ctx.nextSteps?.find((step) => step.tool === 'swipe')?.params).toEqual({
-        simulatorId: '12345678-1234-4234-8234-123456789012',
-        withinElementRef: 'e1',
-        direction: 'up',
-        distance: 0.5,
-      });
+      expect(ctx.nextSteps?.find((step) => step.tool === 'swipe')).toBeUndefined();
       expect(ctx.nextSteps?.map((step) => step.tool)).toEqual([
         'snapshot_ui',
         'wait_for_ui',
-        'swipe',
         'tap',
       ]);
-      expect(ctx.nextSteps?.some((step) => step.tool === 'screenshot')).toBe(false);
+      expect(ctx.nextSteps?.find((step) => step.tool === 'tap')?.params).toEqual({
+        simulatorId: '12345678-1234-4234-8234-123456789012',
+        elementRef: 'e2',
+      });
     });
 
     it('should include scroll guidance before screenshots when scrollable content is present', async () => {

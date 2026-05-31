@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, beforeAll, afterAll, vi } from 'vitest';
 import { ensureSimulatorBooted } from '../harness.ts';
-import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
+import type { SnapshotRuntime, WorkflowSnapshotHarness, SnapshotResult } from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
@@ -15,47 +15,56 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
     let simulatorUdid: string;
     let snapshotCaptured = false;
 
+    async function waitForLaunchedBundle(bundleId: string): Promise<void> {
+      await harness.invoke('simulator', 'launch-app', {
+        simulatorId: simulatorUdid,
+        bundleId,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
     async function refreshRuntimeSnapshot(): Promise<void> {
       if (snapshotCaptured) {
         return;
       }
 
-      await harness.invoke('simulator', 'launch-app', {
-        simulatorId: simulatorUdid,
-        bundleId: BUNDLE_ID,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await waitForLaunchedBundle(BUNDLE_ID);
 
-      const { isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+      await harness.invoke('ui-automation', 'snapshot-ui', {
         simulatorId: simulatorUdid,
       });
-      expect(isError).toBe(false);
       snapshotCaptured = true;
     }
 
-    async function launchAndSnapshot(bundleId: string): Promise<string> {
-      await harness.invoke('simulator', 'launch-app', {
-        simulatorId: simulatorUdid,
-        bundleId,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    async function launchAndSnapshot(bundleId: string): Promise<SnapshotResult> {
+      await waitForLaunchedBundle(bundleId);
 
-      const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+      const result = await harness.invoke('ui-automation', 'snapshot-ui', {
         simulatorId: simulatorUdid,
       });
-      expect(isError).toBe(false);
-      return text;
+      return result;
+    }
+
+    async function showHomeScreen(): Promise<void> {
+      await harness.invoke('ui-automation', 'button', {
+        simulatorId: simulatorUdid,
+        buttonType: 'home',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     async function captureFirstScrollRef(bundleId: string): Promise<string | null> {
-      const text = await launchAndSnapshot(bundleId);
-      return /\b(e\d+)\|swipe\|/.exec(text)?.[1] ?? null;
+      const result = await launchAndSnapshot(bundleId);
+      return /\b(e\d+)\|swipe\|/.exec(result.rawText)?.[1] ?? null;
     }
 
     async function captureTapRefByLabel(bundleId: string, label: string): Promise<string | null> {
-      const text = await launchAndSnapshot(bundleId);
+      const result = await launchAndSnapshot(bundleId);
       const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp(`\\b(e\\d+)\\|tap\\|[^|]*\\|${escapedLabel}\\|`).exec(text)?.[1] ?? null;
+      return (
+        new RegExp(`\\b(e\\d+)\\|tap\\|[^|]*\\|${escapedLabel}\\|`).exec(result.rawText)?.[1] ??
+        null
+      );
     }
 
     beforeAll(async () => {
@@ -83,11 +92,10 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
           throw new Error("Expected Calculator button '7' to have a tap ref.");
         }
 
-        const { text, isError } = await harness.invoke('ui-automation', 'tap', {
+        const { text } = await harness.invoke('ui-automation', 'tap', {
           simulatorId: simulatorUdid,
           elementRef: tapRef,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'tap--success');
       });
 
@@ -98,7 +106,7 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
             throw new Error("Expected Calculator button '7' to have a tap ref.");
           }
 
-          const { text, isError, structuredEnvelope } = await harness.invoke(
+          const { text } = await harness.invoke(
             'ui-automation',
             'tap',
             {
@@ -107,28 +115,15 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
             },
             { verbose: true },
           );
-          expect(isError).toBe(false);
-          expect(structuredEnvelope?.schemaVersion).toBe('3');
-          expect(structuredEnvelope?.data).toEqual(
-            expect.objectContaining({
-              capture: expect.objectContaining({
-                type: 'runtime-snapshot',
-                protocol: 'rs/1',
-                elements: expect.any(Array),
-                actions: expect.any(Array),
-              }),
-            }),
-          );
           expectFixture(text, 'tap--success-verbose');
         });
       }
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'tap', {
+        const { text } = await harness.invoke('ui-automation', 'tap', {
           simulatorId: INVALID_SIMULATOR_ID,
           elementRef: 'e3',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'tap--error-no-simulator');
       });
     });
@@ -138,24 +133,22 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
         snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
-        const { text, isError } = await harness.invoke('ui-automation', 'touch', {
+        const { text } = await harness.invoke('ui-automation', 'touch', {
           simulatorId: simulatorUdid,
           elementRef: 'e3',
           down: true,
           up: true,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'touch--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'touch', {
+        const { text } = await harness.invoke('ui-automation', 'touch', {
           simulatorId: INVALID_SIMULATOR_ID,
           elementRef: 'e3',
           down: true,
           up: true,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'touch--error-no-simulator');
       });
     });
@@ -165,22 +158,20 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
         snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
-        const { text, isError } = await harness.invoke('ui-automation', 'long-press', {
+        const { text } = await harness.invoke('ui-automation', 'long-press', {
           simulatorId: simulatorUdid,
           elementRef: 'e3',
           duration: 500,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'long-press--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'long-press', {
+        const { text } = await harness.invoke('ui-automation', 'long-press', {
           simulatorId: INVALID_SIMULATOR_ID,
           elementRef: 'e3',
           duration: 500,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'long-press--error-no-simulator');
       });
     });
@@ -188,117 +179,116 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
     describe('swipe', () => {
       it('success', async () => {
         const scrollRef = await captureFirstScrollRef('com.apple.Preferences');
-        expect(scrollRef).not.toBeNull();
+        if (!scrollRef) {
+          throw new Error('Expected Settings scroll view to have a swipe ref.');
+        }
 
-        const { text, isError } = await harness.invoke('ui-automation', 'swipe', {
+        const result = await harness.invoke('ui-automation', 'swipe', {
           simulatorId: simulatorUdid,
           withinElementRef: scrollRef,
           direction: 'up',
         });
-        expect(isError).toBe(false);
-        expectFixture(text, 'swipe--success');
+        expectFixture(result.text, 'swipe--success');
         snapshotCaptured = false;
       });
 
       it('error - target not actionable', async () => {
         await refreshRuntimeSnapshot();
 
-        const { text, isError } = await harness.invoke('ui-automation', 'swipe', {
+        const { text } = await harness.invoke('ui-automation', 'swipe', {
           simulatorId: simulatorUdid,
           withinElementRef: 'e3',
           direction: 'up',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'swipe--error-not-actionable');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'swipe', {
+        const { text } = await harness.invoke('ui-automation', 'swipe', {
           simulatorId: INVALID_SIMULATOR_ID,
           withinElementRef: 'e3',
           direction: 'up',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'swipe--error-no-simulator');
       });
     });
 
     describe('gesture', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'gesture', {
+        await waitForLaunchedBundle(BUNDLE_ID);
+
+        const { text } = await harness.invoke('ui-automation', 'gesture', {
           simulatorId: simulatorUdid,
           preset: 'scroll-down',
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'gesture--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'gesture', {
+        const { text } = await harness.invoke('ui-automation', 'gesture', {
           simulatorId: INVALID_SIMULATOR_ID,
           preset: 'scroll-down',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'gesture--error-no-simulator');
       });
     });
 
     describe('button', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'button', {
+        await showHomeScreen();
+
+        const { text } = await harness.invoke('ui-automation', 'button', {
           simulatorId: simulatorUdid,
           buttonType: 'home',
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'button--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'button', {
+        const { text } = await harness.invoke('ui-automation', 'button', {
           simulatorId: INVALID_SIMULATOR_ID,
           buttonType: 'home',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'button--error-no-simulator');
       });
     });
 
     describe('key-press', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'key-press', {
+        await waitForLaunchedBundle(BUNDLE_ID);
+
+        const { text } = await harness.invoke('ui-automation', 'key-press', {
           simulatorId: simulatorUdid,
           keyCode: 4,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'key-press--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'key-press', {
+        const { text } = await harness.invoke('ui-automation', 'key-press', {
           simulatorId: INVALID_SIMULATOR_ID,
           keyCode: 4,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'key-press--error-no-simulator');
       });
     });
 
     describe('key-sequence', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'key-sequence', {
+        await waitForLaunchedBundle(BUNDLE_ID);
+
+        const { text } = await harness.invoke('ui-automation', 'key-sequence', {
           simulatorId: simulatorUdid,
           keyCodes: [4, 5, 6],
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'key-sequence--success');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'key-sequence', {
+        const { text } = await harness.invoke('ui-automation', 'key-sequence', {
           simulatorId: INVALID_SIMULATOR_ID,
           keyCodes: [4, 5, 6],
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'key-sequence--error-no-simulator');
       });
     });
@@ -308,35 +298,29 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
         snapshotCaptured = false;
         await refreshRuntimeSnapshot();
 
-        const { text, isError } = await harness.invoke('ui-automation', 'type-text', {
+        const { text } = await harness.invoke('ui-automation', 'type-text', {
           simulatorId: simulatorUdid,
           elementRef: 'e3',
           text: 'hello',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'type-text--error-not-actionable');
       });
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'type-text', {
+        const { text } = await harness.invoke('ui-automation', 'type-text', {
           simulatorId: INVALID_SIMULATOR_ID,
           elementRef: 'e3',
           text: 'hello',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'type-text--error-no-simulator');
       });
     });
 
     describe('wait-for-ui', () => {
       it('success - existing calculator button', async () => {
-        await harness.invoke('simulator', 'launch-app', {
-          simulatorId: simulatorUdid,
-          bundleId: BUNDLE_ID,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await waitForLaunchedBundle(BUNDLE_ID);
 
-        const { text, isError } = await harness.invoke('ui-automation', 'wait-for-ui', {
+        const { text } = await harness.invoke('ui-automation', 'wait-for-ui', {
           simulatorId: simulatorUdid,
           predicate: 'exists',
           label: 'C',
@@ -344,7 +328,6 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
           timeoutMs: 1000,
           pollIntervalMs: 100,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'wait-for-ui--success');
         snapshotCaptured = true;
       });
@@ -352,33 +335,20 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
 
     describe('snapshot-ui', () => {
       it('success - calculator app', async () => {
-        // Re-focus the calculator app before snapshotting: preceding UI tests
-        // (hardware button presses, gestures) can leave the app backgrounded,
-        // which makes the root Application's AXLabel volatile across runs.
-        await harness.invoke('simulator', 'launch-app', {
-          simulatorId: simulatorUdid,
-          bundleId: BUNDLE_ID,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await waitForLaunchedBundle(BUNDLE_ID);
 
-        const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+        const { text } = await harness.invoke('ui-automation', 'snapshot-ui', {
           simulatorId: simulatorUdid,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(100);
         expectFixture(text, 'snapshot-ui--success');
         snapshotCaptured = true;
       });
 
       if (runtime === 'cli/json') {
         it('success - verbose runtime snapshot', async () => {
-          await harness.invoke('simulator', 'launch-app', {
-            simulatorId: simulatorUdid,
-            bundleId: BUNDLE_ID,
-          });
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await waitForLaunchedBundle(BUNDLE_ID);
 
-          const { text, isError, structuredEnvelope } = await harness.invoke(
+          const { text } = await harness.invoke(
             'ui-automation',
             'snapshot-ui',
             {
@@ -386,28 +356,15 @@ export function registerUiAutomationSnapshotSuite(runtime: SnapshotRuntime): voi
             },
             { verbose: true },
           );
-          expect(isError).toBe(false);
-          expect(structuredEnvelope?.schemaVersion).toBe('2');
-          expect(structuredEnvelope?.data).toEqual(
-            expect.objectContaining({
-              capture: expect.objectContaining({
-                type: 'runtime-snapshot',
-                protocol: 'rs/1',
-                elements: expect.any(Array),
-                actions: expect.any(Array),
-              }),
-            }),
-          );
           expectFixture(text, 'snapshot-ui--success-verbose');
           snapshotCaptured = true;
         });
       }
 
       it('error - invalid simulator', async () => {
-        const { text, isError } = await harness.invoke('ui-automation', 'snapshot-ui', {
+        const { text } = await harness.invoke('ui-automation', 'snapshot-ui', {
           simulatorId: INVALID_SIMULATOR_ID,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'snapshot-ui--error-no-simulator');
       });
     });

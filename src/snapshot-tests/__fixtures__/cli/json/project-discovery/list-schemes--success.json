@@ -16,6 +16,6 @@
     "Build for macOS: xcodebuildmcp macos build --workspace-path example_projects/iOS_Calculator/CalculatorApp.xcworkspace --scheme CalculatorApp",
     "Build and run on iOS Simulator (default for run intent): xcodebuildmcp simulator build-and-run --workspace-path example_projects/iOS_Calculator/CalculatorApp.xcworkspace --scheme CalculatorApp --simulator-name 'iPhone 17'",
     "Build for iOS Simulator (compile-only): xcodebuildmcp simulator build --workspace-path example_projects/iOS_Calculator/CalculatorApp.xcworkspace --scheme CalculatorApp --simulator-name 'iPhone 17'",
-    "Show build settings: xcodebuildmcp device show-build-settings --workspace-path example_projects/iOS_Calculator/CalculatorApp.xcworkspace --scheme CalculatorApp"
+    "Show build settings: xcodebuildmcp project-discovery show-build-settings --workspace-path example_projects/iOS_Calculator/CalculatorApp.xcworkspace --scheme CalculatorApp"
   ]
 }

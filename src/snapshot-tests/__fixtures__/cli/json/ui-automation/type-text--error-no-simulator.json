@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "type-text",
-      "elementRef": "e3",
+      "elementRef": "<ELEMENT_REF>",
       "textLength": 5
     },
     "artifacts": {

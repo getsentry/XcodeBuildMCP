@@ -61,6 +61,21 @@ function snapshotExpiredError(snapshotAgeMs: number): UiAutomationRecoverableErr
   };
 }
 
+function isActionableCandidateForRequiredActions(
+  candidate: RuntimeSnapshotRecord['payload']['elements'][number],
+  requiredActions: readonly RuntimeActionNameV1[],
+): boolean {
+  return requiredActions.some((action) => {
+    if (!candidate.actions.includes(action)) {
+      return false;
+    }
+
+    return (
+      action !== 'swipeWithin' || (candidate.role !== 'application' && candidate.role !== 'window')
+    );
+  });
+}
+
 export function recordRuntimeSnapshot(snapshot: RuntimeSnapshotRecord): RuntimeSnapshotRecord {
   const nextSeq = (runtimeSnapshotSeqs.get(snapshot.simulatorId) ?? 0) + 1;
   runtimeSnapshotSeqs.set(snapshot.simulatorId, nextSeq);
@@ -157,7 +172,7 @@ export function resolveElementRefForAnyAction(
         elementRef,
         candidates: snapshot.payload.elements
           .filter((candidate) =>
-            requiredActions.some((action) => candidate.actions.includes(action)),
+            isActionableCandidateForRequiredActions(candidate, requiredActions),
           )
           .slice(0, COMPACT_RUNTIME_TARGET_LIMIT),
         snapshotAgeMs: ageMs,

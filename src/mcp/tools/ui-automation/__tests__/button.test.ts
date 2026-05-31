@@ -16,16 +16,6 @@ import {
   simulatorId,
 } from './ui-action-test-helpers.ts';
 
-function createImmediatePostActionTiming() {
-  let nowMs = 0;
-  return {
-    now: () => nowMs,
-    sleep: async (durationMs: number) => {
-      nowMs += durationMs;
-    },
-  };
-}
-
 describe('Button Plugin', () => {
   beforeEach(() => {
     __resetRuntimeSnapshotStoreForTests();
@@ -223,25 +213,19 @@ describe('Button Plugin', () => {
   });
 
   describe('Executor Behavior', () => {
-    it('captures a fresh runtime snapshot after a successful button press', async () => {
+    it('invalidates the runtime snapshot after a successful button press', async () => {
       const { calls, executor } = createTrackingExecutor();
-      const executeButton = createButtonExecutor(
-        executor,
-        createMockAxeHelpers(),
-        undefined,
-        0,
-        createImmediatePostActionTiming(),
-      );
+      const executeButton = createButtonExecutor(executor, createMockAxeHelpers(), undefined, 0);
 
       const result = await executeButton({ simulatorId, buttonType: 'home' });
 
       expect(result.didError).toBe(false);
-      expect(result.capture).toMatchObject({ type: 'runtime-snapshot', simulatorId });
-      expect(calls.map((call) => call.command[1])).toEqual([
-        'button',
-        'describe-ui',
-        'describe-ui',
-      ]);
+      expect(result.capture).toBeUndefined();
+      expect(result.uiError).toBeUndefined();
+      expect(result.diagnostics?.warnings.map((entry) => entry.message)).toContain(
+        'Hardware button actions can change system UI. Run snapshot_ui again before reusing elementRefs from the previous snapshot.',
+      );
+      expect(calls.map((call) => call.command[1])).toEqual(['button']);
     });
 
     it('waits briefly after successful button presses so system UI transitions can settle', async () => {
@@ -259,13 +243,7 @@ describe('Button Plugin', () => {
           getBundledAxeEnvironment: () => ({}),
         };
 
-        const executeButton = createButtonExecutor(
-          mockExecutor,
-          mockAxeHelpers,
-          undefined,
-          500,
-          createImmediatePostActionTiming(),
-        );
+        const executeButton = createButtonExecutor(mockExecutor, mockAxeHelpers, undefined, 500);
         let settled = false;
         const resultPromise = executeButton({
           simulatorId: '12345678-1234-4234-8234-123456789012',

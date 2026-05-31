@@ -1,6 +1,7 @@
 import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { log } from '../../../utils/logging/index.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import { buildOpenSimulatorAppCommand, isHeadlessLaunchMode } from '../../../utils/focus-policy.ts';
 
 export type KeyboardShortcut = 'software-keyboard' | 'connect-hardware-keyboard';
 
@@ -100,7 +101,24 @@ export async function sendKeyboardShortcut(
     };
   }
 
-  const openResult = await executor(['open', '-a', 'Simulator'], 'Open Simulator App', false);
+  if (isHeadlessLaunchMode()) {
+    return {
+      success: false,
+      error:
+        'Keyboard shortcuts require Simulator.app to be in the foreground, which is incompatible with XCODEBUILDMCP_HEADLESS_LAUNCH mode.',
+    };
+  }
+
+  const openCommand = buildOpenSimulatorAppCommand();
+  if (openCommand === null) {
+    return {
+      success: false,
+      error:
+        'Keyboard shortcuts require Simulator.app to be in the foreground, which is incompatible with XCODEBUILDMCP_HEADLESS_LAUNCH mode.',
+    };
+  }
+
+  const openResult = await executor(openCommand, 'Open Simulator App', false);
   if (!openResult.success) {
     return {
       success: false,

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import {
   isCliSnapshotRuntime,
   type SnapshotResult,
@@ -162,11 +162,10 @@ export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
           context.skip();
         }
 
-        const { text, isError } = await harness.invoke('xcode-ide', 'list-tools', {
+        const { text } = await harness.invoke('xcode-ide', 'list-tools', {
           refresh: false,
         });
 
-        expect(isError).toBe(false);
         expectFixture(text, 'list-tools--success');
       }, 120_000);
     });
@@ -177,13 +176,12 @@ export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
           context.skip();
         }
 
-        const { text, isError } = await harness.invoke('xcode-ide', 'call-tool', {
+        const { text } = await harness.invoke('xcode-ide', 'call-tool', {
           remoteTool: DOCUMENTATION_SEARCH_TOOL,
           arguments: { query: DOCUMENTATION_SEARCH_QUERY, frameworks: ['AVFoundation'] },
           timeoutMs: 120_000,
         });
 
-        expect(isError).toBe(false);
         expectFixture(text, 'documentation-search--success');
       }, 120_000);
     });

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { log } from './logging/index.ts';
 import type { CommandExecutor } from './CommandExecutor.ts';
+import { buildOpenAppCommand } from './focus-policy.ts';
 
 export interface MacLaunchResult {
   success: boolean;
@@ -18,10 +19,7 @@ export async function launchMacApp(
   opts?: { args?: string[] },
 ): Promise<MacLaunchResult> {
   log('info', `Launching macOS app: ${appPath}`);
-  const command = ['open', appPath];
-  if (opts?.args?.length) {
-    command.push('--args', ...opts.args);
-  }
+  const command = buildOpenAppCommand(appPath, { args: opts?.args });
 
   const result = await executor(command, 'Launch macOS App', false);
   if (!result.success) {

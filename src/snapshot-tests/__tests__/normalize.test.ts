@@ -23,6 +23,11 @@ describe('normalizeSnapshotOutput', () => {
           '      SDK_DIR_iphoneos26_4 = /Applications/Xcode-26.4.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk',
           '      MAC_OS_X_PRODUCT_BUILD_VERSION = 25D2128',
           '      MAC_OS_X_VERSION_ACTUAL = 260301',
+          '      XCODE_PRODUCT_BUILD_VERSION = 17F42',
+          '      XCODE_VERSION_ACTUAL = 2650',
+          '      DEPLOYMENT_TARGET_SUGGESTED_VALUES = 12.0 26.5',
+          '      MACOSX_DEPLOYMENT_TARGET = 26.5',
+          '      XROS_DEPLOYMENT_TARGET = 26.5',
           '      PLATFORM_DEVELOPER_APPLICATIONS_DIR = /Applications/Xcode-26.4.0.app/Contents/Developer/Applications',
           '      XCODE_APP_SUPPORT_DIR = /Applications/Xcode.app/Contents/Developer/Library/Xcode',
         ].join('\n') + '\n',
@@ -38,9 +43,65 @@ describe('normalizeSnapshotOutput', () => {
         '      SDK_DIR_<SDK_NAME> = <SDK_PATH>',
         '      MAC_OS_X_PRODUCT_BUILD_VERSION = <SDK_BUILD_VERSION>',
         '      MAC_OS_X_VERSION_ACTUAL = <SDK_VERSION>',
+        '      XCODE_PRODUCT_BUILD_VERSION = <SDK_BUILD_VERSION>',
+        '      XCODE_VERSION_ACTUAL = <SDK_VERSION>',
+        '      DEPLOYMENT_TARGET_SUGGESTED_VALUES = <DEPLOYMENT_TARGETS>',
+        '      MACOSX_DEPLOYMENT_TARGET = <DEPLOYMENT_TARGET>',
+        '      XROS_DEPLOYMENT_TARGET = <DEPLOYMENT_TARGET>',
         '      PLATFORM_DEVELOPER_APPLICATIONS_DIR = /Applications/Xcode-<VERSION>.app/Contents/Developer/Applications',
         '      XCODE_APP_SUPPORT_DIR = /Applications/Xcode-<VERSION>.app/Contents/Developer/Library/Xcode',
       ].join('\n') + '\n',
+    );
+  });
+
+  it('normalizes volatile CoreDevice not-found preambles', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          '  ✗ Failed to load provisioning paramter list due to error: Error Domain=com.apple.dt.CoreDeviceError Code=1002 "No provider was found." UserInfo={NSLocalizedDescription=No provider was found.}.',
+          '    `devicectl manage create` may support a reduced set of arguments.',
+          '    ERROR: The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))',
+          '           DeviceName = <UUID>',
+        ].join('\n') + '\n',
+      ),
+    ).toBe(
+      [
+        '  ✗ The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))',
+        '           DeviceName = <UUID>',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('normalizes volatile CoreDevice not-found ERROR prefixes without a preamble', () => {
+    expect(
+      normalizeSnapshotOutput(
+        '  ✗ ERROR: The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))\n',
+      ),
+    ).toBe(
+      '  ✗ The specified device was not found. (Name: <UUID>) (com.apple.dt.CoreDeviceError error 1000 (0x3E8))\n',
+    );
+  });
+
+  it('normalizes doctor process tree depth without hiding the section', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          'Process Tree',
+          '   <PID> (ppid <PID>): <PROCESS>',
+          '   <PID> (ppid <PID>): <PROCESS>',
+          '   <PID> (ppid <PID>): <PROCESS>',
+          '   <PID> (ppid <PID>): <PROCESS>',
+          '',
+        ].join('\n'),
+      ),
+    ).toBe(
+      [
+        'Process Tree',
+        '   <PID> (ppid <PID>): <PROCESS>',
+        '   <PID> (ppid <PID>): <PROCESS>',
+        '   <PID> (ppid <PID>): <PROCESS>',
+        '',
+      ].join('\n'),
     );
   });
 
@@ -51,6 +112,52 @@ describe('normalizeSnapshotOutput', () => {
       ),
     ).toBe(
       '  1.1: where = App.debug.dylib`ContentView.body.getter + <OFFSET> at ContentView.swift:42:31, address = <ADDR>, unresolved, hit count = 0\n',
+    );
+  });
+
+  it('normalizes CoreSimulator runtime roots in LLDB stack output', () => {
+    const runtimeRoot =
+      '/Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot';
+
+    expect(
+      normalizeSnapshotOutput(
+        [
+          `  frame #12: 0x123456789 at ${runtimeRoot}/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\`__CFRunLoopRun:1234`,
+          '  frame #13: static CalculatorApp.$main() at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():1234',
+          '  frame #14: main at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Library/Caches/com.apple.containermanagerd/Dead/temp.7Nradi/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:1234',
+        ].join('\n') + '\n',
+      ),
+    ).toBe(
+      [
+        '  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation`<FUNC>:<OFFSET>',
+        '  frame #<N>: static CalculatorApp.$main() at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>',
+        '  frame #<N>: main at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('trims volatile system stack prefixes while preserving the app launch suffix', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          'Frames:',
+          '  Thread 123456 (Thread 1 Queue: com.apple.main-thread (serial))',
+          '  frame #0: 0x1111 at /Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/System/Library/PrivateFrameworks/AXRuntime.framework/AXRuntime`AXPerform:1234',
+          '  frame #1: 0x2222 at /Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices`GSEventRunModal:1234',
+          '  frame #2: 0x3333 at /Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/System/Library/Frameworks/SwiftUI.framework/SwiftUI`static SwiftUI.App.main() -> ():1234',
+          '  frame #3: static CalculatorApp.$main() at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():1234',
+          '  frame #4: main at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:1234',
+        ].join('\n') + '\n',
+      ),
+    ).toBe(
+      [
+        'Frames:',
+        '  Thread <THREAD_ID> (Thread 1 Queue: com.apple.main-thread (serial))',
+        '  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices`<FUNC>:<OFFSET>',
+        '  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`<FUNC>:<OFFSET>',
+        '  frame #<N>: static CalculatorApp.$main() at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>',
+        '  frame #<N>: main at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>',
+      ].join('\n') + '\n',
     );
   });
 
@@ -104,8 +211,52 @@ describe('normalizeSnapshotOutput', () => {
     );
   });
 
-  it('normalizes UI snapshot clock text without hiding element refs', () => {
-    expect(normalizeSnapshotOutput('"e42|text|text|12:34||"\n')).toBe('"e42|text|text|<TIME>||"\n');
+  it('normalizes UI snapshot clock text and volatile compact element refs', () => {
+    expect(normalizeSnapshotOutput('"e42|text|text|12:34||"\n')).toBe(
+      '"<REF>|text|text|<TIME>||"\n',
+    );
+  });
+
+  it('normalizes UI element refs in next-step syntax and prose', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          'Tap: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e48',
+          'Scroll: xcodebuildmcp ui-automation swipe --within-element-ref "e1" --direction up',
+          'MCP: tap({ simulatorId: "<UUID>", elementRef: "e48" })',
+          'JSON: {"action":"tap","elementRef":"e40"}',
+          'Message: acted on within elementRef e6',
+        ].join('\n') + '\n',
+      ),
+    ).toBe(
+      [
+        'Tap: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>',
+        'Scroll: xcodebuildmcp ui-automation swipe --within-element-ref "<REF>" --direction up',
+        'MCP: tap({ simulatorId: "<UUID>", elementRef: "<REF>" })',
+        'JSON: {"action":"tap","elementRef":"<REF>"}',
+        'Message: acted on within elementRef <REF>',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('normalizes runtime and compact UI action rows without hiding action content', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          '  iOS 26.5:',
+          '  e48|tap|button|Camera||com.apple.settings.camera',
+          '  e1|swipe|application|Settings||',
+          '  [5/8] Write swift-version--58304C5D6DBC2206.txt',
+        ].join('\n') + '\n',
+      ),
+    ).toBe(
+      [
+        '  iOS <VERSION>:',
+        '  <REF>|tap|button|Camera||com.apple.settings.camera',
+        '  <REF>|swipe|application|Settings||',
+        '  [5/8] Write swift-version--<HASH>.txt',
+      ].join('\n') + '\n',
+    );
   });
 
   it('collapses long simulator failure progress streams while preserving final counts', () => {

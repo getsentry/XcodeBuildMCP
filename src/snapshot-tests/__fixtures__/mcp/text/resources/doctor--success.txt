@@ -36,6 +36,7 @@ Process Tree
    <PID> (ppid <PID>): <PROCESS>
    <PID> (ppid <PID>): <PROCESS>
    <PID> (ppid <PID>): <PROCESS>
+   <PID> (ppid <PID>): <PROCESS>
 
 Xcode Information
   version: <XCODE_VERSION>
@@ -59,6 +60,7 @@ Environment Variables
   XBMCP_LAUNCH_JSON_WAIT_MS: (not set)
   XCODEBUILDMCP_DEBUGGER_BACKEND: (not set)
   XCODEBUILDMCP_UI_DEBUGGER_GUARD_MODE: (not set)
+  XCODEBUILDMCP_HEADLESS_LAUNCH: 1
   XCODEBUILDMCP_ENABLED_WORKFLOWS:
   XCODEBUILDMCP_RUNTIME: mcp
   XCODEBUILDMCP_SILENCE_LOGS: true

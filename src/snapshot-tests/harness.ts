@@ -207,6 +207,16 @@ type SimctlAvailableDevices = {
   devices: Record<string, SimctlAvailableDevice[]>;
 };
 
+type SimctlRuntime = {
+  identifier?: unknown;
+  version?: unknown;
+  isAvailable?: unknown;
+};
+
+type SimctlRuntimes = {
+  runtimes: SimctlRuntime[];
+};
+
 function getAvailableDevices(): SimctlAvailableDevices {
   const listOutput = execSync('xcrun simctl list devices available --json', {
     encoding: 'utf8',
@@ -227,6 +237,59 @@ function findAvailableDeviceByName(simulatorName: string): SimctlAvailableDevice
   }
 
   throw new Error(`Simulator "${simulatorName}" not found`);
+}
+
+function parseIosRuntimeVersion(runtime: SimctlRuntime): number[] | null {
+  if (typeof runtime.identifier !== 'string') {
+    return null;
+  }
+
+  const identifierMatch = runtime.identifier.match(/\.SimRuntime\.iOS-(\d+(?:-\d+)*)$/);
+  if (!identifierMatch) {
+    return null;
+  }
+
+  return identifierMatch[1].split('-').map(Number);
+}
+
+function compareRuntimeVersions(left: number[], right: number[]): number {
+  const maxLength = Math.max(left.length, right.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftPart = left[index] ?? 0;
+    const rightPart = right[index] ?? 0;
+    if (leftPart !== rightPart) {
+      return leftPart - rightPart;
+    }
+  }
+  return 0;
+}
+
+export function selectLatestAvailableIosRuntimeIdentifier(data: SimctlRuntimes): string {
+  const latest = data.runtimes
+    .filter(
+      (runtime): runtime is SimctlRuntime & { identifier: string } =>
+        typeof runtime.identifier === 'string' && runtime.isAvailable !== false,
+    )
+    .map((runtime) => ({ runtime, version: parseIosRuntimeVersion(runtime) }))
+    .filter(
+      (item): item is { runtime: SimctlRuntime & { identifier: string }; version: number[] } =>
+        item.version !== null,
+    )
+    .sort((left, right) => compareRuntimeVersions(right.version, left.version))[0];
+
+  if (!latest) {
+    throw new Error('No available iOS simulator runtime found');
+  }
+
+  return latest.runtime.identifier;
+}
+
+function getLatestAvailableIosRuntimeIdentifier(): string {
+  const listOutput = execSync('xcrun simctl list runtimes available --json', {
+    encoding: 'utf8',
+  });
+
+  return selectLatestAvailableIosRuntimeIdentifier(JSON.parse(listOutput) as SimctlRuntimes);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -267,7 +330,7 @@ export async function ensureSimulatorBooted(simulatorName: string): Promise<stri
 
 export async function createTemporarySimulator(
   simulatorName: string,
-  runtimeIdentifier: string,
+  runtimeIdentifier = getLatestAvailableIosRuntimeIdentifier(),
 ): Promise<string> {
   const tempSimulatorName = `xcodebuildmcp-snapshot-${simulatorName}-${randomUUID()}`;
   const udid = execSync(

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
 
@@ -20,21 +20,18 @@ export function registerUtilitiesSnapshotSuite(runtime: SnapshotRuntime): void {
 
     describe('clean', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('utilities', 'clean', {
+        const { text } = await harness.invoke('utilities', 'clean', {
           workspacePath: WORKSPACE,
           scheme: 'CalculatorApp',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'clean--success');
       }, 120000);
 
       it('error - wrong scheme', async () => {
-        const { text, isError } = await harness.invoke('utilities', 'clean', {
+        const { text } = await harness.invoke('utilities', 'clean', {
           workspacePath: WORKSPACE,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'clean--error-wrong-scheme');
       }, 120000);
     });

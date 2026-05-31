@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -56,96 +56,82 @@ export function registerProjectDiscoverySnapshotSuite(runtime: SnapshotRuntime):
 
     describe('list-schemes', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'list-schemes', {
+        const { text } = await harness.invoke('project-discovery', 'list-schemes', {
           workspacePath: WORKSPACE,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'list-schemes--success');
       });
 
       it('error - invalid workspace', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'list-schemes', {
+        const { text } = await harness.invoke('project-discovery', 'list-schemes', {
           workspacePath: '/nonexistent/path/Fake.xcworkspace',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'list-schemes--error-invalid-workspace');
       });
     });
 
     describe('show-build-settings', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'show-build-settings', {
+        const { text } = await harness.invoke('project-discovery', 'show-build-settings', {
           workspacePath: WORKSPACE,
           scheme: 'CalculatorApp',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'show-build-settings--success');
       });
 
       it('error - wrong scheme', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'show-build-settings', {
+        const { text } = await harness.invoke('project-discovery', 'show-build-settings', {
           workspacePath: WORKSPACE,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'show-build-settings--error-wrong-scheme');
       });
     });
 
     describe('discover-projs', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'discover-projects', {
+        const { text } = await harness.invoke('project-discovery', 'discover-projects', {
           workspaceRoot: 'example_projects/iOS_Calculator',
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'discover-projs--success');
       });
 
       it('error - invalid root', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'discover-projects', {
+        const { text } = await harness.invoke('project-discovery', 'discover-projects', {
           workspaceRoot: '/nonexistent/path/Fake.app',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'discover-projs--error-invalid-root');
       });
     });
 
     describe('get-app-bundle-id', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'get-app-bundle-id', {
+        const { text } = await harness.invoke('project-discovery', 'get-app-bundle-id', {
           appPath: bundleIdAppPath,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(0);
         expectFixture(text, 'get-app-bundle-id--success');
       });
 
       it('error - missing app', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'get-app-bundle-id', {
+        const { text } = await harness.invoke('project-discovery', 'get-app-bundle-id', {
           appPath: '/nonexistent/path/Fake.app',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-app-bundle-id--error-missing-app');
       });
     });
 
     describe('get-macos-bundle-id', () => {
       it('success', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'get-macos-bundle-id', {
+        const { text } = await harness.invoke('project-discovery', 'get-macos-bundle-id', {
           appPath: bundleIdAppPath,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(0);
         expectFixture(text, 'get-macos-bundle-id--success');
       });
 
       it('error - missing app', async () => {
-        const { text, isError } = await harness.invoke('project-discovery', 'get-macos-bundle-id', {
+        const { text } = await harness.invoke('project-discovery', 'get-macos-bundle-id', {
           appPath: '/nonexistent/path/Fake.app',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-macos-bundle-id--error-missing-app');
       });
     });

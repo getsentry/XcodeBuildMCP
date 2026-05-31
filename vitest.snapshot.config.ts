@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    include: ['src/snapshot-tests/__tests__/**/*.test.ts'],
+    include: ['src/snapshot-tests/__tests__/**/*.snapshot.test.ts'],
     pool: 'threads',
     poolOptions: {
       threads: {
@@ -13,6 +13,7 @@ export default defineConfig({
     },
     env: {
       NODE_OPTIONS: '--max-old-space-size=4096',
+      XCODEBUILDMCP_HEADLESS_LAUNCH: '1',
     },
     testTimeout: 120000,
     hookTimeout: 120000,

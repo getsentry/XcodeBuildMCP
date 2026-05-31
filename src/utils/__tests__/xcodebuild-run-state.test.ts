@@ -185,6 +185,66 @@ describe('xcodebuild-run-state', () => {
     expect(snap.testFailures).toHaveLength(1);
   });
 
+  it('deduplicates Swift Testing failures with volatile trailing source context lines', () => {
+    const state = createXcodebuildRunState({ operation: 'TEST' });
+
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: 'Calculator Basic Functionality',
+      test: 'This test should fail to verify error reporting',
+      message: `Expectation failed: Bool(false)
+// This test is designed to fail so we can test error reporting
+This should fail for testing purposes`,
+      location: '/tmp/CalculatorServiceTests.swift:37',
+    });
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: '(Unknown Suite)',
+      test: 'This test should fail to verify error reporting',
+      message: `Expectation failed: Bool(false)
+// This test is designed to fail so we can test error reporting
+This should fail for testing purposes
+// MARK: - Calculator Basic Tests`,
+      location: 'CalculatorServiceTests.swift:37',
+    });
+
+    const snap = state.snapshot();
+    expect(snap.testFailures).toHaveLength(1);
+  });
+
+  it('keeps distinct Swift Testing failures when MARK lines are part of the assertion message', () => {
+    const state = createXcodebuildRunState({ operation: 'TEST' });
+
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      message: `Expectation failed
+// MARK: expected value`,
+      location: '/tmp/Test.swift:10',
+    });
+    state.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: 'Suite',
+      test: 'testA',
+      message: `Expectation failed
+// MARK: expected value
+Actual mismatch`,
+      location: '/tmp/Test.swift:10',
+    });
+
+    const snap = state.snapshot();
+    expect(snap.testFailures).toHaveLength(2);
+  });
+
   it('deduplicates warnings by location+message', () => {
     const state = createXcodebuildRunState({ operation: 'BUILD' });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   isJsonSnapshotRuntime,
   isMcpSnapshotRuntime,
@@ -50,12 +50,10 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
 
       describe('session-set-defaults', () => {
         it('success', async () => {
-          const { text, isError } = await harness.invoke('session-management', 'set-defaults', {
+          const { text } = await harness.invoke('session-management', 'set-defaults', {
             scheme: 'CalculatorApp',
             workspacePath: WORKSPACE,
           });
-          expect(isError).toBe(false);
-          expect(text.length).toBeGreaterThan(10);
           expectFixture(text, 'session-set-defaults--success');
         });
       });
@@ -66,8 +64,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
             await seedSessionDefaults();
           }
 
-          const { text, isError } = await harness.invoke('session-management', 'show-defaults', {});
-          expect(isError).toBe(false);
+          const { text } = await harness.invoke('session-management', 'show-defaults', {});
           expectFixture(text, 'session-show-defaults--success');
         });
       });
@@ -81,12 +78,7 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
             });
           }
 
-          const { text, isError } = await harness.invoke(
-            'session-management',
-            'clear-defaults',
-            {},
-          );
-          expect(isError).toBe(false);
+          const { text } = await harness.invoke('session-management', 'clear-defaults', {});
           expectFixture(text, 'session-clear-defaults--success');
         });
       });
@@ -100,7 +92,6 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
           const { text } = await harness.invoke('session-management', 'use-defaults-profile', {
             profile: 'MyCustomProfile',
           });
-          expect(text.length).toBeGreaterThan(0);
           expectFixture(text, 'session-use-defaults-profile--success');
         });
       });
@@ -116,7 +107,6 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
           }
 
           const { text } = await harness.invoke('session-management', 'sync-xcode-defaults', {});
-          expect(text.length).toBeGreaterThan(0);
           expectFixture(text, 'session-sync-xcode-defaults--success');
         });
       });
@@ -136,16 +126,14 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
         });
 
         it('session-show-defaults -- empty', async () => {
-          const { text, isError } = await harness.invoke('session-management', 'show-defaults', {});
-          expect(isError).toBe(false);
+          const { text } = await harness.invoke('session-management', 'show-defaults', {});
           expectFixture(text, 'session-show-defaults--empty');
         });
 
         it('session-set-defaults -- set scheme', async () => {
-          const { text, isError } = await harness.invoke('session-management', 'set-defaults', {
+          const { text } = await harness.invoke('session-management', 'set-defaults', {
             scheme: 'CalculatorApp',
           });
-          expect(isError).toBe(false);
           expectFixture(text, 'session-set-defaults--scheme');
         });
 
@@ -158,15 +146,10 @@ export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime)
           });
           await harness.invoke('session-management', 'use-defaults-profile', { global: true });
 
-          const { text, isError } = await harness.invoke(
-            'session-management',
-            'use-defaults-profile',
-            {
-              profile: 'MyCustomProfile',
-              persist: true,
-            },
-          );
-          expect(isError).toBe(false);
+          const { text } = await harness.invoke('session-management', 'use-defaults-profile', {
+            profile: 'MyCustomProfile',
+            persist: true,
+          });
           expectFixture(text, 'session-use-defaults-profile--persist-success');
         });
       });

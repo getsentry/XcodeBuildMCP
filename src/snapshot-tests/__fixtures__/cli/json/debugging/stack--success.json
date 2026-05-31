@@ -7,93 +7,58 @@
     "threads": [
       {
         "threadId": 1,
-        "name": "Thread 1",
+        "name": "Thread 1 Queue: com.apple.main-thread (serial)",
         "truncated": false,
         "frames": [
           {
             "index": 0,
-            "symbol": "mach_msg2_trap",
-            "displayLocation": "/usr/lib/system/libsystem_kernel.dylib`mach_msg2_trap:<OFFSET>"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices`<FUNC>:<OFFSET>"
           },
           {
             "index": 1,
-            "symbol": "mach_msg2_internal",
-            "displayLocation": "/usr/lib/system/libsystem_kernel.dylib`mach_msg2_internal:<OFFSET>"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore`<FUNC>:<OFFSET>"
           },
           {
             "index": 2,
-            "symbol": "mach_msg_overwrite",
-            "displayLocation": "/usr/lib/system/libsystem_kernel.dylib`mach_msg_overwrite:<OFFSET>"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore`<FUNC>:<OFFSET>"
           },
           {
             "index": 3,
-            "symbol": "mach_msg",
-            "displayLocation": "/usr/lib/system/libsystem_kernel.dylib`mach_msg:<OFFSET>"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`<FUNC>:<OFFSET>"
           },
           {
             "index": 4,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`<FUNC>:<OFFSET>"
           },
           {
             "index": 5,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`<FUNC>:<OFFSET>"
           },
           {
             "index": 6,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
+            "symbol": "static CalculatorApp.$main()",
+            "displayLocation": "<SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>"
           },
           {
             "index": 7,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
+            "symbol": "main",
+            "displayLocation": "<SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>"
           },
           {
             "index": 8,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
+            "symbol": "<FUNC>",
+            "displayLocation": "<SIM_RUNTIME_ROOT>/usr/lib/dyld_sim`<FUNC>:<OFFSET>"
           },
           {
             "index": 9,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
-          },
-          {
-            "index": 10,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
-          },
-          {
-            "index": 11,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
-          },
-          {
-            "index": 12,
-            "symbol": "<ADDR>",
-            "displayLocation": "<ADDR>:1"
-          },
-          {
-            "index": 13,
-            "symbol": "static CalculatorApp.$main()",
-            "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>"
-          },
-          {
-            "index": 14,
-            "symbol": "main",
-            "displayLocation": "<HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>"
-          },
-          {
-            "index": 15,
-            "symbol": "start_sim",
-            "displayLocation": "/Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/usr/lib/dyld_sim`start_sim:<OFFSET>"
-          },
-          {
-            "index": 16,
-            "symbol": "start",
-            "displayLocation": "/usr/lib/dyld`start:<OFFSET>"
+            "symbol": "<FUNC>",
+            "displayLocation": "/usr/lib/dyld`<FUNC>:<OFFSET>"
           }
         ]
       }

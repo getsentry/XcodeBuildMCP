@@ -3,9 +3,8 @@
 
    Simulator: <UUID>
 
-✅ Swipe up within elementRef e1 simulated successfully.
+✅ Swipe up within elementRef <REF> simulated successfully.
 
 Next steps:
-1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e40"},{"action":"tap","elementRef":"e56"}]}'
-2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e48
-3. Scroll visible content: xcodebuildmcp ui-automation swipe --simulator-id <UUID> --within-element-ref e1 --direction up --distance 0.5
+1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"<REF>"},{"action":"tap","elementRef":"<REF>"}]}'
+2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>

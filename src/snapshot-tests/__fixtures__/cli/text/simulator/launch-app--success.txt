@@ -11,5 +11,5 @@
      └ OSLog: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.sentry.calculatorapp_oslog_<TIMESTAMP>_pid<PID>.log
 
 Next steps:
-1. Open Simulator app to see it: xcodebuildmcp simulator-management open
+1. Open Simulator app to see it: xcodebuildmcp simulator open
 2. Stop app in simulator: xcodebuildmcp simulator stop --simulator-id <UUID> --bundle-id io.sentry.calculatorapp

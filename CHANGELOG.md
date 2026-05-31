@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added `XCODEBUILDMCP_HEADLESS_LAUNCH` opt-in environment variable that suppresses GUI focus-stealing on macOS: `launch_mac_app` and `build_run_macos` use `open -g` (background launch), Simulator.app GUI launches in `open_sim` and `build_run_sim` are skipped (`simctl boot` continues to run the simulator runtime), and `simulator-management keyboard-shortcut` short-circuits with a clear error because System Events keystrokes inherently require foreground focus. Enabled automatically for snapshot test runs so tests no longer steal window focus.
 - Added `--from-result` to the Claude UI benchmark harness so existing `result.json` artifacts can be rendered as text or JSON without rerunning Claude.
 - Added `nextSteps` hint lines to MCP `structuredContent` and CLI `--output json` envelopes so agents can consume follow-up actions without scraping text. CLI JSON renders shell command lines; MCP structured content renders MCP tool-call hints. Structured result schemas that include `nextSteps` now use schema version 2; existing version 1 schema files remain available for current validators.
 - Added `snapshot_ui sinceScreenHash` / CLI `--since-screen-hash` so callers can skip full runtime snapshot output when the screen hash is unchanged.

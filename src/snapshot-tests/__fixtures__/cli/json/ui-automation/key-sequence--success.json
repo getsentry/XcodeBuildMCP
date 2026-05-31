@@ -23,32 +23,37 @@
       "rs": "1",
       "screenHash": "<SCREEN_HASH>",
       "seq": 1,
-      "count": 206,
+      "count": 28,
       "targets": [
-        "e22|tap|button|Fitness||Fitness",
-        "e31|tap|button|Watch||Watch",
-        "e40|tap|button|Contacts||Contacts",
-        "e49|tap|button|Files||Files",
-        "e58|tap|button|Preview||Preview",
-        "e67|tap|button|Utilities folder|2 apps|Utilities",
-        "e70|tap|button|Weather||Weather",
-        "e79|tap|button|Calculator||Calculator",
-        "e98|tap|button|Safari||Safari",
-        "e103|tap|button|Messages||Messages"
+        "<REF>|tap|button|7||",
+        "<REF>|tap|button|8||",
+        "<REF>|tap|button|9||",
+        "<REF>|tap|button|4||",
+        "<REF>|tap|button|5||",
+        "<REF>|tap|button|6||",
+        "<REF>|tap|button|1||",
+        "<REF>|tap|button|2||",
+        "<REF>|tap|button|3||",
+        "<REF>|tap|button|0||",
+        "<REF>|tap|button|.||",
+        "<REF>|tap|button|C||",
+        "<REF>|tap|button|±||",
+        "<REF>|tap|button|%||",
+        "<REF>|tap|button|÷||",
+        "<REF>|tap|button|×||",
+        "<REF>|tap|button|-||",
+        "<REF>|tap|button|+||",
+        "<REF>|tap|button|=||"
       ],
-      "scroll": [
-        "e6|swipe|other|||Home screen icons"
-      ],
+      "scroll": [],
       "text": [
-        "e8|text|text|<TIME>||",
-        "e93|text|text|Search||"
+        "<REF>|text|text|0||"
       ],
       "udid": "<UUID>"
     }
   },
   "nextSteps": [
-    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"e22\"},{\"action\":\"tap\",\"elementRef\":\"e31\"}]}'",
-    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e22",
-    "Scroll visible content: xcodebuildmcp ui-automation swipe --simulator-id <UUID> --within-element-ref e6 --direction up --distance 0.5"
+    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"<REF>\"},{\"action\":\"tap\",\"elementRef\":\"<REF>\"}]}'",
+    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>"
   ]
 }

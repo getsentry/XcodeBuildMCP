@@ -9,6 +9,9 @@
 - Do not add fallback behavior by default. If required context, configuration, runtime state, or dependencies are missing, fail loudly and fix the caller/setup instead of silently switching to an alternate path. Add a fallback only when explicitly requested or when it is a documented product requirement.
 - Follow TypeScript best practices
 
+## Test Conventions
+- Snapshot tests (`*.snapshot.test.ts`) must only assert generated tool output against fixtures. Move helper, parser, schema, setup, or behavior assertions to non-snapshot unit/integration tests.
+
 ## Commands
 - NEVER commit unless user asks
 

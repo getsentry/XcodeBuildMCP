@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import {
   createMockCommandResponse,
   type CommandExecutor,
@@ -39,6 +39,9 @@ const PREFIX_NAME_JSON = JSON.stringify({
 
 type Call = { command: string[] };
 
+const HEADLESS_ENV_VAR = 'XCODEBUILDMCP_HEADLESS_LAUNCH';
+const originalHeadlessValue = process.env[HEADLESS_ENV_VAR];
+
 function makeFifoExecutor(
   responses: Array<{ success: boolean; output?: string; error?: string }>,
 ): { executor: CommandExecutor; calls: Call[] } {
@@ -58,6 +61,18 @@ function makeFifoExecutor(
 }
 
 describe('sendKeyboardShortcut', () => {
+  beforeEach(() => {
+    delete process.env[HEADLESS_ENV_VAR];
+  });
+
+  afterEach(() => {
+    if (originalHeadlessValue === undefined) {
+      delete process.env[HEADLESS_ENV_VAR];
+    } else {
+      process.env[HEADLESS_ENV_VAR] = originalHeadlessValue;
+    }
+  });
+
   it('sends Cmd+K for software-keyboard when simulator is booted and window exists', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
@@ -152,6 +167,35 @@ describe('sendKeyboardShortcut', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toContain('not booted');
+    }
+    expect(calls).toHaveLength(1);
+  });
+
+  it('reports an invalid simulator before the headless foreground precondition', async () => {
+    process.env[HEADLESS_ENV_VAR] = '1';
+    const { executor, calls } = makeFifoExecutor([{ success: true, output: EMPTY_JSON }]);
+
+    const result = await sendKeyboardShortcut('missing-uuid', 'software-keyboard', executor);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain('missing-uuid');
+      expect(result.error).toContain('not found');
+      expect(result.error).not.toContain('HEADLESS_LAUNCH');
+    }
+    expect(calls).toHaveLength(1);
+  });
+
+  it('blocks a valid booted simulator before GUI keyboard shortcuts in headless mode', async () => {
+    process.env[HEADLESS_ENV_VAR] = '1';
+    const { executor, calls } = makeFifoExecutor([{ success: true, output: BOOTED_JSON }]);
+
+    const result = await sendKeyboardShortcut('test-uuid-123', 'software-keyboard', executor);
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain('foreground');
+      expect(result.error).toContain('XCODEBUILDMCP_HEADLESS_LAUNCH');
     }
     expect(calls).toHaveLength(1);
   });

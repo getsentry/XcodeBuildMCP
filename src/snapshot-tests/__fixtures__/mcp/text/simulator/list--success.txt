@@ -3,9 +3,12 @@
 
 iOS Simulators:
 
-  iOS 26.4:
+  iOS <VERSION>:
 
     📱 [<STATUS>] iPhone 17 Pro (<SIM_STATE>)
+      UDID: <UUID>
+
+    📱 [<STATUS>] Claude UI reminders 20260531T151345Z (<SIM_STATE>)
       UDID: <UUID>
 
     📱 [<STATUS>] iPhone 17 Pro Max (<SIM_STATE>)
@@ -38,7 +41,7 @@ iOS Simulators:
     📱 [<STATUS>] iPad (A16) (<SIM_STATE>)
       UDID: <UUID>
 
-✅ 11 simulators available (11 iOS).
+✅ 12 simulators available (12 iOS).
 
 Hints
   Use the simulator ID/UDID from above when required by other tools.

@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "swipe",
-      "withinElementRef": "e3",
+      "withinElementRef": "<ELEMENT_REF>",
       "direction": "up"
     },
     "artifacts": {

@@ -119,6 +119,45 @@ describe('runtime snapshot store', () => {
     });
   });
 
+  it('omits broad application and window roots from swipeWithin candidate lists', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        {
+          type: 'Application',
+          role: 'AXApplication',
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          children: [],
+          enabled: true,
+          custom_actions: [],
+          AXLabel: 'Settings',
+        },
+        {
+          type: 'ScrollView',
+          role: 'AXScrollArea',
+          frame: { x: 0, y: 80, width: 390, height: 600 },
+          children: [],
+          enabled: true,
+          custom_actions: [],
+          AXLabel: 'Content',
+        },
+        node,
+      ],
+      nowMs: 1_000,
+    });
+    recordRuntimeSnapshot(snapshot);
+
+    const result = resolveElementRef(simulatorId, 'e3', 'swipeWithin', 2_000);
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: 'TARGET_NOT_ACTIONABLE',
+        candidates: [expect.objectContaining({ ref: 'e2', role: 'scroll-view' })],
+      }),
+    });
+  });
+
   it('caps not-actionable candidate lists at the compact runtime target limit', () => {
     const textFields: AccessibilityNode[] = Array.from(
       { length: COMPACT_RUNTIME_TARGET_LIMIT + 10 },

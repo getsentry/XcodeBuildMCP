@@ -17,7 +17,7 @@
     }
   },
   "nextSteps": [
-    "Open the Simulator app: xcodebuildmcp simulator-management open",
+    "Open the Simulator app: xcodebuildmcp simulator open",
     "Launch the app: xcodebuildmcp simulator launch-app --simulator-id <UUID> --bundle-id io.sentry.calculatorapp"
   ]
 }

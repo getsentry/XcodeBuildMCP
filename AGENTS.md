@@ -63,6 +63,7 @@ ESM TypeScript project (`type: module`). Key layers:
 
 ## Test Conventions
 - Vitest with colocated `__tests__/` directories using `*.test.ts`
+- Snapshot tests (`*.snapshot.test.ts`) must only assert generated tool output against fixtures. Move helper, parser, schema, setup, or behavior assertions to non-snapshot unit/integration tests.
 - Smoke tests in `src/smoke-tests/__tests__/` (separate Vitest config, serial execution)
 - Use `vi.mock`/`vi.hoisted` for isolation; inject executors and mock file systems
 - MCP integration tests use `McpServer`, `InMemoryTransport`, and `Client`

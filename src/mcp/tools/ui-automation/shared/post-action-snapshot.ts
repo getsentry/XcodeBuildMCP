@@ -13,7 +13,7 @@ import { evaluateSettledPredicate, type SettledTracker } from './wait-predicate.
 const POST_ACTION_SNAPSHOT_RECOVERY_HINT =
   'Run snapshot_ui again before reusing elementRefs from the previous snapshot.';
 
-const POST_ACTION_SNAPSHOT_TIMEOUT_MS = 1_500;
+const POST_ACTION_SNAPSHOT_TIMEOUT_MS = 5_000;
 const POST_ACTION_SNAPSHOT_POLL_INTERVAL_MS = 100;
 const POST_ACTION_SNAPSHOT_SETTLED_DURATION_MS = 100;
 

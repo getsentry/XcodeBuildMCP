@@ -35,6 +35,7 @@ export interface McpSnapshotHarness extends WorkflowSnapshotHarness {
 
 export interface CreateMcpSnapshotHarnessOptions {
   enabledWorkflows?: string[];
+  env?: Record<string, string>;
 }
 
 function extractSnapshotTextContent(result: unknown): string {
@@ -113,6 +114,7 @@ export async function createMcpSnapshotHarness(
     command: 'node',
     args: [CLI_PATH, 'mcp'],
     env: createSnapshotHarnessEnv({
+      ...(opts.env ?? {}),
       XCODEBUILDMCP_ENABLED_WORKFLOWS: enabledWorkflows.join(','),
       XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS: 'true',
       XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC: '1',

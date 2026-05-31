@@ -19,6 +19,8 @@ import {
 } from '../simulator-lifecycle.ts';
 import type { BenchmarkConfig } from '../types.ts';
 
+const HEADLESS_ENV_VAR = 'XCODEBUILDMCP_HEADLESS_LAUNCH';
+
 interface ClaudeMcpConfig {
   mcpServers: {
     'xcodebuildmcp-dev': {
@@ -202,6 +204,60 @@ describe('Claude UI temporary simulator lifecycle', () => {
     expect(commands[4]?.args).toEqual(['simctl', 'delete', 'TEMP-SIM-123']);
     expect(log.messages.join('\n')).toContain('Created simulatorId: TEMP-SIM-123');
     expect(log.messages.join('\n')).toContain('Temporary simulator ready: TEMP-SIM-123');
+  });
+
+  it('does not open Simulator.app when headless launch mode is enabled', async () => {
+    const previousHeadlessValue = process.env[HEADLESS_ENV_VAR];
+    process.env[HEADLESS_ENV_VAR] = '1';
+    try {
+      const logPath = '/tmp/simulator-lifecycle.log';
+      const log = inMemoryLifecycleLog();
+      const commands: LifecycleCommandOptions[] = [];
+      const events: string[] = [];
+      const executor: LifecycleCommandExecutor = async (opts) => {
+        commands.push(opts);
+        return {
+          exitCode: 0,
+          stdout: opts.args[1] === 'create' ? 'TEMP-SIM-123\n' : '',
+          stderr: '',
+          durationSeconds: 0.01,
+        };
+      };
+
+      const simulator = await prepareTemporarySimulator({
+        config: config(),
+        suiteSlug: 'weather',
+        timestamp: '20260522T120000Z',
+        cwd: '/repo',
+        logPath,
+        executor,
+        logWriter: log.writer,
+        onEvent: (message) => events.push(message),
+        readinessDelayMs: 0,
+      });
+
+      expect(simulator?.simulatorId).toBe('TEMP-SIM-123');
+      expect(commands.map((item) => [item.command, ...item.args])).toEqual([
+        ['xcrun', 'simctl', 'create', 'Claude UI weather 20260522T120000Z', 'iPhone 17 Pro Max'],
+        ['xcrun', 'simctl', 'boot', 'TEMP-SIM-123'],
+        ['xcrun', 'simctl', 'bootstatus', 'TEMP-SIM-123', '-b'],
+      ]);
+      expect(events).toEqual([
+        'creating simulator Claude UI weather 20260522T120000Z',
+        'booting simulator TEMP-SIM-123',
+        'waiting for simulator TEMP-SIM-123 bootstatus',
+        'simulator ready TEMP-SIM-123',
+      ]);
+      expect(log.messages.join('\n')).toContain(
+        'Simulator.app launch skipped by headless launch policy',
+      );
+    } finally {
+      if (previousHeadlessValue === undefined) {
+        delete process.env[HEADLESS_ENV_VAR];
+      } else {
+        process.env[HEADLESS_ENV_VAR] = previousHeadlessValue;
+      }
+    }
   });
 
   it('continues when the harness-created simulator is already booted before bootstatus', async () => {

@@ -5,6 +5,6 @@
 
 Errors (1):
 
-  ✗ Failed to capture screenshot: Invalid device: <UUID>
+  ✗ Simulator <UUID> was not found.
 
 ❌ Failed to capture screenshot.

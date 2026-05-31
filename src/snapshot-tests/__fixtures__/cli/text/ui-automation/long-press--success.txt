@@ -3,8 +3,8 @@
 
    Simulator: <UUID>
 
-✅ Long press on elementRef e3 for 500ms simulated successfully.
+✅ Long press on elementRef <REF> for 500ms simulated successfully.
 
 Next steps:
-1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e14"},{"action":"tap","elementRef":"e15"}]}'
-2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e14
+1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"<REF>"},{"action":"tap","elementRef":"<REF>"}]}'
+2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>

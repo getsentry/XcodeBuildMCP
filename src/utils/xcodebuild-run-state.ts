@@ -57,9 +57,22 @@ function normalizeTestFailureLocation(location: string | undefined): string | nu
   return (match?.[1] ?? location).trim().toLowerCase();
 }
 
+function normalizeTestFailureMessage(message: string): string {
+  const lines = message
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  while (lines.at(-1)?.startsWith('// MARK:') === true) {
+    lines.pop();
+  }
+
+  return lines.join('\n').toLowerCase();
+}
+
 function normalizeTestFailureKey(fragment: TestFailureFragment): string {
   const normalizedLocation = normalizeTestFailureLocation(fragment.location);
-  const normalizedMessage = fragment.message.trim().toLowerCase();
+  const normalizedMessage = normalizeTestFailureMessage(fragment.message);
   const suite = normalizeTestIdentifier(fragment.suite);
   const test = normalizeTestIdentifier(fragment.test);
 

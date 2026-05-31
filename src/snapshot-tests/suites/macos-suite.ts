@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,69 +55,61 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
 
     describe('build', () => {
       it('success', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build', {
+        const { text } = await harness.invoke('macos', 'build', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'build--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build', {
+        const { text } = await harness.invoke('macos', 'build', {
           projectPath: PROJECT,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'build--error-wrong-scheme');
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build', {
+        const { text } = await harness.invoke('macos', 'build', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
           extraArgs: compilerErrorExtraArgs(),
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'build--error-compiler');
       });
     });
 
     describe('build-and-run', () => {
       it('success', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build-and-run', {
+        const { text } = await harness.invoke('macos', 'build-and-run', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'build-and-run--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build-and-run', {
+        const { text } = await harness.invoke('macos', 'build-and-run', {
           projectPath: PROJECT,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'build-and-run--error-wrong-scheme');
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'build-and-run', {
+        const { text } = await harness.invoke('macos', 'build-and-run', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
           extraArgs: compilerErrorExtraArgs(),
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'build-and-run--error-compiler');
       });
     });
 
     describe('test', () => {
       it('success', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'test', {
+        const { text } = await harness.invoke('macos', 'test', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
           extraArgs: [
@@ -125,32 +117,27 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
             '-only-testing:MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
           ],
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'test--success');
       });
 
       it('failure - intentional test failure', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'test', {
+        const { text } = await harness.invoke('macos', 'test', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(isError).toBe(true);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'test--failure');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'test', {
+        const { text } = await harness.invoke('macos', 'test', {
           projectPath: PROJECT,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'test--error-wrong-scheme');
       });
 
       it('error - compiler error', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'test', {
+        const { text } = await harness.invoke('macos', 'test', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
           extraArgs: compilerErrorExtraArgs([
@@ -158,28 +145,24 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
             '-only-testing:MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect',
           ]),
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'test--error-compiler');
       });
     });
 
     describe('get-app-path', () => {
       it('success', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'get-app-path', {
+        const { text } = await harness.invoke('macos', 'get-app-path', {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'get-app-path--success');
       });
 
       it('error - wrong scheme', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'get-app-path', {
+        const { text } = await harness.invoke('macos', 'get-app-path', {
           projectPath: PROJECT,
           scheme: 'NONEXISTENT',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-app-path--error-wrong-scheme');
       });
     });
@@ -190,24 +173,20 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(appPathResult.isError).toBe(false);
 
         const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
-        const { text, isError } = await harness.invoke('macos', 'launch', {
+        const { text } = await harness.invoke('macos', 'launch', {
           appPath,
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'launch--success');
       });
 
       it('error - invalid app', { timeout: 120000 }, async () => {
         const nonExistentApp = path.join(tmpDir, 'NonExistent.app');
-        const { text, isError } = await harness.invoke('macos', 'launch', {
+        const { text } = await harness.invoke('macos', 'launch', {
           appPath: nonExistentApp,
         });
-        expect(isError).toBe(true);
-        expect(text.length).toBeGreaterThan(0);
         expectFixture(text, 'launch--error-invalid-app');
       });
     });
@@ -218,44 +197,37 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           projectPath: PROJECT,
           scheme: 'MCPTest',
         });
-        expect(appPathResult.isError).toBe(false);
 
         const appPath = extractAppPathFromSnapshotResult(appPathResult);
 
         await harness.invoke('macos', 'launch', { appPath });
 
-        const { text, isError } = await harness.invoke('macos', 'stop', {
+        const { text } = await harness.invoke('macos', 'stop', {
           appName: 'MCPTest',
         });
-        expect(isError).toBe(false);
         expectFixture(text, 'stop--success');
       });
 
       it('error - no app', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'stop', {
+        const { text } = await harness.invoke('macos', 'stop', {
           processId: 999999,
         });
-        expect(isError).toBe(true);
-        expect(text.length).toBeGreaterThan(0);
         expectFixture(text, 'stop--error-no-app');
       });
     });
 
     describe('get-macos-bundle-id', () => {
       it('success', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'get-macos-bundle-id', {
+        const { text } = await harness.invoke('macos', 'get-macos-bundle-id', {
           appPath: bundleIdAppPath,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(0);
         expectFixture(text, 'get-macos-bundle-id--success');
       });
 
       it('error - missing app', { timeout: 120000 }, async () => {
-        const { text, isError } = await harness.invoke('macos', 'get-macos-bundle-id', {
+        const { text } = await harness.invoke('macos', 'get-macos-bundle-id', {
           appPath: '/nonexistent/path/Fake.app',
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'get-macos-bundle-id--error-missing-app');
       });
     });

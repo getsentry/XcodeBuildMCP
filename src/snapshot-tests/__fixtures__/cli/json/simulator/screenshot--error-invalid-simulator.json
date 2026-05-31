@@ -14,7 +14,7 @@
       "warnings": [],
       "errors": [
         {
-          "message": "Failed to capture screenshot: Invalid device: <UUID>"
+          "message": "Simulator <UUID> was not found."
         }
       ]
     }

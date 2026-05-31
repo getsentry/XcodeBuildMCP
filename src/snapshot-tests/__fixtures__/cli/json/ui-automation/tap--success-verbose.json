@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "tap",
-      "elementRef": "e14",
+      "elementRef": "<ELEMENT_REF>",
       "x": 61,
       "y": 490
     },
@@ -912,7 +912,7 @@
     }
   },
   "nextSteps": [
-    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"e14\"},{\"action\":\"tap\",\"elementRef\":\"e15\"}]}'",
-    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e14"
+    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"<REF>\"},{\"action\":\"tap\",\"elementRef\":\"<REF>\"}]}'",
+    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>"
   ]
 }

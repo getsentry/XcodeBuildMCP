@@ -4,6 +4,5 @@
 ✅ Key press (code: 4) simulated successfully.
 
 Next steps:
-1. Batch same-screen taps: batch({ simulatorId: "<UUID>", steps: [{"action":"tap","elementRef":"e22"},{"action":"tap","elementRef":"e31"}] })
-2. Tap an elementRef: tap({ simulatorId: "<UUID>", elementRef: "e22" })
-3. Scroll visible content: swipe({ simulatorId: "<UUID>", withinElementRef: "e6", direction: "up", distance: 0.5 })
+1. Batch same-screen taps: batch({ simulatorId: "<UUID>", steps: [{"action":"tap","elementRef":"<REF>"},{"action":"tap","elementRef":"<REF>"}] })
+2. Tap an elementRef: tap({ simulatorId: "<UUID>", elementRef: "<REF>" })

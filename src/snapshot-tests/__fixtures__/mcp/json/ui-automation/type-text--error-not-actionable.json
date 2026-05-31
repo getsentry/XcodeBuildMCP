@@ -9,7 +9,7 @@
     },
     "action": {
       "type": "type-text",
-      "elementRef": "e3",
+      "elementRef": "<ELEMENT_REF>",
       "textLength": 5
     },
     "artifacts": {
@@ -19,7 +19,7 @@
       "code": "TARGET_NOT_ACTIONABLE",
       "message": "Element ref 'e3' does not support 'typeText'.",
       "recoveryHint": "Choose an elementRef that lists the required action, or refresh with snapshot_ui.",
-      "elementRef": "e3",
+      "elementRef": "<ELEMENT_REF>",
       "candidates": [],
       "snapshotAgeMs": 1234
     }

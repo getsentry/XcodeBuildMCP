@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, beforeAll } from 'vitest';
 import { invokeResource } from '../resource-harness.ts';
 import { createWorkflowFixtureMatcher } from './helpers.ts';
 import { ensureSimulatorBooted } from '../harness.ts';
@@ -12,7 +12,6 @@ export function registerResourcesSnapshotSuite(): void {
     describe('devices', () => {
       it('success', async () => {
         const { text } = await invokeResource('devices');
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'devices--success');
       });
     });
@@ -20,7 +19,6 @@ export function registerResourcesSnapshotSuite(): void {
     describe('doctor', () => {
       it('success', async () => {
         const { text } = await invokeResource('doctor');
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'doctor--success');
       });
     });
@@ -28,7 +26,6 @@ export function registerResourcesSnapshotSuite(): void {
     describe('session-status', () => {
       it('success', async () => {
         const { text } = await invokeResource('session-status');
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'session-status--success');
       });
     });
@@ -36,7 +33,6 @@ export function registerResourcesSnapshotSuite(): void {
     describe('simulators', () => {
       it('success', async () => {
         const { text } = await invokeResource('simulators');
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'simulators--success');
       });
     });

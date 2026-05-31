@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createCommandMatchingMockExecutor,
+  createMockCommandResponse,
   createMockExecutor,
   createMockFileSystemExecutor,
 } from '../../../../test-utils/mock-executors.ts';
@@ -17,6 +18,7 @@ import { tapLogic } from '../tap.ts';
 import { touchLogic } from '../touch.ts';
 import { type_textLogic } from '../type_text.ts';
 import { __resetRuntimeSnapshotStoreForTests } from '../shared/snapshot-ui-state.ts';
+import type { CommandExecutor } from '../../../../utils/execution/index.ts';
 import { createNode, recordSnapshot } from './ui-action-test-helpers.ts';
 
 const simulatorId = '12345678-1234-4234-8234-123456789012';
@@ -30,6 +32,15 @@ function createMockAxeHelpers() {
   };
 }
 
+function createUiActionExecutor(): CommandExecutor {
+  return async (command) =>
+    createMockCommandResponse({
+      success: true,
+      output: command[1] === 'describe-ui' ? runtimeSnapshotOutput : '',
+      error: undefined,
+    });
+}
+
 describe('ui automation non-streaming tools', () => {
   it('returns structured text without emitting progress events for ui action tools', async () => {
     const axeHelpers = createMockAxeHelpers();
@@ -39,7 +50,7 @@ describe('ui automation non-streaming tools', () => {
         run: () =>
           buttonLogic(
             { simulatorId, buttonType: 'home' },
-            createMockExecutor({ success: true }),
+            createUiActionExecutor(),
             axeHelpers,
             undefined,
             0,
@@ -49,21 +60,13 @@ describe('ui automation non-streaming tools', () => {
       {
         name: 'gesture',
         run: () =>
-          gestureLogic(
-            { simulatorId, preset: 'scroll-up' },
-            createMockExecutor({ success: true }),
-            axeHelpers,
-          ),
+          gestureLogic({ simulatorId, preset: 'scroll-up' }, createUiActionExecutor(), axeHelpers),
         expectedText: "Gesture 'scroll-up' executed successfully.",
       },
       {
         name: 'key_press',
         run: () =>
-          key_pressLogic(
-            { simulatorId, keyCode: 40 },
-            createMockExecutor({ success: true }),
-            axeHelpers,
-          ),
+          key_pressLogic({ simulatorId, keyCode: 40 }, createUiActionExecutor(), axeHelpers),
         expectedText: 'Key press (code: 40) simulated successfully.',
       },
       {
@@ -71,7 +74,7 @@ describe('ui automation non-streaming tools', () => {
         run: () =>
           key_sequenceLogic(
             { simulatorId, keyCodes: [40, 42], delay: 0.1 },
-            createMockExecutor({ success: true }),
+            createUiActionExecutor(),
             axeHelpers,
           ),
         expectedText: 'Key sequence [40,42] executed successfully.',
@@ -83,7 +86,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode()]);
           return long_pressLogic(
             { simulatorId, elementRef: 'e1', duration: 1500 },
-            createMockExecutor({ success: true }),
+            createUiActionExecutor(),
             axeHelpers,
           );
         },
@@ -96,7 +99,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode({ type: 'ScrollView', role: 'AXScrollArea' })]);
           return swipeLogic(
             { simulatorId, withinElementRef: 'e1', direction: 'up' },
-            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
+            createUiActionExecutor(),
             axeHelpers,
           );
         },
@@ -107,11 +110,7 @@ describe('ui automation non-streaming tools', () => {
         run: () => {
           __resetRuntimeSnapshotStoreForTests();
           recordSnapshot([createNode()]);
-          return tapLogic(
-            { simulatorId, elementRef: 'e1' },
-            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
-            axeHelpers,
-          );
+          return tapLogic({ simulatorId, elementRef: 'e1' }, createUiActionExecutor(), axeHelpers);
         },
         expectedText: 'Tap on elementRef e1 simulated successfully.',
       },
@@ -122,7 +121,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode()]);
           return touchLogic(
             { simulatorId, elementRef: 'e1', down: true },
-            createMockExecutor({ success: true }),
+            createUiActionExecutor(),
             axeHelpers,
           );
         },
@@ -135,7 +134,7 @@ describe('ui automation non-streaming tools', () => {
           recordSnapshot([createNode({ type: 'TextField', role: 'AXTextField' })]);
           return type_textLogic(
             { simulatorId, elementRef: 'e1', text: 'Hello' },
-            createMockExecutor({ success: true, output: runtimeSnapshotOutput }),
+            createUiActionExecutor(),
             axeHelpers,
           );
         },

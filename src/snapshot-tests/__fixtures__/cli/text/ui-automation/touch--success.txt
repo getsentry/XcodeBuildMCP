@@ -3,8 +3,8 @@
 
    Simulator: <UUID>
 
-✅ Touch event (touch down+up) on elementRef e3 executed successfully.
+✅ Touch event (touch down+up) on elementRef <REF> executed successfully.
 
 Next steps:
-1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e14"},{"action":"tap","elementRef":"e15"}]}'
-2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e14
+1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"<REF>"},{"action":"tap","elementRef":"<REF>"}]}'
+2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>

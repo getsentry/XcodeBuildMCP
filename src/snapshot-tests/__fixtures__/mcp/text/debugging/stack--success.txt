@@ -4,21 +4,14 @@
 ✅ Stack trace retrieved
 
 Frames:
-  Thread <THREAD_ID> (Thread 1)
-  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
-  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
-  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
-  frame #<N>: <FUNC> at /usr/lib/system/libsystem_kernel.dylib`<FUNC>:<OFFSET>
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: <ADDR> at <ADDR>:1
-  frame #<N>: static CalculatorApp.$main() at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>
-  frame #<N>: main at <HOME>/Library/Developer/CoreSimulator/Devices/<UUID>/data/Containers/Bundle/Application/<UUID>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>
-  frame #<N>: <FUNC> at /Library/Developer/CoreSimulator/Volumes/iOS_23E244/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.4.simruntime/Contents/Resources/RuntimeRoot/usr/lib/dyld_sim`<FUNC>:<OFFSET>
+  Thread <THREAD_ID> (Thread 1 Queue: com.apple.main-thread (serial))
+  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices`<FUNC>:<OFFSET>
+  frame #<N>: -[UIApplication _run] at <SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore`-[UIApplication _run]:<OFFSET>
+  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore`<FUNC>:<OFFSET>
+  frame #<N>: closure #1 in KitRendererCommon(_:) at <SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`closure #1 (Swift.UnsafeMutablePointer<Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int8>>>) -> Swift.Never in SwiftUI.KitRendererCommon(Swift.AnyObject.Type) -> Swift.Never:<OFFSET>
+  frame #<N>: runApp<τ_0_0>(_:) at <SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`SwiftUI.runApp<τ_0_0 where τ_0_0: SwiftUI.App>(τ_0_0) -> Swift.Never:<OFFSET>
+  frame #<N>: static App.main() at <SIM_RUNTIME_ROOT>/System/Library/Frameworks/SwiftUI.framework/SwiftUI`static SwiftUI.App.main() -> ():<OFFSET>
+  frame #<N>: static CalculatorApp.$main() at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`static CalculatorApp.CalculatorApp.$main() -> ():<OFFSET>
+  frame #<N>: main at <SIM_APP_BUNDLE>/CalculatorApp.app/CalculatorApp.debug.dylib`main:<OFFSET>
+  frame #<N>: <FUNC> at <SIM_RUNTIME_ROOT>/usr/lib/dyld_sim`<FUNC>:<OFFSET>
   frame #<N>: <FUNC> at /usr/lib/dyld`<FUNC>:<OFFSET>

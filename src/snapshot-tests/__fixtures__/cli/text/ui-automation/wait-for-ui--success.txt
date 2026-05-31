@@ -4,28 +4,28 @@
    Simulator: <UUID>
 
 Matched exists (1) — ref|action|role|label|value|id
-  e10|tap|button|C||
+  <REF>|tap|button|C||
 
 Targets (19) — ref|action|role|label|value|id
-  e14|tap|button|7||
-  e15|tap|button|8||
-  e16|tap|button|9||
-  e18|tap|button|4||
-  e19|tap|button|5||
-  e20|tap|button|6||
-  e22|tap|button|1||
-  e23|tap|button|2||
-  e24|tap|button|3||
-  e26|tap|button|0||
-  e27|tap|button|.||
-  e10|tap|button|C||
-  e11|tap|button|±||
-  e12|tap|button|%||
-  e13|tap|button|÷||
-  e17|tap|button|×||
-  e21|tap|button|-||
-  e25|tap|button|+||
-  e28|tap|button|=||
+  <REF>|tap|button|7||
+  <REF>|tap|button|8||
+  <REF>|tap|button|9||
+  <REF>|tap|button|4||
+  <REF>|tap|button|5||
+  <REF>|tap|button|6||
+  <REF>|tap|button|1||
+  <REF>|tap|button|2||
+  <REF>|tap|button|3||
+  <REF>|tap|button|0||
+  <REF>|tap|button|.||
+  <REF>|tap|button|C||
+  <REF>|tap|button|±||
+  <REF>|tap|button|%||
+  <REF>|tap|button|÷||
+  <REF>|tap|button|×||
+  <REF>|tap|button|-||
+  <REF>|tap|button|+||
+  <REF>|tap|button|=||
 
 Tips
   - Use target refs with tap, type_text, long_press, and touch.

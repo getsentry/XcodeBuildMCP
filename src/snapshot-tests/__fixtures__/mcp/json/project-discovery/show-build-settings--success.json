@@ -547,7 +547,7 @@
       },
       {
         "key": "DEPLOYMENT_TARGET_SUGGESTED_VALUES",
-        "value": "12.0 12.1 12.2 12.3 12.4 13.0 13.1 13.2 13.3 13.4 13.5 13.6 14.0 14.1 14.2 14.3 14.4 14.5 14.6 14.7 15.0 15.1 15.2 15.3 15.4 15.5 15.6 16.0 16.1 16.2 16.3 16.4 16.5 16.6 17.0 17.1 17.2 17.3 17.4 17.5 17.6 18.0 18.1 18.2 18.3 18.4 18.5 18.6 26.0 26.2 26.3 26.4"
+        "value": "<DEPLOYMENT_TARGETS>"
       },
       {
         "key": "DERIVED_FILES_DIR",
@@ -627,7 +627,7 @@
       },
       {
         "key": "DRIVERKIT_DEPLOYMENT_TARGET",
-        "value": "25.4"
+        "value": "<DEPLOYMENT_TARGET>"
       },
       {
         "key": "DSTROOT",
@@ -1395,7 +1395,7 @@
       },
       {
         "key": "MACOSX_DEPLOYMENT_TARGET",
-        "value": "26.4"
+        "value": "<DEPLOYMENT_TARGET>"
       },
       {
         "key": "MAC_OS_X_PRODUCT_BUILD_VERSION",
@@ -2227,7 +2227,7 @@
       },
       {
         "key": "TVOS_DEPLOYMENT_TARGET",
-        "value": "26.4"
+        "value": "<DEPLOYMENT_TARGET>"
       },
       {
         "key": "UID",
@@ -2311,7 +2311,7 @@
       },
       {
         "key": "WATCHOS_DEPLOYMENT_TARGET",
-        "value": "26.4"
+        "value": "<DEPLOYMENT_TARGET>"
       },
       {
         "key": "WORKSPACE_DIR",
@@ -2339,19 +2339,19 @@
       },
       {
         "key": "XCODE_PRODUCT_BUILD_VERSION",
-        "value": "17E192"
+        "value": "<SDK_BUILD_VERSION>"
       },
       {
         "key": "XCODE_VERSION_ACTUAL",
-        "value": "2640"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "XCODE_VERSION_MAJOR",
-        "value": "2600"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "XCODE_VERSION_MINOR",
-        "value": "2640"
+        "value": "<SDK_VERSION>"
       },
       {
         "key": "XPCSERVICES_FOLDER_PATH",
@@ -2359,7 +2359,7 @@
       },
       {
         "key": "XROS_DEPLOYMENT_TARGET",
-        "value": "26.4"
+        "value": "<DEPLOYMENT_TARGET>"
       },
       {
         "key": "YACC",

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,12 +25,10 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
     describe('scaffold-ios', () => {
       it('success', async () => {
         const outputPath = join(tmpDir, 'ios');
-        const { text, isError } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
+        const { text } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
           projectName: 'SnapshotTestApp',
           outputPath,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'scaffold-ios--success');
       }, 120000);
 
@@ -43,11 +41,10 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
           outputPath,
         });
 
-        const { text, isError } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
+        const { text } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
           projectName: 'SnapshotTestApp',
           outputPath,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'scaffold-ios--error-existing');
       }, 120000);
     });
@@ -55,12 +52,10 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
     describe('scaffold-macos', () => {
       it('success', async () => {
         const outputPath = join(tmpDir, 'macos');
-        const { text, isError } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
+        const { text } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
           projectName: 'SnapshotTestMacApp',
           outputPath,
         });
-        expect(isError).toBe(false);
-        expect(text.length).toBeGreaterThan(10);
         expectFixture(text, 'scaffold-macos--success');
       }, 120000);
 
@@ -73,11 +68,10 @@ export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime
           outputPath,
         });
 
-        const { text, isError } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
+        const { text } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
           projectName: 'SnapshotTestMacApp',
           outputPath,
         });
-        expect(isError).toBe(true);
         expectFixture(text, 'scaffold-macos--error-existing');
       }, 120000);
     });

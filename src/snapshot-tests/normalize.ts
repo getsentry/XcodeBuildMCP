@@ -22,6 +22,8 @@ const CLI_PROCESS_ID_ARG_REGEX = /--process-id (["']?)\d+\1/g;
 const MCP_PROCESS_ID_ARG_REGEX = /(processId:\s*)\d+/g;
 const THREAD_ID_REGEX = /Thread \d{5,}/g;
 const HEX_ADDRESS_REGEX = /0x[0-9a-fA-F]{8,}/g;
+const SIMULATOR_APP_DEBUG_DYLIB_REGEX =
+  /<HOME>\/Library\/Developer\/CoreSimulator\/Devices\/<UUID>\/data\/(?:Containers\/Bundle\/Application\/<UUID>|Library\/Caches\/com\.apple\.containermanagerd\/Dead\/temp\.[^/\s]+\/<UUID>)\/([^/\s]+\.app\/[^/`\s]+\.debug\.dylib)/g;
 
 const LLDB_FRAME_OFFSET_REGEX = /(`[^`\n]+):(\d+)$/gm;
 const LLDB_BREAKPOINT_BYTE_OFFSET_REGEX = /\+ \d+ at /g;
@@ -29,6 +31,8 @@ const LLDB_SYS_FRAME_FUNC_REGEX =
   /(frame #\d+: )\S+( at (?:\/usr\/lib\/|\/Library\/Developer\/CoreSimulator\/)[^`\n]*`)[^:\n]+(:<OFFSET>)/gm;
 const LLDB_FRAME_NUMBER_REGEX = /  frame #\d+:/g;
 const LLDB_BREAKPOINT_LOCATIONS_REGEX = /locations = .+$/gm;
+const CORE_SIMULATOR_RUNTIME_ROOT_REGEX =
+  /\/Library\/Developer\/CoreSimulator\/Volumes\/[^/\s]+\/Library\/Developer\/CoreSimulator\/Profiles\/Runtimes\/[^/\n]+?\.simruntime\/Contents\/Resources\/RuntimeRoot/g;
 const DERIVED_DATA_HASH_REGEX = /(DerivedData\/[^/\s]+)-(?:[a-z]{28}|[0-9a-f]{12})(?=\/|\b)/g;
 const LOCAL_TIMESTAMP_REGEX = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/g;
 const XCTEST_PARENS_DURATION_REGEX = /\(\d+\.\d+\) seconds/g;
@@ -40,6 +44,10 @@ const DEVICE_LABEL_REGEX = /Device: .+ \(<UUID>\)/g;
 const UPTIME_REGEX = /Uptime: \d+s/g;
 const RESULT_BUNDLE_LINE_REGEX = /\S+\[\d+:\d+\] Writing error result bundle to \S+/g;
 const DEVICE_TRANSPORT_TYPE_REGEX = /\b(wired|localNetwork)\b/g;
+const COREDEVICE_PROVISIONING_PREAMBLE_REGEX =
+  /^(\s*✗ )Failed to load provisioning paramter list due to error: Error Domain=com\.apple\.dt\.CoreDeviceError Code=1002 "No provider was found\." UserInfo=\{NSLocalizedDescription=No provider was found\.\}\.\n\s+`devicectl manage create` may support a reduced set of arguments\.\n\s+ERROR: /gm;
+const COREDEVICE_NOT_FOUND_ERROR_PREFIX_REGEX =
+  /(^\s*✗ )ERROR: (?=The specified device was not found\.)/gm;
 const TARGET_DEVICE_IDENTIFIER_REGEX = /(TARGET_DEVICE_IDENTIFIER = )([0-9A-Fa-f]{24,40})/g;
 const TARGET_DEVICE_MODEL_REGEX =
   /((?:TARGET_DEVICE_MODEL|ASSETCATALOG_FILTER_FOR_DEVICE_MODEL) = ).+$/gm;
@@ -57,10 +65,10 @@ const SDK_PATH_REGEX =
 const SDK_DIR_PLACEHOLDER_KEY_REGEX = /^(\s*)SDK_DIR_[A-Za-z0-9_]+ = <SDK_PATH>$/gm;
 const SDK_NAME_REGEX = /^(\s*(?:CORRESPONDING_SIMULATOR_SDK_NAME|SDK_NAMES?) = ).+$/gm;
 const SDK_BUILD_VERSION_REGEX =
-  /^(\s*(?:PLATFORM_PRODUCT_BUILD_VERSION|SDK_PRODUCT_BUILD_VERSION|MAC_OS_X_PRODUCT_BUILD_VERSION) = ).+$/gm;
+  /^(\s*(?:PLATFORM_PRODUCT_BUILD_VERSION|SDK_PRODUCT_BUILD_VERSION|MAC_OS_X_PRODUCT_BUILD_VERSION|XCODE_PRODUCT_BUILD_VERSION) = ).+$/gm;
 const SDK_STAT_CACHE_PATH_REGEX = /^(\s*SDK_STAT_CACHE_PATH = ).+$/gm;
 const SDK_VERSION_REGEX =
-  /^(\s*(?:SDK_VERSION|SDK_VERSION_ACTUAL|SDK_VERSION_MAJOR|SDK_VERSION_MINOR|MAC_OS_X_VERSION_ACTUAL|MAC_OS_X_VERSION_MAJOR|MAC_OS_X_VERSION_MINOR) = ).+$/gm;
+  /^(\s*(?:SDK_VERSION|SDK_VERSION_ACTUAL|SDK_VERSION_MAJOR|SDK_VERSION_MINOR|MAC_OS_X_VERSION_ACTUAL|MAC_OS_X_VERSION_MAJOR|MAC_OS_X_VERSION_MINOR|XCODE_VERSION_ACTUAL|XCODE_VERSION_MAJOR|XCODE_VERSION_MINOR) = ).+$/gm;
 const CODEX_ARG0_PATH_REGEX = /<HOME>\/\.codex\/tmp\/arg0\/codex-arg0[A-Za-z0-9]+/g;
 const CODEX_WORKTREE_NODE_MODULES_REGEX =
   /<HOME>\/\.codex\/worktrees\/[^/:]+\/node_modules\/\.bin/g;
@@ -72,7 +80,18 @@ const XCODE_IDE_ARTIFACT_HASH_REGEX =
   /(\/state\/xcode-ide\/call-tool\/[^/\n]+\/[^/\n]+-)[0-9a-f]{8}(?=\.json)/g;
 const ACQUIRED_USAGE_ASSERTION_TIME_REGEX =
   /(^\s*)\d{2}:\d{2}:\d{2}( {2}Acquired usage assertion\.)$/gm;
-const UI_SNAPSHOT_TIME_TEXT_ROW_REGEX = /\b(e\d+\|text\|text\|)\d{1,2}:\d{2}(\|\|)/g;
+const UI_SNAPSHOT_TIME_TEXT_ROW_REGEX = /\b((?:e\d+|<REF>)\|text\|text\|)\d{1,2}:\d{2}(\|\|)/g;
+const UI_COMPACT_ROW_ELEMENT_REF_REGEX =
+  /\be\d+(?=\|(?:tap|typeText|longPress|touch|swipe|text)\|)/g;
+const UI_CLI_ELEMENT_REF_ARG_REGEX = /(--(?:within-)?element-ref\s+)(["']?)e\d+\2/g;
+const UI_OBJECT_ELEMENT_REF_REGEX = /((?:elementRef|withinElementRef|ref)\s*:\s*["'])e\d+(["'])/g;
+const UI_JSON_ELEMENT_REF_REGEX = /("(?:elementRef|withinElementRef|ref)"\s*:\s*")e\d+(")/g;
+const UI_PROSE_ELEMENT_REF_REGEX = /(\b(?:within\s+)?elementRef\s+)e\d+\b/g;
+const DEPLOYMENT_TARGET_SUGGESTED_VALUES_REGEX = /^(\s*DEPLOYMENT_TARGET_SUGGESTED_VALUES = ).+$/gm;
+const PLATFORM_DEPLOYMENT_TARGET_REGEX =
+  /^(\s*(?:DRIVERKIT_DEPLOYMENT_TARGET|MACOSX_DEPLOYMENT_TARGET|TVOS_DEPLOYMENT_TARGET|WATCHOS_DEPLOYMENT_TARGET|XROS_DEPLOYMENT_TARGET) = ).+$/gm;
+const IOS_RUNTIME_HEADING_REGEX = /\biOS \d+(?:\.\d+)*(?=:)/g;
+const SWIFT_VERSION_TEMP_FILE_REGEX = /swift-version--[0-9A-Fa-f]+\.txt/g;
 const BUILD_SETTINGS_PATH_REGEX = /^( {6}PATH = ).+$/gm;
 const TRAILING_WHITESPACE_REGEX = /[ \t]+$/gm;
 const SIMULATOR_FAILURE_TEST_PROGRESS_BLOCK_REGEX =
@@ -109,6 +128,48 @@ function isMonotonicProgress(progress: TestProgress[]): boolean {
         current.skipped >= previous.skipped)
     );
   });
+}
+
+function normalizeDoctorProcessTree(text: string): string {
+  return text.replace(
+    /(^|\n)(Process Tree\n)(?:   <PID> \(ppid <PID>\): <PROCESS>\n)+/g,
+    '$1$2   <PID> (ppid <PID>): <PROCESS>\n   <PID> (ppid <PID>): <PROCESS>\n   <PID> (ppid <PID>): <PROCESS>\n',
+  );
+}
+
+function trimVolatileDebugStackPrefix(text: string): string {
+  const lines = text.split('\n');
+  const framesIndex = lines.findIndex((line) => line.trim() === 'Frames:');
+  if (framesIndex === -1) {
+    return text;
+  }
+
+  const threadIndex = lines.findIndex(
+    (line, index) => index > framesIndex && line.trim().startsWith('Thread <THREAD_ID>'),
+  );
+  if (threadIndex === -1) {
+    return text;
+  }
+
+  const firstAppFrameIndex = lines.findIndex(
+    (line, index) => index > threadIndex && line.includes('<SIM_APP_BUNDLE>/'),
+  );
+  if (firstAppFrameIndex === -1) {
+    return text;
+  }
+
+  const stableLaunchBoundaryIndex = lines.findIndex(
+    (line, index) =>
+      index > threadIndex &&
+      index < firstAppFrameIndex &&
+      line.includes('GraphicsServices.framework/GraphicsServices'),
+  );
+  if (stableLaunchBoundaryIndex <= threadIndex + 1) {
+    return text;
+  }
+
+  lines.splice(threadIndex + 1, stableLaunchBoundaryIndex - threadIndex - 1);
+  return lines.join('\n');
 }
 
 function normalizeSimulatorFailureTestProgressBlock(match: string): string {
@@ -181,6 +242,8 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(UUID_REGEX, '<UUID>');
   normalized = normalized.replace(DEVICE_LABEL_REGEX, 'Device: <DEVICE> (<UUID>)');
   normalized = normalized.replace(DEVICE_TRANSPORT_TYPE_REGEX, '<CONNECTION>');
+  normalized = normalized.replace(COREDEVICE_PROVISIONING_PREAMBLE_REGEX, '$1');
+  normalized = normalized.replace(COREDEVICE_NOT_FOUND_ERROR_PREFIX_REGEX, '$1');
   normalized = normalized.replace(DURATION_REGEX, '<DURATION>');
   normalized = normalized.replace(PID_NUMBER_REGEX, '$1<PID>');
   normalized = normalized.replace(PID_NAME_REGEX, 'PID <PID>');
@@ -206,11 +269,14 @@ export function normalizeSnapshotOutput(text: string): string {
 
   normalized = normalized.replace(THREAD_ID_REGEX, 'Thread <THREAD_ID>');
   normalized = normalized.replace(HEX_ADDRESS_REGEX, '<ADDR>');
+  normalized = normalized.replace(SIMULATOR_APP_DEBUG_DYLIB_REGEX, '<SIM_APP_BUNDLE>/$1');
   normalized = normalized.replace(LLDB_FRAME_OFFSET_REGEX, '$1:<OFFSET>');
   normalized = normalized.replace(LLDB_BREAKPOINT_BYTE_OFFSET_REGEX, '+ <OFFSET> at ');
   normalized = normalized.replace(LLDB_SYS_FRAME_FUNC_REGEX, '$1<FUNC>$2<FUNC>$3');
   normalized = normalized.replace(LLDB_FRAME_NUMBER_REGEX, '  frame #<N>:');
   normalized = normalized.replace(LLDB_BREAKPOINT_LOCATIONS_REGEX, 'locations = <LOCATIONS>');
+  normalized = normalized.replace(CORE_SIMULATOR_RUNTIME_ROOT_REGEX, '<SIM_RUNTIME_ROOT>');
+  normalized = trimVolatileDebugStackPrefix(normalized);
   normalized = normalized.replace(RESULT_BUNDLE_LINE_REGEX, '<RESULT_BUNDLE_ERROR>');
 
   normalized = normalized.replace(LOCAL_TIMESTAMP_REGEX, '<TIMESTAMP>');
@@ -239,10 +305,25 @@ export function normalizeSnapshotOutput(text: string): string {
   normalized = normalized.replace(SDK_BUILD_VERSION_REGEX, '$1<SDK_BUILD_VERSION>');
   normalized = normalized.replace(SDK_STAT_CACHE_PATH_REGEX, '$1<SDK_STAT_CACHE_PATH>');
   normalized = normalized.replace(SDK_VERSION_REGEX, '$1<SDK_VERSION>');
+  normalized = normalized.replace(
+    DEPLOYMENT_TARGET_SUGGESTED_VALUES_REGEX,
+    '$1<DEPLOYMENT_TARGETS>',
+  );
+  normalized = normalized.replace(PLATFORM_DEPLOYMENT_TARGET_REGEX, '$1<DEPLOYMENT_TARGET>');
+  normalized = normalized.replace(IOS_RUNTIME_HEADING_REGEX, 'iOS <VERSION>');
+  normalized = normalized.replace(SWIFT_VERSION_TEMP_FILE_REGEX, 'swift-version--<HASH>.txt');
   normalized = normalized.replace(BUILD_SETTINGS_PATH_REGEX, '$1<PATH>');
   normalized = normalized.replace(CODEX_ARG0_PATH_REGEX, '<HOME>/.codex/tmp/arg0/codex-arg0<ARG0>');
   normalized = normalized.replace(ACQUIRED_USAGE_ASSERTION_TIME_REGEX, '$1<TIME>$2');
   normalized = normalized.replace(UI_SNAPSHOT_TIME_TEXT_ROW_REGEX, '$1<TIME>$2');
+  normalized = normalized.replace(UI_COMPACT_ROW_ELEMENT_REF_REGEX, '<REF>');
+  normalized = normalized.replace(
+    UI_CLI_ELEMENT_REF_ARG_REGEX,
+    (_match: string, prefix: string, quote: string) => `${prefix}${quote}<REF>${quote}`,
+  );
+  normalized = normalized.replace(UI_JSON_ELEMENT_REF_REGEX, '$1<REF>$2');
+  normalized = normalized.replace(UI_OBJECT_ELEMENT_REF_REGEX, '$1<REF>$2');
+  normalized = normalized.replace(UI_PROSE_ELEMENT_REF_REGEX, '$1<REF>');
   normalized = normalized.replace(
     CODEX_WORKTREE_NODE_MODULES_REGEX,
     '<HOME>/.codex/worktrees/<WORKTREE>/node_modules/.bin',
@@ -322,6 +403,8 @@ export function normalizeSnapshotOutput(text: string): string {
   // PATH section body: every entry is an absolute system path that varies by
   // host/user. Replace the entire body with a single stable placeholder.
   normalized = normalized.replace(/(\nPATH\n)(?:  [^\n]+\n)+/g, '$1  <PATH_ENTRIES>\n');
+
+  normalized = normalizeDoctorProcessTree(normalized);
 
   normalized = normalized.replace(TRAILING_WHITESPACE_REGEX, '');
   normalized = normalized.replace(/\n*$/, '\n');

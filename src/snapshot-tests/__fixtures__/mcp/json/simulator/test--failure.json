@@ -36,7 +36,7 @@
       "errors": [],
       "testFailures": [
         {
-          "suite": "(Unknown Suite)",
+          "suite": "<SWIFT_TEST_SUITE>",
           "test": "This test should fail to verify error reporting",
           "message": "Expectation failed: (calculator.display → \"0\") == \"999\"\n// This test is designed to fail to test error reporting\nThis should fail - display should be 0, not 999",
           "location": "CalculatorServiceTests.swift:37"

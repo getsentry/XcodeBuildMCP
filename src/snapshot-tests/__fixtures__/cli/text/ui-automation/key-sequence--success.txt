@@ -6,6 +6,5 @@
 ✅ Key sequence [4,5,6] executed successfully.
 
 Next steps:
-1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"e22"},{"action":"tap","elementRef":"e31"}]}'
-2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref e22
-3. Scroll visible content: xcodebuildmcp ui-automation swipe --simulator-id <UUID> --within-element-ref e6 --direction up --distance 0.5
+1. Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{"simulatorId":"<UUID>","steps":[{"action":"tap","elementRef":"<REF>"},{"action":"tap","elementRef":"<REF>"}]}'
+2. Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>
