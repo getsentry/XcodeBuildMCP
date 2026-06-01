@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # contents: write required for sweep to open draft fix PRs
 # issues: write required for the sweep tracking issue

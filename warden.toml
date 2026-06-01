@@ -252,9 +252,13 @@ remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
 maxTurns = 10
 maxFindings = 5
 paths = [
+  "src/cli.ts",
   "src/cli/**",
+  "src/daemon.ts",
   "src/daemon/**",
+  "src/doctor-cli.ts",
   "src/integrations/**",
+  "src/mcp/resources/**",
   "src/mcp/tools/**",
   "src/runtime/tool-invoker.ts",
   "src/utils/execution/**",
@@ -314,9 +318,13 @@ remote = "getsentry/skills@b10e2db21d3165de1904bdf3fa64285016765fe5"
 maxTurns = 10
 maxFindings = 5
 paths = [
+  "src/cli.ts",
   "src/cli/**",
+  "src/daemon.ts",
   "src/daemon/**",
+  "src/doctor-cli.ts",
   "src/integrations/**",
+  "src/mcp/resources/**",
   "src/mcp/tools/**",
   "src/runtime/**",
   "src/server/**",
