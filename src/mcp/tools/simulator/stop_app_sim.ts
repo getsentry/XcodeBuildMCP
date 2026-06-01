@@ -132,7 +132,6 @@ const publicSchemaObject = z.strictObject(
   baseSchemaObject.omit({
     simulatorId: true,
     simulatorName: true,
-    bundleId: true,
   } as const).shape,
 );
 
