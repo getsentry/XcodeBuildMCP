@@ -4,6 +4,18 @@ workingDirectory: .
 sessionDefaults:
   bundleId: com.apple.MobileAddressBook
   simulatorName: iPhone 17 Pro Max
+claude:
+  model: claude-opus-4-7
+  appendSystemPrompt: >-
+    Match the benchmark baseline tool pattern for Contacts. Start with session_show_defaults, then
+    launch_app_sim. After launch_app_sim, use this tracked UI sequence: snapshot_ui, tap Add,
+    snapshot_ui, tap Continue if visible, type_text first name,
+    snapshot_ui, type_text last name, type_text company, tap add phone, snapshot_ui, type_text phone,
+    tap add email, snapshot_ui, type_text email, tap Done, snapshot_ui. When a UI action reports
+    SNAPSHOT_CAPTURE_FAILED, call snapshot_ui next. Do not use wait_for_ui for Contacts unless a
+    later tool result explicitly asks for wait_for_ui. Do not tap text fields before type_text. Keep
+    assistant text terse: no progress narration beyond what is needed to choose tools, and keep the
+    final answer to one sentence.
 firstRunPromptDismissals:
   labels:
     - Continue

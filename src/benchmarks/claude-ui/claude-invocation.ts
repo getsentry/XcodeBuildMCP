@@ -32,6 +32,7 @@ export function buildClaudeArgs(opts: {
   workingDirectory: string;
   pluginDirs?: string[];
   simulatorId?: string;
+  model?: string;
   resumeSessionId?: string;
   sessionId?: string;
 }): string[] {
@@ -57,6 +58,10 @@ export function buildClaudeArgs(opts: {
   }
   if (allowedTools.length > 0) {
     args.push('--allowedTools', allowedTools.join(','));
+  }
+  const model = opts.model ?? claudeConfig.model;
+  if (model) {
+    args.push('--model', model);
   }
   if (claudeConfig.appendSystemPrompt) {
     args.push(

@@ -13,13 +13,6 @@
         "runtime": "iOS <VERSION>"
       },
       {
-        "name": "Claude UI reminders 20260531T151345Z",
-        "simulatorId": "<UUID>",
-        "state": "<SIM_STATE>",
-        "isAvailable": true,
-        "runtime": "iOS <VERSION>"
-      },
-      {
         "name": "iPhone 17 Pro Max",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",

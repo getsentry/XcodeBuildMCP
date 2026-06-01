@@ -2,10 +2,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildClaudeArgs } from '../claude-invocation.ts';
 import { compareBenchmark, diffToolSequence } from '../compare.ts';
 import { renderAggregate } from '../render.ts';
 import { readConfig } from '../config.ts';
 import {
+  extractObservedClaudeModel,
   listSuitePaths,
   requireSuitePaths,
   resolveParserPath,
@@ -185,7 +187,9 @@ describe('Claude UI benchmark analysis', () => {
         subtype: 'success',
         is_error: false,
         duration_ms: 1000,
+        duration_api_ms: 750,
         result: 'done',
+        model: 'claude-sonnet-4-7',
       }),
     ].join('\n');
 
@@ -196,7 +200,24 @@ describe('Claude UI benchmark analysis', () => {
     expect(audit.uiAutomationCalls).toBe(2);
     expect(audit.mcpSequence.map((call) => call.shortName)).toEqual(['snapshot_ui', 'tap']);
     expect(audit.failures).toEqual([]);
+    expect(audit.claudeDurationSeconds).toBe(1);
+    expect(audit.claudeApiDurationSeconds).toBe(0.75);
     expect(audit.finalText).toBe('done');
+    expect(extractObservedClaudeModel(audit.resultSummary)).toBe('claude-sonnet-4-7');
+  });
+
+  it('extracts observed Claude model from model usage metadata', () => {
+    expect(
+      extractObservedClaudeModel(
+        {
+          modelUsage: {
+            'claude-haiku-4-5-20251001': {},
+            'claude-opus-4-8': {},
+          },
+        },
+        'claude-opus-4-8',
+      ),
+    ).toBe('claude-opus-4-8');
   });
 
   it('reports tool failures and configured failure patterns', () => {
@@ -335,6 +356,59 @@ describe('Claude UI benchmark analysis', () => {
     ).toThrow(
       'weather.yml.sequence: removed; use baselineToolSequence for observed sequence reporting',
     );
+  });
+
+  it('accepts first-class Claude model config', () => {
+    const config = readConfig(
+      {
+        name: 'weather',
+        prompt: 'prompt.md',
+        claude: { model: 'claude-sonnet-4-7' },
+      },
+      'weather.yml',
+    );
+
+    expect(config.claude?.model).toBe('claude-sonnet-4-7');
+  });
+
+  it('rejects Claude model flags in extraArgs', () => {
+    for (const extraArgs of [['--model', 'sonnet'], ['--model=sonnet']]) {
+      expect(() =>
+        readConfig(
+          {
+            name: 'weather',
+            prompt: 'prompt.md',
+            claude: { extraArgs },
+          },
+          'weather.yml',
+        ),
+      ).toThrow('weather.yml.claude.extraArgs: use claude.model instead of --model');
+    }
+  });
+
+  it('builds Claude args with suite model and CLI model override', () => {
+    const config: BenchmarkConfig = {
+      name: 'weather',
+      prompt: 'prompt.md',
+      claude: { model: 'suite-model' },
+    };
+
+    const fromSuite = buildClaudeArgs({
+      config,
+      artifacts: runMetadata(10).artifacts,
+      workingDirectory: '/tmp/project',
+    });
+    const suiteModelFlagIndex = fromSuite.indexOf('--model');
+    expect(fromSuite[suiteModelFlagIndex + 1]).toBe('suite-model');
+
+    const overridden = buildClaudeArgs({
+      config,
+      artifacts: runMetadata(10).artifacts,
+      workingDirectory: '/tmp/project',
+      model: 'cli-model',
+    });
+    const modelFlagIndex = overridden.indexOf('--model');
+    expect(overridden[modelFlagIndex + 1]).toBe('cli-model');
   });
 
   it('rejects invalid Claude timeout values when loading config', () => {

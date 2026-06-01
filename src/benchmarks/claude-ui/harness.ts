@@ -45,6 +45,7 @@ import type {
   BenchmarkConfig,
   BenchmarkResult,
   BenchmarkRunMetadata,
+  ClaudeVersionProbe,
   TemporarySimulatorRunMetadata,
   ToolAnalysisConfig,
 } from './types.ts';
@@ -57,6 +58,11 @@ interface CommandResult {
 interface StreamJsonResult {
   type?: unknown;
   is_error?: unknown;
+}
+interface CapturedCommandResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
 }
 interface SuiteDirectories {
   suitesDir: string;
@@ -208,6 +214,77 @@ export async function resolveParserPath(parserPath: string | undefined): Promise
     throw new Error(`Claude UI benchmark parser does not exist: ${resolved}`);
   }
   return resolved;
+}
+
+function runCapturedCommand(opts: {
+  command: string;
+  args: string[];
+  cwd: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<CapturedCommandResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(opts.command, opts.args, {
+      cwd: opts.cwd,
+      env: opts.env ?? process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+    child.on('error', reject);
+    child.on('close', (exitCode) => {
+      resolve({
+        exitCode: exitCode ?? null,
+        stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf8'),
+      });
+    });
+  });
+}
+
+async function probeClaudeVersion(opts: {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+}): Promise<ClaudeVersionProbe> {
+  const command = ['claude', '--version'];
+  const result = await runCapturedCommand({
+    command: command[0]!,
+    args: command.slice(1),
+    cwd: opts.cwd,
+    env: opts.env,
+  });
+  return { command, ...result };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function extractObservedClaudeModel(
+  summary: Record<string, unknown> | undefined,
+  requestedModel?: string | null,
+): string | null {
+  const raw = summary?.model ?? summary?.model_name;
+  if (typeof raw === 'string' && raw.length > 0) return raw;
+
+  const modelUsage = summary?.modelUsage;
+  if (!isRecord(modelUsage)) return null;
+
+  const modelNames = Object.keys(modelUsage).filter((name) => name.length > 0);
+  if (modelNames.length === 0) return null;
+
+  if (requestedModel) {
+    const requested = modelNames.find(
+      (name) => name === requestedModel || name.startsWith(`${requestedModel}-`),
+    );
+    if (requested) return requested;
+  }
+
+  const primaryModels = modelNames.filter((name) => !name.includes('haiku'));
+  if (primaryModels.length === 1) return primaryModels[0]!;
+  if (modelNames.length === 1) return modelNames[0]!;
+  return modelNames.join(', ');
 }
 
 function runCommand(opts: {
@@ -474,6 +551,7 @@ export async function runSuite(
     simulatorExecutor?: LifecycleCommandExecutor;
     progress?: ProgressReporter;
     parserPath?: string;
+    model?: string;
   } = {},
 ): Promise<BenchmarkResult> {
   const config = await loadSuite(suitePath);
@@ -599,12 +677,18 @@ export async function runSuite(
     });
 
     const claudeSessionId = config.claude?.activateSkill ? randomUUID() : undefined;
+    const requestedClaudeModel = opts.model ?? config.claude?.model ?? null;
+    const claudeVersion = await probeClaudeVersion({
+      cwd: claudeWorkingDirectory,
+      env: benchmarkEnv,
+    });
     const baseClaudeArgs = {
       config,
       artifacts,
       workingDirectory,
       pluginDirs: config.claude?.pluginDirs?.map((pluginDir) => resolveFrom(repoRoot, pluginDir)),
       simulatorId: effectiveSimulatorId,
+      model: opts.model,
     };
     const claudeArgs = buildClaudeArgs({
       ...baseClaudeArgs,
@@ -612,7 +696,7 @@ export async function runSuite(
     });
     await writeFile(
       artifacts.claudeCommandLogPath,
-      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${claudeWorkingDirectory}\nBenchmark working directory: ${workingDirectory}\nMCP server enabled: ${String(useMcpServer)}\nMCP workspace: ${useMcpServer ? artifacts.mcpWorkspaceDirectory : 'disabled'}\nMCP workspace config: ${useMcpServer ? artifacts.mcpWorkspaceConfigPath : 'disabled'}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${effectiveSimulatorId ?? 'suite/default'}\nClaude session ID: ${claudeSessionId ?? 'new task session'}\nStarted: ${new Date().toISOString()}\n`,
+      `Run dir: ${runDirectory}\nCommand: claude ${claudeArgs.join(' ')} < ${artifacts.promptPath} > ${artifacts.claudeJsonlPath} 2> ${artifacts.claudeStderrPath}\nWorking directory: ${claudeWorkingDirectory}\nBenchmark working directory: ${workingDirectory}\nMCP server enabled: ${String(useMcpServer)}\nMCP workspace: ${useMcpServer ? artifacts.mcpWorkspaceDirectory : 'disabled'}\nMCP workspace config: ${useMcpServer ? artifacts.mcpWorkspaceConfigPath : 'disabled'}\nSimulator lifecycle log: ${artifacts.simulatorLifecycleLogPath}\nSimulator ID: ${effectiveSimulatorId ?? 'suite/default'}\nClaude session ID: ${claudeSessionId ?? 'new task session'}\nRequested model: ${requestedClaudeModel ?? 'default'}\nClaude version command: ${claudeVersion.command.join(' ')}\nClaude version exit status: ${claudeVersion.exitCode}\nClaude version stdout: ${claudeVersion.stdout.trim() || '(empty)'}\nClaude version stderr: ${claudeVersion.stderr.trim() || '(empty)'}\nStarted: ${new Date().toISOString()}\n`,
       'utf8',
     );
     if (installedSkillDirs.length > 0) {
@@ -705,6 +789,15 @@ export async function runSuite(
       failurePatternTargets: config.failurePatternTargets,
       ignoredFailurePatterns: config.ignoredFailurePatterns,
     });
+    const observedClaudeModel = extractObservedClaudeModel(
+      audit.resultSummary,
+      requestedClaudeModel,
+    );
+    await writeFile(
+      artifacts.claudeCommandLogPath,
+      `Observed model: ${observedClaudeModel ?? 'unknown'}\n`,
+      { flag: 'a' },
+    );
     const run: BenchmarkRunMetadata = {
       suitePath,
       wallClockSeconds: claude.durationSeconds,
@@ -712,6 +805,11 @@ export async function runSuite(
       parserExitCode,
       artifacts,
       temporarySimulator: temporarySimulatorRun,
+      claude: {
+        requestedModel: requestedClaudeModel,
+        observedModel: observedClaudeModel,
+        version: claudeVersion,
+      },
     };
     result = compareBenchmark(config, audit, run);
   } finally {
@@ -763,12 +861,21 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
       type: 'string',
       describe: `Path to parse_claude_conversation.py (defaults to benchmarks/claude-ui/parse_claude_conversation.py; can also set ${parserEnvName})`,
     })
+    .option('model', {
+      type: 'string',
+      describe:
+        'Claude model to request for benchmark runs; overrides claude.model in the suite YAML',
+    })
     .option('from-result', {
       type: 'string',
       describe: 'Render an existing result.json or artifact directory without running Claude',
     })
     .strict()
     .parse();
+
+  if (args.model !== undefined && args.model.length === 0) {
+    throw new Error('--model requires a non-empty value');
+  }
 
   if (args.fromResult) {
     if (args.all || args.suite) {
@@ -802,7 +909,11 @@ export async function main(argv = hideBin(process.argv)): Promise<number> {
       suitePaths.length,
       path.basename(suitePath, path.extname(suitePath)),
     );
-    const item = await runSuite(suitePath, { progress, parserPath: args.parser });
+    const item = await runSuite(suitePath, {
+      progress,
+      parserPath: args.parser,
+      model: args.model,
+    });
     results.push(item);
     progress.event(`suite ${item.completed ? 'completed' : 'incomplete'}`);
     if (!args.json) process.stdout.write(renderSuiteReport(item));

@@ -5,6 +5,19 @@ sessionDefaults:
   projectPath: Weather.xcodeproj
   scheme: Weather
   simulatorName: iPhone 17 Pro Max
+claude:
+  model: claude-opus-4-7
+  appendSystemPrompt: >-
+    Match the benchmark baseline tool pattern for Weather. If you need tool discovery, load all
+    required tools in one ToolSearch using the full MCP names: mcp__xcodebuildmcp-dev__session_show_defaults,
+    mcp__xcodebuildmcp-dev__build_run_sim, mcp__xcodebuildmcp-dev__snapshot_ui,
+    mcp__xcodebuildmcp-dev__tap, mcp__xcodebuildmcp-dev__batch,
+    mcp__xcodebuildmcp-dev__type_text, mcp__xcodebuildmcp-dev__swipe. Do not call ToolSearch
+    again after that. Start with session_show_defaults, then build_run_sim. After build_run_sim, use
+    this tracked UI sequence: snapshot_ui, tap, batch, tap,
+    tap, type_text, tap, tap, swipe, snapshot_ui, tap. Do not call snapshot_ui immediately after the
+    batch; the next two tracked UI calls after batch should be tap, then tap. Keep assistant text terse:
+    no progress narration beyond what is needed to choose tools, and keep the final answer to one sentence.
 baseline:
   totalToolCalls: 14
   trackedToolCalls: 13

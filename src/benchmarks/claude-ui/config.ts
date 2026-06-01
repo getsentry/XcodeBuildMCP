@@ -115,6 +115,15 @@ function readNumberMap(value: unknown, source: string): Record<string, number> |
   );
 }
 
+function rejectClaudeModelExtraArgs(extraArgs: string[] | undefined, source: string): void {
+  if (!extraArgs) return;
+  for (const arg of extraArgs) {
+    if (arg === '--model' || arg.startsWith('--model=')) {
+      throw new Error(`${source}.extraArgs: use claude.model instead of --model`);
+    }
+  }
+}
+
 function readClaudeInvocationConfig(
   raw: unknown,
   source: string,
@@ -152,13 +161,17 @@ function readClaudeInvocationConfig(
     throw new Error(`${source}.activateSkill: must match a basename from skillDirs`);
   }
 
+  const extraArgs = readOptionalStringArray(raw, 'extraArgs', source);
+  rejectClaudeModelExtraArgs(extraArgs, source);
+
   return {
+    model: readOptionalString(raw, 'model', source),
     useMcpServer: readOptionalBoolean(raw, 'useMcpServer', source),
     permissionMode,
     tools: readOptionalStringArray(raw, 'tools', source),
     allowedTools: readOptionalStringArray(raw, 'allowedTools', source),
     appendSystemPrompt: readOptionalString(raw, 'appendSystemPrompt', source),
-    extraArgs: readOptionalStringArray(raw, 'extraArgs', source),
+    extraArgs,
     pluginDirs: readOptionalStringArray(raw, 'pluginDirs', source),
     skillDirs,
     activateSkill,

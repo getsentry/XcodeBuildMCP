@@ -51,6 +51,15 @@ Print machine-readable output from a new run:
 npm run bench:claude-ui -- --suite reminders --json
 ```
 
+Request an exact Claude model for controlled comparisons:
+
+```bash
+npm run bench:claude-ui -- --suite weather --model claude-sonnet-4-7
+npm run bench:claude-ui:xcodebuildmcp -- --model claude-sonnet-4-7
+```
+
+The `--model` CLI option overrides `claude.model` from the suite YAML for that run.
+
 Render an existing result without rerunning Claude:
 
 ```bash
@@ -113,6 +122,7 @@ Suites can override the Claude invocation without changing harness code. Omit th
 
 ```yaml
 claude:
+  model: claude-sonnet-4-7
   useMcpServer: false
   tools:
     - Bash
@@ -128,8 +138,6 @@ claude:
   extraArgs:
     - --setting-sources
     - project,local
-    - --model
-    - sonnet
 toolAnalysis:
   matchers:
     - kind: bashCommand
@@ -144,6 +152,8 @@ toolAnalysis:
       commandPrefix: xcodebuild
       shortName: xcodebuild
 ```
+
+`claude.model` is the canonical suite-level model request. Do not put `--model` or `--model=<value>` in `claude.extraArgs`; the config parser rejects those forms so suite config and CLI overrides cannot disagree. Pass `--model <model>` to override the suite model for controlled comparison runs.
 
 `claude.useMcpServer: false` writes an empty per-run MCP config and passes it with `--strict-mcp-config`, so project/user MCP servers cannot leak into CLI-only benchmark runs. The harness still prepares the simulator lifecycle and exports `CLAUDE_UI_BENCHMARK_SIMULATOR_ID`, `CLAUDE_UI_BENCHMARK_RUN_DIR`, and `CLAUDE_UI_BENCHMARK_WORKING_DIRECTORY` to Claude. `appendSystemPrompt` also supports `{simulatorId}`, `{runDirectory}`, and `{workingDirectory}` placeholders.
 
@@ -194,6 +204,7 @@ Each suite renders as a structured report with a task-completion banner, aligned
 COMPLETED  weather                                             1m 38.6s
   suite     benchmarks/claude-ui/suites/weather.yml
   artifacts out.nosync/claude-benchmarks/weather/20260522T214044Z
+  claude   model requested=claude-sonnet-4-7 observed=claude-sonnet-4-7 version=1.2.3
   exit      claude=0 parser=0
 
 Metrics
@@ -282,8 +293,8 @@ Each run writes:
 - `mcp-workspace/.xcodebuildmcp/config.yaml` — isolated MCP server config with effective suite defaults
 - `claude.jsonl` — Claude stream JSON output
 - `claude.stderr` — Claude stderr
-- `claude-command.log` — command, cwd, simulator ID, exit status, wall clock
+- `claude-command.log` — command, cwd, simulator ID, requested/observed model, `claude --version`, exit status, wall clock
 - `simulator-lifecycle.log` — temporary simulator create, boot, bootstatus, open, readiness, deletion commands, and simulator ID
 - `parsed/` — files written by `parse_claude_conversation.py`
 - `parse.log` / `parse.log.stderr` — parser output
-- `result.json` — full benchmark result
+- `result.json` — full benchmark result, including requested model, observed model when Claude reports it, and `claude --version` output under `run.claude`

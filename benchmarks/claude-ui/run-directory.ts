@@ -25,9 +25,12 @@ async function suitePaths(directory: string): Promise<string[]> {
 
 async function run(): Promise<number> {
   const directory = process.argv[2];
-  const label = process.argv[3] ?? directory;
+  const maybeLabel = process.argv[3];
+  const label = maybeLabel && !maybeLabel.startsWith('-') ? maybeLabel : directory;
+  const forwardedArgs =
+    maybeLabel && !maybeLabel.startsWith('-') ? process.argv.slice(4) : process.argv.slice(3);
   if (!directory) {
-    console.error('Usage: run-directory.ts <suite-directory> [label]');
+    console.error('Usage: run-directory.ts <suite-directory> [label] [benchmark args...]');
     return 1;
   }
 
@@ -38,7 +41,7 @@ async function run(): Promise<number> {
   }
 
   for (const suite of suites) {
-    const exitCode = await main(['--suite', suite]);
+    const exitCode = await main(['--suite', suite, ...forwardedArgs]);
     if (exitCode !== 0) return exitCode;
   }
   return 0;

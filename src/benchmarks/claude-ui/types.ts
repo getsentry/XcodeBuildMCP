@@ -17,6 +17,7 @@ export interface FirstRunPromptDismissals {
 }
 
 export interface ClaudeInvocationConfig {
+  model?: string;
   useMcpServer?: boolean;
   permissionMode?: 'default' | 'bypassPermissions';
   tools?: string[];
@@ -98,6 +99,8 @@ export interface PatternFailureRecord {
 export interface TranscriptAudit {
   records: number;
   parseErrors: string[];
+  claudeDurationSeconds?: number;
+  claudeApiDurationSeconds?: number;
   totalToolCalls: number;
   totalToolCallsByName: Record<string, number>;
   trackedToolCalls: number;
@@ -159,6 +162,19 @@ export interface TemporarySimulatorRunMetadata {
   deleteError?: string;
 }
 
+export interface ClaudeVersionProbe {
+  command: string[];
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+export interface ClaudeRunMetadata {
+  requestedModel: string | null;
+  observedModel: string | null;
+  version: ClaudeVersionProbe;
+}
+
 export interface BenchmarkRunMetadata {
   suitePath: string;
   wallClockSeconds: number;
@@ -166,6 +182,7 @@ export interface BenchmarkRunMetadata {
   parserExitCode: number | null;
   artifacts: BenchmarkArtifacts;
   temporarySimulator?: TemporarySimulatorRunMetadata;
+  claude?: ClaudeRunMetadata;
 }
 
 export interface BenchmarkResult {

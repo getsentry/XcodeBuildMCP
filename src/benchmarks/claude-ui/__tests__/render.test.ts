@@ -37,6 +37,8 @@ function baseResult(overrides: Partial<BenchmarkResult> = {}): BenchmarkResult {
     audit: {
       records: 10,
       parseErrors: [],
+      claudeDurationSeconds: 98,
+      claudeApiDurationSeconds: 61.25,
       totalToolCalls: 13,
       totalToolCallsByName: {},
       trackedToolCalls: 12,
@@ -83,6 +85,7 @@ describe('renderSuiteReport', () => {
     expect(output).toContain('totalToolCalls');
     expect(output).toContain('METRIC            ACTUAL  BASELINE   DELTA');
     expect(output).toContain('Tool calls (baseline-observed)');
+    expect(output).toContain('claude   timing api=1m 1.3s non-api=36.75s');
     expect(output).toContain('OBSERVED  stumbles: 0');
     expect(output).not.toContain('Inspect');
     expect(output).not.toContain('@@ baseline');
@@ -207,6 +210,31 @@ describe('renderSuiteReport', () => {
 
     expect(output).toContain('suite     benchmarks/claude-ui/suites/weather.yml');
     expect(output).toContain('artifacts out.nosync/claude-benchmarks/weather/20260101T000000Z');
+  });
+
+  it('renders Claude model and version metadata when present', () => {
+    const output = renderSuiteReport(
+      baseResult({
+        run: {
+          ...baseResult().run,
+          claude: {
+            requestedModel: 'claude-sonnet-4-7',
+            observedModel: 'claude-sonnet-4-7-20260501',
+            version: {
+              command: ['claude', '--version'],
+              exitCode: 0,
+              stdout: '1.2.3\n',
+              stderr: '',
+            },
+          },
+        },
+      }),
+      { color: false, width: 80, cwd: '/repo' },
+    );
+
+    expect(output).toContain(
+      'claude   model requested=claude-sonnet-4-7 observed=claude-sonnet-4-7-20260501 version=1.2.3',
+    );
   });
 
   it('renders the temporary simulator id when present', () => {

@@ -340,13 +340,36 @@ function renderInspectHints(result: BenchmarkResult, opts: ResolvedOptions): str
   return lines;
 }
 
+function firstLine(value: string): string | undefined {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+}
+
 function renderMetadata(result: BenchmarkResult, opts: ResolvedOptions): string[] {
   const lines: string[] = [];
   const suiteRel = relativePath(result.run.suitePath, opts.cwd);
+  const apiSeconds = result.audit.claudeApiDurationSeconds;
+  const totalSeconds = result.audit.claudeDurationSeconds;
   const artifactsRel = relativePath(result.run.artifacts.runDirectory, opts.cwd);
   const exit = `claude=${result.run.claudeExitCode ?? 'null'} parser=${result.run.parserExitCode ?? 'null'}`;
   lines.push(`  ${colorize(opts, ANSI.dim, 'suite     ')}${suiteRel}`);
   lines.push(`  ${colorize(opts, ANSI.dim, 'artifacts ')}${artifactsRel}`);
+  if (result.run.claude) {
+    const requested = result.run.claude.requestedModel ?? 'default';
+    const observed = result.run.claude.observedModel ?? 'unknown';
+    const version = firstLine(result.run.claude.version.stdout) ?? 'unknown';
+    lines.push(
+      `  ${colorize(opts, ANSI.dim, 'claude   ')}model requested=${requested} observed=${observed} version=${version}`,
+    );
+  }
+  if (apiSeconds !== undefined && totalSeconds !== undefined && totalSeconds > 0) {
+    const nonApiSeconds = Math.max(0, totalSeconds - apiSeconds);
+    lines.push(
+      `  ${colorize(opts, ANSI.dim, 'claude   ')}timing api=${formatDuration(apiSeconds)} non-api=${formatDuration(nonApiSeconds)}`,
+    );
+  }
   if (result.run.temporarySimulator) {
     lines.push(
       `  ${colorize(opts, ANSI.dim, 'simulator ')}${result.run.temporarySimulator.simulatorId}`,

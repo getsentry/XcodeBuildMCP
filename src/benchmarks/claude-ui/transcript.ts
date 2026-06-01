@@ -49,6 +49,10 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function asFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function shortToolName(fullName: string): string {
   const parts = fullName.split('__');
   return parts[parts.length - 1] ?? fullName;
@@ -304,6 +308,8 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
     options.toolAnalysis ??
     defaultToolAnalysisConfig(options.mcpToolPrefix ?? 'mcp__xcodebuildmcp-dev__');
   let records = 0;
+  let claudeDurationSeconds = 0;
+  let claudeApiDurationSeconds = 0;
   let finalText: string | undefined;
   let resultSummary: Record<string, unknown> | undefined;
 
@@ -327,6 +333,8 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
     }
 
     records += 1;
+    claudeDurationSeconds += (asFiniteNumber(entry.duration_ms) ?? 0) / 1_000;
+    claudeApiDurationSeconds += (asFiniteNumber(entry.duration_api_ms) ?? 0) / 1_000;
     const timestamp = asString(entry.timestamp);
     const entryType = asString(entry.type);
     const lineText = rawLine.length > 600 ? `${rawLine.slice(0, 600)}…` : rawLine;
@@ -451,6 +459,8 @@ export function analyzeClaudeJsonl(text: string, options: AnalyzeOptions): Trans
   return {
     records,
     parseErrors,
+    claudeDurationSeconds,
+    claudeApiDurationSeconds,
     totalToolCalls: Object.values(totalToolCallsByName).reduce((sum, count) => sum + count, 0),
     totalToolCallsByName,
     trackedToolCalls: trackedSequence.length,
