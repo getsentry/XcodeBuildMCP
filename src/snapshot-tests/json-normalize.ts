@@ -1,5 +1,5 @@
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
-import { normalizeSnapshotOutput } from './normalize.ts';
+import { normalizeSnapshotOutput, type NormalizeSnapshotOutputOptions } from './normalize.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
@@ -16,8 +16,10 @@ function isIosRuntimeLabel(value: string): boolean {
   return /^iOS \d+(?:\.\d+)*$/.test(value);
 }
 
-function normalizeBaseString(value: string): string {
-  const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '));
+type NormalizeStructuredEnvelopeOptions = NormalizeSnapshotOutputOptions;
+
+function normalizeBaseString(value: string, options: NormalizeStructuredEnvelopeOptions): string {
+  const normalized = normalizeSnapshotOutput(value.replace(/\u00A0/g, ' '), options);
   return normalized.endsWith('\n') ? normalized.slice(0, -1) : normalized;
 }
 
@@ -25,11 +27,16 @@ function isDeviceListPath(path: string[]): boolean {
   return path.includes('data') && path.includes('devices');
 }
 
-function normalizeString(value: string, key?: string, path: string[] = []): string {
+function normalizeString(
+  value: string,
+  options: NormalizeStructuredEnvelopeOptions,
+  key?: string,
+  path: string[] = [],
+): string {
   const parentKey = path.at(-2);
   const isVerboseRuntimeCaptureRef =
     path.includes('capture') && (path.includes('elements') || path.includes('actions'));
-  let result = normalizeBaseString(value);
+  let result = normalizeBaseString(value, options);
 
   if (parentKey === 'stderr') {
     result = result.replace(/^\[\d+\/\d+\] /, '[<STEP>] ');
@@ -228,7 +235,11 @@ function normalizeBuildSettingsEntryKey(key: string): string {
   return key;
 }
 
-function normalizeBuildSettingsEntryValue(key: string, value: string): string {
+function normalizeBuildSettingsEntryValue(
+  key: string,
+  value: string,
+  options: NormalizeStructuredEnvelopeOptions,
+): string {
   if (key === 'SDKROOT' || key === 'SDK_DIR' || key.startsWith('SDK_DIR_')) {
     return '<SDK_PATH>';
   }
@@ -291,7 +302,7 @@ function normalizeBuildSettingsEntryValue(key: string, value: string): string {
     case 'XROS_DEPLOYMENT_TARGET':
       return '<DEPLOYMENT_TARGET>';
     default:
-      return normalizeBaseString(value);
+      return normalizeBaseString(value, options);
   }
 }
 
@@ -396,11 +407,15 @@ function normalizeStderrLines(items: unknown[]): unknown[] {
   return normalized;
 }
 
-function normalizeValue(value: unknown, path: string[] = []): unknown {
+function normalizeValue(
+  value: unknown,
+  options: NormalizeStructuredEnvelopeOptions,
+  path: string[] = [],
+): unknown {
   const key = path.at(-1);
 
   if (typeof value === 'string') {
-    return normalizeString(value, key, path);
+    return normalizeString(value, options, key, path);
   }
 
   if (typeof value === 'boolean') {
@@ -412,7 +427,9 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
   }
 
   if (Array.isArray(value)) {
-    const normalized = value.map((item, index) => normalizeValue(item, [...path, String(index)]));
+    const normalized = value.map((item, index) =>
+      normalizeValue(item, options, [...path, String(index)]),
+    );
     if (key === 'testCases') {
       return normalizeTestCases(normalized);
     }
@@ -436,10 +453,13 @@ function normalizeValue(value: unknown, path: string[] = []): unknown {
       }
 
       if (isBuildSetting && entryKey === 'value') {
-        return [entryKey, normalizeBuildSettingsEntryValue(String(value.key), String(value.value))];
+        return [
+          entryKey,
+          normalizeBuildSettingsEntryValue(String(value.key), String(value.value), options),
+        ];
       }
 
-      return [entryKey, normalizeValue(entryValue, [...path, entryKey])];
+      return [entryKey, normalizeValue(entryValue, options, [...path, entryKey])];
     });
 
     return normalizeSpringBoardHomeCompactCapture(
@@ -474,9 +494,11 @@ function normalizeXcodeBridgeCallEnvelope(
 
 export function normalizeStructuredEnvelope(
   envelope: StructuredOutputEnvelope<unknown>,
+  options: NormalizeStructuredEnvelopeOptions = {},
 ): StructuredOutputEnvelope<unknown> {
   return normalizeValue(
     normalizeXcodeBridgeCallEnvelope(envelope),
+    options,
   ) as StructuredOutputEnvelope<unknown>;
 }
 
@@ -492,7 +514,8 @@ function compactFrameObjects(json: string): string {
 
 export function formatStructuredEnvelopeFixture(
   envelope: StructuredOutputEnvelope<unknown>,
+  options: NormalizeStructuredEnvelopeOptions = {},
 ): string {
-  const json = JSON.stringify(normalizeStructuredEnvelope(envelope), null, 2);
+  const json = JSON.stringify(normalizeStructuredEnvelope(envelope, options), null, 2);
   return `${compactFrameObjects(json)}\n`;
 }

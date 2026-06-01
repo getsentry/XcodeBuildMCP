@@ -31,7 +31,7 @@ describe('normalizeStructuredEnvelope', () => {
     });
   });
 
-  it('preserves xcresult paths in test result artifacts', () => {
+  it('preserves non-temp xcresult paths in test result artifacts', () => {
     const envelope: StructuredOutputEnvelope<unknown> = {
       schema: 'xcodebuildmcp.output.test-result',
       schemaVersion: '1',
@@ -40,13 +40,44 @@ describe('normalizeStructuredEnvelope', () => {
       data: {
         summary: { target: 'simulator' },
         artifacts: {
-          buildLogPath: '/tmp/build.log',
-          xcresultPath: '/tmp/App Tests.xcresult',
+          buildLogPath: '/snapshot-fixtures/build.log',
+          xcresultPath: '/snapshot-fixtures/App Tests.xcresult',
         },
       },
     };
 
     expect(normalizeStructuredEnvelope(envelope)).toEqual(envelope);
+  });
+
+  it('normalizes test result artifact paths under an injected temp directory', () => {
+    const tmpDir = '/__xcodebuildmcp_tmp__';
+    const envelope: StructuredOutputEnvelope<unknown> = {
+      schema: 'xcodebuildmcp.output.test-result',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: {
+        summary: { target: 'simulator' },
+        artifacts: {
+          buildLogPath: `${tmpDir}/run/build.log`,
+          xcresultPath: `${tmpDir}/run/App Tests.xcresult`,
+        },
+      },
+    };
+
+    expect(normalizeStructuredEnvelope(envelope, { tmpDir })).toEqual({
+      schema: 'xcodebuildmcp.output.test-result',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: {
+        summary: { target: 'simulator' },
+        artifacts: {
+          buildLogPath: '<TMPDIR>/build.log',
+          xcresultPath: '<TMPDIR>/App Tests.xcresult',
+        },
+      },
+    });
   });
 
   it('keeps suite-less passed test cases for non-simulator results', () => {
