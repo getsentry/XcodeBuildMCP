@@ -12,6 +12,17 @@ import {
   simulatorId,
 } from './ui-action-test-helpers.ts';
 
+function createImmediatePostActionTiming() {
+  let nowMs = 0;
+
+  return {
+    now: () => nowMs,
+    sleep: async (durationMs: number) => {
+      nowMs += durationMs;
+    },
+  };
+}
+
 describe('Key Sequence Tool', () => {
   beforeEach(() => {
     sessionStore.clear();
@@ -194,7 +205,12 @@ describe('Key Sequence Tool', () => {
   describe('Handler Behavior (Complete Literal Returns)', () => {
     it('captures a fresh runtime snapshot after a successful key sequence', async () => {
       const { calls, executor } = createTrackingExecutor();
-      const executeKeySequence = createKeySequenceExecutor(executor, createMockAxeHelpers());
+      const executeKeySequence = createKeySequenceExecutor(
+        executor,
+        createMockAxeHelpers(),
+        undefined,
+        createImmediatePostActionTiming(),
+      );
 
       const result = await executeKeySequence({ simulatorId, keyCodes: [40, 42, 44] });
 
