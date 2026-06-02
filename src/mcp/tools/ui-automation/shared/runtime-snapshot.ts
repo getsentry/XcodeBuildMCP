@@ -108,6 +108,9 @@ function deriveRole(
   node: AccessibilityNode,
   identifier: string | undefined,
 ): RuntimeElementRoleV1 | undefined {
+  const roleDescription = normalizeText(node.role_description)?.toLowerCase();
+  if (roleDescription === 'tab') return 'tab';
+
   const roleText = [node.role, node.type, node.subrole, node.role_description]
     .map((value) => normalizeText(value)?.toLowerCase())
     .filter((value): value is string => value !== undefined)

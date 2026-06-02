@@ -142,6 +142,31 @@ describe('runtime snapshot normalization', () => {
     expect(snapshot.payload.elements[0]?.actions).not.toContain('tap');
   });
 
+  it('classifies tab radio buttons from AXe as tabs', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'RadioButton',
+          role: 'AXRadioButton',
+          role_description: 'tab',
+          AXLabel: 'Reports',
+          AXValue: '0',
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements[0]).toEqual(
+      expect.objectContaining({
+        role: 'tab',
+        label: 'Reports',
+        value: '0',
+        actions: expect.arrayContaining(['tap', 'longPress', 'touch']),
+      }),
+    );
+  });
+
   it('derives deterministic screen hashes from normalized UI content', () => {
     const uiHierarchy = [createNode({ AXLabel: 'Continue' }), createNode({ AXLabel: 'Cancel' })];
 
