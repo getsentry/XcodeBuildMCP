@@ -6,11 +6,7 @@ export default defineConfig({
     globals: true,
     include: ['src/smoke-tests/__tests__/**/*.test.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: 1,
-      },
-    },
+    maxWorkers: 1,
     env: {
       NODE_OPTIONS: '--max-old-space-size=4096',
     },

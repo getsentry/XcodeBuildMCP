@@ -6,11 +6,7 @@ export default defineConfig({
     globals: true,
     include: ['src/snapshot-tests/__tests__/**/*.snapshot.test.ts'],
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        maxThreads: 1,
-      },
-    },
+    maxWorkers: 1,
     env: {
       NODE_OPTIONS: '--max-old-space-size=4096',
       XCODEBUILDMCP_HEADLESS_LAUNCH: '1',
