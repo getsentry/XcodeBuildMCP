@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/getsentry-xcodebuildmcp-badge.png)](https://mseep.ai/app/getsentry-xcodebuildmcp)
+
 <img src="assets/banner.png" alt="XcodeBuild MCP" width="600"/>
 
 A Model Context Protocol (MCP) server and CLI that provides tools for agent use when working on iOS and macOS projects.
