@@ -59,8 +59,11 @@ async function installXcodemake(): Promise<boolean> {
     await fs.mkdir(xcodemakeDir, { recursive: true });
 
     log('info', 'Downloading xcodemake from GitHub...');
+    // Pin to a specific release tag rather than the floating `main` branch.
+    const XCODEMAKE_VERSION = 'v1.0.0'; // update when upgrading
+    const XCODEMAKE_SHA256 = 'REPLACE_WITH_KNOWN_SHA256_HEX'; // sha256 of the pinned release
     const response = await fetch(
-      'https://raw.githubusercontent.com/cameroncooke/xcodemake/main/xcodemake',
+      `https://raw.githubusercontent.com/cameroncooke/xcodemake/${XCODEMAKE_VERSION}/xcodemake`,
     );
 
     if (!response.ok) {
@@ -68,6 +71,13 @@ async function installXcodemake(): Promise<boolean> {
     }
 
     const scriptContent = await response.text();
+
+    const { createHash } = await import('node:crypto');
+    const actualHash = createHash('sha256').update(scriptContent, 'utf8').digest('hex');
+    if (actualHash !== XCODEMAKE_SHA256) {
+      throw new Error(`xcodemake checksum mismatch: expected ${XCODEMAKE_SHA256}, got ${actualHash}`);
+    }
+
     await fs.writeFile(xcodemakePath, scriptContent, 'utf8');
 
     await fs.chmod(xcodemakePath, 0o755);
