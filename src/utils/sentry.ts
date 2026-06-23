@@ -422,6 +422,10 @@ export function captureMcpShutdownSummary(summary: McpShutdownSummaryEvent): voi
       level = 'info';
     }
 
+    if (level === 'info') {
+      return;
+    }
+
     Sentry.captureEvent({
       level,
       message: 'mcp.shutdown.summary',
