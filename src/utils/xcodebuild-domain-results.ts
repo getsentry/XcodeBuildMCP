@@ -28,7 +28,7 @@ import type { XcodebuildRunState } from './xcodebuild-run-state.js';
 import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.js';
 import { createStreamingExecutionContext } from './tool-execution-compat.js';
 import { isBuildErrorDiagnosticLine } from './xcodebuild-line-parsers.js';
-import { extractTestSummaryCountsFromXcresult } from './xcresult-test-failures.ts';
+import { extractTestSummaryCountsFromXcresult } from './xcresult-test-failures.js';
 
 const MAX_DISCOVERED_TESTS = 6;
 

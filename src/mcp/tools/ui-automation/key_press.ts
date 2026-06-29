@@ -35,7 +35,7 @@ const keyPressSchema = z.object({
   simulatorId: z.uuid({ message: 'Invalid Simulator UUID format' }),
   keyCode: z
     .number()
-    .int({ message: 'HID keycode to press (0-255)' })
+    .int({ message: 'keyCode must be an integer' })
     .min(0)
     .max(255)
     .describe('HID keycode. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.'),
