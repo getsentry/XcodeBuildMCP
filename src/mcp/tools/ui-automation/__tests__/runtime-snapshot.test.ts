@@ -167,6 +167,74 @@ describe('runtime snapshot normalization', () => {
     );
   });
 
+  // Regression coverage for issue #442. A `.accessibilityIdentifier(...)` applied to a
+  // SwiftUI `Tab` is not forwarded to the native tab bar item's accessibility element,
+  // so `describe-ui` reports no AXUniqueId/AXIdentifier for the tab (confirmed by
+  // reproducing on a simulator: the identifier string is absent from the entire AX
+  // tree, while an identifier on the tab's content still propagates normally). The
+  // snapshot must still expose the tab for automation via role + label, and must not
+  // invent an identifier or leak the tab's SF Symbol image identifier onto the tab.
+  it('does not surface an identifier for SwiftUI tabs that expose none (issue #442)', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'RadioButton',
+          role: 'AXRadioButton',
+          subrole: 'AXTabButton',
+          role_description: 'tab',
+          AXLabel: 'Wheels',
+          AXValue: '0',
+          frame: { x: 120, y: 780, width: 80, height: 50 },
+          children: [
+            createNode({
+              type: 'Image',
+              role: 'AXImage',
+              role_description: 'image',
+              AXLabel: 'arrow.trianglehead.2.clockwise',
+              AXUniqueId: 'arrow.trianglehead.2.clockwise',
+              frame: { x: 140, y: 786, width: 30, height: 30 },
+            }),
+          ],
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    const tab = snapshot.payload.elements.find((element) => element.role === 'tab');
+    expect(tab).toEqual(
+      expect.objectContaining({
+        role: 'tab',
+        label: 'Wheels',
+        value: '0',
+        actions: expect.arrayContaining(['tap']),
+      }),
+    );
+    expect(tab).not.toHaveProperty('identifier');
+  });
+
+  it('surfaces a tab identifier when the platform does expose one (issue #442)', () => {
+    const snapshot = createRuntimeSnapshotRecord({
+      simulatorId,
+      uiHierarchy: [
+        createNode({
+          type: 'RadioButton',
+          role: 'AXRadioButton',
+          subrole: 'AXTabButton',
+          role_description: 'tab',
+          AXLabel: 'Wheels',
+          AXValue: '0',
+          AXUniqueId: 'tab_wheels',
+        }),
+      ],
+      nowMs: 1_000,
+    });
+
+    expect(snapshot.payload.elements.find((element) => element.role === 'tab')).toEqual(
+      expect.objectContaining({ role: 'tab', label: 'Wheels', identifier: 'tab_wheels' }),
+    );
+  });
+
   it('derives deterministic screen hashes from normalized UI content', () => {
     const uiHierarchy = [createNode({ AXLabel: 'Continue' }), createNode({ AXLabel: 'Cancel' })];
 
