@@ -127,7 +127,7 @@ async function discoverDevices(
   },
 ): Promise<DeviceDiscoveryOutcome> {
   const tempDir = pathDeps?.tmpdir ? pathDeps.tmpdir() : tmpdir();
-  const timestamp = pathDeps?.join ? '123' : Date.now();
+  const timestamp = Date.now();
   const tempJsonPath = pathDeps?.join
     ? pathDeps.join(tempDir, `devicectl-${timestamp}.json`)
     : join(tempDir, `devicectl-${timestamp}.json`);
