@@ -94,7 +94,9 @@ export async function executeXcodeBuildCommand(
     }
 
     command.push('-scheme', params.scheme);
-    command.push('-configuration', params.configuration);
+    if (params.configuration) {
+      command.push('-configuration', params.configuration);
+    }
     command.push('-skipMacroValidation');
 
     let destinationString: string;

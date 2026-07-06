@@ -32,7 +32,7 @@ function createBuildRunMacOSRequest(params: BuildRunMacOSParams): BuildInvocatio
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
     derivedDataPath: resolveEffectiveDerivedDataPath(params),
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: 'macOS',
     arch: params.arch,
     target: 'macos',
@@ -82,7 +82,7 @@ export function createBuildRunMacOSExecutor(
   executor: CommandExecutor,
 ): StreamingExecutor<BuildRunMacOSParams, BuildRunMacOSResult> {
   return async (params, ctx) => {
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
     const request = createBuildRunMacOSRequest(params);
     const started = createDomainStreamingPipeline('build_run_macos', 'BUILD', ctx);
     try {

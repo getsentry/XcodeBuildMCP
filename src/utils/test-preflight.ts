@@ -21,7 +21,7 @@ export interface ResolvedTestTarget {
 
 export interface TestPreflightResult {
   scheme: string;
-  configuration: string;
+  configuration?: string;
   workspacePath?: string;
   projectPath?: string;
   destinationName: string;
@@ -359,7 +359,7 @@ export async function resolveTestPreflight(
     workspacePath?: string;
     projectPath?: string;
     scheme: string;
-    configuration: string;
+    configuration?: string;
     extraArgs?: string[];
     destinationName: string;
   },

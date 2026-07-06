@@ -66,7 +66,7 @@ export type TestMacosParams = z.infer<typeof testMacosSchema>;
 type TestMacosResult = TestResultDomainResult;
 
 interface PreparedTestMacosExecution {
-  configuration: string;
+  configuration?: string;
   preflight?: TestPreflightResult;
   invocationRequest: BuildInvocationRequest;
 }
@@ -75,7 +75,7 @@ async function prepareTestMacosExecution(
   params: TestMacosParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestMacosExecution> {
-  const configuration = params.configuration ?? 'Debug';
+  const configuration = params.configuration;
   const preflight = await resolveTestPreflight(
     {
       projectPath: params.projectPath,

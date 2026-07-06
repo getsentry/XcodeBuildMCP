@@ -90,13 +90,13 @@ const SIMULATOR_TO_DEVICE_PLATFORM: Partial<Record<XcodePlatform, XcodePlatform>
 
 function createCleanArtifacts(
   params: CleanParams,
-  configuration: string,
+  configuration: string | undefined,
   platform: XcodePlatform,
 ): CleanResult['artifacts'] {
   return {
     ...(params.workspacePath ? { workspacePath: params.workspacePath } : {}),
     ...(params.scheme ? { scheme: params.scheme } : {}),
-    configuration,
+    ...(configuration ? { configuration } : {}),
     platform: String(platform),
   };
 }
@@ -130,7 +130,7 @@ function createCleanResult(
   },
 ): CleanResult {
   const cleanPlatform = options?.cleanPlatform ?? resolveCleanPlatform(params) ?? XcodePlatform.iOS;
-  const configuration = options?.configuration ?? params.configuration ?? 'Debug';
+  const configuration = options?.configuration ?? params.configuration;
 
   return {
     kind: 'build-result',
@@ -182,7 +182,7 @@ export function createCleanExecutor(
       );
     }
 
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
     const stderrChunks: string[] = [];
 
     try {

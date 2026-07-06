@@ -344,6 +344,67 @@ describe('build-utils Sentry Classification', () => {
     });
   });
 
+  describe('Configuration Flag', () => {
+    it('should omit -configuration when configuration is not provided', async () => {
+      let capturedCommand: string[] | undefined;
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'BUILD SUCCEEDED',
+        exitCode: 0,
+        onExecute: (command) => {
+          capturedCommand = command;
+        },
+      });
+
+      await executeXcodeBuildCommand(
+        {
+          scheme: 'TestScheme',
+          projectPath: '/path/to/project.xcodeproj',
+        },
+        mockPlatformOptions,
+        false,
+        'build',
+        mockExecutor,
+        undefined,
+        createMockPipeline(),
+      );
+
+      expect(capturedCommand).toBeDefined();
+      expect(capturedCommand).not.toContain('-configuration');
+    });
+
+    it('should include -configuration when configuration is provided', async () => {
+      let capturedCommand: string[] | undefined;
+      const mockExecutor = createMockExecutor({
+        success: true,
+        output: 'BUILD SUCCEEDED',
+        exitCode: 0,
+        onExecute: (command) => {
+          capturedCommand = command;
+        },
+      });
+
+      await executeXcodeBuildCommand(
+        {
+          scheme: 'TestScheme',
+          configuration: 'Release',
+          projectPath: '/path/to/project.xcodeproj',
+        },
+        mockPlatformOptions,
+        false,
+        'build',
+        mockExecutor,
+        undefined,
+        createMockPipeline(),
+      );
+
+      expect(capturedCommand).toBeDefined();
+      const index = capturedCommand?.indexOf('-configuration') ?? -1;
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(capturedCommand?.[index + 1]).toBe('Release');
+    });
+  });
+
   describe('Working Directory (cwd) Handling', () => {
     it('should pass project directory as cwd for workspace builds', async () => {
       let capturedOptions: Record<string, unknown> | undefined;

@@ -126,8 +126,6 @@ describe('get_mac_app_path plugin', () => {
           '/path/to/MyProject.xcworkspace',
           '-scheme',
           'MyScheme',
-          '-configuration',
-          'Debug',
           '-destination',
           'generic/platform=macOS',
           '-derivedDataPath',
@@ -168,8 +166,6 @@ describe('get_mac_app_path plugin', () => {
           '/path/to/MyProject.xcodeproj',
           '-scheme',
           'MyScheme',
-          '-configuration',
-          'Debug',
           '-destination',
           'generic/platform=macOS',
           '-derivedDataPath',
@@ -315,7 +311,7 @@ describe('get_mac_app_path plugin', () => {
       ]);
     });
 
-    it('should use default configuration when not provided', async () => {
+    it('should omit configuration when not provided', async () => {
       // Manual call tracking for command verification
       const calls: any[] = [];
       const mockExecutor: CommandExecutor = async (...args) => {
@@ -345,8 +341,6 @@ describe('get_mac_app_path plugin', () => {
           '/path/to/MyProject.xcworkspace',
           '-scheme',
           'MyScheme',
-          '-configuration',
-          'Debug',
           '-destination',
           'platform=macOS,arch=arm64',
           '-derivedDataPath',

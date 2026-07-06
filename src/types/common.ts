@@ -132,7 +132,7 @@ export interface SharedBuildParams {
   workspacePath?: string;
   projectPath?: string;
   scheme: string;
-  configuration: string;
+  configuration?: string;
   derivedDataPath?: string;
   extraArgs?: string[];
 }

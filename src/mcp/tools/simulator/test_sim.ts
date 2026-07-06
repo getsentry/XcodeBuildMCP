@@ -91,7 +91,7 @@ type TestSimulatorParams = z.infer<typeof testSimulatorSchema>;
 type TestSimulatorResult = TestResultDomainResult;
 
 interface PreparedTestSimExecution {
-  configuration: string;
+  configuration?: string;
   platform: InferPlatformResult['platform'];
   preflight?: TestPreflightResult;
   resolvedSimulatorId?: string;
@@ -105,7 +105,7 @@ async function prepareTestSimExecution(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestSimExecution> {
-  const configuration = params.configuration ?? 'Debug';
+  const configuration = params.configuration;
   const inferred = await inferPlatform(
     {
       projectPath: params.projectPath,

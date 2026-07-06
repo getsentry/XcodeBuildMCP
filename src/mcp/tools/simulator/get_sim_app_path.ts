@@ -85,7 +85,7 @@ function createRequest(params: GetSimulatorAppPathParams) {
     scheme: params.scheme,
     projectPath: params.projectPath,
     workspacePath: params.workspacePath,
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: params.platform,
     simulator: params.simulatorName ?? params.simulatorId,
   };
@@ -95,7 +95,7 @@ export function createGetSimAppPathExecutor(
   executor: CommandExecutor,
 ): NonStreamingExecutor<GetSimulatorAppPathParams, AppPathDomainResult> {
   return async (params) => {
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
     const useLatestOS = params.useLatestOS ?? true;
 
     if (params.simulatorId && params.useLatestOS !== undefined) {

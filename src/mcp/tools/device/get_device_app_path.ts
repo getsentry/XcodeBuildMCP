@@ -62,7 +62,7 @@ function createRequest(params: GetDeviceAppPathParams) {
     scheme: params.scheme,
     projectPath: params.projectPath,
     workspacePath: params.workspacePath,
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: String(mapDevicePlatform(params.platform)),
   };
 }
@@ -72,7 +72,7 @@ export function createGetDeviceAppPathExecutor(
 ): NonStreamingExecutor<GetDeviceAppPathParams, AppPathDomainResult> {
   return async (params) => {
     const platform = mapDevicePlatform(params.platform);
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
 
     log('info', `Getting app path for scheme ${params.scheme} on platform ${platform}`);
 

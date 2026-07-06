@@ -84,7 +84,7 @@ export interface SharedTestExecutorParams {
   workspacePath?: string;
   projectPath?: string;
   scheme: string;
-  configuration: string;
+  configuration?: string;
   simulatorName?: string;
   simulatorId?: string;
   deviceId?: string;
