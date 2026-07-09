@@ -142,6 +142,42 @@ describe('CLI session defaults', () => {
     });
   });
 
+  it('keeps repeatable configured destination extraArgs when explicit args add another', () => {
+    const merged = mergeCliSessionDefaults({
+      defaults: {
+        extraArgs: ['-destination', 'id=DEFAULT', '-skipPackagePluginValidation'],
+      },
+      explicitArgs: {
+        extraArgs: ['-destination', 'id=EXPLICIT'],
+      },
+    });
+
+    expect(merged).toEqual({
+      extraArgs: [
+        '-destination',
+        'id=DEFAULT',
+        '-skipPackagePluginValidation',
+        '-destination',
+        'id=EXPLICIT',
+      ],
+    });
+  });
+
+  it('appends explicit scalar extraArgs after matching configured extraArgs', () => {
+    const merged = mergeCliSessionDefaults({
+      defaults: {
+        extraArgs: ['-configuration', 'Debug'],
+      },
+      explicitArgs: {
+        extraArgs: ['-configuration', 'Release'],
+      },
+    });
+
+    expect(merged).toEqual({
+      extraArgs: ['-configuration', 'Debug', '-configuration', 'Release'],
+    });
+  });
+
   it('allows an explicit empty extraArgs array to clear configured extraArgs', () => {
     const merged = mergeCliSessionDefaults({
       defaults: {

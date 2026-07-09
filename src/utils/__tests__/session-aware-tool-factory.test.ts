@@ -554,6 +554,76 @@ describe('createSessionAwareTool', () => {
     expect(parsed).toEqual(['-skipPackagePluginValidation', '-quiet']);
   });
 
+  it('keeps repeatable session default destination extraArgs when explicit args add another', async () => {
+    const extraArgsSchema = z.object({
+      scheme: z.string(),
+      projectPath: z.string().optional(),
+      extraArgs: z.array(z.string()).optional(),
+    });
+
+    const extraArgsHandler = createSessionAwareTool<z.infer<typeof extraArgsSchema>>({
+      internalSchema: extraArgsSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params.extraArgs)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['scheme'] }],
+    });
+
+    sessionStore.setDefaults({
+      scheme: 'App',
+      projectPath: '/a.xcodeproj',
+      extraArgs: ['-destination', 'id=DEFAULT', '-skipPackagePluginValidation'],
+    });
+
+    const result = await invokeAndCollect(extraArgsHandler, {
+      extraArgs: ['-destination', 'id=EXPLICIT'],
+    });
+    expect(result.isError).toBe(false);
+
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\[.*\]).*$/, '$1'));
+    expect(parsed).toEqual([
+      '-destination',
+      'id=DEFAULT',
+      '-skipPackagePluginValidation',
+      '-destination',
+      'id=EXPLICIT',
+    ]);
+  });
+
+  it('keeps repeatable session default test constraints when explicit args add another', async () => {
+    const extraArgsSchema = z.object({
+      scheme: z.string(),
+      projectPath: z.string().optional(),
+      extraArgs: z.array(z.string()).optional(),
+    });
+
+    const extraArgsHandler = createSessionAwareTool<z.infer<typeof extraArgsSchema>>({
+      internalSchema: extraArgsSchema,
+      logicFunction: async (params) => {
+        const ctx = getHandlerContext();
+        ctx.emit(statusFragment('success', JSON.stringify(params.extraArgs)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['scheme'] }],
+    });
+
+    sessionStore.setDefaults({
+      scheme: 'App',
+      projectPath: '/a.xcodeproj',
+      extraArgs: ['-only-testing', 'AppTests/testA'],
+    });
+
+    const result = await invokeAndCollect(extraArgsHandler, {
+      extraArgs: ['-only-testing', 'AppTests/testB'],
+    });
+    expect(result.isError).toBe(false);
+
+    const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\[.*\]).*$/, '$1'));
+    expect(parsed).toEqual(['-only-testing', 'AppTests/testA', '-only-testing', 'AppTests/testB']);
+  });
+
   it('allows explicit empty extraArgs to clear session default extraArgs', async () => {
     const extraArgsSchema = z.object({
       scheme: z.string(),

@@ -30,6 +30,13 @@ export function pickSessionDefaultsForKeys(
   return pickedDefaults;
 }
 
+function mergeExtraArgs(
+  defaultExtraArgs: readonly unknown[],
+  explicitExtraArgs: readonly unknown[],
+): unknown[] {
+  return explicitExtraArgs.length === 0 ? [] : [...defaultExtraArgs, ...explicitExtraArgs];
+}
+
 export function mergeSessionDefaultArgs(opts: {
   defaults: Record<string, unknown>;
   explicitArgs: Record<string, unknown>;
@@ -50,10 +57,7 @@ export function mergeSessionDefaultArgs(opts: {
     Array.isArray(opts.defaults.extraArgs) &&
     Array.isArray(sanitizedArgs.extraArgs)
   ) {
-    merged.extraArgs =
-      sanitizedArgs.extraArgs.length === 0
-        ? []
-        : [...opts.defaults.extraArgs, ...sanitizedArgs.extraArgs];
+    merged.extraArgs = mergeExtraArgs(opts.defaults.extraArgs, sanitizedArgs.extraArgs);
   }
 
   if (
