@@ -5,6 +5,7 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
+import { createHash } from 'crypto';
 import { getConfig } from './config-store.ts';
 
 let overriddenXcodemakePath: string | null = null;
@@ -68,7 +69,7 @@ async function installXcodemake(): Promise<boolean> {
     }
 
     const scriptContent = await response.text();
-    await fs.writeFile(xcodemakePath, scriptContent, 'utf8');
+    await fs.writeFile(xcodemakePath, patchXcodemakeScript(scriptContent), 'utf8');
 
     await fs.chmod(xcodemakePath, 0o755);
     log('info', 'Made xcodemake executable');
@@ -125,12 +126,59 @@ export function doesMakefileExist(projectDir: string): boolean {
   return existsSync(`${projectDir}/Makefile`);
 }
 
+function sanitizeXcodemakeLogTag(args: string[]): string {
+  const sanitized = ['xcodemake', ...args]
+    .join('_')
+    .replace(/[/:]+/g, '_')
+    .replace(/[^\p{L}\p{N}._+=,@ -]+/gu, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return sanitized || 'xcodemake';
+}
+
+function getXcodemakeLogFileName(args: string[]): string {
+  const logSuffix = `-${createHash('md5').update(args.join('\0')).digest('hex')}.log`;
+  const maxLogNameLength = 150;
+  const maxLogTagLength = Math.max(0, maxLogNameLength - logSuffix.length);
+  const logTag = sanitizeXcodemakeLogTag(args).slice(0, maxLogTagLength).replace(/_+$/g, '');
+
+  return `${logTag || 'xcodemake'}${logSuffix}`;
+}
+
+function patchXcodemakeScript(scriptContent: string): string {
+  const patchedImports = scriptContent.includes('use Digest::MD5 qw(md5_hex);')
+    ? scriptContent
+    : scriptContent.replace('use IO::File;\n', 'use IO::File;\nuse Digest::MD5 qw(md5_hex);\n');
+
+  return patchedImports
+    .replace(
+      'my $log = "xcodemake @original_ARGV.log";',
+      `my $logTag = join "_", ("xcodemake", @original_ARGV);
+$logTag =~ s{[/:]+}{_}g;
+$logTag =~ s{[^[:alnum:]._+=,@ -]+}{_}g;
+$logTag =~ s{\\s+}{_}g;
+$logTag =~ s{_+}{_}g;
+$logTag =~ s{^_+|_+$}{}g;
+$logTag ||= "xcodemake";
+my $maxLogNameLength = 150;
+my $logSuffix = "-" . md5_hex(join "\\0", @original_ARGV) . ".log";
+$logTag = substr($logTag, 0, $maxLogNameLength - length($logSuffix));
+$logTag =~ s{_+$}{};
+my $log = ($logTag || "xcodemake") . $logSuffix;`,
+    )
+    .replaceAll(
+      `dollarEscape($make_dep_source);
+                unescape("'", $make_dep_source);`,
+      `dollarEscape($make_dep_source);
+                unescape("'", $make_dep_source);
+                escape(" ", $make_dep_source);`,
+    );
+}
+
 export function doesMakeLogFileExist(projectDir: string, command: string[]): boolean {
-  const originalDir = process.cwd();
-
   try {
-    process.chdir(projectDir);
-
     const xcodemakeCommand = ['xcodemake', ...command.slice(1)];
     const escapedCommand = xcodemakeCommand.map((arg) => {
       // Remove projectDir from arguments if present at the start
@@ -140,11 +188,10 @@ export function doesMakeLogFileExist(projectDir: string, command: string[]): boo
       }
       return arg;
     });
-    const commandString = escapedCommand.join(' ');
-    const logFileName = `${commandString}.log`;
-    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${process.cwd()}`);
+    const logFileName = getXcodemakeLogFileName(escapedCommand.slice(1));
+    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${projectDir}`);
 
-    const files = readdirSync('.');
+    const files = readdirSync(projectDir);
     const exists = files.includes(logFileName);
     log('debug', `Makefile log ${exists ? 'exists' : 'does not exist'}: ${logFileName}`);
     return exists;
@@ -154,8 +201,6 @@ export function doesMakeLogFileExist(projectDir: string, command: string[]): boo
       `Error checking for Makefile log: ${error instanceof Error ? error.message : String(error)}`,
     );
     return false;
-  } finally {
-    process.chdir(originalDir);
   }
 }
 
