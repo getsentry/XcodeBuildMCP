@@ -12,7 +12,7 @@ import {
 } from './log-capture/simulator-launch-oslog-sessions.ts';
 import { log } from './logging/index.ts';
 import { getRuntimeInstance, getRuntimeInstanceIfConfigured } from './runtime-instance.ts';
-import { tryAcquireFsLock } from './fs-lock.ts';
+import { tryAcquireFsLock, type AcquiredFsLock } from './fs-lock.ts';
 import { isPidAlive } from './process-liveness.ts';
 import { getResultBundleCompletionMarkerPath } from './result-bundle-path.ts';
 
@@ -113,6 +113,30 @@ interface RetainedLogFile {
   mtimeMs: number;
 }
 
+export interface WorkspaceLifecycleProtectedLogPathsOptions {
+  workspaceKey: string;
+  protectedLogPaths?: string[];
+}
+
+export interface WorkspaceLifecycleRetainedArtifact {
+  path: string;
+  name: string;
+  mtimeMs: number;
+}
+
+export type WorkspaceLifecycleLogProtectionReason = 'protectedPath' | 'recent' | 'liveHelperPid';
+
+export interface WorkspaceLifecycleLogProtectionOptions {
+  now: number;
+  minVisibleMs: number;
+  protectedPaths: ReadonlySet<string>;
+}
+
+export interface WorkspaceLifecycleResultBundleProtectionOptions {
+  now: number;
+  minVisibleMs: number;
+}
+
 function resolveWorkspaceKey(options: WorkspaceFilesystemLifecycleOptions): string {
   if (options.workspaceKey) {
     return options.workspaceKey;
@@ -193,18 +217,18 @@ function hasLiveHelperPidInName(fileName: string): boolean {
   return false;
 }
 
-function isXcodeBuildMCPManagedLogName(fileName: string): boolean {
+export function isXcodeBuildMCPManagedLogName(fileName: string): boolean {
   if (fileName === 'daemon.log') {
     return true;
   }
   return XCODEBUILD_LOG_NAME_PATTERN.test(fileName) || SIMULATOR_LOG_NAME_PATTERN.test(fileName);
 }
 
-function isXcodeBuildMCPManagedResultBundleName(fileName: string): boolean {
+export function isXcodeBuildMCPManagedResultBundleName(fileName: string): boolean {
   return RESULT_BUNDLE_NAME_PATTERN.test(fileName);
 }
 
-function getManagedResultBundleOwnerPid(fileName: string): number | null {
+export function getManagedResultBundleOwnerPid(fileName: string): number | null {
   const pid = Number(fileName.match(RESULT_BUNDLE_OWNER_PID_PATTERN)?.[1]);
   return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
@@ -218,24 +242,40 @@ async function deleteFile(filePath: string): Promise<boolean> {
   }
 }
 
+export function getWorkspaceLifecycleProtectedLogReason(
+  file: WorkspaceLifecycleRetainedArtifact,
+  options: WorkspaceLifecycleLogProtectionOptions,
+): WorkspaceLifecycleLogProtectionReason | null {
+  if (options.protectedPaths.has(file.path)) {
+    return 'protectedPath';
+  }
+  if (options.now - file.mtimeMs < options.minVisibleMs) {
+    return 'recent';
+  }
+  if (hasLiveHelperPidInName(file.name)) {
+    return 'liveHelperPid';
+  }
+  return null;
+}
+
 function isProtectedLogFile(
   file: RetainedLogFile,
   options: ResolvedWorkspaceFilesystemLifecycleOptions,
   protectedPaths: Set<string>,
 ): boolean {
-  if (protectedPaths.has(file.path)) {
-    return true;
-  }
-  if (options.now - file.mtimeMs < options.minVisibleMs) {
-    return true;
-  }
-  return hasLiveHelperPidInName(file.name);
+  return (
+    getWorkspaceLifecycleProtectedLogReason(file, {
+      now: options.now,
+      minVisibleMs: options.minVisibleMs,
+      protectedPaths,
+    }) !== null
+  );
 }
 
-async function collectProtectedLogPaths(
-  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+export async function collectWorkspaceLifecycleProtectedLogPaths(
+  options: WorkspaceLifecycleProtectedLogPathsOptions,
 ): Promise<Set<string>> {
-  const protectedPaths = new Set(options.protectedLogPaths);
+  const protectedPaths = new Set(options.protectedLogPaths ?? []);
 
   try {
     for (const osLogPath of await listSimulatorLaunchOsLogProtectedPaths({
@@ -253,6 +293,15 @@ async function collectProtectedLogPaths(
   }
 
   return protectedPaths;
+}
+
+async function collectProtectedLogPaths(
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+): Promise<Set<string>> {
+  return collectWorkspaceLifecycleProtectedLogPaths({
+    workspaceKey: options.workspaceKey,
+    protectedLogPaths: options.protectedLogPaths,
+  });
 }
 
 async function pruneKnownLogDirectory(
@@ -319,9 +368,9 @@ async function hasResultBundleCompletionMarker(bundlePath: string): Promise<bool
   }
 }
 
-async function isProtectedResultBundleDirectory(
-  bundle: RetainedLogFile,
-  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+export async function isWorkspaceLifecycleProtectedResultBundleDirectory(
+  bundle: WorkspaceLifecycleRetainedArtifact,
+  options: WorkspaceLifecycleResultBundleProtectionOptions,
 ): Promise<boolean> {
   if (options.now - bundle.mtimeMs < options.minVisibleMs) {
     return true;
@@ -333,6 +382,16 @@ async function isProtectedResultBundleDirectory(
   }
 
   return false;
+}
+
+async function isProtectedResultBundleDirectory(
+  bundle: RetainedLogFile,
+  options: ResolvedWorkspaceFilesystemLifecycleOptions,
+): Promise<boolean> {
+  return isWorkspaceLifecycleProtectedResultBundleDirectory(bundle, {
+    now: options.now,
+    minVisibleMs: options.minVisibleMs,
+  });
 }
 
 async function pruneKnownResultBundleDirectory(
@@ -449,11 +508,21 @@ function runDaemonCleanup(options: ResolvedWorkspaceFilesystemLifecycleOptions):
   cleanupWorkspaceDaemonFiles(options.workspaceKey, options.daemonCleanup);
 }
 
-function xcodeIdeCallToolTransientRoot(workspaceKey: string): string {
+export function xcodeIdeCallToolTransientRoot(workspaceKey: string): string {
   return path.join(
     getWorkspaceFilesystemLayout(workspaceKey).state,
     XCODE_IDE_CALL_TOOL_TRANSIENT_DIR,
   );
+}
+
+export function getXcodeIdeCallToolTransientOwnerPid(directoryName: string): number | null {
+  const ownerPid = Number(directoryName.match(XCODE_IDE_CALL_TOOL_OWNER_DIR_PATTERN)?.[1]);
+  return Number.isInteger(ownerPid) && ownerPid > 0 ? ownerPid : null;
+}
+
+export function isStaleXcodeIdeCallToolTransientDirectoryName(directoryName: string): boolean {
+  const ownerPid = getXcodeIdeCallToolTransientOwnerPid(directoryName);
+  return ownerPid !== null && !isPidAlive(ownerPid);
 }
 
 async function cleanupXcodeIdeCallToolTransientArtifacts(
@@ -482,9 +551,8 @@ async function cleanupXcodeIdeCallToolTransientArtifacts(
     if (!entry.isDirectory()) {
       continue;
     }
-    const ownerPid = Number(entry.name.match(XCODE_IDE_CALL_TOOL_OWNER_DIR_PATTERN)?.[1]);
     const ownedByCurrentRuntime = options.includeCurrentOwner && currentOwnerDir === entry.name;
-    const ownedByDeadRuntime = Number.isInteger(ownerPid) && ownerPid > 0 && !isPidAlive(ownerPid);
+    const ownedByDeadRuntime = isStaleXcodeIdeCallToolTransientDirectoryName(entry.name);
     if (!ownedByCurrentRuntime && !ownedByDeadRuntime) {
       continue;
     }
@@ -539,12 +607,18 @@ export async function runWorkspaceFilesystemLifecycleSweep(
     return zeroResult(resolved, true, false, stopped, errors);
   }
 
-  const lock = await tryAcquireFsLock({
-    lockDir: resolved.lockDir,
-    purpose: resolved.lockPurpose,
-    leaseMs: WORKSPACE_FILESYSTEM_LIFECYCLE_LOCK_LEASE_MS,
-    now: resolved.now,
-  });
+  let lock: AcquiredFsLock | null;
+  try {
+    lock = await tryAcquireFsLock({
+      lockDir: resolved.lockDir,
+      purpose: resolved.lockPurpose,
+      leaseMs: WORKSPACE_FILESYSTEM_LIFECYCLE_LOCK_LEASE_MS,
+      now: resolved.now,
+    });
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return zeroResult(resolved, false, true, stopped, errors);
+  }
   if (!lock) {
     return zeroResult(resolved, false, true, stopped, errors);
   }

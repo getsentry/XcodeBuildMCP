@@ -103,10 +103,10 @@ function tryRecoverExpiredLockDir(
 function createLock(lockDir: string, owner: FsLockOwner): AcquiredFsLockSync {
   mkdirSync(lockDir, { mode: 0o700 });
   try {
-    writeFileSync(join(lockDir, FS_LOCK_OWNER_FILE), `${JSON.stringify(owner)}\n`, {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
+    const ownerPath = join(lockDir, FS_LOCK_OWNER_FILE);
+    const tempPath = `${ownerPath}.${randomUUID()}.tmp`;
+    writeFileSync(tempPath, `${JSON.stringify(owner)}\n`, { encoding: 'utf8', mode: 0o600 });
+    renameSync(tempPath, ownerPath);
   } catch (error) {
     rmSync(lockDir, { recursive: true, force: true });
     throw error;

@@ -6,7 +6,11 @@ import { formatLogTimestamp, shortRandomSuffix } from './log-naming.ts';
 import { getRuntimeInstanceIfConfigured } from './runtime-instance.ts';
 import { workspaceKeyForRoot } from './workspace-identity.ts';
 
-const RESULT_BUNDLE_COMPLETION_MARKER_SUFFIX = '.xcodebuildmcp-completed';
+export const RESULT_BUNDLE_COMPLETION_MARKER_SUFFIX = '.xcodebuildmcp-completed';
+
+export function isResultBundleCompletionMarkerTempName(name: string): boolean {
+  return name.includes(`${RESULT_BUNDLE_COMPLETION_MARKER_SUFFIX}.`) && name.endsWith('.tmp');
+}
 
 function resolveWorkspaceKey(): string {
   return getRuntimeInstanceIfConfigured()?.workspaceKey ?? workspaceKeyForRoot(process.cwd());
@@ -44,7 +48,15 @@ export function markResultBundlePathCompleted(resultBundlePath: string | undefin
     if (!fs.existsSync(resultBundlePath) || !fs.statSync(resultBundlePath).isDirectory()) {
       return;
     }
-    fs.writeFileSync(getResultBundleCompletionMarkerPath(resultBundlePath), `${Date.now()}\n`);
+    const markerPath = getResultBundleCompletionMarkerPath(resultBundlePath);
+    const tempPath = `${markerPath}.${process.pid}_${shortRandomSuffix()}.tmp`;
+    fs.writeFileSync(tempPath, `${Date.now()}\n`);
+    try {
+      fs.renameSync(tempPath, markerPath);
+    } catch (renameError) {
+      fs.rmSync(tempPath, { force: true });
+      throw renameError;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log('warn', `Unable to mark result bundle completed at ${resultBundlePath}: ${message}`);

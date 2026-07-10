@@ -1,5 +1,27 @@
 import * as clack from '@clack/prompts';
 
+export class PromptCancelledError extends Error {
+  constructor() {
+    super('Prompt cancelled.');
+    this.name = 'PromptCancelledError';
+  }
+}
+
+export class PromptInterruptedError extends Error {
+  constructor() {
+    super('Prompt interrupted.');
+    this.name = 'PromptInterruptedError';
+  }
+}
+
+export function isPromptCancelledError(error: unknown): error is PromptCancelledError {
+  return error instanceof PromptCancelledError;
+}
+
+export function isPromptInterruptedError(error: unknown): error is PromptInterruptedError {
+  return error instanceof PromptInterruptedError;
+}
+
 export interface SelectOption<T> {
   value: T;
   label: string;
@@ -58,11 +80,48 @@ function createNonInteractivePrompter(): Prompter {
   };
 }
 
-function handleCancel(result: unknown): void {
-  if (clack.isCancel(result)) {
-    clack.cancel('Setup cancelled.');
-    throw new Error('Setup cancelled.');
+type PromptCancelKind = 'cancel' | 'interrupt';
+
+interface KeypressInfo {
+  name?: string;
+  sequence?: string;
+  ctrl?: boolean;
+}
+
+async function runClackPrompt<T>(
+  prompt: Promise<T>,
+): Promise<{ result: T; cancelKind: PromptCancelKind }> {
+  let cancelKind: PromptCancelKind = 'cancel';
+  const onKeypress = (_text: string, key: KeypressInfo = {}): void => {
+    if (key.sequence === '\u0003' || (key.name === 'c' && key.ctrl === true)) {
+      cancelKind = 'interrupt';
+    }
+  };
+
+  process.stdin.prependListener('keypress', onKeypress);
+  try {
+    return { result: await prompt, cancelKind };
+  } finally {
+    process.stdin.off('keypress', onKeypress);
   }
+}
+
+function handleCancel(result: unknown, cancelKind: PromptCancelKind): void {
+  if (clack.isCancel(result)) {
+    clack.cancel(cancelKind === 'interrupt' ? 'Interrupted.' : 'Cancelled.');
+    if (cancelKind === 'interrupt') {
+      throw new PromptInterruptedError();
+    }
+    throw new PromptCancelledError();
+  }
+}
+
+function toClackOptions<T>(options: SelectOption<T>[]): clack.Option<T>[] {
+  return options.map((option) => ({
+    value: option.value,
+    label: option.label,
+    ...(option.description ? { hint: option.description } : {}),
+  })) as unknown as clack.Option<T>[];
 }
 
 function createTtyPrompter(): Prompter {
@@ -78,19 +137,15 @@ function createTtyPrompter(): Prompter {
 
       const initialIndex = clampIndex(opts.initialIndex ?? 0, opts.options.length);
 
-      const promptOptions = opts.options.map((option) => ({
-        value: option.value,
-        label: option.label,
-        ...(option.description ? { hint: option.description } : {}),
-      })) as unknown as clack.Option<T>[];
+      const { result, cancelKind } = await runClackPrompt(
+        clack.select<T>({
+          message: opts.message,
+          options: toClackOptions(opts.options),
+          initialValue: opts.options[initialIndex].value,
+        }),
+      );
 
-      const result = await clack.select<T>({
-        message: opts.message,
-        options: promptOptions,
-        initialValue: opts.options[initialIndex].value,
-      });
-
-      handleCancel(result);
+      handleCancel(result, cancelKind);
       return result as T;
     },
 
@@ -110,30 +165,28 @@ function createTtyPrompter(): Prompter {
         .filter((option) => initialKeys.has(opts.getKey(option.value)))
         .map((option) => option.value);
 
-      const promptOptions = opts.options.map((option) => ({
-        value: option.value,
-        label: option.label,
-        ...(option.description ? { hint: option.description } : {}),
-      })) as unknown as clack.Option<T>[];
+      const { result, cancelKind } = await runClackPrompt(
+        clack.multiselect<T>({
+          message: opts.message,
+          options: toClackOptions(opts.options),
+          initialValues,
+          required: (opts.minSelected ?? 0) > 0,
+        }),
+      );
 
-      const result = await clack.multiselect<T>({
-        message: opts.message,
-        options: promptOptions,
-        initialValues,
-        required: (opts.minSelected ?? 0) > 0,
-      });
-
-      handleCancel(result);
+      handleCancel(result, cancelKind);
       return result as T[];
     },
 
     async confirm(opts: { message: string; defaultValue: boolean }): Promise<boolean> {
-      const result = await clack.confirm({
-        message: opts.message,
-        initialValue: opts.defaultValue,
-      });
+      const { result, cancelKind } = await runClackPrompt(
+        clack.confirm({
+          message: opts.message,
+          initialValue: opts.defaultValue,
+        }),
+      );
 
-      handleCancel(result);
+      handleCancel(result, cancelKind);
       return result as boolean;
     },
   };

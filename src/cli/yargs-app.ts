@@ -5,6 +5,7 @@ import type { ResolvedRuntimeConfig } from '../utils/config-store.ts';
 import { registerDaemonCommands } from './commands/daemon.ts';
 import { registerInitCommand } from './commands/init.ts';
 import { registerMcpCommand } from './commands/mcp.ts';
+import { registerPurgeCommand } from './commands/purge.ts';
 import { registerSetupCommand } from './commands/setup.ts';
 import { registerToolsCommand } from './commands/tools.ts';
 import { registerUpgradeCommand } from './commands/upgrade.ts';
@@ -83,6 +84,7 @@ export function buildYargsApp(opts: YargsAppOptions): ReturnType<typeof yargs> {
   registerSetupCommand(app);
   registerUpgradeCommand(app);
   registerToolsCommand(app);
+  registerPurgeCommand(app, { currentWorkspaceKey: opts.workspaceKey });
   registerToolCommands(app, opts.catalog, {
     workspaceRoot: opts.workspaceRoot,
     runtimeConfig: opts.runtimeConfig,

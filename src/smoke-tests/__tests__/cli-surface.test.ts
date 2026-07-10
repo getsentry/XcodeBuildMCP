@@ -56,6 +56,13 @@ describe('CLI Surface (e2e)', () => {
       expect(output).toContain('simulator:');
       expect(output).toContain('build');
     });
+
+    it('purge --help shows storage management options', () => {
+      const output = run('purge --help');
+      expect(output).toContain('Report and clean XcodeBuildMCP workspace storage');
+      expect(output).toContain('--dry-run');
+      expect(output).toContain('--delete');
+    });
   });
 
   describe('workflow subcommands', () => {

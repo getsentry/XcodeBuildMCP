@@ -7,6 +7,11 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import {
   cleanupOwnedWorkspaceFilesystemArtifacts,
+  getManagedResultBundleOwnerPid,
+  getXcodeIdeCallToolTransientOwnerPid,
+  isStaleXcodeIdeCallToolTransientDirectoryName,
+  isXcodeBuildMCPManagedLogName,
+  isXcodeBuildMCPManagedResultBundleName,
   resetWorkspaceFilesystemLifecycleStateForTests,
   runWorkspaceFilesystemLifecycleSweep,
   scheduleWorkspaceFilesystemLifecycleSweep,
@@ -79,6 +84,22 @@ describe('workspace filesystem lifecycle', () => {
     setRuntimeInstanceForTests(null);
     setXcodeBuildMCPAppDirOverrideForTests(null);
     await rm(appDir, { recursive: true, force: true });
+  });
+
+  it('exposes cleanup classification helpers without broadening managed artifact matches', () => {
+    const logName = managedXcodebuildLogName();
+    const resultBundleName = managedResultBundleName('test', 123);
+
+    expect(isXcodeBuildMCPManagedLogName(logName)).toBe(true);
+    expect(isXcodeBuildMCPManagedLogName('manual.log')).toBe(false);
+    expect(isXcodeBuildMCPManagedResultBundleName(resultBundleName)).toBe(true);
+    expect(isXcodeBuildMCPManagedResultBundleName('manual.xcresult')).toBe(false);
+    expect(getManagedResultBundleOwnerPid(resultBundleName)).toBe(123);
+    expect(getXcodeIdeCallToolTransientOwnerPid('ownerpid999999999_stale')).toBe(999999999);
+    expect(isStaleXcodeIdeCallToolTransientDirectoryName('ownerpid999999999_stale')).toBe(true);
+    expect(isStaleXcodeIdeCallToolTransientDirectoryName(`ownerpid${process.pid}_live`)).toBe(
+      false,
+    );
   });
 
   it('prunes only known workspace log files and never scans DerivedData', async () => {

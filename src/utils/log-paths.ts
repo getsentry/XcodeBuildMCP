@@ -44,6 +44,9 @@ function normalizeWorkspaceKey(workspaceKey: string): string {
   if (normalized.includes('/') || normalized.includes('\\')) {
     throw new Error(`Workspace key cannot contain path separators: ${workspaceKey}`);
   }
+  if (normalized === '.' || normalized === '..') {
+    throw new Error(`Workspace key cannot be a relative path segment: ${workspaceKey}`);
+  }
   return normalized;
 }
 

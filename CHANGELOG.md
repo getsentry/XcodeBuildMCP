@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Added `xcodebuildmcp purge` to report and explicitly clean XcodeBuildMCP-managed workspace storage, including opt-in DerivedData cleanup with dry-run and confirmation safeguards.
+
 ## [2.6.2]
 
 ### Fixed

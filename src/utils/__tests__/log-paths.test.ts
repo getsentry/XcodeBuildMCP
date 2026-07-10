@@ -11,6 +11,15 @@ describe('log paths', () => {
     setXcodeBuildMCPAppDirOverrideForTests(null);
   });
 
+  it('rejects relative path segment workspace keys', () => {
+    expect(() => getWorkspaceFilesystemLayout('.')).toThrow(
+      'Workspace key cannot be a relative path segment',
+    );
+    expect(() => getWorkspaceFilesystemLayout('..')).toThrow(
+      'Workspace key cannot be a relative path segment',
+    );
+  });
+
   it('builds the workspace-first filesystem layout', () => {
     const appDir = path.join('/tmp', 'xcodebuildmcp-app');
     setXcodeBuildMCPAppDirOverrideForTests(appDir);

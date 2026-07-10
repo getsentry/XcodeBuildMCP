@@ -128,10 +128,10 @@ async function tryRecoverExpiredLockDir(
 async function createLock(lockDir: string, owner: FsLockOwner): Promise<AcquiredFsLock> {
   await fs.mkdir(lockDir, { mode: 0o700 });
   try {
-    await fs.writeFile(path.join(lockDir, FS_LOCK_OWNER_FILE), `${JSON.stringify(owner)}\n`, {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
+    const ownerPath = path.join(lockDir, FS_LOCK_OWNER_FILE);
+    const tempPath = `${ownerPath}.${randomUUID()}.tmp`;
+    await fs.writeFile(tempPath, `${JSON.stringify(owner)}\n`, { encoding: 'utf8', mode: 0o600 });
+    await fs.rename(tempPath, ownerPath);
   } catch (error) {
     await removeLockDir(lockDir);
     throw error;
@@ -168,7 +168,7 @@ async function tryAcquireGuard(
     return await createLock(guardDir, guardOwner);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-      return null;
+      throw error;
     }
     const recovered = await tryRecoverExpiredLockDir(guardDir, guardOwner.purpose, now, leaseMs);
     if (!recovered) {
@@ -176,8 +176,11 @@ async function tryAcquireGuard(
     }
     try {
       return await createLock(guardDir, guardOwner);
-    } catch {
-      return null;
+    } catch (retryError) {
+      if ((retryError as NodeJS.ErrnoException).code === 'EEXIST') {
+        return null;
+      }
+      throw retryError;
     }
   }
 }
@@ -194,39 +197,34 @@ export async function tryAcquireFsLock(
     expiresAtMs: now + options.leaseMs,
   };
 
+  await fs.mkdir(path.dirname(options.lockDir), { recursive: true, mode: 0o700 });
+  const guard = await tryAcquireGuard(options.lockDir, options.purpose, options.leaseMs, now);
+  if (!guard) {
+    return null;
+  }
+
   try {
-    await fs.mkdir(path.dirname(options.lockDir), { recursive: true, mode: 0o700 });
-    const guard = await tryAcquireGuard(options.lockDir, options.purpose, options.leaseMs, now);
-    if (!guard) {
-      return null;
-    }
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await createLock(options.lockDir, owner);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
 
-    try {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          return await createLock(options.lockDir, owner);
-        } catch (error) {
-          const code = (error as NodeJS.ErrnoException).code;
-          if (code !== 'EEXIST') {
-            return null;
-          }
-
-          const recovered = await tryRecoverExpiredLockDir(
-            options.lockDir,
-            options.purpose,
-            now,
-            options.leaseMs,
-          );
-          if (!recovered) {
-            return null;
-          }
+        const recovered = await tryRecoverExpiredLockDir(
+          options.lockDir,
+          options.purpose,
+          now,
+          options.leaseMs,
+        );
+        if (!recovered) {
+          return null;
         }
       }
-    } finally {
-      await guard.release();
     }
-  } catch {
-    return null;
+  } finally {
+    await guard.release();
   }
 
   return null;
