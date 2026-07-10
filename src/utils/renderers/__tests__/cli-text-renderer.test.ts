@@ -175,6 +175,23 @@ describe('cli-text-renderer', () => {
     );
   });
 
+  it('omits settled build warnings when suppressWarnings is set', () => {
+    const structuredOutput = buildOutput({
+      diagnostics: {
+        warnings: [{ message: 'unused variable "foo"', location: 'App.swift:12' }],
+        errors: [],
+      },
+    });
+
+    const shown = renderCliTextTranscript({ structuredOutput });
+    expect(shown).toContain('Warnings (1):');
+    expect(shown).toContain('unused variable');
+
+    const suppressed = renderCliTextTranscript({ structuredOutput, suppressWarnings: true });
+    expect(suppressed).not.toContain('Warnings (1):');
+    expect(suppressed).not.toContain('unused variable');
+  });
+
   it('renders non-interactive test progress durably and deduplicates repeated counts', () => {
     const output = renderCliTextTranscript({
       items: [

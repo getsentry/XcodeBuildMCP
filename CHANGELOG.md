@@ -7,6 +7,10 @@
 - Added `xcodebuildmcp purge` to report and explicitly clean XcodeBuildMCP-managed workspace storage, including opt-in DerivedData cleanup with dry-run and confirmation safeguards.
 - Added `extraArgs` as a first-class session-default value. Repo config or runtime defaults can now carry common `xcodebuild` flags (for example `-skipPackagePluginValidation` or `-disableAutomaticPackageResolution`) so they don't need repeating on every build or test call. Per-call `extraArgs` replace matching configured flags or build settings and append after non-matching defaults, while an explicit empty array (`extraArgs: []`) clears the defaults for a single call. The session management tools show, set, sync, and clear `extraArgs` alongside the other defaults.
 
+### Fixed
+
+- Fixed `suppressWarnings` being ignored in settled build, build-run, and test output. The flag was honored only while streaming, so warnings still reached the final MCP tool response ([#447](https://github.com/getsentry/XcodeBuildMCP/issues/447)).
+
 ## [2.6.2]
 
 ### Fixed

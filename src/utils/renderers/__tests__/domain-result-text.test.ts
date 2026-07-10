@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import type {
+  BuildResultDomainResult,
   LaunchResultDomainResult,
   UiActionResultDomainResult,
 } from '../../../types/domain-results.ts';
 import { renderDomainResultTextItems } from '../domain-result-text.ts';
+
+function buildResultWithDiagnostics(): BuildResultDomainResult {
+  return {
+    kind: 'build-result',
+    didError: false,
+    error: null,
+    summary: { status: 'SUCCEEDED' },
+    artifacts: { scheme: 'MyScheme' },
+    diagnostics: {
+      warnings: [{ message: 'unused variable "foo"', location: 'App.swift:12' }],
+      errors: [{ message: 'cannot find "bar" in scope', location: 'App.swift:20' }],
+    },
+  };
+}
+
+function sectionTitles(items: ReturnType<typeof renderDomainResultTextItems>): string[] {
+  return items.flatMap((item) => (item.type === 'section' ? [item.title] : []));
+}
 
 function uiActionResult(action: UiActionResultDomainResult['action']): UiActionResultDomainResult {
   return {
@@ -112,6 +131,24 @@ describe('renderDomainResultTextItems', () => {
         },
       ]
     `);
+  });
+
+  it('renders build warnings by default', () => {
+    const titles = sectionTitles(renderDomainResultTextItems(buildResultWithDiagnostics()));
+
+    expect(titles).toContain('Warnings (1):');
+    expect(titles).toContain('Errors (1):');
+  });
+
+  it('omits build warnings when suppressWarnings is set, keeping errors', () => {
+    const titles = sectionTitles(
+      renderDomainResultTextItems(buildResultWithDiagnostics(), undefined, {
+        suppressWarnings: true,
+      }),
+    );
+
+    expect(titles).not.toContain('Warnings (1):');
+    expect(titles).toContain('Errors (1):');
   });
 
   it('renders batch UI action results', () => {

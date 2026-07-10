@@ -87,6 +87,10 @@ export type TextRendererBlock =
 
 export type TextRenderableItem = RenderItem | TextRendererBlock;
 
+export interface DomainResultTextOptions {
+  suppressWarnings?: boolean;
+}
+
 const SESSION_DEFAULT_KEYS = [
   'projectPath',
   'workspacePath',
@@ -248,6 +252,7 @@ function createMarkedDiagnosticLines(
 
 function createStandardDiagnosticSections(
   diagnostics: BasicDiagnostics | TestDiagnostics | undefined,
+  suppressWarnings = false,
 ): SectionTextBlock[] {
   const sections: SectionTextBlock[] = [];
   if (!diagnostics) {
@@ -265,7 +270,7 @@ function createStandardDiagnosticSections(
       ),
     );
   }
-  if (diagnostics.warnings.length > 0) {
+  if (!suppressWarnings && diagnostics.warnings.length > 0) {
     sections.push(
       createSection(
         `Warnings (${diagnostics.warnings.length}):`,
@@ -2013,8 +2018,11 @@ function createCleanResultItems(
   return items;
 }
 
-function createDiagnosticSections(result: ToolDomainResult): SectionTextBlock[] {
-  return createStandardDiagnosticSections(getResultDiagnostics(result));
+function createDiagnosticSections(
+  result: ToolDomainResult,
+  suppressWarnings: boolean,
+): SectionTextBlock[] {
+  return createStandardDiagnosticSections(getResultDiagnostics(result), suppressWarnings);
 }
 
 function createSummaryBlock(result: ToolDomainResult): SummaryTextBlock | null {
@@ -2072,8 +2080,12 @@ function createTestDiscoveryProgress(
 
 function createBuildLikeDiagnosticItems(
   result: Extract<ToolDomainResult, { kind: 'build-result' | 'build-run-result' | 'test-result' }>,
+  suppressWarnings: boolean,
 ): TextRenderableItem[] {
-  return createStandardDiagnosticSections('diagnostics' in result ? result.diagnostics : undefined);
+  return createStandardDiagnosticSections(
+    'diagnostics' in result ? result.diagnostics : undefined,
+    suppressWarnings,
+  );
 }
 
 function createBuildRunSyntheticStepItems(
@@ -2576,12 +2588,14 @@ export function createNextStepsBlock(
 export function renderDomainResultTextItems(
   result: ToolDomainResult,
   hints?: RenderHints,
+  options?: DomainResultTextOptions,
 ): TextRenderableItem[] {
   const specialCaseItems = createSpecialCaseItems(result, hints);
   if (specialCaseItems) {
     return specialCaseItems;
   }
 
+  const suppressWarnings = options?.suppressWarnings ?? false;
   const items: TextRenderableItem[] = [];
   if (
     result.kind === 'build-result' ||
@@ -2599,7 +2613,7 @@ export function renderDomainResultTextItems(
       }
     }
     const tailItems = createBuildLikeTailItems(result);
-    items.push(...createBuildLikeDiagnosticItems(result));
+    items.push(...createBuildLikeDiagnosticItems(result, suppressWarnings));
     if (result.kind === 'build-run-result') {
       items.push(...createBuildRunSyntheticStepItems(result));
     }
@@ -2623,7 +2637,7 @@ export function renderDomainResultTextItems(
     return items;
   }
 
-  items.push(...createDiagnosticSections(result));
+  items.push(...createDiagnosticSections(result, suppressWarnings));
   const summary = createSummaryBlock(result);
   if (summary) {
     items.push(summary);

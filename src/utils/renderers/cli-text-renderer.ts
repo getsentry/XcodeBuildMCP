@@ -444,6 +444,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
           const structuredItems = renderDomainResultTextItems(
             structuredOutput.result,
             structuredOutput.renderHints,
+            { suppressWarnings },
           );
           const replayItems =
             sawIncomingHeaderEvent && structuredItems[0]?.type === 'header'
@@ -456,6 +457,7 @@ function createCliTextProcessor(options: CliTextProcessorOptions): TranscriptRen
           const structuredItems = renderDomainResultTextItems(
             structuredOutput.result,
             structuredOutput.renderHints,
+            { suppressWarnings },
           );
           const replayItems = structuredItems.filter((item) => {
             if (sawIncomingHeaderEvent && item.type === 'header') return false;
