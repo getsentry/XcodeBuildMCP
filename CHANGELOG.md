@@ -6,6 +6,10 @@
 
 - Added `xcodebuildmcp purge` to report and explicitly clean XcodeBuildMCP-managed workspace storage, including opt-in DerivedData cleanup with dry-run and confirmation safeguards.
 
+### Fixed
+
+- Fixed `xcodebuildmcp purge --report` so default reports keep totals, workspace rows, class breakdowns, and JSON output scoped to recognized workspaces consistently.
+
 ## [2.6.2]
 
 ### Fixed

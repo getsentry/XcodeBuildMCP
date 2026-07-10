@@ -103,10 +103,6 @@ function validateModeSpecificArgs(mode: PurgeMode, args: PurgeCommandArguments):
   }
 }
 
-function hasExplicitReportScope(args: PurgeCommandArguments): boolean {
-  return args.scope !== undefined || args.workspaceKey !== undefined || args.family !== undefined;
-}
-
 function parseOlderThan(value: string | undefined): number | undefined {
   if (value == null || value.trim().length === 0) {
     return undefined;
@@ -271,7 +267,7 @@ export async function runPurgeCommand(
     const selectedScope = resolveScope(args, resolvedDeps.currentWorkspaceKey);
     const report = await enumeratePurgeStorage({
       now: resolvedDeps.now,
-      scope: hasExplicitReportScope(args) ? selectedScope : undefined,
+      scope: selectedScope,
     });
     if (args.json) {
       writeJson(resolvedDeps.write, reportToJson(report, selectedScope));
