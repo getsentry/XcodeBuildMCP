@@ -21,6 +21,7 @@ export type SessionDefaults = {
   platform?: string;
   bundleId?: string;
   env?: Record<string, string>;
+  extraArgs?: string[];
 };
 
 class SessionStore {
@@ -33,6 +34,9 @@ class SessionStore {
     const copy = { ...defaults };
     if (copy.env) {
       copy.env = { ...copy.env };
+    }
+    if (copy.extraArgs) {
+      copy.extraArgs = [...copy.extraArgs];
     }
     return copy;
   }

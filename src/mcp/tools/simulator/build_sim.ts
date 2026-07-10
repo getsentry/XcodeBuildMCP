@@ -81,10 +81,10 @@ export type BuildSimulatorParams = z.infer<typeof buildSimulatorSchema>;
 type BuildSimulatorResult = BuildResultDomainResult;
 
 interface PreparedBuildSimExecution {
-  configuration: string;
+  configuration?: string;
   detectedPlatform: InferPlatformResult['platform'];
   platformName: string;
-  sharedBuildParams: BuildSimulatorParams & { configuration: string };
+  sharedBuildParams: BuildSimulatorParams;
   platformOptions: {
     platform: InferPlatformResult['platform'];
     simulatorName?: string;
@@ -100,7 +100,7 @@ async function prepareBuildSimExecution(
   params: BuildSimulatorParams,
   executor: CommandExecutor,
 ): Promise<PreparedBuildSimExecution> {
-  const configuration = params.configuration ?? 'Debug';
+  const configuration = params.configuration;
   const useLatestOS = params.useLatestOS ?? true;
   const inferred = await inferPlatform(
     {

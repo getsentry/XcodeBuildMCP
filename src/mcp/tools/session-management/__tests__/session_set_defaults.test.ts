@@ -421,6 +421,47 @@ describe('session-set-defaults tool', () => {
       expect(parsed.sessionDefaults?.env).toEqual(envVars);
     });
 
+    it('should store extraArgs as a string array default', async () => {
+      const extraArgs = ['-skipPackagePluginValidation', '-skipMacroValidation'];
+      const result = await runLogic(() => sessionSetDefaultsLogic({ extraArgs }, createContext()));
+
+      expect(result.isError).toBeFalsy();
+      expect(sessionStore.getAll().extraArgs).toEqual(extraArgs);
+    });
+
+    it('should persist extraArgs to config when persist is true', async () => {
+      const yaml = ['schemaVersion: 1', 'sessionDefaults: {}', ''].join('\n');
+
+      const writes: { path: string; content: string }[] = [];
+      const fs = createMockFileSystemExecutor({
+        existsSync: (targetPath: string) => targetPath === configPath,
+        readFile: async (targetPath: string) => {
+          if (targetPath !== configPath) {
+            throw new Error(`Unexpected readFile path: ${targetPath}`);
+          }
+          return yaml;
+        },
+        writeFile: async (targetPath: string, content: string) => {
+          writes.push({ path: targetPath, content });
+        },
+      });
+
+      await initConfigStore({ cwd, fs });
+
+      const extraArgs = ['-skipPackagePluginValidation'];
+      const result = await runLogic(() =>
+        sessionSetDefaultsLogic({ extraArgs, persist: true }, createContext()),
+      );
+
+      expect(result.isError).toBeFalsy();
+      expect(writes.length).toBe(1);
+
+      const parsed = parseYaml(writes[0].content) as {
+        sessionDefaults?: Record<string, unknown>;
+      };
+      expect(parsed.sessionDefaults?.extraArgs).toEqual(extraArgs);
+    });
+
     it('should not persist when persist is true but no defaults were provided', async () => {
       const writes: { path: string; content: string }[] = [];
       const fs = createMockFileSystemExecutor({

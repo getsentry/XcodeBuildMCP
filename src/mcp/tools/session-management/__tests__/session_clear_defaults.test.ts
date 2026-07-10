@@ -63,6 +63,18 @@ describe('session-clear-defaults tool', () => {
       expect(current.scheme).toBe('MyScheme');
     });
 
+    it('should clear extraArgs when keys includes extraArgs', async () => {
+      sessionStore.setDefaults({ extraArgs: ['-skipPackagePluginValidation'] });
+
+      const result = await runLogic(() => sessionClearDefaultsLogic({ keys: ['extraArgs'] }));
+
+      expect(result.isError).toBeFalsy();
+
+      const current = sessionStore.getAll();
+      expect(current.extraArgs).toBeUndefined();
+      expect(current.scheme).toBe('MyScheme');
+    });
+
     it('should clear all profiles only when all=true', async () => {
       sessionStore.setActiveProfile('ios');
       sessionStore.setDefaults({ scheme: 'IOS' });

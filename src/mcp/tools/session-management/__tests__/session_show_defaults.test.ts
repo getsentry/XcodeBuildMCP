@@ -32,5 +32,13 @@ describe('session-show-defaults tool', () => {
       expect(result.isError).toBeFalsy();
       expect(allText(result)).toContain('scheme: IOSScheme');
     });
+
+    it('shows extraArgs defaults', async () => {
+      sessionStore.setDefaults({ extraArgs: ['-skipPackagePluginValidation'] });
+
+      const result = await callHandler(handler, {});
+      expect(result.isError).toBeFalsy();
+      expect(allText(result)).toContain('extraArgs: -skipPackagePluginValidation');
+    });
   });
 });

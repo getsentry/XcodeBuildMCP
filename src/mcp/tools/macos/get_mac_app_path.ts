@@ -58,7 +58,7 @@ function createRequest(params: GetMacosAppPathParams) {
     scheme: params.scheme,
     projectPath: params.projectPath,
     workspacePath: params.workspacePath,
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: 'macOS',
   };
 }
@@ -67,7 +67,7 @@ export function createGetMacAppPathExecutor(
   executor: CommandExecutor,
 ): NonStreamingExecutor<GetMacosAppPathParams, AppPathDomainResult> {
   return async (params) => {
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
 
     log('info', `Getting app path for scheme ${params.scheme} on platform macOS`);
 

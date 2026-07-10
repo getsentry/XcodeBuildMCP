@@ -127,6 +127,7 @@ export interface SessionDefaultsProfile {
   platform: string | null;
   bundleId: string | null;
   env: Record<string, string> | null;
+  extraArgs: string[] | null;
 }
 export interface BuildLikeSummary extends StatusSummary {
   durationMs?: number;

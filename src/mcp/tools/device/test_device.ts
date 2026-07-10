@@ -73,7 +73,7 @@ const publicSchemaObject = baseSchemaObject.omit({
 } as const);
 
 interface PreparedTestDeviceExecution {
-  configuration: string;
+  configuration?: string;
   platform: XcodePlatform;
   preflight?: TestPreflightResult;
   invocationRequest: BuildInvocationRequest;
@@ -83,7 +83,7 @@ async function prepareTestDeviceExecution(
   params: TestDeviceParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestDeviceExecution> {
-  const configuration = params.configuration ?? 'Debug';
+  const configuration = params.configuration;
   const platform = mapDevicePlatform(params.platform);
   const preflight = await resolveTestPreflight(
     {

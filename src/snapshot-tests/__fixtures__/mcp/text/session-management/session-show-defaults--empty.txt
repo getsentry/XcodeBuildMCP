@@ -17,4 +17,5 @@
   ├ preferXcodebuild: (not set)
   ├ platform: (not set)
   ├ bundleId: (not set)
-  └ env: (not set)
+  ├ env: (not set)
+  └ extraArgs: (not set)

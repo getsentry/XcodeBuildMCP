@@ -36,7 +36,7 @@ function createBuildDeviceRequest(params: BuildDeviceParams): BuildInvocationReq
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
     derivedDataPath: resolveEffectiveDerivedDataPath(params),
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: String(mapDevicePlatform(params.platform)),
     target: 'device',
   };
@@ -77,7 +77,7 @@ export function createBuildDeviceExecutor(
     const platform = mapDevicePlatform(params.platform);
     const processedParams = {
       ...params,
-      configuration: params.configuration ?? 'Debug',
+      configuration: params.configuration,
     };
     const started = createDomainStreamingPipeline('build_device', 'BUILD', ctx, 'build-result');
 

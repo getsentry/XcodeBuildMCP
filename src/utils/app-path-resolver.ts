@@ -65,7 +65,9 @@ export async function resolveAppPathFromBuildSettings(
   }
 
   command.push('-scheme', params.scheme);
-  command.push('-configuration', params.configuration ?? 'Debug');
+  if (params.configuration) {
+    command.push('-configuration', params.configuration);
+  }
 
   const destination =
     params.destination ?? getBuildSettingsDestination(params.platform, params.deviceId);

@@ -104,7 +104,7 @@ export type SimulatorLauncher = typeof launchSimulatorAppWithLogging;
 type BuildRunSimulatorResult = BuildRunResultDomainResult;
 
 interface PreparedBuildRunSimExecution {
-  configuration: string;
+  configuration?: string;
   detectedPlatform: InferPlatformResult['platform'];
   displayPlatform: string;
   platformName: string;
@@ -135,7 +135,7 @@ async function prepareBuildRunSimExecution(
     executor,
   );
   const detectedPlatform = inferred.platform;
-  const configuration = params.configuration ?? 'Debug';
+  const configuration = params.configuration;
   const displayPlatform =
     params.simulatorId && inferred.source !== 'simulator-runtime'
       ? 'Simulator'
@@ -542,7 +542,7 @@ export async function build_run_simLogic(
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
       derivedDataPath: resolveEffectiveDerivedDataPath(params),
-      configuration: params.configuration ?? 'Debug',
+      configuration: params.configuration,
       platform: 'Simulator',
       simulatorName: params.simulatorName,
       simulatorId: params.simulatorId,

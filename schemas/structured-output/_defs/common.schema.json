@@ -375,6 +375,19 @@
               }
             }
           ]
+        },
+        "extraArgs": {
+          "anyOf": [
+            {
+              "const": null
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
         }
       },
       "required": [

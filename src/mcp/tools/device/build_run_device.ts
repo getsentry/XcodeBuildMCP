@@ -43,7 +43,7 @@ function createBuildRunDeviceRequest(params: BuildRunDeviceParams): BuildInvocat
     workspacePath: params.workspacePath,
     projectPath: params.projectPath,
     derivedDataPath: resolveEffectiveDerivedDataPath(params),
-    configuration: params.configuration ?? 'Debug',
+    configuration: params.configuration,
     platform: String(mapDevicePlatform(params.platform)),
     deviceId: params.deviceId,
     target: 'device',
@@ -87,7 +87,7 @@ export function createBuildRunDeviceExecutor(
 ): StreamingExecutor<BuildRunDeviceParams, BuildRunDeviceResult> {
   return async (params, ctx) => {
     const platform = mapDevicePlatform(params.platform);
-    const configuration = params.configuration ?? 'Debug';
+    const configuration = params.configuration;
     const request = createBuildRunDeviceRequest(params);
     const sharedBuildParams: SharedBuildParams = {
       projectPath: params.projectPath,
