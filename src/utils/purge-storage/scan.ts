@@ -25,6 +25,8 @@ export function zeroAccumulator(): ScanAccumulator {
     fileCount: 0,
     directoryCount: 0,
     latestMtimeMs: null,
+    latestFileMtimeMs: null,
+    latestDirectoryMtimeMs: null,
     scanComplete: true,
     warnings: [],
   };
@@ -70,6 +72,10 @@ async function scanPathInto(
   }
 
   if (stat.isDirectory()) {
+    accumulator.latestDirectoryMtimeMs = updateLatestMtime(
+      accumulator.latestDirectoryMtimeMs,
+      stat.mtimeMs,
+    );
     accumulator.directoryCount += 1;
     let entries: Dirent[];
     try {
@@ -85,6 +91,7 @@ async function scanPathInto(
   }
 
   if (stat.isFile()) {
+    accumulator.latestFileMtimeMs = updateLatestMtime(accumulator.latestFileMtimeMs, stat.mtimeMs);
     accumulator.fileCount += 1;
     if (stat.nlink > 1) {
       const inodeKey = `${stat.dev}:${stat.ino}`;

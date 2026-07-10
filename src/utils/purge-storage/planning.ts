@@ -87,6 +87,18 @@ function shouldKeepForRetention(params: {
   return null;
 }
 
+function retentionMtimeForCandidate(params: {
+  isDirectory: boolean;
+  statMtimeMs: number;
+  latestFileMtimeMs: number | null;
+  latestDirectoryMtimeMs: number | null;
+}): number {
+  if (!params.isDirectory) {
+    return params.statMtimeMs;
+  }
+  return params.latestFileMtimeMs ?? params.latestDirectoryMtimeMs ?? params.statMtimeMs;
+}
+
 function lifecycleLogProtectionReasonText(reason: WorkspaceLifecycleLogProtectionReason): string {
   switch (reason) {
     case 'protectedPath':
@@ -130,11 +142,15 @@ async function candidateFromPath(params: {
   }
 
   const scan = await scanPath(params.candidatePath);
-  const effectiveMtimeMs =
-    scan.latestMtimeMs === null ? stat.mtimeMs : Math.max(stat.mtimeMs, scan.latestMtimeMs);
+  const retentionMtimeMs = retentionMtimeForCandidate({
+    isDirectory: stat.isDirectory(),
+    statMtimeMs: stat.mtimeMs,
+    latestFileMtimeMs: scan.latestFileMtimeMs,
+    latestDirectoryMtimeMs: scan.latestDirectoryMtimeMs,
+  });
 
   const retentionReason = shouldKeepForRetention({
-    mtimeMs: effectiveMtimeMs,
+    mtimeMs: retentionMtimeMs,
     now: params.now,
     olderThanMs: params.olderThanMs,
   });

@@ -512,7 +512,51 @@ describe('purge storage', () => {
     expect(existsSync(outsideProject)).toBe(true);
   });
 
-  it('uses the newest descendant mtime for the older-than filter, not the directory mtime', async () => {
+  it('uses newest file mtime for non-empty directory retention instead of directory metadata mtime', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('DemoApp-123456789abc');
+    const freshDirOldFile = path.join(layout.derivedData, 'FreshDirOldFile');
+    writeFileWithMtime(path.join(freshDirOldFile, 'old.txt'), 'old', now - 30 * DAY_MS);
+    const freshMtime = new Date(now - 1000);
+    utimesSync(freshDirOldFile, freshMtime, freshMtime);
+
+    const plan = await planPurgeStorage({
+      scope: { type: 'all' },
+      classes: ['derivedData'],
+      now,
+      olderThanMs: 7 * DAY_MS,
+      derivedDataExplicit: true,
+    });
+
+    expect(plan.candidates.map((candidate) => path.basename(candidate.path))).toEqual([
+      'FreshDirOldFile',
+    ]);
+    expect(plan.skipped).toHaveLength(0);
+  });
+
+  it('uses directory mtime as the older-than fallback for empty directory candidates', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('DemoApp-123456789abc');
+    const emptyRecentDir = path.join(layout.derivedData, 'EmptyRecentDir');
+    mkdirSync(emptyRecentDir, { recursive: true });
+    const freshMtime = new Date(now - 1000);
+    utimesSync(emptyRecentDir, freshMtime, freshMtime);
+
+    const plan = await planPurgeStorage({
+      scope: { type: 'all' },
+      classes: ['derivedData'],
+      now,
+      olderThanMs: 7 * DAY_MS,
+      derivedDataExplicit: true,
+    });
+
+    expect(plan.candidates).toHaveLength(0);
+    expect(plan.skipped.map((candidate) => path.basename(candidate.path))).toEqual([
+      'EmptyRecentDir',
+    ]);
+  });
+
+  it('uses newest file mtime to keep non-empty directory candidates with fresh files', async () => {
     const now = Date.UTC(2026, 4, 2, 12);
     const layout = getWorkspaceFilesystemLayout('DemoApp-123456789abc');
     const staleDirFreshFile = path.join(layout.derivedData, 'StaleDirFreshFile');

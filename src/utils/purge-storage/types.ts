@@ -156,6 +156,8 @@ export interface ScanAccumulator {
   fileCount: number;
   directoryCount: number;
   latestMtimeMs: number | null;
+  latestFileMtimeMs: number | null;
+  latestDirectoryMtimeMs: number | null;
   scanComplete: boolean;
   warnings: string[];
 }
