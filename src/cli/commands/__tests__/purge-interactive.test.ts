@@ -3,6 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import type { Prompter } from '../../interactive/prompts.ts';
+import {
+  PURGE_INTERACTIVE_ROOT_PROMPT,
+  purgeInteractiveProjectPrompt,
+} from '../purge-interactive.ts';
 import { runPurgeCommand } from '../purge.ts';
 import {
   getWorkspaceFilesystemLayout,
@@ -69,7 +73,7 @@ describe('purge interactive command', () => {
         message: string;
         options: Array<{ value: T; label?: string }>;
       }) => {
-        if (opts.message === 'Select a project to clean') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootLabels.push(...opts.options.map((option) => option.label ?? ''));
           return opts.options.find((option) => option.value === 'cancel')!.value;
         }
@@ -131,7 +135,7 @@ describe('purge interactive command', () => {
         options: Array<{ value: T; label?: string }>;
       }) => {
         messages.push(opts.message);
-        if (opts.message === 'Select a project to clean' && !selectedProject) {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT && !selectedProject) {
           selectedProject = true;
           return opts.options.find((option) => option.label?.startsWith('› DemoApp - '))!.value;
         }
@@ -149,9 +153,9 @@ describe('purge interactive command', () => {
       { currentWorkspaceKey, prompter, isTTY: true, now, write: output.write },
     );
 
-    expect(messages).toContain('Select a project to clean');
+    expect(messages).toContain(PURGE_INTERACTIVE_ROOT_PROMPT);
     expect(messages.some((message) => /^Delete .*\?$/u.test(message))).toBe(true);
-    expect(messages).not.toContain('Project DemoApp');
+    expect(messages).not.toContain(purgeInteractiveProjectPrompt('DemoApp'));
     expect(output.chunks.join('')).toContain('No storage deleted.');
   });
 
@@ -165,7 +169,7 @@ describe('purge interactive command', () => {
         message: string;
         options: Array<{ value: T; label?: string }>;
       }) => {
-        if (opts.message === 'Select a project to clean') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootLabels.push(...opts.options.map((option) => option.label ?? ''));
           return opts.options.find((option) => option.value === 'cancel')!.value;
         }

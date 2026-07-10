@@ -29,6 +29,18 @@ import {
   storageClassLabel,
 } from './purge-ui.ts';
 
+export const PURGE_INTERACTIVE_ROOT_PROMPT = 'Select a project to clean';
+
+export function purgeInteractiveProjectPrompt(projectName: string): string {
+  return `Project ${projectName}`;
+}
+
+export function purgeInteractiveWorkspacePrompt(workspaceKey: string): string {
+  return `Workspace ${workspaceKey}`;
+}
+
+// Interactive purge is a confirmation-gated human flow. Bulk actions intentionally
+// include DerivedData; non-TTY modes keep stricter defaults for scripts and agents.
 const FULL_WORKSPACE_CLASSES: PurgeStorageDeletableClass[] = [...PURGE_STORAGE_DELETABLE_CLASSES];
 
 type RootSelection = 'cancel' | WorkspaceGroupSummary;
@@ -269,7 +281,7 @@ async function handleWorkspace(params: {
     let selection: WorkspaceSelection;
     try {
       selection = await deps.prompter.selectOne({
-        message: `Workspace ${workspace.workspaceKey}`,
+        message: purgeInteractiveWorkspacePrompt(workspace.workspaceKey),
         options: workspaceActionOptions(workspace, state),
         initialIndex: 0,
       });
@@ -316,7 +328,7 @@ async function handleProject(params: {
     let selection: ProjectSelection;
     try {
       selection = await deps.prompter.selectOne({
-        message: `Project ${group.name}`,
+        message: purgeInteractiveProjectPrompt(group.name),
         options: projectOptions(group, deps.currentWorkspaceKey, state),
         initialIndex: 0,
       });
@@ -378,7 +390,7 @@ export async function runInteractivePurge(deps: PurgeInteractiveDependencies): P
       let selection: RootSelection;
       try {
         selection = await deps.prompter.selectOne({
-          message: 'Select a project to clean',
+          message: PURGE_INTERACTIVE_ROOT_PROMPT,
           options: rootOptions(state.groups),
           initialIndex: 0,
         });

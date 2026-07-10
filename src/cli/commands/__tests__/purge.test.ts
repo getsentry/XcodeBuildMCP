@@ -7,6 +7,11 @@ import {
   PromptInterruptedError,
   type Prompter,
 } from '../../interactive/prompts.ts';
+import {
+  PURGE_INTERACTIVE_ROOT_PROMPT,
+  purgeInteractiveProjectPrompt,
+  purgeInteractiveWorkspacePrompt,
+} from '../purge-interactive.ts';
 import { runPurgeCommand } from '../purge.ts';
 import {
   getWorkspaceFilesystemLayout,
@@ -197,18 +202,22 @@ describe('purge command', () => {
   it('runs the interactive project to workspace to folder flow for one workspace', async () => {
     const first = getWorkspaceFilesystemLayout(currentWorkspaceKey);
     const secondWorkspaceKey = 'DemoApp-abcdefabcdef';
+    const thirdWorkspaceKey = 'DemoApp-bbbbbbbbbbbb';
     const second = getWorkspaceFilesystemLayout(secondWorkspaceKey);
+    const third = getWorkspaceFilesystemLayout(thirdWorkspaceKey);
     const firstLog = path.join(first.logs, managedLogName('first'));
     const secondLog = path.join(second.logs, managedLogName('second'));
+    const thirdLog = path.join(third.logs, managedLogName('third'));
     writeFileWithMtime(firstLog, 'first', now - 10 * DAY_MS);
     writeFileWithMtime(secondLog, 'second', now - 10 * DAY_MS);
+    writeFileWithMtime(thirdLog, 'third', now - 10 * DAY_MS);
     const output = captureOutput();
     const messages: string[] = [];
     let deleted = false;
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
         messages.push(opts.message);
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           if (deleted) return opts.options.find((option) => option.value === 'cancel')!.value;
           return opts.options.find(
             (option) =>
@@ -218,7 +227,7 @@ describe('purge command', () => {
               option.value.name === 'DemoApp',
           )!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           if (deleted) return opts.options.find((option) => option.value === 'back')!.value;
           return opts.options.find(
             (option) =>
@@ -228,7 +237,7 @@ describe('purge command', () => {
               option.value.workspaceKey === currentWorkspaceKey,
           )!.value;
         }
-        if (opts.message === `Workspace ${currentWorkspaceKey}`) {
+        if (opts.message === purgeInteractiveWorkspacePrompt(currentWorkspaceKey)) {
           if (deleted) return opts.options.find((option) => option.value === 'back')!.value;
           return opts.options.find((option) => option.value === 'logs')!.value;
         }
@@ -253,9 +262,9 @@ describe('purge command', () => {
     );
 
     const text = output.chunks.join('');
-    expect(messages).toContain('What do you want to do?');
-    expect(messages).toContain('Project DemoApp');
-    expect(messages).toContain(`Workspace ${currentWorkspaceKey}`);
+    expect(messages).toContain(PURGE_INTERACTIVE_ROOT_PROMPT);
+    expect(messages).toContain(purgeInteractiveProjectPrompt('DemoApp'));
+    expect(messages).toContain(purgeInteractiveWorkspacePrompt(currentWorkspaceKey));
     expect(messages).not.toContain('Select project');
     expect(messages).not.toContain('Select workspace in DemoApp');
     expect(messages).not.toContain(`Select folders in ${currentWorkspaceKey}`);
@@ -263,6 +272,7 @@ describe('purge command', () => {
     expect(text).not.toContain('Warnings:');
     expect(existsSync(firstLog)).toBe(false);
     expect(existsSync(secondLog)).toBe(true);
+    expect(existsSync(thirdLog)).toBe(true);
   });
 
   it('runs the interactive workspace DerivedData action without deleting logs', async () => {
@@ -279,7 +289,7 @@ describe('purge command', () => {
     let deleted = false;
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           if (deleted) return opts.options.find((option) => option.value === 'cancel')!.value;
           return opts.options.find(
             (option) =>
@@ -289,7 +299,7 @@ describe('purge command', () => {
               option.value.name === 'DemoApp',
           )!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           if (deleted) return opts.options.find((option) => option.value === 'back')!.value;
           return opts.options.find(
             (option) =>
@@ -299,7 +309,7 @@ describe('purge command', () => {
               option.value.workspaceKey === currentWorkspaceKey,
           )!.value;
         }
-        if (opts.message === `Workspace ${currentWorkspaceKey}`) {
+        if (opts.message === purgeInteractiveWorkspacePrompt(currentWorkspaceKey)) {
           if (deleted) return opts.options.find((option) => option.value === 'back')!.value;
           return opts.options.find((option) => option.value === 'derivedData')!.value;
         }
@@ -339,7 +349,7 @@ describe('purge command', () => {
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
         messages.push(opts.message);
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootVisits += 1;
           if (rootVisits > 1)
             return opts.options.find((option) => option.value === 'cancel')!.value;
@@ -351,7 +361,7 @@ describe('purge command', () => {
               option.value.name === 'DemoApp',
           )!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           projectVisits += 1;
           if (projectVisits > 1)
             return opts.options.find((option) => option.value === 'back')!.value;
@@ -363,7 +373,7 @@ describe('purge command', () => {
               option.value.workspaceKey === currentWorkspaceKey,
           )!.value;
         }
-        if (opts.message === `Workspace ${currentWorkspaceKey}`) {
+        if (opts.message === purgeInteractiveWorkspacePrompt(currentWorkspaceKey)) {
           return opts.options.find((option) => option.value === 'back')!.value;
         }
         return opts.options[0].value;
@@ -382,11 +392,11 @@ describe('purge command', () => {
     );
 
     expect(messages).toEqual([
-      'What do you want to do?',
-      'Project DemoApp',
-      `Workspace ${currentWorkspaceKey}`,
-      'Project DemoApp',
-      'What do you want to do?',
+      PURGE_INTERACTIVE_ROOT_PROMPT,
+      purgeInteractiveProjectPrompt('DemoApp'),
+      purgeInteractiveWorkspacePrompt(currentWorkspaceKey),
+      purgeInteractiveProjectPrompt('DemoApp'),
+      PURGE_INTERACTIVE_ROOT_PROMPT,
     ]);
     expect(output.chunks.join('')).toContain('No storage deleted.');
     expect(existsSync(firstLog)).toBe(true);
@@ -395,13 +405,19 @@ describe('purge command', () => {
 
   it('treats prompt cancellation as back in nested menus and cancel at the root', async () => {
     const layout = getWorkspaceFilesystemLayout(currentWorkspaceKey);
+    const second = getWorkspaceFilesystemLayout('DemoApp-abcdefabcdef');
     const logPath = path.join(layout.logs, managedLogName('old'));
     writeFileWithMtime(logPath, 'old', now - 10 * DAY_MS);
+    writeFileWithMtime(
+      path.join(second.logs, managedLogName('second')),
+      'second',
+      now - 10 * DAY_MS,
+    );
     const output = captureOutput();
     let rootVisits = 0;
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootVisits += 1;
           if (rootVisits > 1) throw new PromptCancelledError();
           return opts.options.find(
@@ -412,7 +428,7 @@ describe('purge command', () => {
               option.value.name === 'DemoApp',
           )!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           throw new PromptCancelledError();
         }
         return opts.options[0].value;
@@ -432,12 +448,18 @@ describe('purge command', () => {
 
   it('quits cleanly when an interactive prompt is interrupted from a nested menu', async () => {
     const layout = getWorkspaceFilesystemLayout(currentWorkspaceKey);
+    const second = getWorkspaceFilesystemLayout('DemoApp-abcdefabcdef');
     const logPath = path.join(layout.logs, managedLogName('old'));
     writeFileWithMtime(logPath, 'old', now - 10 * DAY_MS);
+    writeFileWithMtime(
+      path.join(second.logs, managedLogName('second')),
+      'second',
+      now - 10 * DAY_MS,
+    );
     const output = captureOutput();
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           return opts.options.find(
             (option) =>
               typeof option.value === 'object' &&
@@ -446,7 +468,7 @@ describe('purge command', () => {
               option.value.name === 'DemoApp',
           )!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           throw new PromptInterruptedError();
         }
         return opts.options[0].value;
@@ -471,7 +493,7 @@ describe('purge command', () => {
     const output = captureOutput();
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           const demoApp = opts.options.find(
             (option) =>
               typeof option.value === 'object' &&
@@ -506,9 +528,10 @@ describe('purge command', () => {
     let rootVisits = 0;
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootVisits += 1;
           if (rootVisits === 1) {
+            rmSync(logPath, { force: true });
             return opts.options.find(
               (option) =>
                 typeof option.value === 'object' &&
@@ -518,10 +541,6 @@ describe('purge command', () => {
             )!.value;
           }
           return opts.options.find((option) => option.value === 'cancel')!.value;
-        }
-        if (opts.message === 'Project DemoApp') {
-          rmSync(logPath, { force: true });
-          return opts.options.find((option) => option.value === 'deleteAllWorkspaces')!.value;
         }
         return opts.options[0].value;
       },
@@ -555,7 +574,7 @@ describe('purge command', () => {
     let rootVisits = 0;
     const prompter: Prompter = {
       selectOne: async <T>(opts: { message: string; options: Array<{ value: T }> }) => {
-        if (opts.message === 'What do you want to do?') {
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
           rootVisits += 1;
           const demoApp = opts.options.find(
             (option) =>
@@ -570,7 +589,7 @@ describe('purge command', () => {
           expect(demoApp).toBeUndefined();
           return opts.options.find((option) => option.value === 'cancel')!.value;
         }
-        if (opts.message === 'Project DemoApp') {
+        if (opts.message === purgeInteractiveProjectPrompt('DemoApp')) {
           return opts.options.find((option) => option.value === 'deleteAllWorkspaces')!.value;
         }
         return opts.options[0].value;
