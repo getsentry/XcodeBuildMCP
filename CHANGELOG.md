@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added Autohand Code MCP client setup documentation ([#471](https://github.com/getsentry/XcodeBuildMCP/pull/471) by [@igorcosta](https://github.com/igorcosta)).
 - Added `extraArgs` as a first-class session-default value. Repo config or runtime defaults can now carry common `xcodebuild` flags (for example `-skipPackagePluginValidation` or `-disableAutomaticPackageResolution`) so they don't need repeating on every build or test call. Per-call `extraArgs` replace matching configured flags or build settings and append after non-matching defaults, while an explicit empty array (`extraArgs: []`) clears the defaults for a single call. The session management tools show, set, sync, and clear `extraArgs` alongside the other defaults.
 
 ## [2.6.2]
