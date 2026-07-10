@@ -31,6 +31,14 @@ xcodebuildmcp --help
 
 Drop-in config snippets for Cursor, Claude Code, Codex, can be found in the official docs page [MCP Clients](https://xcodebuildmcp.com/docs/clients). Most clients can also run the MCP server on demand via `npx -y xcodebuildmcp@latest mcp` without a global install.
 
+For Autohand Code, add the server from the command line:
+
+```bash
+autohand mcp add xcodebuildmcp npx -y xcodebuildmcp@latest mcp
+```
+
+Add `--scope project` after `add` to keep the server configuration in the current project. See [Autohand Code](https://github.com/autohandai/code-cli/) for current installation and CLI details.
+
 ## Requirements
 
 - macOS 14.5 or later
