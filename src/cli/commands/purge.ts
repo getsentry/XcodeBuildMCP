@@ -264,7 +264,7 @@ export async function runPurgeCommand(
   }
 
   if (mode === 'report') {
-    const selectedScope = resolveScope(args, resolvedDeps.currentWorkspaceKey);
+    const selectedScope = resolvePlanningScope(args, resolvedDeps.currentWorkspaceKey);
     const report = await enumeratePurgeStorage({
       now: resolvedDeps.now,
       scope: selectedScope,

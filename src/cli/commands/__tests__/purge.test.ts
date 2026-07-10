@@ -69,9 +69,16 @@ describe('purge command', () => {
     expect(existsSync(logPath)).toBe(true);
   });
 
-  it('prints deterministic JSON report output', async () => {
+  it('prints deterministic JSON report output for the current workspace by default', async () => {
     const layout = getWorkspaceFilesystemLayout(currentWorkspaceKey);
+    const unrelatedWorkspaceKey = 'OtherApp-abcdefabcdef';
+    const unrelated = getWorkspaceFilesystemLayout(unrelatedWorkspaceKey);
     writeFileWithMtime(path.join(layout.logs, managedLogName('old')), 'old', now - 10 * DAY_MS);
+    writeFileWithMtime(
+      path.join(unrelated.logs, managedLogName('unrelated')),
+      'unrelated',
+      now - 10 * DAY_MS,
+    );
     const output = captureOutput();
 
     await runPurgeCommand(
@@ -82,12 +89,46 @@ describe('purge command', () => {
     const parsed = JSON.parse(output.chunks.join('')) as {
       action: string;
       deletionHappened: boolean;
+      selectedScope: { type: string; workspaceKey?: string };
       workspaces: Array<{ workspaceKey: string }>;
     };
     expect(parsed.action).toBe('report');
     expect(parsed.deletionHappened).toBe(false);
+    expect(parsed.selectedScope).toEqual({ type: 'workspace', workspaceKey: currentWorkspaceKey });
     expect(parsed.workspaces.map((workspace) => workspace.workspaceKey)).toEqual([
       currentWorkspaceKey,
+    ]);
+  });
+
+  it('reports all workspaces when all scope is explicit', async () => {
+    const unrelatedWorkspaceKey = 'OtherApp-abcdefabcdef';
+    const target = getWorkspaceFilesystemLayout(currentWorkspaceKey);
+    const unrelated = getWorkspaceFilesystemLayout(unrelatedWorkspaceKey);
+    writeFileWithMtime(
+      path.join(target.logs, managedLogName('target')),
+      'target',
+      now - 10 * DAY_MS,
+    );
+    writeFileWithMtime(
+      path.join(unrelated.logs, managedLogName('unrelated')),
+      'unrelated',
+      now - 10 * DAY_MS,
+    );
+    const output = captureOutput();
+
+    await runPurgeCommand(
+      { report: true, scope: 'all', json: true },
+      { currentWorkspaceKey, isTTY: false, now, write: output.write },
+    );
+
+    const parsed = JSON.parse(output.chunks.join('')) as {
+      selectedScope: { type: string };
+      workspaces: Array<{ workspaceKey: string }>;
+    };
+    expect(parsed.selectedScope).toEqual({ type: 'all' });
+    expect(parsed.workspaces.map((workspace) => workspace.workspaceKey).sort()).toEqual([
+      currentWorkspaceKey,
+      unrelatedWorkspaceKey,
     ]);
   });
 
