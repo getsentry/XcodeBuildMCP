@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import type { Prompter } from '../../interactive/prompts.ts';
 import {
   PURGE_INTERACTIVE_ROOT_PROMPT,
   purgeInteractiveProjectPrompt,
+  purgeInteractiveWorkspacePrompt,
 } from '../purge-interactive.ts';
 import { runPurgeCommand } from '../purge.ts';
 import {
@@ -123,28 +124,40 @@ describe('purge interactive command', () => {
     expect(output.chunks.join('')).not.toContain('2 workspaces');
   });
 
-  it('opens the delete confirmation directly for a single-workspace project', async () => {
+  it('opens the workspace class menu for a single-workspace project', async () => {
     const layout = getWorkspaceFilesystemLayout(currentWorkspaceKey);
-    writeFileWithMtime(path.join(layout.logs, managedLogName('known')), 'known', now - 10 * DAY_MS);
+    const logPath = path.join(layout.logs, managedLogName('known'));
+    const derivedDataPath = path.join(layout.derivedData, 'DemoApp-a');
+    writeFileWithMtime(logPath, 'known', now - 10 * DAY_MS);
+    writeFileWithMtime(derivedDataPath, 'derived', now - 10 * DAY_MS);
     const output = captureOutput();
     const messages: string[] = [];
-    let selectedProject = false;
+    let rootVisits = 0;
+    let workspaceVisits = 0;
     const prompter: Prompter = {
       selectOne: async <T>(opts: {
         message: string;
         options: Array<{ value: T; label?: string }>;
       }) => {
         messages.push(opts.message);
-        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT && !selectedProject) {
-          selectedProject = true;
+        if (opts.message === PURGE_INTERACTIVE_ROOT_PROMPT) {
+          rootVisits += 1;
+          if (rootVisits > 1)
+            return opts.options.find((option) => option.value === 'cancel')!.value;
           return opts.options.find((option) => option.label?.startsWith('› DemoApp - '))!.value;
+        }
+        if (opts.message === purgeInteractiveWorkspacePrompt(currentWorkspaceKey)) {
+          workspaceVisits += 1;
+          if (workspaceVisits > 1)
+            return opts.options.find((option) => option.value === 'back')!.value;
+          return opts.options.find((option) => option.value === 'logs')!.value;
         }
         return opts.options.find((option) => option.value === 'cancel')!.value;
       },
       selectMany: async () => [],
       confirm: async (opts) => {
         messages.push(opts.message);
-        return false;
+        return true;
       },
     };
 
@@ -154,9 +167,12 @@ describe('purge interactive command', () => {
     );
 
     expect(messages).toContain(PURGE_INTERACTIVE_ROOT_PROMPT);
+    expect(messages).toContain(purgeInteractiveWorkspacePrompt(currentWorkspaceKey));
     expect(messages.some((message) => /^Delete .*\?$/u.test(message))).toBe(true);
     expect(messages).not.toContain(purgeInteractiveProjectPrompt('DemoApp'));
-    expect(output.chunks.join('')).toContain('No storage deleted.');
+    expect(output.chunks.join('')).toContain('Deleted 1 item;');
+    expect(existsSync(logPath)).toBe(false);
+    expect(existsSync(derivedDataPath)).toBe(true);
   });
 
   it('omits global destructive actions from the root menu', async () => {

@@ -317,12 +317,7 @@ async function handleProject(params: {
       return;
     }
     if (group.workspaces.length === 1) {
-      await confirmAndDeleteWorkspaces(
-        deps,
-        state,
-        [group.workspaces[0].workspaceKey],
-        FULL_WORKSPACE_CLASSES,
-      );
+      await handleWorkspace({ deps, state, workspaceKey: group.workspaces[0].workspaceKey });
       return;
     }
     let selection: ProjectSelection;

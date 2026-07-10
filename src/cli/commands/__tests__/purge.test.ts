@@ -240,6 +240,22 @@ describe('purge command', () => {
     ).rejects.toThrow('--dry-run cannot be combined with --confirm.');
   });
 
+  it('rejects blank workspace and family scope values', async () => {
+    await expect(
+      runPurgeCommand(
+        { dryRun: true, workspaceKey: '', classes: 'logs' },
+        { currentWorkspaceKey, isTTY: false, now, write: captureOutput().write },
+      ),
+    ).rejects.toThrow('--workspace-key must not be empty.');
+
+    await expect(
+      runPurgeCommand(
+        { report: true, family: '   ' },
+        { currentWorkspaceKey, isTTY: false, now, write: captureOutput().write },
+      ),
+    ).rejects.toThrow('--family must not be empty.');
+  });
+
   it('runs the interactive project to workspace to folder flow for one workspace', async () => {
     const first = getWorkspaceFilesystemLayout(currentWorkspaceKey);
     const secondWorkspaceKey = 'DemoApp-abcdefabcdef';

@@ -155,34 +155,48 @@ function parseClasses(value: string | string[] | undefined): {
   return { classes: Array.from(new Set(parsed)), explicit: true };
 }
 
+function normalizedScopeValue(value: string | undefined, flagName: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`${flagName} must not be empty.`);
+  }
+  return trimmed;
+}
+
 function resolveScope(args: PurgeCommandArguments, currentWorkspaceKey: string): PurgeStorageScope {
-  if (args.scope === 'current' && (args.workspaceKey || args.family)) {
+  const workspaceKey = normalizedScopeValue(args.workspaceKey, '--workspace-key');
+  const family = normalizedScopeValue(args.family, '--family');
+
+  if (args.scope === 'current' && (workspaceKey !== undefined || family !== undefined)) {
     throw new Error('--scope current cannot be combined with --workspace-key or --family.');
   }
 
-  if (args.scope === 'workspace' && args.family) {
+  if (args.scope === 'workspace' && family !== undefined) {
     throw new Error('--scope workspace cannot be combined with --family.');
   }
 
   if (args.scope === 'all') {
-    if (args.workspaceKey || args.family) {
+    if (workspaceKey !== undefined || family !== undefined) {
       throw new Error('--scope all cannot be combined with --workspace-key or --family.');
     }
     return { type: 'all' };
   }
 
-  if (args.scope === 'family' || args.family) {
-    if (!args.family) {
+  if (args.scope === 'family' || family !== undefined) {
+    if (family === undefined) {
       throw new Error('--scope family requires --family <basename-prefix>.');
     }
-    if (args.workspaceKey) {
+    if (workspaceKey !== undefined) {
       throw new Error('--family cannot be combined with --workspace-key.');
     }
-    return { type: 'family', family: args.family };
+    return { type: 'family', family };
   }
 
-  if (args.scope === 'workspace' || args.workspaceKey) {
-    return { type: 'workspace', workspaceKey: args.workspaceKey ?? currentWorkspaceKey };
+  if (args.scope === 'workspace' || workspaceKey !== undefined) {
+    return { type: 'workspace', workspaceKey: workspaceKey ?? currentWorkspaceKey };
   }
 
   if (args.scope === 'current') {

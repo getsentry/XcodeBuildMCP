@@ -46,18 +46,18 @@ describe('purge report scope', () => {
     rmSync(appDir, { recursive: true, force: true });
   });
 
-  it('keeps default report enumeration aligned with the all recognized workspaces scope', async () => {
-    const recognized = getWorkspaceFilesystemLayout(currentWorkspaceKey);
-    const unrecognizedWorkspaceKey = '20260524T184215Z';
-    const unrecognized = getWorkspaceFilesystemLayout(unrecognizedWorkspaceKey);
+  it('keeps explicit report defaults aligned with the current workspace planning scope', async () => {
+    const current = getWorkspaceFilesystemLayout(currentWorkspaceKey);
+    const unrelatedWorkspaceKey = 'OtherApp-abcdefabcdef';
+    const unrelated = getWorkspaceFilesystemLayout(unrelatedWorkspaceKey);
     writeFileWithMtime(
-      path.join(recognized.logs, managedLogName('recognized')),
-      'recognized',
+      path.join(current.logs, managedLogName('current')),
+      'current',
       now - 10 * DAY_MS,
     );
     writeFileWithMtime(
-      path.join(unrecognized.logs, managedLogName('unrecognized')),
-      'unrecognized',
+      path.join(unrelated.logs, managedLogName('unrelated')),
+      'unrelated',
       now - 10 * DAY_MS,
     );
     const output = captureOutput();
@@ -68,14 +68,14 @@ describe('purge report scope', () => {
     );
 
     const parsed = JSON.parse(output.chunks.join('')) as {
-      selectedScope: { type: string };
+      selectedScope: { type: string; workspaceKey?: string };
       totals: { bytes: number };
       workspaces: Array<{ workspaceKey: string }>;
     };
-    expect(parsed.selectedScope).toEqual({ type: 'all' });
+    expect(parsed.selectedScope).toEqual({ type: 'workspace', workspaceKey: currentWorkspaceKey });
     expect(parsed.workspaces.map((workspace) => workspace.workspaceKey)).toEqual([
       currentWorkspaceKey,
     ]);
-    expect(parsed.totals.bytes).toBe(Buffer.byteLength('recognized'));
+    expect(parsed.totals.bytes).toBe(Buffer.byteLength('current'));
   });
 });
