@@ -406,8 +406,7 @@
         "preferXcodebuild",
         "platform",
         "bundleId",
-        "env",
-        "extraArgs"
+        "env"
       ]
     },
     "buildInvocationRequest": {

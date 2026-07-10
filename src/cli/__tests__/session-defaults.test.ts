@@ -142,39 +142,18 @@ describe('CLI session defaults', () => {
     });
   });
 
-  it('keeps repeatable configured destination extraArgs when explicit args add another', () => {
+  it('lets explicit destination extraArgs replace matching configured extraArgs', () => {
     const merged = mergeCliSessionDefaults({
       defaults: {
-        extraArgs: ['-destination', 'id=DEFAULT', '-skipPackagePluginValidation'],
+        extraArgs: ['-quiet', '-skipMacroValidation', '-destination', 'id=x'],
       },
       explicitArgs: {
-        extraArgs: ['-destination', 'id=EXPLICIT'],
+        extraArgs: ['-quiet', '-destination', 'id=y'],
       },
     });
 
     expect(merged).toEqual({
-      extraArgs: [
-        '-destination',
-        'id=DEFAULT',
-        '-skipPackagePluginValidation',
-        '-destination',
-        'id=EXPLICIT',
-      ],
-    });
-  });
-
-  it('appends explicit scalar extraArgs after matching configured extraArgs', () => {
-    const merged = mergeCliSessionDefaults({
-      defaults: {
-        extraArgs: ['-configuration', 'Debug'],
-      },
-      explicitArgs: {
-        extraArgs: ['-configuration', 'Release'],
-      },
-    });
-
-    expect(merged).toEqual({
-      extraArgs: ['-configuration', 'Debug', '-configuration', 'Release'],
+      extraArgs: ['-skipMacroValidation', '-quiet', '-destination', 'id=y'],
     });
   });
 
