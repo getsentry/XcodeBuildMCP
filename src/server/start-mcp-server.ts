@@ -169,30 +169,48 @@ export async function startMcpServer(): Promise<void> {
 
     lifecycle.markPhase('running');
     idleShutdown.start();
-    const startupSnapshot = await lifecycle.getSnapshot();
-    log('info', `[mcp-lifecycle] start ${JSON.stringify(startupSnapshot)}`);
-    recordMcpLifecycleMetric({
-      event: 'start',
-      phase: startupSnapshot.phase,
-      uptimeMs: startupSnapshot.uptimeMs,
-      rssBytes: startupSnapshot.rssBytes,
-      matchingMcpProcessCount: startupSnapshot.matchingMcpProcessCount,
-      activeOperationCount: startupSnapshot.activeOperationCount,
-      watcherRunning: startupSnapshot.watcherRunning,
-    });
-    for (const anomaly of startupSnapshot.anomalies) {
-      recordMcpLifecycleAnomalyMetric({
-        kind: anomaly,
-        phase: startupSnapshot.phase,
+
+    // Startup snapshot (simulator os_log sessions, peer process sample, etc.) is
+    // telemetry-only. Awaiting it blocked the first tools/list by ~10–17s on cold
+    // start, which makes short health-probe clients report "tools fetch failed"
+    // even though the transport is already up. Keep the same logging/metrics, but
+    // do not block readiness on the snapshot. See #461.
+    void lifecycle
+      .getSnapshot()
+      .then((startupSnapshot) => {
+        if (lifecycle.isShutdownRequested()) {
+          return;
+        }
+        log('info', `[mcp-lifecycle] start ${JSON.stringify(startupSnapshot)}`);
+        recordMcpLifecycleMetric({
+          event: 'start',
+          phase: startupSnapshot.phase,
+          uptimeMs: startupSnapshot.uptimeMs,
+          rssBytes: startupSnapshot.rssBytes,
+          matchingMcpProcessCount: startupSnapshot.matchingMcpProcessCount,
+          activeOperationCount: startupSnapshot.activeOperationCount,
+          watcherRunning: startupSnapshot.watcherRunning,
+        });
+        for (const anomaly of startupSnapshot.anomalies) {
+          recordMcpLifecycleAnomalyMetric({
+            kind: anomaly,
+            phase: startupSnapshot.phase,
+          });
+        }
+        if (startupSnapshot.anomalies.length > 0) {
+          log(
+            'warn',
+            `[mcp-lifecycle] startup anomalies observed: ${startupSnapshot.anomalies.join(', ')}`,
+            { sentry: true },
+          );
+        }
+      })
+      .catch((error) => {
+        log(
+          'warn',
+          `Startup lifecycle snapshot failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       });
-    }
-    if (startupSnapshot.anomalies.length > 0) {
-      log(
-        'warn',
-        `[mcp-lifecycle] startup anomalies observed: ${startupSnapshot.anomalies.join(', ')}`,
-        { sentry: true },
-      );
-    }
 
     lifecycle.markPhase('deferred-initialization');
     void bootstrap
