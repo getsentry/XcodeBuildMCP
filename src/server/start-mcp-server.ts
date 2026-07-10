@@ -170,6 +170,11 @@ export async function startMcpServer(): Promise<void> {
     lifecycle.markPhase('running');
     idleShutdown.start();
 
+    // Capture phase at schedule time so deferred snapshot metrics are not
+    // attributed to a later phase (e.g. deferred-initialization) if markPhase
+    // advances before getSnapshot resolves. See #461 / review note.
+    const startupMetricPhase = 'running' as const;
+
     // Startup snapshot (simulator os_log sessions, peer process sample, etc.) is
     // telemetry-only. Awaiting it blocked the first tools/list by ~10–17s on cold
     // start, which makes short health-probe clients report "tools fetch failed"
@@ -181,10 +186,13 @@ export async function startMcpServer(): Promise<void> {
         if (lifecycle.isShutdownRequested()) {
           return;
         }
-        log('info', `[mcp-lifecycle] start ${JSON.stringify(startupSnapshot)}`);
+        // Prefer the phase at snapshot-schedule time for metrics; still log the
+        // full snapshot object as returned for operational debugging.
+        const metricPhase = startupMetricPhase;
+        log('info', `[mcp-lifecycle] start ${JSON.stringify({ ...startupSnapshot, phase: metricPhase })}`);
         recordMcpLifecycleMetric({
           event: 'start',
-          phase: startupSnapshot.phase,
+          phase: metricPhase,
           uptimeMs: startupSnapshot.uptimeMs,
           rssBytes: startupSnapshot.rssBytes,
           matchingMcpProcessCount: startupSnapshot.matchingMcpProcessCount,
@@ -194,7 +202,7 @@ export async function startMcpServer(): Promise<void> {
         for (const anomaly of startupSnapshot.anomalies) {
           recordMcpLifecycleAnomalyMetric({
             kind: anomaly,
-            phase: startupSnapshot.phase,
+            phase: metricPhase,
           });
         }
         if (startupSnapshot.anomalies.length > 0) {
