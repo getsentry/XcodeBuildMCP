@@ -66,12 +66,19 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
     vi.useRealTimers();
   });
 
-  async function runRefresh(options: { simulatorId?: string; simulatorName?: string }) {
+  async function runRefresh(options: {
+    simulatorId?: string;
+    simulatorName?: string;
+    storedSimulatorPlatform?: 'iOS Simulator' | 'tvOS Simulator';
+  }) {
     vi.useFakeTimers();
 
     const defaults = {
       ...(options.simulatorId != null ? { simulatorId: options.simulatorId } : {}),
       ...(options.simulatorName != null ? { simulatorName: options.simulatorName } : {}),
+      ...(options.storedSimulatorPlatform != null
+        ? { simulatorPlatform: options.storedSimulatorPlatform }
+        : {}),
     };
     sessionStore.setDefaults(defaults);
     const expectedRevision = sessionStore.getRevision();
@@ -185,6 +192,28 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
       'info',
       expect.stringContaining('Could not infer simulator platform during startup-hydration'),
     );
+    expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the stale cached platform when the id is remapped but recompute fails', async () => {
+    resolveSimulatorNameToIdMock.mockResolvedValue({
+      success: true,
+      simulatorId: 'SIM-2',
+      simulatorName: 'iPhone 17 Pro',
+    });
+    inferPlatformMock.mockRejectedValue(new Error('Unable to determine the simulator platform'));
+
+    await runRefresh({
+      simulatorId: 'SIM-1',
+      simulatorName: 'iPhone 17 Pro',
+      storedSimulatorPlatform: 'tvOS Simulator',
+    });
+
+    // The new id must not stay paired with the previous device's platform.
+    expect(sessionStore.getAll()).toEqual({
+      simulatorId: 'SIM-2',
+      simulatorName: 'iPhone 17 Pro',
+    });
     expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
   });
 

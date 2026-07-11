@@ -333,6 +333,11 @@ function getChangedFields(
       afterValue: afterDefaults.simulatorName,
     },
     {
+      label: 'sessionDefaults.simulatorPlatform',
+      beforeValue: beforeDefaults.simulatorPlatform,
+      afterValue: afterDefaults.simulatorPlatform,
+    },
+    {
       label: 'setupPreferences.platforms',
       beforeValue: beforeConfig?.setupPreferences?.platforms,
       afterValue: afterConfig.setupPreferences?.platforms,

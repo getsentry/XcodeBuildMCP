@@ -101,6 +101,7 @@ async function refreshSimulatorDefaults(
     }
 
     const shouldRecomputePlatform = options.recomputePlatform ?? true;
+    let platformRecomputed = false;
     if (shouldRecomputePlatform && (simulatorId || simulatorName)) {
       try {
         const inferred = await inferPlatform(
@@ -118,12 +119,22 @@ async function refreshSimulatorDefaults(
           executor,
         );
         patch.simulatorPlatform = inferred.platform;
+        platformRecomputed = true;
       } catch (error) {
         log(
           'info',
           `[Session] Could not infer simulator platform during ${options.reason} refresh: ${String(error)}`,
         );
       }
+    }
+
+    const deleteKeys: (keyof SessionDefaults)[] = [];
+    if (patch.simulatorId != null && !platformRecomputed) {
+      // Invariant: a changed selector must never keep the previous device's
+      // cached platform. Drop the cache and let the next inference resolve
+      // it from simctl.
+      patch.simulatorPlatform = undefined;
+      deleteKeys.push('simulatorPlatform');
     }
 
     if (Object.keys(patch).length === 0) {
@@ -144,7 +155,7 @@ async function refreshSimulatorDefaults(
     }
 
     if (options.persist) {
-      await persistSessionDefaultsPatch({ patch, profile: options.profile });
+      await persistSessionDefaultsPatch({ patch, deleteKeys, profile: options.profile });
     }
   } catch (error) {
     log(

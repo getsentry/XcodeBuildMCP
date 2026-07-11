@@ -217,6 +217,9 @@ describe('setup command', () => {
     expect(parsed.sessionDefaults?.deviceId).toBe('DEVICE-1');
     expect(parsed.sessionDefaults?.simulatorId).toBe('SIM-1');
     expect(parsed.sessionDefaults?.simulatorPlatform).toBe('iOS Simulator');
+    expect(result.changedFields).toContainEqual(
+      expect.stringContaining('sessionDefaults.simulatorPlatform'),
+    );
   });
 
   it('does not offer simulators whose runtime is unavailable', async () => {
