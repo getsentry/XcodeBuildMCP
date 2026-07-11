@@ -31,12 +31,22 @@ export const sessionDefaultsSchema = z.object({
   configuration: nonEmptyString
     .optional()
     .describe("Build configuration for Xcode and SwiftPM tools (e.g. 'Debug' or 'Release')."),
-  simulatorName: nonEmptyString.optional(),
-  simulatorId: nonEmptyString.optional(),
+  simulatorName: nonEmptyString
+    .optional()
+    .describe(
+      'Canonical, machine-portable simulator selector (safe to share via SCM); the background refresh re-resolves it to this machine’s UDID.',
+    ),
+  simulatorId: nonEmptyString
+    .optional()
+    .describe(
+      'Machine-local simulator UDID, materialized from simulatorName when one is set; UDIDs are not portable across machines.',
+    ),
   simulatorPlatform: z
     .enum(['iOS Simulator', 'watchOS Simulator', 'tvOS Simulator', 'visionOS Simulator'])
     .optional()
-    .describe('Cached inferred simulator platform.'),
+    .describe(
+      'Cached platform derived from the selected simulator’s runtime; must be cleared/recomputed whenever the simulator selector changes.',
+    ),
   deviceId: nonEmptyString.optional(),
   useLatestOS: z.boolean().optional(),
   arch: z.enum(['arm64', 'x86_64']).optional(),

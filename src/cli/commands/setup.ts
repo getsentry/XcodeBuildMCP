@@ -25,6 +25,8 @@ import type { FileSystemExecutor } from '../../utils/FileSystemExecutor.ts';
 import type { CommandExecutor } from '../../utils/CommandExecutor.ts';
 import { createDoctorDependencies } from '../../mcp/tools/doctor/lib/doctor.deps.ts';
 import { XcodePlatform } from '../../types/common.ts';
+import { inferPlatformFromRuntime } from '../../utils/infer-platform.ts';
+import type { SimulatorPlatform } from '../../utils/platform-detection.ts';
 
 type SetupPlatform = WorkflowTargetPlatform;
 
@@ -54,6 +56,7 @@ interface SetupSelection {
   deviceId?: string;
   simulatorId?: string;
   simulatorName?: string;
+  simulatorPlatform?: SimulatorPlatform;
   clearDeviceDefault: boolean;
   clearSimulatorDefault: boolean;
 }
@@ -572,7 +575,7 @@ async function selectSimulator(opts: {
     stopMessage: 'Simulators loaded.',
     task: async () => {
       try {
-        return await listSimulators(opts.executor);
+        return await listSimulators(opts.executor, { enabled: true });
       } catch {
         return [];
       }
@@ -958,6 +961,9 @@ async function collectSetupSelection(
     deviceId: device?.udid,
     simulatorId: simulator?.udid,
     simulatorName: simulator?.name,
+    simulatorPlatform: simulator
+      ? (inferPlatformFromRuntime(simulator.runtime) ?? undefined)
+      : undefined,
     clearDeviceDefault: isMacOsOnly || (requiresDeviceDefault(enabledWorkflows) && device == null),
     clearSimulatorDefault:
       isMacOsOnly || (requiresSimulatorDefault(enabledWorkflows) && simulator == null),
@@ -1000,6 +1006,9 @@ function selectionToMcpConfigJson(selection: SetupSelection): string {
   }
   if (selection.simulatorName) {
     env.XCODEBUILDMCP_SIMULATOR_NAME = selection.simulatorName;
+  }
+  if (selection.simulatorPlatform) {
+    env.XCODEBUILDMCP_SIMULATOR_PLATFORM = selection.simulatorPlatform;
   }
 
   const mcpConfig = {
@@ -1093,7 +1102,7 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
     deleteSessionDefaultKeys.push('deviceId');
   }
   if (selection.clearSimulatorDefault) {
-    deleteSessionDefaultKeys.push('simulatorId', 'simulatorName');
+    deleteSessionDefaultKeys.push('simulatorId', 'simulatorName', 'simulatorPlatform');
   }
 
   const persistedProjectPath =
@@ -1119,6 +1128,7 @@ export async function runSetupWizard(deps?: Partial<SetupDependencies>): Promise
         deviceId: selection.deviceId,
         simulatorId: selection.simulatorId,
         simulatorName: selection.simulatorName,
+        simulatorPlatform: selection.simulatorPlatform,
       },
       setupPreferences:
         selection.platforms.length > 0 ? { platforms: [...selection.platforms] } : null,

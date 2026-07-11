@@ -108,28 +108,28 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
     expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
   });
 
-  it('does not patch defaults when both values are set and name resolves to same id', async () => {
+  it('caches platform without patching id when both are set and name resolves to same id', async () => {
     resolveSimulatorNameToIdMock.mockResolvedValue({
       success: true,
       simulatorId: 'SIM-1',
       simulatorName: 'iPhone 17 Pro',
     });
-    inferPlatformMock.mockResolvedValue({
-      platform: 'iOS Simulator',
-      source: 'default',
-    });
 
     await runRefresh({ simulatorId: 'SIM-1', simulatorName: 'iPhone 17 Pro' });
 
     expect(resolveSimulatorNameToIdMock).toHaveBeenCalledTimes(1);
+    expect(resolveSimulatorIdToNameMock).not.toHaveBeenCalled();
     expect(sessionStore.getAll()).toEqual({
       simulatorId: 'SIM-1',
       simulatorName: 'iPhone 17 Pro',
+      simulatorPlatform: 'iOS Simulator',
     });
     expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
   });
 
-  it('patches simulatorId in memory when both are set and name resolves to a different id', async () => {
+  it('re-materializes the machine-local id when the name resolves to a different id', async () => {
+    // Team-sharing: config.yaml from SCM carries another machine's UDID; the
+    // canonical simulatorName must win and update the id for this machine.
     resolveSimulatorNameToIdMock.mockResolvedValue({
       success: true,
       simulatorId: 'SIM-2',
@@ -147,7 +147,48 @@ describe('scheduleSimulatorDefaultsRefresh', () => {
     expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
   });
 
-  it('keeps the existing simulatorId when name lookup fails and logs a warning', async () => {
+  it('keeps the stored id when no available simulator matches the name', async () => {
+    resolveSimulatorNameToIdMock.mockResolvedValue({
+      success: false,
+      error: 'Simulator named "iPhone 17 Pro" not found.',
+    });
+
+    await runRefresh({ simulatorId: 'SIM-1', simulatorName: 'iPhone 17 Pro' });
+
+    expect(resolveSimulatorNameToIdMock).toHaveBeenCalledTimes(1);
+    expect(sessionStore.getAll()).toEqual({
+      simulatorId: 'SIM-1',
+      simulatorName: 'iPhone 17 Pro',
+      simulatorPlatform: 'iOS Simulator',
+    });
+    expect(logMock).toHaveBeenCalledWith(
+      'info',
+      expect.stringContaining('Simulator name did not resolve during startup-hydration refresh'),
+    );
+    expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the existing defaults when the platform cannot be inferred', async () => {
+    resolveSimulatorNameToIdMock.mockResolvedValue({
+      success: false,
+      error: 'Simulator named "iPhone 17 Pro" not found.',
+    });
+    inferPlatformMock.mockRejectedValue(new Error('Unable to determine the simulator platform'));
+
+    await runRefresh({ simulatorId: 'SIM-1', simulatorName: 'iPhone 17 Pro' });
+
+    expect(sessionStore.getAll()).toEqual({
+      simulatorId: 'SIM-1',
+      simulatorName: 'iPhone 17 Pro',
+    });
+    expect(logMock).toHaveBeenCalledWith(
+      'info',
+      expect.stringContaining('Could not infer simulator platform during startup-hydration'),
+    );
+    expect(persistSessionDefaultsPatchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the existing defaults when name lookup fails and logs a warning', async () => {
     resolveSimulatorNameToIdMock.mockRejectedValue(new Error('simctl failed'));
 
     await runRefresh({ simulatorId: 'SIM-1', simulatorName: 'iPhone 17 Pro' });

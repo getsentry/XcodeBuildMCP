@@ -169,6 +169,16 @@ export async function bootstrapServer(
         }
 
         if (Object.keys(syncedDefaults).length > 0) {
+          const currentDefaults = sessionStore.getAll();
+          const selectorChanged =
+            (syncedDefaults.simulatorId != null &&
+              syncedDefaults.simulatorId !== currentDefaults.simulatorId) ||
+            (syncedDefaults.simulatorName != null &&
+              syncedDefaults.simulatorName !== currentDefaults.simulatorName);
+          if (selectorChanged) {
+            // The cached platform belongs to the previous simulator selection.
+            sessionStore.clear(['simulatorPlatform']);
+          }
           sessionStore.setDefaults(syncedDefaults);
           log(
             'info',

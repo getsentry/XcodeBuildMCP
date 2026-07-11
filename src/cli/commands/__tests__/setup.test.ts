@@ -216,6 +216,74 @@ describe('setup command', () => {
     expect(parsed.sessionDefaults?.scheme).toBe('App');
     expect(parsed.sessionDefaults?.deviceId).toBe('DEVICE-1');
     expect(parsed.sessionDefaults?.simulatorId).toBe('SIM-1');
+    expect(parsed.sessionDefaults?.simulatorPlatform).toBe('iOS Simulator');
+  });
+
+  it('does not offer simulators whose runtime is unavailable', async () => {
+    const { fs, getStoredConfig, setTempFile } = createSetupFs();
+
+    const executor: CommandExecutor = async (command) => {
+      if (command[0] === 'xcrun' && command[1] === 'devicectl') {
+        setTempFile(command[5], mockDeviceListJson());
+        return createMockCommandResponse({ success: true, output: '' });
+      }
+
+      if (command.includes('--json')) {
+        // Unavailable device is listed first: without filtering the picker would
+        // select it. The available device must be chosen instead.
+        return createMockCommandResponse({
+          success: true,
+          output: JSON.stringify({
+            devices: {
+              'com.apple.CoreSimulator.SimRuntime.iOS-26-5': [
+                {
+                  name: 'iPhone 17 Pro',
+                  udid: 'SIM-UNAVAILABLE',
+                  state: 'Shutdown',
+                  isAvailable: false,
+                },
+              ],
+              'com.apple.CoreSimulator.SimRuntime.iOS-17-0': [
+                {
+                  name: 'iPhone 15',
+                  udid: 'SIM-AVAILABLE',
+                  state: 'Shutdown',
+                  isAvailable: true,
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      if (command[0] === 'xcrun') {
+        return createMockCommandResponse({
+          success: true,
+          output: `== Devices ==\n-- iOS 17.0 --\n    iPhone 15 (SIM-AVAILABLE) (Shutdown)`,
+        });
+      }
+
+      return createMockCommandResponse({
+        success: true,
+        output: `Information about workspace "App":\n    Schemes:\n        App`,
+      });
+    };
+
+    await runSetupWizard({
+      cwd,
+      fs,
+      executor,
+      prompter: createTestPrompter(),
+      quietOutput: true,
+    });
+
+    const parsed = parseYaml(getStoredConfig()) as {
+      sessionDefaults?: Record<string, unknown>;
+    };
+
+    expect(parsed.sessionDefaults?.simulatorId).toBe('SIM-AVAILABLE');
+    expect(parsed.sessionDefaults?.simulatorName).toBe('iPhone 15');
+    expect(parsed.sessionDefaults?.simulatorPlatform).toBe('iOS Simulator');
   });
 
   it('shows debug-gated workflows when existing config enables debug', async () => {

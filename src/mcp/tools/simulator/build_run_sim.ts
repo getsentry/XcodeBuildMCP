@@ -136,10 +136,9 @@ async function prepareBuildRunSimExecution(
   );
   const detectedPlatform = inferred.platform;
   const configuration = params.configuration;
-  const displayPlatform =
-    params.simulatorId && inferred.source !== 'simulator-runtime'
-      ? 'Simulator'
-      : String(detectedPlatform);
+  // Every successful inference source (cache, runtime, name heuristic) is
+  // authoritative, so the detected platform is always safe to display.
+  const displayPlatform = String(detectedPlatform);
   const platformName = detectedPlatform.replace(' Simulator', '');
 
   return {

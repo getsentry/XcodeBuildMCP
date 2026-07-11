@@ -29,6 +29,7 @@ import {
 import { toCliJsonlEvent } from './jsonl-event.ts';
 import { resolveSimulatorNameToId } from '../utils/simulator-resolver.ts';
 import { getDefaultCommandExecutor } from '../utils/execution/index.ts';
+import { sessionStore } from '../utils/session-store.ts';
 
 export interface RegisterToolCommandsOptions {
   workspaceRoot: string;
@@ -357,6 +358,16 @@ function registerToolSubcommand(
         runtimeConfig: opts.runtimeConfig,
         profileOverride,
       });
+      // Mirror the MCP bootstrap: hydrate the in-process session store with the
+      // full resolved defaults so session-aware logic (e.g. platform inference's
+      // cached simulatorPlatform) sees fields that are not tool schema parameters.
+      // Unlike the MCP server, the CLI deliberately does NOT schedule the
+      // background simulator defaults refresh: CLI runs must stay deterministic
+      // for CI workflows/scripts, so a stale or foreign simulator id fails fast
+      // instead of being silently re-resolved to a different device.
+      if (Object.keys(rawDefaults).length > 0) {
+        sessionStore.setDefaults(rawDefaults);
+      }
       const args = mergeCliSessionDefaults({
         defaults: getCliSessionDefaultsForTool({
           tool,

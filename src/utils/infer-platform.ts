@@ -2,15 +2,10 @@ import { XcodePlatform } from '../types/common.ts';
 import type { CommandExecutor } from './execution/index.ts';
 import { getDefaultCommandExecutor } from './execution/index.ts';
 import { log } from './logging/index.ts';
-import { detectPlatformFromScheme, type SimulatorPlatform } from './platform-detection.ts';
+import type { SimulatorPlatform } from './platform-detection.ts';
 import { sessionStore, type SessionDefaults } from './session-store.ts';
 
-type PlatformInferenceSource =
-  | 'simulator-platform-cache'
-  | 'simulator-name'
-  | 'simulator-runtime'
-  | 'build-settings'
-  | 'default';
+type PlatformInferenceSource = 'simulator-platform-cache' | 'simulator-name' | 'simulator-runtime';
 
 export interface InferPlatformParams {
   projectPath?: string;
@@ -55,7 +50,7 @@ function inferPlatformFromSimulatorName(simulatorName: string): SimulatorPlatfor
   return null;
 }
 
-function inferPlatformFromRuntime(runtime: string): SimulatorPlatform | null {
+export function inferPlatformFromRuntime(runtime: string): SimulatorPlatform | null {
   const value = runtime.toLowerCase();
 
   if (value.includes('simruntime.watchos') || value.startsWith('watchos')) {
@@ -138,34 +133,6 @@ function resolveCachedPlatform(params: InferPlatformParams): SimulatorPlatform |
   return null;
 }
 
-function resolveProjectFromSession(params: InferPlatformParams): {
-  projectPath?: string;
-  workspacePath?: string;
-  scheme?: string;
-} {
-  const defaults = params.sessionDefaults ?? sessionStore.getAll();
-  const hasExplicitProjectPath = params.projectPath !== undefined;
-  const hasExplicitWorkspacePath = params.workspacePath !== undefined;
-  const projectPath =
-    params.projectPath ?? (params.workspacePath ? undefined : defaults.projectPath);
-  const workspacePath =
-    params.workspacePath ?? (params.projectPath ? undefined : defaults.workspacePath);
-
-  if (projectPath && workspacePath && !hasExplicitProjectPath && !hasExplicitWorkspacePath) {
-    return {
-      projectPath: undefined,
-      workspacePath,
-      scheme: params.scheme ?? defaults.scheme,
-    };
-  }
-
-  return {
-    projectPath,
-    workspacePath,
-    scheme: params.scheme ?? defaults.scheme,
-  };
-}
-
 async function inferPlatformFromSimctl(
   simulatorId: string | undefined,
   simulatorName: string | undefined,
@@ -226,6 +193,22 @@ async function inferPlatformFromSimctl(
   return null;
 }
 
+/**
+ * Determine the simulator platform for a simulator selector.
+ *
+ * Precedence (all sources are authoritative — derived from the device itself):
+ * 1. `sessionDefaults.simulatorPlatform` cache, only when the selector matches
+ *    the session defaults it was computed for (written by setup and the
+ *    background defaults refresh; invalidated whenever the selector changes).
+ * 2. The device's runtime from `simctl list devices available`.
+ * 3. The simulator name heuristic (e.g. "iPhone ..." -> iOS Simulator).
+ *
+ * There is deliberately NO fallback beyond these: guessing from project build
+ * settings (SUPPORTED_PLATFORMS) or defaulting to iOS produced wrong,
+ * non-deterministic destinations for multi-platform projects. If none of the
+ * sources resolve, this throws so callers surface a clear error instead of
+ * building for the wrong platform.
+ */
 export async function inferPlatform(
   params: InferPlatformParams,
   executor: CommandExecutor = getDefaultCommandExecutor(),
@@ -264,13 +247,16 @@ export async function inferPlatform(
     }
   }
 
-  const { projectPath, workspacePath, scheme } = resolveProjectFromSession(params);
-  if (scheme && (projectPath || workspacePath)) {
-    const detection = await detectPlatformFromScheme(projectPath, workspacePath, scheme, executor);
-    if (detection.platform) {
-      return { platform: detection.platform, source: 'build-settings' };
-    }
-  }
+  const selector =
+    simulatorIdForLookup != null
+      ? `simulator id "${simulatorIdForLookup}"`
+      : simulatorNameForLookup != null
+        ? `simulator name "${simulatorNameForLookup}"`
+        : 'the configured simulator';
 
-  return { platform: XcodePlatform.iOSSimulator, source: 'default' };
+  throw new Error(
+    `Unable to determine the simulator platform for ${selector}. The simulator was not found ` +
+      `among available devices — its runtime may not be installed. Run 'xcodebuildmcp setup' to ` +
+      `select an available simulator, or use the simulator list tool to see installed simulators.`,
+  );
 }

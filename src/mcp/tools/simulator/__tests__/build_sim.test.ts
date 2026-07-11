@@ -142,24 +142,23 @@ describe('build_sim tool', () => {
       expect(result.content[0].text).toContain('simulatorName');
     });
 
-    it('should handle empty simulatorName parameter', async () => {
+    it('should error when no resolvable simulator is provided (empty simulatorName)', async () => {
       const mockExecutor = createMockExecutor({
         success: false,
         output: '',
         error: 'For iOS Simulator platform, either simulatorId or simulatorName must be provided',
       });
 
-      const { result } = await runBuildSimLogic(
-        {
-          workspacePath: '/path/to/workspace',
-          scheme: 'MyScheme',
-          simulatorName: '',
-        },
-        mockExecutor,
-      );
-
-      expect(result.isError()).toBe(true);
-      expectPendingBuildResponse(result);
+      await expect(
+        runBuildSimLogic(
+          {
+            workspacePath: '/path/to/workspace',
+            scheme: 'MyScheme',
+            simulatorName: '',
+          },
+          mockExecutor,
+        ),
+      ).rejects.toThrow(/Unable to determine the simulator platform/);
     });
   });
 

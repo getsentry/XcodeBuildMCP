@@ -142,6 +142,10 @@ async function processFileChange(): Promise<void> {
 
   // Update session defaults immediately with scheme/simulatorId
   if (Object.keys(updates).length > 0) {
+    if (updates.simulatorId && updates.simulatorId !== sessionStore.getAll().simulatorId) {
+      // The cached platform belongs to the previous simulator selection.
+      sessionStore.clear(['simulatorPlatform']);
+    }
     sessionStore.setDefaults(updates);
     log('info', `[xcode-watcher] Session defaults updated: ${JSON.stringify(updates)}`);
   }
