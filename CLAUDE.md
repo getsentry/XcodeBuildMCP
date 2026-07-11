@@ -75,7 +75,13 @@ Use these sections under `## [Unreleased]`:
 - Final settled output MUST render from the final structured/domain result and next-step metadata. If final output needs data, add it to the final result type instead of reading it from fragments.
 - Streaming-capable renderers may observe fragment callbacks only for live progress. Fragment handling must not affect final structured output or final settled text.
 
+## Error Handling
+- Structured errors (domain results with `didError`) are for domain errors only: failures in the user's build/test/device/simulator workflow (compile errors, test failures, missing destinations, etc.).
+- System errors with the MCP server or CLI itself (invalid internal state, unresolvable configuration, infrastructure failures) must NOT be wrapped in structured domain results — let them surface as runtime tool errors so they are clearly distinguishable from workflow outcomes.
+
 ## Test Execution Rules
+- **NEVER run the snapshot or smoke test suites without explicit user permission.** They are expensive (~7 min baseline, spawn real `xcodebuild`/`simctl`/`devicectl` processes and can wedge). This covers `npm run test:snapshot`, `npm run test:smoke`, and any direct `vitest run --config vitest.snapshot.config.ts` / `vitest.smoke.config.ts` invocation. Ask first, then run only if the user agrees.
+- The default unit suite (`npm test` / `vitest run`), `npm run typecheck`, `npm run lint`, and `npm run build` are cheap and may be run freely without asking.
 - When running long test suites (snapshot tests, smoke tests), ALWAYS write full output to a log file and read it afterwards. NEVER pipe through `tail` or `grep` directly — that loses output you may need to debug failures.
 - Pattern: `DEVICE_ID=... npm run test:snapshot 2>&1 | tee /tmp/snapshot-results.txt` then read `/tmp/snapshot-results.txt` with the native read tool.
 - If you need a summary, read the log file and grep/filter it — the full output is always preserved.
