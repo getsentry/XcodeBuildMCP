@@ -189,7 +189,10 @@ export async function startMcpServer(): Promise<void> {
         // Prefer the phase at snapshot-schedule time for metrics; still log the
         // full snapshot object as returned for operational debugging.
         const metricPhase = startupMetricPhase;
-        log('info', `[mcp-lifecycle] start ${JSON.stringify({ ...startupSnapshot, phase: metricPhase })}`);
+        log(
+          'info',
+          `[mcp-lifecycle] start ${JSON.stringify({ ...startupSnapshot, phase: metricPhase })}`,
+        );
         recordMcpLifecycleMetric({
           event: 'start',
           phase: metricPhase,
