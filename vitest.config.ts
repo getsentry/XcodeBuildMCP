@@ -25,7 +25,7 @@ export default defineConfig({
       'src/snapshot-tests/__tests__/**/*.snapshot.test.ts',
     ],
     pool: 'threads',
-    maxThreads: 4,
+    maxWorkers: 4,
     env: {
       NODE_OPTIONS: '--max-old-space-size=4096',
     },
