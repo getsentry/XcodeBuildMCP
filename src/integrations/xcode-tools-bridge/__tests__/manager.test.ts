@@ -30,7 +30,11 @@ const {
 }));
 
 vi.mock('../registry.ts', () => ({
-  XcodeToolsProxyRegistry: vi.fn().mockImplementation(() => registryMocks),
+  XcodeToolsProxyRegistry: class {
+    clear = registryMocks.clear;
+    getRegisteredCount = registryMocks.getRegisteredCount;
+    sync = registryMocks.sync;
+  },
 }));
 
 vi.mock('../core.ts', () => ({
@@ -41,12 +45,18 @@ vi.mock('../core.ts', () => ({
 }));
 
 vi.mock('../tool-service.ts', () => ({
-  XcodeIdeToolService: vi
-    .fn()
-    .mockImplementation((options: { onToolCatalogInvalidated?: () => void }) => {
+  XcodeIdeToolService: class {
+    constructor(options: { onToolCatalogInvalidated?: () => void }) {
       onToolCatalogInvalidatedRef.current = options.onToolCatalogInvalidated;
-      return serviceMocks;
-    }),
+    }
+
+    setWorkflowEnabled = serviceMocks.setWorkflowEnabled;
+    disconnect = serviceMocks.disconnect;
+    getClientStatus = serviceMocks.getClientStatus;
+    getLastError = serviceMocks.getLastError;
+    listTools = serviceMocks.listTools;
+    invokeTool = serviceMocks.invokeTool;
+  },
 }));
 
 import { XcodeToolsBridgeManager } from '../manager.ts';
@@ -121,7 +131,7 @@ describe('XcodeToolsBridgeManager', () => {
       sendToolListChanged: vi.fn(),
     } as unknown as McpServer;
 
-    const tools: Tool[] = [{ name: 'remote.tool', inputSchema: { type: 'object' } } as Tool];
+    const tools: Tool[] = [{ name: 'remote.tool', inputSchema: { type: 'object' } }];
     serviceMocks.listTools.mockResolvedValue(tools);
 
     const manager = new XcodeToolsBridgeManager(server);

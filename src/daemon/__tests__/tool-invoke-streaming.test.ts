@@ -11,12 +11,12 @@ const xcodeIdeInvokeToolMock = vi.hoisted(() => vi.fn());
 const xcodeIdeDisconnectMock = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../integrations/xcode-tools-bridge/tool-service.ts', () => ({
-  XcodeIdeToolService: vi.fn().mockImplementation(() => ({
-    setWorkflowEnabled: vi.fn(),
-    listTools: vi.fn(async () => []),
-    invokeTool: xcodeIdeInvokeToolMock,
-    disconnect: xcodeIdeDisconnectMock,
-  })),
+  XcodeIdeToolService: class {
+    setWorkflowEnabled = vi.fn();
+    listTools = vi.fn(async () => []);
+    invokeTool = xcodeIdeInvokeToolMock;
+    disconnect = xcodeIdeDisconnectMock;
+  },
 }));
 
 function createCatalog(tools: ToolDefinition[]): ToolCatalog {

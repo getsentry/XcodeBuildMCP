@@ -36,7 +36,12 @@ vi.mock('../../cli/daemon-client.ts', () => {
     }
   }
   return {
-    DaemonClient: vi.fn().mockImplementation(() => daemonClientMock),
+    DaemonClient: class {
+      isRunning = daemonClientMock.isRunning;
+      invokeXcodeIdeTool = daemonClientMock.invokeXcodeIdeTool;
+      invokeTool = daemonClientMock.invokeTool;
+      listTools = daemonClientMock.listTools;
+    },
     DaemonVersionMismatchError: VersionMismatchError,
   };
 });

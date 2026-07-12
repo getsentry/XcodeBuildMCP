@@ -1,4 +1,4 @@
-import type { ToolHandlerContext } from '../rendering/types.js';
+import type { ToolHandlerContext } from '../rendering/types.ts';
 import type {
   BasicDiagnostics,
   DiagnosticEntry,
@@ -12,22 +12,22 @@ import type {
   TestResultArtifacts,
   TestResultDomainResult,
   TestSelectionInfo,
-} from '../types/domain-results.js';
+} from '../types/domain-results.ts';
 import type {
   BuildInvocationRequest,
   BuildLikeKind,
   TestDiscoveryFragment,
   XcodebuildOperation,
-} from '../types/domain-fragments.js';
-import type { StreamingExecutionContext } from '../types/tool-execution.js';
+} from '../types/domain-fragments.ts';
+import type { StreamingExecutionContext } from '../types/tool-execution.ts';
 
-import { finalizeInlineXcodebuild } from './xcodebuild-output.js';
-import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.js';
-import { createXcodebuildPipeline } from './xcodebuild-pipeline.js';
-import type { XcodebuildRunState } from './xcodebuild-run-state.js';
-import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.js';
-import { createStreamingExecutionContext } from './tool-execution-compat.js';
-import { isBuildErrorDiagnosticLine } from './xcodebuild-line-parsers.js';
+import { finalizeInlineXcodebuild } from './xcodebuild-output.ts';
+import type { StartedPipeline, XcodebuildPipeline } from './xcodebuild-pipeline.ts';
+import { createXcodebuildPipeline } from './xcodebuild-pipeline.ts';
+import type { XcodebuildRunState } from './xcodebuild-run-state.ts';
+import { collectResolvedTestSelectors, type TestPreflightResult } from './test-preflight.ts';
+import { createStreamingExecutionContext } from './tool-execution-compat.ts';
+import { isBuildErrorDiagnosticLine } from './xcodebuild-line-parsers.ts';
 import { extractTestSummaryCountsFromXcresult } from './xcresult-test-failures.ts';
 
 const MAX_DISCOVERED_TESTS = 6;

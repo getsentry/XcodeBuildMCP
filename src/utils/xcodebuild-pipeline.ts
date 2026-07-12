@@ -28,7 +28,7 @@ export interface PipelineResult {
   state: XcodebuildRunState;
 }
 
-export interface PipelineFinalizeOptions {}
+export type PipelineFinalizeOptions = Record<never, never>;
 
 export interface XcodebuildPipeline {
   onStdout(chunk: string): void;

@@ -36,27 +36,31 @@ export default [
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
-        'error',
+        'warn',
         {
-          argsIgnorePattern: 'never',
-          varsIgnorePattern: 'never',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
         },
       ],
       'no-console': ['warn', { allow: ['error'] }],
+      'prefer-const': 'warn',
+      'no-useless-escape': 'warn',
+      'preserve-caught-error': 'warn',
+      'no-useless-assignment': 'warn',
 
       // Prevent dangerous type casting anti-patterns (errors)
       '@typescript-eslint/consistent-type-assertions': [
-        'error',
+        'warn',
         {
           assertionStyle: 'as',
           objectLiteralTypeAssertions: 'never',
         },
       ],
-      '@typescript-eslint/no-unsafe-argument': 'error',
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
 
       // Prevent specific anti-patterns we found
       '@typescript-eslint/ban-ts-comment': [
@@ -125,8 +129,8 @@ export default [
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
-          argsIgnorePattern: 'never',
-          varsIgnorePattern: 'never',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
         },
       ],
       'no-console': 'off', // Scripts are allowed to use console

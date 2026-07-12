@@ -23,7 +23,13 @@ const clientMocks = {
 };
 
 vi.mock('../../../../integrations/xcode-tools-bridge/client.ts', () => ({
-  XcodeToolsBridgeClient: vi.fn().mockImplementation(() => clientMocks),
+  XcodeToolsBridgeClient: class {
+    connectOnce = clientMocks.connectOnce;
+    listTools = clientMocks.listTools;
+    callTool = clientMocks.callTool;
+    disconnect = clientMocks.disconnect;
+    getStatus = clientMocks.getStatus;
+  },
 }));
 
 import {

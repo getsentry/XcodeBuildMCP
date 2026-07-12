@@ -149,7 +149,7 @@ export function toBridgeCallResultDomainResult(
     error: bridgeResult.isError
       ? (bridgeResult.errorMessage ?? `Tool "${remoteTool}" failed`)
       : null,
-    succeeded: payload?.succeeded ?? !Boolean(bridgeResult.isError),
+    succeeded: payload?.succeeded ?? !bridgeResult.isError,
     content: payload?.content ?? [],
     ...(payload?.artifacts ? { artifacts: payload.artifacts } : {}),
   };

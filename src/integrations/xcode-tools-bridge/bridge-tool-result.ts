@@ -65,7 +65,7 @@ export function callToolResultToBridgeResult(result: CallToolResult): BridgeTool
       .nextStepParams as BridgeToolResult['nextStepParams'],
     payload: {
       kind: 'call-result',
-      succeeded: !Boolean(result.isError),
+      succeeded: !result.isError,
       content: [],
     },
   };
