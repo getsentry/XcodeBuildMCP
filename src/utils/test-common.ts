@@ -27,7 +27,7 @@ import {
 } from './test-products-path.ts';
 import { resolvePathFromCwd } from './path.ts';
 import { displayPath } from './build-preflight.ts';
-import { filterPreparedTestExtraArgs } from './test-source.ts';
+import { filterPreparedTestExtraArgs, getPreparedTestDestinationArgs } from './test-source.ts';
 
 import type {
   BuildTarget,
@@ -167,6 +167,7 @@ async function executePreparedTestCommand(
   executor: CommandExecutor,
   execOpts: CommandExecOptions | undefined,
   pipeline: ReturnType<typeof createDomainStreamingPipeline>['pipeline'],
+  destinationArgs?: string[],
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const sourceArgs = params.testProductsPath
     ? ['-testProductsPath', resolvePathFromCwd(params.testProductsPath)]
@@ -190,8 +191,9 @@ async function executePreparedTestCommand(
   const command = [
     'xcodebuild',
     ...sourceArgs,
-    '-destination',
-    destination,
+    ...(destinationArgs && destinationArgs.length > 0
+      ? destinationArgs
+      : ['-destination', destination]),
     '-collect-test-diagnostics',
     'never',
     ...extraArgs,
@@ -316,6 +318,7 @@ export function createTestExecutor(
           executor,
           execOpts,
           started.pipeline,
+          getPreparedTestDestinationArgs(executionPlan.testArgs),
         );
       } finally {
         markTestProductsPathCompleted(testProductsPath);

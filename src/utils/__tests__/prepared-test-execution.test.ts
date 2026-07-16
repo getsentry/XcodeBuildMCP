@@ -146,7 +146,8 @@ describe('prepared test execution', () => {
     expect(commands[0]).toContain('-destination');
     expect(commands[0]).toContain('-scheme=Injected');
     expect(commands[0]).toContain('-derivedDataPath');
-    expect(commands[1]).not.toContain('platform=macOS,arch=arm64');
+    expect(commands[1]).toContain('platform=macOS,arch=arm64');
+    expect(commands[1].filter((argument) => argument === '-destination')).toHaveLength(1);
     expect(commands[1]).not.toContain('-scheme=Injected');
     expect(commands[1]).not.toContain('/tmp/OtherDerivedData');
     expect(commands[1]).toContain('-quiet');
