@@ -202,6 +202,24 @@ describe('discover_projs plugin', () => {
 
       expect(scannedPaths).toEqual([process.cwd()]);
     });
+
+    it('resolves an explicit dot scan path from a relative bundle workspace root', async () => {
+      const scannedPaths: string[] = [];
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async (filePath) => {
+          scannedPaths.push(filePath);
+          return { isDirectory: () => true, mtimeMs: 0 };
+        },
+        readdir: async () => [],
+      });
+
+      await discoverProjects(
+        { workspaceRoot: 'App.xcodeproj', scanPath: '.' },
+        mockFileSystemExecutor,
+      );
+
+      expect(scannedPaths).toEqual([process.cwd()]);
+    });
   });
 
   describe('Logic error handling', () => {

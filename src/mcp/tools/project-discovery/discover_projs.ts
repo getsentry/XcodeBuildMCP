@@ -174,23 +174,11 @@ function isBundleLikePath(workspaceRoot: string): boolean {
   );
 }
 
-function resolveScanBase(workspaceRoot: string, scanPath?: string): string {
-  if (scanPath) {
-    return scanPath;
-  }
-
-  if (isBundleLikePath(workspaceRoot)) {
-    return path.dirname(workspaceRoot);
-  }
-
-  return '.';
-}
-
 async function discoverProjectsOrError(
   params: DiscoverProjectsParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<DiscoverProjectsComputation> {
-  const scanPath = resolveScanBase(params.workspaceRoot, params.scanPath);
+  const scanPath = params.scanPath ?? '.';
   const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
   const workspaceRoot = params.workspaceRoot;
 
@@ -198,10 +186,7 @@ async function discoverProjectsOrError(
     ? path.dirname(workspaceRoot)
     : workspaceRoot;
   const absoluteWorkspaceBoundary = path.resolve(workspaceBoundary);
-  const requestedScanPath =
-    params.scanPath === undefined && isBundleLikePath(workspaceRoot)
-      ? absoluteWorkspaceBoundary
-      : path.resolve(workspaceRoot, scanPath);
+  const requestedScanPath = path.resolve(absoluteWorkspaceBoundary, scanPath);
   let absoluteScanPath = requestedScanPath;
   if (!isPathWithin(absoluteWorkspaceBoundary, absoluteScanPath)) {
     log(
