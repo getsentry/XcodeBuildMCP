@@ -1,6 +1,6 @@
 {
   "schema": "xcodebuildmcp.output.test-result",
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "didError": true,
   "error": "Tests failed",
   "data": {
