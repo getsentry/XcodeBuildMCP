@@ -44,13 +44,11 @@ import {
 
 function emitXcresultFailures(
   pipeline: ReturnType<typeof createDomainStreamingPipeline>['pipeline'],
+  xcresultPath: string,
 ): void {
-  const xcresultPath = pipeline.xcresultPath;
-  if (xcresultPath) {
-    const failures = extractTestFailuresFromXcresult(xcresultPath);
-    for (const event of failures) {
-      pipeline.emitFragment(event);
-    }
+  const failures = extractTestFailuresFromXcresult(xcresultPath);
+  for (const event of failures) {
+    pipeline.emitFragment(event);
   }
 }
 
@@ -325,7 +323,7 @@ export function createTestExecutor(
           markResultBundlePathCompleted(resultBundlePath);
         }
       }
-      emitXcresultFailures(started.pipeline);
+      emitXcresultFailures(started.pipeline, resultBundlePath);
 
       return createDisplayedTestDomainResult({
         started,
@@ -366,7 +364,7 @@ export function createTestExecutor(
         markResultBundlePathCompleted(resultBundlePath);
       }
     }
-    emitXcresultFailures(started.pipeline);
+    emitXcresultFailures(started.pipeline, resultBundlePath);
 
     return createDisplayedTestDomainResult({
       started,

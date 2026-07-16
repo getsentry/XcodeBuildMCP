@@ -16,6 +16,12 @@ import {
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import { resetWorkspaceFilesystemLifecycleStateForTests } from '../workspace-filesystem-lifecycle.ts';
 import { getTestProductsCompletionMarkerPath } from '../test-products-path.ts';
+import { extractTestFailuresFromXcresult } from '../xcresult-test-failures.ts';
+
+vi.mock('../xcresult-test-failures.ts', () => ({
+  extractTestFailuresFromXcresult: vi.fn(() => []),
+  extractTestSummaryCountsFromXcresult: vi.fn(() => null),
+}));
 
 function createSuccessfulCommandResponse(): CommandResponse {
   return {
@@ -107,6 +113,7 @@ describe('createTestExecutor', () => {
   let tempAppDir: string;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     tempAppDir = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-result-bundles-'));
     setXcodeBuildMCPAppDirOverrideForTests(tempAppDir);
     setRuntimeInstanceForTests({
@@ -226,6 +233,7 @@ describe('createTestExecutor', () => {
     expect(commands[1]).not.toContain('-project');
     expect(commands[1]).not.toContain('-scheme');
     expect(commands[1]).not.toContain('-derivedDataPath');
+    expect(extractTestFailuresFromXcresult).toHaveBeenCalledWith(resultBundlePath);
     expect(result.artifacts.xcresultPath).toBe(resultBundlePath);
     expect(result.artifacts.testProductsPath).toEqual(
       expect.stringContaining(getWorkspaceFilesystemLayout('workspace-a').testProducts),
