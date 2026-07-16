@@ -107,4 +107,49 @@ describe('prepared test execution', () => {
     expect(commands[0]!.at(-1)).toBe('test-without-building');
     expect(result.artifacts.xctestrunPath).toBe('/tmp/Weather.xctestrun');
   });
+
+  it('does not forward source-only arguments to the prepared test phase', async () => {
+    const commands: string[][] = [];
+    const executor: CommandExecutor = async (command) => {
+      commands.push(command);
+      return createMockCommandResponse({ success: true, output: '', exitCode: 0 });
+    };
+    const executeTest = createTestExecutor(executor, {
+      toolName: 'test_macos',
+      target: 'macos',
+      request: {
+        scheme: 'Weather',
+        projectPath: 'Weather.xcodeproj',
+        platform: XcodePlatform.macOS,
+      },
+    });
+
+    await executeTest(
+      {
+        scheme: 'Weather',
+        projectPath: 'Weather.xcodeproj',
+        platform: XcodePlatform.macOS,
+        extraArgs: [
+          '-destination',
+          'platform=macOS,arch=arm64',
+          '-scheme=Injected',
+          '-derivedDataPath',
+          '/tmp/OtherDerivedData',
+          '-quiet',
+          '-only-testing:WeatherTests/testWeather',
+        ],
+      },
+      new DefaultStreamingExecutionContext(),
+    );
+
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toContain('-destination');
+    expect(commands[0]).toContain('-scheme=Injected');
+    expect(commands[0]).toContain('-derivedDataPath');
+    expect(commands[1]).not.toContain('platform=macOS,arch=arm64');
+    expect(commands[1]).not.toContain('-scheme=Injected');
+    expect(commands[1]).not.toContain('/tmp/OtherDerivedData');
+    expect(commands[1]).toContain('-quiet');
+    expect(commands[1]).toContain('-only-testing:WeatherTests/testWeather');
+  });
 });

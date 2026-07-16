@@ -50,6 +50,30 @@ function getConflictingPreparedTestArgs(extraArgs: unknown): string[] {
   );
 }
 
+export function filterPreparedTestExtraArgs(extraArgs: string[]): string[] {
+  const filteredArgs: string[] = [];
+
+  for (let index = 0; index < extraArgs.length; index += 1) {
+    const argument = extraArgs[index]!;
+    const argumentKey = getArgumentKey(argument);
+
+    if (conflictingPreparedTestActions.has(argument)) {
+      continue;
+    }
+
+    if (conflictingPreparedTestArgKeys.has(argumentKey)) {
+      if (argument === argumentKey && index + 1 < extraArgs.length) {
+        index += 1;
+      }
+      continue;
+    }
+
+    filteredArgs.push(argument);
+  }
+
+  return filteredArgs;
+}
+
 export function hasPreparedTestSource(params: {
   testProductsPath?: string;
   xctestrunPath?: string;

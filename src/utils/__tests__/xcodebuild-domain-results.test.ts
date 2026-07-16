@@ -126,6 +126,41 @@ describe('xcodebuild-domain-results', () => {
     expect(result.summary.counts).toEqual({ passed: 16, failed: 0, skipped: 0 });
   });
 
+  it('sorts test failures independently of xcodebuild emission order', () => {
+    const runState = createXcodebuildRunState({ operation: 'TEST' });
+    runState.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: 'MCPTestsXCTests',
+      test: 'testDeliberateFailure()',
+      message: 'XCTAssertTrue failed',
+      location: 'MCPTestsXCTests.swift:11',
+    });
+    runState.push({
+      kind: 'test-result',
+      fragment: 'test-failure',
+      operation: 'TEST',
+      suite: 'MCPTestTests',
+      test: 'deliberateFailure()',
+      message: 'Expectation failed',
+      location: 'MCPTestTests.swift:11',
+    });
+
+    const result = createTestDomainResult({
+      started: createStartedPipelineWithState(runState.finalize(false, 1000)),
+      succeeded: false,
+      target: 'macos',
+      artifacts: { buildLogPath: '/tmp/build.log' },
+      request: { scheme: 'MCPTest' },
+    });
+
+    expect(result.diagnostics.testFailures.map((failure) => failure.suite)).toEqual([
+      'MCPTestTests',
+      'MCPTestsXCTests',
+    ]);
+  });
+
   it('does not duplicate fallback lines represented by multi-line parsed errors', () => {
     const runState = createXcodebuildRunState({ operation: 'BUILD' });
     runState.push({

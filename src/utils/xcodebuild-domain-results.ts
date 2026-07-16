@@ -156,12 +156,18 @@ function createTestDiagnostics(
       didError,
       state.testFailures.length === 0 ? fallbackErrorMessages : undefined,
     ),
-    testFailures: state.testFailures.map((failure) => ({
-      suite: failure.suite ?? '(Unknown Suite)',
-      test: failure.test ?? 'test',
-      message: failure.message,
-      location: failure.location,
-    })),
+    testFailures: state.testFailures
+      .map((failure) => ({
+        suite: failure.suite ?? '(Unknown Suite)',
+        test: failure.test ?? 'test',
+        message: failure.message,
+        location: failure.location,
+      }))
+      .sort((left, right) => {
+        const leftKey = `${left.suite}\0${left.test}\0${left.location}\0${left.message}`;
+        const rightKey = `${right.suite}\0${right.test}\0${right.location}\0${right.message}`;
+        return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+      }),
   };
 }
 

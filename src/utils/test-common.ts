@@ -27,6 +27,7 @@ import {
 } from './test-products-path.ts';
 import { resolvePathFromCwd } from './path.ts';
 import { displayPath } from './build-preflight.ts';
+import { filterPreparedTestExtraArgs } from './test-source.ts';
 
 import type {
   BuildTarget,
@@ -312,7 +313,7 @@ export function createTestExecutor(
       try {
         testWithoutBuildingResult = await executePreparedTestCommand(
           { ...params, testProductsPath },
-          executionPlan.testArgs,
+          filterPreparedTestExtraArgs(executionPlan.testArgs),
           resultBundlePath,
           executor,
           execOpts,
