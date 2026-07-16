@@ -24,6 +24,7 @@ class LldbCliBackend implements DebuggerBackend {
   private queue: Promise<unknown> = Promise.resolve();
   private ready: Promise<void>;
   private disposed = false;
+  private processExitDescription: string | null = null;
   // The sentinel queued after continue owns all output until the next command drains it.
   private resumeOutputPending = false;
 
@@ -43,7 +44,9 @@ class LldbCliBackend implements DebuggerBackend {
     this.process.process.stderr?.on('data', (data: Buffer) => this.handleData(data));
     this.process.process.on('exit', (code, signal) => {
       const detail = signal ? `signal ${signal}` : `code ${code ?? 'unknown'}`;
-      this.failPending(new Error(`LLDB process exited (${detail})`));
+      this.processExitDescription = `LLDB process exited (${detail})`;
+      this.resumeOutputPending = false;
+      this.failPending(new Error(this.processExitDescription));
     });
 
     this.ready = this.initialize();
@@ -155,6 +158,12 @@ class LldbCliBackend implements DebuggerBackend {
   }
 
   async getExecutionState(opts?: { timeoutMs?: number }): Promise<DebugExecutionState> {
+    if (this.disposed) {
+      return { status: 'unknown', description: 'LLDB backend disposed' };
+    }
+    if (this.processExitDescription) {
+      return { status: 'terminated', description: this.processExitDescription };
+    }
     if (this.resumeOutputPending && !COMMAND_SENTINEL_REGEX.test(this.buffer)) {
       return { status: 'running', description: 'Process is running' };
     }
@@ -194,6 +203,7 @@ class LldbCliBackend implements DebuggerBackend {
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
+    this.resumeOutputPending = false;
     this.failPending(new Error('LLDB backend disposed'));
     this.process.dispose();
   }

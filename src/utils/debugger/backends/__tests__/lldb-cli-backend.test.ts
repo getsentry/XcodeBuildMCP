@@ -35,6 +35,35 @@ describe('LldbCliBackend', () => {
     await backend.dispose();
   });
 
+  it('does not report stale running state after LLDB exits', async () => {
+    let session: MockInteractiveSession | undefined;
+    let sentinelCount = 0;
+    const spawner = createMockInteractiveSpawner({
+      onSpawn(spawnedSession) {
+        session = spawnedSession;
+      },
+      onWrite(data, spawnedSession) {
+        if (data.includes(SENTINEL_COMMAND) && sentinelCount++ === 0) {
+          emitSentinel(spawnedSession);
+        }
+      },
+    });
+    const backend = await createLldbCliBackend(spawner);
+
+    await backend.resume();
+    session?.emitExit(9);
+
+    await expect(backend.getExecutionState()).resolves.toEqual({
+      status: 'terminated',
+      description: 'LLDB process exited (code 9)',
+    });
+    await backend.dispose();
+    await expect(backend.getExecutionState()).resolves.toEqual({
+      status: 'unknown',
+      description: 'LLDB backend disposed',
+    });
+  });
+
   it('drains continue output before returning the next command output', async () => {
     const spawner = createMockInteractiveSpawner({
       onWrite(data, session) {
