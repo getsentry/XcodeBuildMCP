@@ -2,6 +2,7 @@ export const PURGE_STORAGE_CLASSES = [
   'derivedData',
   'logs',
   'resultBundles',
+  'testProducts',
   'stateTransients',
   'locks',
 ] as const;
@@ -10,6 +11,7 @@ export const PURGE_STORAGE_DELETABLE_CLASSES = [
   'derivedData',
   'logs',
   'resultBundles',
+  'testProducts',
   'stateTransients',
 ] as const;
 

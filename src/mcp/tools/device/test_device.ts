@@ -21,7 +21,12 @@ import {
   getSessionAwareToolSchemaShape,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import {
+  hasPreparedTestSource,
+  TEST_SOURCE_EXCLUSIVE_GROUPS,
+  withProjectWorkspaceOrTestArtifact,
+} from '../../../utils/test-source.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
@@ -31,11 +36,20 @@ import {
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
-  scheme: z.string().describe('The scheme to test'),
+  scheme: z.string().optional().describe('The scheme to test in source mode'),
+  testProductsPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestproducts package. Cannot be combined with source inputs'),
+  xctestrunPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestrun file. Cannot be combined with source inputs'),
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
   configuration: z.string().optional().describe('Build configuration (Debug, Release)'),
   derivedDataPath: z.string().optional(),
@@ -56,7 +70,7 @@ const baseSchemaObject = z.object({
 
 const testDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
-  withProjectOrWorkspace(baseSchemaObject),
+  withProjectWorkspaceOrTestArtifact(baseSchemaObject),
 );
 
 export type TestDeviceParams = z.infer<typeof testDeviceSchema>;
@@ -83,19 +97,22 @@ async function prepareTestDeviceExecution(
   params: TestDeviceParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestDeviceExecution> {
-  const configuration = params.configuration;
+  const preparedTestSource = hasPreparedTestSource(params);
+  const configuration = preparedTestSource ? undefined : params.configuration;
   const platform = mapDevicePlatform(params.platform);
-  const preflight = await resolveTestPreflight(
-    {
-      projectPath: params.projectPath,
-      workspacePath: params.workspacePath,
-      scheme: params.scheme,
-      configuration,
-      extraArgs: params.extraArgs,
-      destinationName: params.deviceId,
-    },
-    fileSystemExecutor,
-  );
+  const preflight = preparedTestSource
+    ? null
+    : await resolveTestPreflight(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme!,
+          configuration,
+          extraArgs: params.extraArgs,
+          destinationName: params.deviceId,
+        },
+        fileSystemExecutor,
+      );
 
   return {
     configuration,
@@ -105,11 +122,13 @@ async function prepareTestDeviceExecution(
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
-      derivedDataPath: resolveEffectiveDerivedDataPath(params),
+      derivedDataPath: preparedTestSource ? undefined : resolveEffectiveDerivedDataPath(params),
       configuration,
       platform: String(platform),
       deviceId: params.deviceId,
       target: 'device' as const,
+      testProductsPath: params.testProductsPath ? displayPath(params.testProductsPath) : undefined,
+      xctestrunPath: params.xctestrunPath ? displayPath(params.xctestrunPath) : undefined,
       onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
       skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
     } satisfies BuildInvocationRequest,
@@ -144,6 +163,8 @@ export function createTestDeviceExecutor(
         useLatestOS: false,
         testRunnerEnv: params.testRunnerEnv,
         progress: params.progress,
+        testProductsPath: params.testProductsPath,
+        xctestrunPath: params.xctestrunPath,
       },
       ctx,
     );
@@ -163,7 +184,7 @@ export async function testDeviceLogic(
   const executeTestDevice = createTestDeviceExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestDevice(params, executionContext);
 
-  setXcodebuildStructuredOutput(ctx, 'test-result', result);
+  setXcodebuildStructuredOutput(ctx, 'test-result', result, '3');
 }
 
 export const schema = getSessionAwareToolSchemaShape({
@@ -176,9 +197,6 @@ export const handler = createSessionAwareTool<TestDeviceParams>({
   logicFunction: (params, executor) =>
     testDeviceLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,
-  requirements: [
-    { allOf: ['scheme', 'deviceId'], message: 'Provide scheme and deviceId' },
-    { oneOf: ['projectPath', 'workspacePath'], message: 'Provide a project or workspace' },
-  ],
-  exclusivePairs: [['projectPath', 'workspacePath']],
+  requirements: [{ allOf: ['deviceId'], message: 'Provide deviceId' }],
+  exclusivePairs: [...TEST_SOURCE_EXCLUSIVE_GROUPS, ['projectPath', 'workspacePath']],
 });

@@ -54,7 +54,9 @@ describe('test_macos plugin (unified)', () => {
       expect(zodSchema.safeParse({ testRunnerEnv: { FOO: 123 } }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'progress', 'testRunnerEnv'].sort());
+      expect(schemaKeys).toEqual(
+        ['extraArgs', 'progress', 'testProductsPath', 'testRunnerEnv', 'xctestrunPath'].sort(),
+      );
     });
   });
 
@@ -72,7 +74,7 @@ describe('test_macos plugin (unified)', () => {
       const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Provide a project or workspace');
+      expect(result.content[0].text).toContain('Either projectPath or workspacePath is required');
     });
 
     it('should reject when both projectPath and workspacePath provided explicitly', async () => {
@@ -95,7 +97,7 @@ describe('test_macos plugin (unified)', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Provide a project or workspace');
+      expect(result.content[0].text).toContain('Either projectPath or workspacePath is required');
     });
 
     it('should validate that both projectPath and workspacePath cannot be provided', async () => {
@@ -251,16 +253,16 @@ describe('test_macos plugin (unified)', () => {
     });
 
     it('should return pending response on successful test', async () => {
-      const commandCalls: { command: string[]; logPrefix?: string }[] = [];
+      const commandCalls: { command: string[]; logPrefix?: string; cwd?: string }[] = [];
 
       const mockExecutor = async (
         command: string[],
         logPrefix?: string,
         _useShell?: boolean,
-        _opts?: { env?: Record<string, string> },
+        opts?: { env?: Record<string, string>; cwd?: string },
         _detached?: boolean,
       ) => {
-        commandCalls.push({ command, logPrefix });
+        commandCalls.push({ command, logPrefix, cwd: opts?.cwd });
         return createMockCommandResponse({
           success: true,
           output: 'Test Succeeded',
@@ -278,14 +280,19 @@ describe('test_macos plugin (unified)', () => {
         mockFs(),
       );
 
-      expect(commandCalls).toHaveLength(1);
+      expect(commandCalls).toHaveLength(2);
       expect(commandCalls[0].command).toContain('xcodebuild');
       expect(commandCalls[0].command).toContain('-workspace');
       expect(commandCalls[0].command).toContain('/path/to/MyProject.xcworkspace');
       expect(commandCalls[0].command).toContain('-scheme');
       expect(commandCalls[0].command).toContain('MyScheme');
-      expect(commandCalls[0].command).toContain('test');
+      expect(commandCalls[0].command).toContain('build-for-testing');
       expect(commandCalls[0].logPrefix).toBe('Test Run');
+      expect(commandCalls[1].command).toContain('-testProductsPath');
+      expect(commandCalls[1].command).not.toContain('-workspace');
+      expect(commandCalls[1].command).not.toContain('-scheme');
+      expect(commandCalls[1].command).toContain('test-without-building');
+      expect(commandCalls.map((call) => call.cwd)).toEqual(['/path/to', '/path/to']);
 
       expectPendingBuildResponse(result);
       expect(result.isError()).toBeFalsy();
@@ -383,23 +390,23 @@ describe('test_macos plugin (unified)', () => {
       expect(result.isError()).toBe(true);
     });
 
-    it('should return error response when executor throws an exception', async () => {
+    it('should propagate executor exceptions as runtime errors', async () => {
       const mockExecutor = createMockExecutor({
         success: false,
         error: '',
         shouldThrow: new Error('Network error'),
       });
 
-      const { result } = await runTestMacosLogic(
-        {
-          workspacePath: '/path/to/MyProject.xcworkspace',
-          scheme: 'MyScheme',
-        },
-        mockExecutor,
-        mockFs(),
-      );
-
-      expect(result.isError()).toBe(true);
+      await expect(
+        runTestMacosLogic(
+          {
+            workspacePath: '/path/to/MyProject.xcworkspace',
+            scheme: 'MyScheme',
+          },
+          mockExecutor,
+          mockFs(),
+        ),
+      ).rejects.toThrow('Network error');
     });
   });
 });

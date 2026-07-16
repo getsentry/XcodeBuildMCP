@@ -34,6 +34,8 @@ function classPathForWorkspace(workspaceKey: string, storageClass: PurgeStorageC
       return layout.logs;
     case 'resultBundles':
       return layout.resultBundles;
+    case 'testProducts':
+      return layout.testProducts;
     case 'stateTransients':
       return layout.state;
     case 'locks':

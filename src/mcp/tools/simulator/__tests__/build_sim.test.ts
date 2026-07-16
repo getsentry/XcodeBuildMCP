@@ -12,7 +12,7 @@ import {
 } from '../../../../test-utils/test-helpers.ts';
 import { sessionStore } from '../../../../utils/session-store.ts';
 
-import { schema, handler, build_simLogic } from '../build_sim.ts';
+import { schema, handler, build_simLogic, buildSimulatorSchema } from '../build_sim.ts';
 
 const runBuildSimLogic = (
   params: Parameters<typeof build_simLogic>[0],
@@ -43,6 +43,23 @@ describe('build_sim tool', () => {
       expect(schemaObj.safeParse({ derivedDataPath: '/path/to/derived' }).success).toBe(false);
       expect(schemaObj.safeParse({ extraArgs: [123] }).success).toBe(false);
       expect(schemaObj.safeParse({ preferXcodebuild: false }).success).toBe(false);
+      expect(
+        schemaObj.safeParse({
+          buildForTesting: true,
+          testProductsPath: '/tmp/MyApp.xctestproducts',
+        }).success,
+      ).toBe(true);
+    });
+
+    it('should reject testProductsPath without buildForTesting', () => {
+      const result = buildSimulatorSchema.safeParse({
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+        simulatorName: 'iPhone 17',
+        testProductsPath: '/tmp/MyApp.xctestproducts',
+      });
+
+      expect(result.success).toBe(false);
     });
   });
 
@@ -392,6 +409,31 @@ describe('build_sim tool', () => {
         'watchOS Simulator Build',
       );
     });
+
+    it('should prepare reusable simulator test products', async () => {
+      const callHistory: Array<{ command: string[]; logPrefix?: string }> = [];
+      const testProductsPath = '/tmp/MyApp Tests.xctestproducts';
+
+      const { result } = await runBuildSimLogic(
+        {
+          projectPath: '/path/to/MyProject.xcodeproj',
+          scheme: 'MyScheme',
+          simulatorName: 'iPhone 17',
+          buildForTesting: true,
+          testProductsPath,
+        },
+        createTrackingExecutor(callHistory),
+      );
+
+      expect(callHistory).toHaveLength(2);
+      expect(callHistory[1].command.slice(-3)).toEqual([
+        '-testProductsPath',
+        testProductsPath,
+        'build-for-testing',
+      ]);
+      expect(callHistory[1].logPrefix).toBe('iOS Simulator Build for Testing');
+      expect(result.nextStepParams).toBeUndefined();
+    });
   });
 
   describe('Response Processing', () => {
@@ -527,6 +569,26 @@ describe('build_sim tool', () => {
 
       expect(result.isError()).toBeFalsy();
       expectPendingBuildResponse(result, 'get_sim_app_path');
+    });
+
+    it('should suggest running prepared simulator tests after success', async () => {
+      const mockExecutor = createMockExecutor({ success: true, output: 'BUILD SUCCEEDED' });
+      const testProductsPath = '/tmp/MyApp Tests.xctestproducts';
+
+      const { result } = await runBuildSimLogic(
+        {
+          workspacePath: '/path/to/workspace',
+          scheme: 'MyScheme',
+          simulatorName: 'iPhone 17',
+          buildForTesting: true,
+          testProductsPath,
+        },
+        mockExecutor,
+      );
+
+      expect(result.nextStepParams).toEqual({
+        test_sim: { testProductsPath, simulatorName: 'iPhone 17' },
+      });
     });
   });
 

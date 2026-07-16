@@ -348,7 +348,7 @@ export function registerPurgeCommand(app: Argv, opts: { currentWorkspaceKey: str
         .option('classes', {
           type: 'string',
           describe:
-            'Comma-separated storage classes: derivedData,logs,resultBundles,stateTransients. "all" excludes DerivedData.',
+            'Comma-separated storage classes: derivedData,logs,resultBundles,testProducts,stateTransients. "all" excludes DerivedData.',
         })
         .option('older-than', {
           type: 'string',

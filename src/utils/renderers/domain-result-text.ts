@@ -2247,6 +2247,17 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
       if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
         items.push(createPathDetailItem('Build Logs', result.artifacts.buildLogPath));
       }
+      if (
+        'testProductsPath' in result.artifacts &&
+        typeof result.artifacts.testProductsPath === 'string'
+      ) {
+        items.push(createPathDetailItem('Test Products', result.artifacts.testProductsPath));
+      }
+      if ('xctestrunPaths' in result.artifacts && Array.isArray(result.artifacts.xctestrunPaths)) {
+        for (const xctestrunPath of result.artifacts.xctestrunPaths) {
+          items.push(createPathDetailItem('XCTest Run', xctestrunPath));
+        }
+      }
       return items.length > 0 ? [createDetailTree(items)] : [];
     }
     case 'build-run-result': {
@@ -2306,6 +2317,18 @@ export function createBuildLikeTailItems(result: ToolDomainResult): TextRenderab
       }
       if ('buildLogPath' in result.artifacts && typeof result.artifacts.buildLogPath === 'string') {
         items.push(createPathDetailItem('Build Logs', result.artifacts.buildLogPath));
+      }
+      if (
+        'testProductsPath' in result.artifacts &&
+        typeof result.artifacts.testProductsPath === 'string'
+      ) {
+        items.push(createPathDetailItem('Test Products', result.artifacts.testProductsPath));
+      }
+      if (
+        'xctestrunPath' in result.artifacts &&
+        typeof result.artifacts.xctestrunPath === 'string'
+      ) {
+        items.push(createPathDetailItem('XCTest Run', result.artifacts.xctestrunPath));
       }
       return items.length > 0 ? [createDetailTree(items)] : [];
     }

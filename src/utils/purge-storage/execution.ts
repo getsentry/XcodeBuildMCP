@@ -9,6 +9,12 @@ import {
   isResultBundleCompletionMarkerTempName,
 } from '../result-bundle-path.ts';
 import {
+  getTestProductsCompletionMarkerPath,
+  isTestProductsCompletionMarkerTempName,
+  isXcodeBuildMCPManagedTestProductsName,
+} from '../test-products-path.ts';
+import { isProtectedManagedTestProducts } from '../test-products-lifecycle.ts';
+import {
   WORKSPACE_FILESYSTEM_LIFECYCLE_LOCK_LEASE_MS,
   WORKSPACE_FILESYSTEM_LIFECYCLE_MIN_VISIBLE_MS,
   collectWorkspaceLifecycleProtectedLogPaths,
@@ -62,6 +68,8 @@ function deletionRootForClass(
       return layout.logs;
     case 'resultBundles':
       return layout.resultBundles;
+    case 'testProducts':
+      return layout.testProducts;
     case 'stateTransients':
       return layout.state;
   }
@@ -165,6 +173,24 @@ async function validateClassSpecificDeletionCandidate(
         return 'result bundle candidate is protected by active lifecycle owner';
       }
       return null;
+    case 'testProducts':
+      if (isTestProductsCompletionMarkerTempName(name)) {
+        return candidate.kind === 'file'
+          ? null
+          : 'test products temp marker candidate is not a file';
+      }
+      if (!isXcodeBuildMCPManagedTestProductsName(name)) {
+        return 'test products candidate is not managed';
+      }
+      if (
+        await isProtectedManagedTestProducts(
+          { name, path: candidate.path, mtimeMs: candidate.mtimeMs },
+          { now, minVisibleMs: 0 },
+        )
+      ) {
+        return 'test products candidate is protected by active lifecycle owner';
+      }
+      return null;
     case 'stateTransients':
       return validateStateTransientCandidate(candidate);
   }
@@ -220,15 +246,23 @@ async function validateSidecarPath(
   candidate: PurgeStorageCandidate,
   sidecarPath: string,
 ): Promise<string | null> {
-  if (candidate.storageClass !== 'resultBundles') {
-    return 'sidecar path is not associated with a result bundle';
+  const layout = getWorkspaceFilesystemLayout(candidate.workspaceKey);
+  const expectedSidecarPath =
+    candidate.storageClass === 'resultBundles'
+      ? getResultBundleCompletionMarkerPath(candidate.path)
+      : candidate.storageClass === 'testProducts'
+        ? getTestProductsCompletionMarkerPath(candidate.path)
+        : null;
+  if (expectedSidecarPath === null) {
+    return 'sidecar path is not associated with a managed artifact';
   }
-  if (sidecarPath !== getResultBundleCompletionMarkerPath(candidate.path)) {
+  if (sidecarPath !== expectedSidecarPath) {
     return 'sidecar path does not match the candidate completion marker';
   }
-  const layout = getWorkspaceFilesystemLayout(candidate.workspaceKey);
-  if (!pathIsInside(layout.resultBundles, sidecarPath)) {
-    return 'sidecar path is outside result-bundles';
+  const sidecarRoot =
+    candidate.storageClass === 'resultBundles' ? layout.resultBundles : layout.testProducts;
+  if (!pathIsInside(sidecarRoot, sidecarPath)) {
+    return 'sidecar path is outside the managed artifact root';
   }
   try {
     await fs.lstat(sidecarPath);

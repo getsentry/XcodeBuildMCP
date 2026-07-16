@@ -142,6 +142,8 @@ export type BuildResultArtifacts = AtLeastOne<{
   scheme: string;
   configuration: string;
   platform: string;
+  testProductsPath: string;
+  xctestrunPaths: string[];
 }>;
 export type BuildRunResultArtifacts = AtLeastOne<{
   appPath: string;
@@ -176,6 +178,8 @@ export type TestResultArtifacts = AtLeastOne<{
   buildLogPath: string;
   packagePath: string;
   xcresultPath: string;
+  testProductsPath: string;
+  xctestrunPath: string;
 }>;
 export interface CoverageSummary extends StatusSummary {
   coveragePct?: number;

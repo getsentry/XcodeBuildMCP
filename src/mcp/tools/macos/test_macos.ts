@@ -20,7 +20,12 @@ import {
   getSessionAwareToolSchemaShape,
   toInternalSchema,
 } from '../../../utils/typed-tool-factory.ts';
-import { nullifyEmptyStrings, withProjectOrWorkspace } from '../../../utils/schema-helpers.ts';
+import { nullifyEmptyStrings } from '../../../utils/schema-helpers.ts';
+import {
+  hasPreparedTestSource,
+  TEST_SOURCE_EXCLUSIVE_GROUPS,
+  withProjectWorkspaceOrTestArtifact,
+} from '../../../utils/test-source.ts';
 import { resolveTestPreflight, type TestPreflightResult } from '../../../utils/test-preflight.ts';
 import { getHandlerContext } from '../../../utils/typed-tool-factory.ts';
 import {
@@ -30,11 +35,20 @@ import {
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
   workspacePath: z.string().optional().describe('Path to the .xcworkspace file'),
-  scheme: z.string().describe('The scheme to use'),
+  scheme: z.string().optional().describe('The scheme to use in source mode'),
+  testProductsPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestproducts package. Cannot be combined with source inputs'),
+  xctestrunPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestrun file. Cannot be combined with source inputs'),
   configuration: z.string().optional().describe('Build configuration (Debug, Release, etc.)'),
   derivedDataPath: z.string().optional(),
   extraArgs: z.array(z.string()).optional(),
@@ -60,7 +74,10 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
-const testMacosSchema = z.preprocess(nullifyEmptyStrings, withProjectOrWorkspace(baseSchemaObject));
+const testMacosSchema = z.preprocess(
+  nullifyEmptyStrings,
+  withProjectWorkspaceOrTestArtifact(baseSchemaObject),
+);
 
 export type TestMacosParams = z.infer<typeof testMacosSchema>;
 type TestMacosResult = TestResultDomainResult;
@@ -75,18 +92,21 @@ async function prepareTestMacosExecution(
   params: TestMacosParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestMacosExecution> {
-  const configuration = params.configuration;
-  const preflight = await resolveTestPreflight(
-    {
-      projectPath: params.projectPath,
-      workspacePath: params.workspacePath,
-      scheme: params.scheme,
-      configuration,
-      extraArgs: params.extraArgs,
-      destinationName: 'macOS',
-    },
-    fileSystemExecutor,
-  );
+  const preparedTestSource = hasPreparedTestSource(params);
+  const configuration = preparedTestSource ? undefined : params.configuration;
+  const preflight = preparedTestSource
+    ? null
+    : await resolveTestPreflight(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme!,
+          configuration,
+          extraArgs: params.extraArgs,
+          destinationName: 'macOS',
+        },
+        fileSystemExecutor,
+      );
 
   return {
     configuration,
@@ -95,9 +115,11 @@ async function prepareTestMacosExecution(
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
-      derivedDataPath: resolveEffectiveDerivedDataPath(params),
+      derivedDataPath: preparedTestSource ? undefined : resolveEffectiveDerivedDataPath(params),
       configuration,
       platform: 'macOS',
+      testProductsPath: params.testProductsPath ? displayPath(params.testProductsPath) : undefined,
+      xctestrunPath: params.xctestrunPath ? displayPath(params.xctestrunPath) : undefined,
       onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
       skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
     },
@@ -130,6 +152,8 @@ export function createTestMacOSExecutor(
         platform: XcodePlatform.macOS,
         testRunnerEnv: params.testRunnerEnv,
         progress: params.progress,
+        testProductsPath: params.testProductsPath,
+        xctestrunPath: params.xctestrunPath,
       },
       ctx,
     );
@@ -149,7 +173,7 @@ export async function testMacosLogic(
   const executeTestMacOS = createTestMacOSExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestMacOS(params, executionContext);
 
-  setXcodebuildStructuredOutput(ctx, 'test-result', result);
+  setXcodebuildStructuredOutput(ctx, 'test-result', result, '3');
 }
 
 export const schema = getSessionAwareToolSchemaShape({
@@ -162,9 +186,5 @@ export const handler = createSessionAwareTool<TestMacosParams>({
   logicFunction: (params, executor) =>
     testMacosLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,
-  requirements: [
-    { allOf: ['scheme'], message: 'scheme is required' },
-    { oneOf: ['projectPath', 'workspacePath'], message: 'Provide a project or workspace' },
-  ],
-  exclusivePairs: [['projectPath', 'workspacePath']],
+  exclusivePairs: [...TEST_SOURCE_EXCLUSIVE_GROUPS, ['projectPath', 'workspacePath']],
 });

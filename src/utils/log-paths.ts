@@ -23,6 +23,7 @@ export interface WorkspaceFilesystemLayout {
   locks: string;
   derivedData: string;
   resultBundles: string;
+  testProducts: string;
   logRetention: LogRetentionPaths;
   filesystemLifecycle: WorkspaceFilesystemLifecyclePaths;
   simulatorLaunchOsLogRegistryDir: string;
@@ -58,6 +59,7 @@ export function getWorkspaceFilesystemLayout(workspaceKey: string): WorkspaceFil
   const locks = path.join(root, 'locks');
   const derivedData = path.join(root, 'DerivedData');
   const resultBundles = path.join(root, 'result-bundles');
+  const testProducts = path.join(root, 'test-products');
 
   return {
     workspaceKey: normalizedWorkspaceKey,
@@ -67,6 +69,7 @@ export function getWorkspaceFilesystemLayout(workspaceKey: string): WorkspaceFil
     locks,
     derivedData,
     resultBundles,
+    testProducts,
     logRetention: {
       lockDir: path.join(locks, 'log-retention.lock'),
       markerPath: path.join(state, 'log-retention', 'last-cleanup'),

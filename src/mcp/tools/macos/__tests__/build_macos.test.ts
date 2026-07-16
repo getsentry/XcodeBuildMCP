@@ -51,7 +51,20 @@ describe('build_macos plugin', () => {
       expect(zodSchema.safeParse({ preferXcodebuild: true }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs']);
+      expect(schemaKeys).toEqual(['buildForTesting', 'extraArgs', 'testProductsPath']);
+    });
+
+    it('should reject testProductsPath without buildForTesting', async () => {
+      const result = await callHandler(handler, {
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+        testProductsPath: '/tmp/MyApp.xctestproducts',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'testProductsPath requires buildForTesting to be true',
+      );
     });
   });
 
@@ -366,6 +379,34 @@ describe('build_macos plugin', () => {
         computeScopedDerivedDataPath('/path/to/workspace.xcworkspace'),
         'build',
       ]);
+    });
+
+    it('should prepare reusable macOS test products without app inspection', async () => {
+      const calls: string[][] = [];
+      const testProductsPath = '/tmp/MyApp Tests.xctestproducts';
+      const executor = createMockExecutor({
+        success: true,
+        output: 'BUILD SUCCEEDED',
+        onExecute: (command) => calls.push(command),
+      });
+
+      const { result } = await runBuildMacOS(
+        {
+          projectPath: '/path/to/project.xcodeproj',
+          scheme: 'MyScheme',
+          buildForTesting: true,
+          testProductsPath,
+        },
+        executor,
+      );
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].slice(-3)).toEqual([
+        '-testProductsPath',
+        testProductsPath,
+        'build-for-testing',
+      ]);
+      expect(result.nextStepParams).toEqual({ test_macos: { testProductsPath } });
     });
   });
 

@@ -450,11 +450,12 @@ export function setXcodebuildStructuredOutput<K extends XcodebuildStructuredOutp
   ctx: ToolHandlerContext,
   kind: K,
   result: XcodebuildDomainResultFor<K>,
+  schemaVersion = '2',
 ): void {
   ctx.structuredOutput = {
     result,
     schema: XCODEBUILD_STRUCTURED_OUTPUT_SCHEMAS[kind],
-    schemaVersion: '2',
+    schemaVersion,
   };
 }
 

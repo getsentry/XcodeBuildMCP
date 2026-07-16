@@ -22,6 +22,10 @@ export interface BuildCommandResult {
   isError?: boolean;
 }
 
+export interface BuildCommandExecutionOptions {
+  propagateInfrastructureErrors?: boolean;
+}
+
 function getDefaultSwiftPackageCachePath(): string {
   return path.join(os.homedir(), 'Library', 'Caches', 'org.swift.swiftpm');
 }
@@ -34,6 +38,7 @@ export async function executeXcodeBuildCommand(
   executor: CommandExecutor,
   execOpts?: CommandExecOptions,
   pipeline?: XcodebuildPipeline,
+  executionOptions?: BuildCommandExecutionOptions,
 ): Promise<BuildCommandResult> {
   function addBuildMessage(message: string, level: 'info' | 'success' = 'info'): void {
     pipeline?.emitFragment(
@@ -249,6 +254,10 @@ export async function executeXcodeBuildCommand(
 
     return successResponse;
   } catch (error) {
+    if (executionOptions?.propagateInfrastructureErrors) {
+      throw error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     const isSpawnError =

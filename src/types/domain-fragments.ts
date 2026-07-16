@@ -46,6 +46,7 @@ export type BuildLikeKind = 'build-result' | 'build-run-result' | 'test-result';
 // ---------------------------------------------------------------------------
 
 export interface BuildInvocationRequest {
+  buildForTesting?: boolean;
   scheme?: string;
   workspacePath?: string;
   projectPath?: string;
@@ -60,6 +61,8 @@ export interface BuildInvocationRequest {
   executableName?: string;
   arch?: string;
   derivedDataPath?: string;
+  testProductsPath?: string;
+  xctestrunPath?: string;
   onlyTesting?: string[];
   skipTesting?: string[];
 }

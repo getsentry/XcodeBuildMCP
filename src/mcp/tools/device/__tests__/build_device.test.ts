@@ -49,7 +49,26 @@ describe('build_device plugin', () => {
       expect(schemaObj.safeParse({ platform: 'macOS' }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'platform']);
+      expect(schemaKeys).toEqual([
+        'buildForTesting',
+        'deviceId',
+        'extraArgs',
+        'platform',
+        'testProductsPath',
+      ]);
+    });
+
+    it('should reject testProductsPath without buildForTesting', async () => {
+      const result = await callHandler(handler, {
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+        testProductsPath: '/tmp/MyApp.xctestproducts',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'testProductsPath requires buildForTesting to be true',
+      );
     });
   });
 
@@ -357,6 +376,61 @@ describe('build_device plugin', () => {
           get_device_app_path: expect.objectContaining({ platform: 'watchOS' }),
         }),
       );
+    });
+
+    it('should prepare reusable test products for a selected device', async () => {
+      const spy = createSpyExecutor();
+      const testProductsPath = '/tmp/MyApp Tests.xctestproducts';
+
+      const { result } = await runToolLogic(() =>
+        buildDeviceLogic(
+          {
+            projectPath: '/path/to/MyProject.xcodeproj',
+            scheme: 'MyScheme',
+            platform: 'iOS',
+            deviceId: 'DEVICE-UDID',
+            buildForTesting: true,
+            testProductsPath,
+          },
+          spy.executor,
+        ),
+      );
+
+      expect(spy.commandCalls).toHaveLength(1);
+      expect(spy.commandCalls[0].args).toContain('platform=iOS,id=DEVICE-UDID');
+      expect(spy.commandCalls[0].args.slice(-3)).toEqual([
+        '-testProductsPath',
+        testProductsPath,
+        'build-for-testing',
+      ]);
+      expect(spy.commandCalls[0].logPrefix).toBe('iOS Device Build for Testing');
+      expect(result.nextStepParams).toEqual({
+        test_device: {
+          testProductsPath,
+          deviceId: 'DEVICE-UDID',
+          platform: 'iOS',
+        },
+      });
+    });
+
+    it('should not suggest running generic device test products without a device', async () => {
+      const spy = createSpyExecutor();
+      const testProductsPath = '/tmp/MyApp Tests.xctestproducts';
+
+      const { result } = await runToolLogic(() =>
+        buildDeviceLogic(
+          {
+            projectPath: '/path/to/MyProject.xcodeproj',
+            scheme: 'MyScheme',
+            buildForTesting: true,
+            testProductsPath,
+          },
+          spy.executor,
+        ),
+      );
+
+      expect(spy.commandCalls[0].args).toContain('generic/platform=iOS');
+      expect(result.nextStepParams).toBeUndefined();
     });
   });
 });

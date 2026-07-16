@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   BuildResultDomainResult,
   LaunchResultDomainResult,
+  TestResultDomainResult,
   UiActionResultDomainResult,
 } from '../../../types/domain-results.ts';
 import { renderDomainResultTextItems } from '../domain-result-text.ts';
@@ -149,6 +150,46 @@ describe('renderDomainResultTextItems', () => {
 
     expect(titles).not.toContain('Warnings (1):');
     expect(titles).toContain('Errors (1):');
+  });
+
+  it('renders prepared test artifacts in build and test results', () => {
+    const buildResult: BuildResultDomainResult = {
+      kind: 'build-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: {
+        testProductsPath: 'artifacts/App.xctestproducts',
+        xctestrunPaths: ['artifacts/App.xctestproducts/App.xctestrun'],
+      },
+      diagnostics: { warnings: [], errors: [] },
+    };
+    const testResult: TestResultDomainResult = {
+      kind: 'test-result',
+      didError: false,
+      error: null,
+      summary: { status: 'SUCCEEDED' },
+      artifacts: {
+        testProductsPath: 'artifacts/App.xctestproducts',
+        xcresultPath: 'artifacts/test.xcresult',
+      },
+      diagnostics: { warnings: [], errors: [], testFailures: [] },
+    };
+
+    expect(renderDomainResultTextItems(buildResult)).toContainEqual({
+      type: 'detail-tree',
+      items: [
+        { label: 'Test Products', path: 'artifacts/App.xctestproducts' },
+        { label: 'XCTest Run', path: 'artifacts/App.xctestproducts/App.xctestrun' },
+      ],
+    });
+    expect(renderDomainResultTextItems(testResult)).toContainEqual({
+      type: 'detail-tree',
+      items: [
+        { label: 'Result Bundle', path: 'artifacts/test.xcresult' },
+        { label: 'Test Products', path: 'artifacts/App.xctestproducts' },
+      ],
+    });
   });
 
   it('renders batch UI action results', () => {

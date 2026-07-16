@@ -35,25 +35,27 @@ describe('test_sim tool', () => {
       expect(schemaObj.safeParse({ testRunnerEnv: { FOO: 123 } }).success).toBe(false);
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'progress', 'testRunnerEnv'].sort());
+      expect(schemaKeys).toEqual(
+        ['extraArgs', 'progress', 'testProductsPath', 'testRunnerEnv', 'xctestrunPath'].sort(),
+      );
     });
   });
 
   describe('Handler Requirements', () => {
-    it('should require scheme when not provided', async () => {
+    it('should require a simulator destination before source validation', async () => {
       const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('scheme is required');
+      expect(result.content[0].text).toContain('Provide simulatorId or simulatorName');
     });
 
     it('should require project or workspace when scheme default exists', async () => {
       sessionStore.setDefaults({ scheme: 'MyScheme' });
 
-      const result = await callHandler(handler, {});
+      const result = await callHandler(handler, { simulatorId: 'SIM-UUID' });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Provide a project or workspace');
+      expect(result.content[0].text).toContain('Either projectPath or workspacePath is required');
     });
 
     it('should require simulator identifier when scheme and project defaults exist', async () => {

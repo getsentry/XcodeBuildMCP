@@ -14,6 +14,7 @@ const CLASS_LABELS: Record<PurgeStorageClass, string> = {
   derivedData: 'DerivedData',
   logs: 'Logs',
   resultBundles: 'Result bundles',
+  testProducts: 'Test products',
   stateTransients: 'State transients',
   locks: 'Locks',
 };
@@ -345,5 +346,5 @@ export function executionToJson(result: PurgeStorageExecutionResult): object {
 }
 
 export function defaultClassKeys(): PurgeStorageDeletableClass[] {
-  return ['logs', 'resultBundles', 'stateTransients'];
+  return ['logs', 'resultBundles', 'testProducts', 'stateTransients'];
 }

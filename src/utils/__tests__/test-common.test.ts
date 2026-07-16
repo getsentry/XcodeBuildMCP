@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createTestExecutor, resolveTestProgressEnabled } from '../test-common.ts';
@@ -15,6 +15,7 @@ import {
 } from '../log-paths.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import { resetWorkspaceFilesystemLifecycleStateForTests } from '../workspace-filesystem-lifecycle.ts';
+import { getTestProductsCompletionMarkerPath } from '../test-products-path.ts';
 
 function createSuccessfulCommandResponse(): CommandResponse {
   return {
@@ -217,13 +218,21 @@ describe('createTestExecutor', () => {
       new DefaultStreamingExecutionContext(),
     );
 
-    expect(commands).toHaveLength(1);
-    const resultBundlePath = expectDefaultResultBundlePath(commands[0]!, 'test_macos');
-    expect(commands[0]!.at(-1)).toBe('test');
+    expect(commands).toHaveLength(2);
+    expect(commands[0]!.at(-1)).toBe('build-for-testing');
+    expect(commands[0]).toContain('-testProductsPath');
+    const resultBundlePath = expectDefaultResultBundlePath(commands[1]!, 'test_macos');
+    expect(commands[1]!.at(-1)).toBe('test-without-building');
+    expect(commands[1]).not.toContain('-project');
+    expect(commands[1]).not.toContain('-scheme');
+    expect(commands[1]).not.toContain('-derivedDataPath');
     expect(result.artifacts.xcresultPath).toBe(resultBundlePath);
+    expect(result.artifacts.testProductsPath).toEqual(
+      expect.stringContaining(getWorkspaceFilesystemLayout('workspace-a').testProducts),
+    );
   });
 
-  it('returns a structured test-result when default result bundle path resolution fails', async () => {
+  it('propagates default result bundle setup failures as runtime errors', async () => {
     const layout = getWorkspaceFilesystemLayout('workspace-a');
     mkdirSync(layout.root, { recursive: true });
     writeFileSync(layout.resultBundles, 'not a directory');
@@ -240,23 +249,19 @@ describe('createTestExecutor', () => {
       },
     });
 
-    const result = await executeTest(
-      {
-        projectPath: 'Weather.xcodeproj',
-        scheme: 'Weather',
-        configuration: 'Debug',
-        platform: XcodePlatform.macOS,
-      },
-      new DefaultStreamingExecutionContext(),
-    );
+    await expect(
+      executeTest(
+        {
+          projectPath: 'Weather.xcodeproj',
+          scheme: 'Weather',
+          configuration: 'Debug',
+          platform: XcodePlatform.macOS,
+        },
+        new DefaultStreamingExecutionContext(),
+      ),
+    ).rejects.toThrow('Unable to create writable result bundle directory');
 
     expect(executor).not.toHaveBeenCalled();
-    expect(result.kind).toBe('test-result');
-    expect(result.didError).toBe(true);
-    expect(result.summary.status).toBe('FAILED');
-    expect(result.diagnostics.rawOutput?.join('\n')).toContain(
-      'Unable to create writable result bundle directory',
-    );
   });
 
   it('injects a workspace-scoped default result bundle path for device test commands', async () => {
@@ -289,16 +294,21 @@ describe('createTestExecutor', () => {
       new DefaultStreamingExecutionContext(),
     );
 
-    expect(commands).toHaveLength(1);
-    const resultBundlePath = expectDefaultResultBundlePath(commands[0]!, 'test_device');
-    expect(commands[0]!.at(-1)).toBe('test');
+    expect(commands).toHaveLength(2);
+    expect(commands[0]!.at(-1)).toBe('build-for-testing');
+    const resultBundlePath = expectDefaultResultBundlePath(commands[1]!, 'test_device');
+    expect(commands[1]!.at(-1)).toBe('test-without-building');
     expect(result.artifacts.xcresultPath).toBe(resultBundlePath);
   });
 
   it('does not surface a result bundle when simulator build-for-testing fails before tests run', async () => {
     const commands: string[][] = [];
+    let testProductsPath: string | undefined;
     const executor: CommandExecutor = async (command, _logPrefix, _useShell, opts) => {
       commands.push(command);
+      const testProductsIndex = command.indexOf('-testProductsPath');
+      testProductsPath = command[testProductsIndex + 1];
+      mkdirSync(testProductsPath!);
       opts?.onStderr?.(
         'Writing error result bundle to /var/folders/test/ResultBundle_2026-05-07_09-38-0016.xcresult\n',
       );
@@ -336,6 +346,7 @@ describe('createTestExecutor', () => {
     expect(commands).toHaveLength(1);
     expect(commands[0]).not.toContain('-resultBundlePath');
     expect(result.artifacts.xcresultPath).toBeUndefined();
+    expect(existsSync(getTestProductsCompletionMarkerPath(testProductsPath!))).toBe(true);
   });
 
   it('injects the default result bundle only into the simulator test execution phase', async () => {
@@ -370,9 +381,14 @@ describe('createTestExecutor', () => {
 
     expect(commands).toHaveLength(2);
     expect(commands[0]).not.toContain('-resultBundlePath');
+    expect(commands[0]).toContain('-testProductsPath');
     expect(commands[0]!.at(-1)).toBe('build-for-testing');
     const testResultBundlePath = expectDefaultResultBundlePath(commands[1]!, 'test_sim');
     expect(commands[1]!.at(-1)).toBe('test-without-building');
+    expect(commands[1]).toContain('-testProductsPath');
+    expect(commands[1]).not.toContain('-project');
+    expect(commands[1]).not.toContain('-scheme');
+    expect(commands[1]).not.toContain('-derivedDataPath');
     expect(result.artifacts.xcresultPath).toBe(testResultBundlePath);
   });
 
@@ -405,11 +421,57 @@ describe('createTestExecutor', () => {
       new DefaultStreamingExecutionContext(),
     );
 
-    expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain('-quiet');
-    expect(commands[0]).toContain('-resultBundlePath');
-    expect(commands[0]).toContain('/tmp/User Provided.xcresult');
-    expect(commands[0]).not.toContain(getWorkspaceFilesystemLayout('workspace-a').resultBundles);
+    expect(commands).toHaveLength(2);
+    expect(commands[1]).toContain('-quiet');
+    expect(commands[1]).toContain('-resultBundlePath');
+    expect(commands[1]).toContain('/tmp/User Provided.xcresult');
+    expect(commands[1].filter((argument) => argument === '-resultBundlePath')).toHaveLength(1);
+    expect(
+      commands[1].filter((argument) => argument === '/tmp/User Provided.xcresult'),
+    ).toHaveLength(1);
+    expect(commands[0]).not.toContain('/tmp/User Provided.xcresult');
+    expect(commands[1]).not.toContain(getWorkspaceFilesystemLayout('workspace-a').resultBundles);
     expect(result.artifacts.xcresultPath).toBe('/tmp/User Provided.xcresult');
+  });
+
+  it('keeps managed test products active until a failed test run settles', async () => {
+    let testProductsPath: string | undefined;
+    const executor: CommandExecutor = async (command) => {
+      if (command.at(-1) === 'build-for-testing') {
+        const testProductsIndex = command.indexOf('-testProductsPath');
+        testProductsPath = command[testProductsIndex + 1];
+        mkdirSync(testProductsPath!);
+        return createSuccessfulCommandResponse();
+      }
+
+      expect(existsSync(getTestProductsCompletionMarkerPath(testProductsPath!))).toBe(false);
+      return {
+        ...createSuccessfulCommandResponse(),
+        success: false,
+        error: 'Tests failed',
+        exitCode: 65,
+      };
+    };
+    const executeTest = createTestExecutor(executor, {
+      toolName: 'test_macos',
+      target: 'macos',
+      request: {
+        scheme: 'Weather',
+        projectPath: '/tmp/Weather/Weather.xcodeproj',
+        platform: XcodePlatform.macOS,
+      },
+    });
+
+    const result = await executeTest(
+      {
+        projectPath: '/tmp/Weather/Weather.xcodeproj',
+        scheme: 'Weather',
+        platform: XcodePlatform.macOS,
+      },
+      new DefaultStreamingExecutionContext(),
+    );
+
+    expect(result.didError).toBe(true);
+    expect(existsSync(getTestProductsCompletionMarkerPath(testProductsPath!))).toBe(true);
   });
 });

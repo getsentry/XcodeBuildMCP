@@ -71,7 +71,14 @@ describe('test_device plugin', () => {
       );
 
       const schemaKeys = Object.keys(schema).sort();
-      expect(schemaKeys).toEqual(['extraArgs', 'platform', 'progress', 'testRunnerEnv']);
+      expect(schemaKeys).toEqual([
+        'extraArgs',
+        'platform',
+        'progress',
+        'testProductsPath',
+        'testRunnerEnv',
+        'xctestrunPath',
+      ]);
     });
 
     it('should validate XOR between projectPath and workspacePath', async () => {
@@ -112,7 +119,7 @@ describe('test_device plugin', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Missing required session defaults');
-      expect(result.content[0].text).toContain('Provide scheme and deviceId');
+      expect(result.content[0].text).toContain('Provide deviceId');
     });
 
     it('should require project or workspace when defaults provide scheme and device', async () => {
@@ -121,7 +128,7 @@ describe('test_device plugin', () => {
       const result = await callHandler(handler, {});
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Provide a project or workspace');
+      expect(result.content[0].text).toContain('Either projectPath or workspacePath is required');
     });
 
     it('should reject mutually exclusive project inputs when defaults satisfy requirements', async () => {
@@ -155,7 +162,7 @@ describe('test_device plugin', () => {
         mockFs(),
       );
 
-      expect(spy.commandCalls).toHaveLength(1);
+      expect(spy.commandCalls).toHaveLength(2);
       expect(spy.commandCalls[0].args).toEqual([
         'xcodebuild',
         '-project',
@@ -171,9 +178,21 @@ describe('test_device plugin', () => {
         'never',
         '-derivedDataPath',
         computeScopedDerivedDataPath('/path/to/project.xcodeproj'),
+        '-testProductsPath',
+        expect.stringContaining('/test-products/test_device_'),
+        'build-for-testing',
+      ]);
+      expect(spy.commandCalls[1].args).toEqual([
+        'xcodebuild',
+        '-testProductsPath',
+        expect.stringContaining('/test-products/test_device_'),
+        '-destination',
+        'platform=iOS,id=test-device-123',
+        '-collect-test-diagnostics',
+        'never',
         '-resultBundlePath',
         expect.stringContaining('/result-bundles/test_device_'),
-        'test',
+        'test-without-building',
       ]);
     });
   });

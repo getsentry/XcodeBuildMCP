@@ -21,6 +21,7 @@ import {
 import { enumeratePurgeStorage } from './enumerate.ts';
 import { readRegistryRecord } from './registry-record.ts';
 import { describeFsError, errorMessage, isEnoent, scanPath } from './scan.ts';
+import { collectTestProductsCandidates } from './test-products.ts';
 import type {
   PlanPurgeStorageOptions,
   PurgeStorageCandidate,
@@ -461,6 +462,8 @@ async function collectCandidatesForWorkspaceClass(
       return collectLogCandidates(workspaceKey, options);
     case 'resultBundles':
       return collectResultBundleCandidates(workspaceKey, options);
+    case 'testProducts':
+      return collectTestProductsCandidates(workspaceKey, options);
     case 'stateTransients':
       return collectStateTransientCandidates(workspaceKey, options);
   }

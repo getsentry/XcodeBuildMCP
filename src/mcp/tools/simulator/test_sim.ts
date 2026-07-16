@@ -16,11 +16,12 @@ import {
   getDefaultCommandExecutor,
   getDefaultFileSystemExecutor,
 } from '../../../utils/execution/index.ts';
+import { nullifyEmptyStrings, withSimulatorIdOrName } from '../../../utils/schema-helpers.ts';
 import {
-  nullifyEmptyStrings,
-  withProjectOrWorkspace,
-  withSimulatorIdOrName,
-} from '../../../utils/schema-helpers.ts';
+  hasPreparedTestSource,
+  TEST_SOURCE_EXCLUSIVE_GROUPS,
+  withProjectWorkspaceOrTestArtifact,
+} from '../../../utils/test-source.ts';
 import {
   createSessionAwareTool,
   getSessionAwareToolSchemaShape,
@@ -39,6 +40,7 @@ import {
 import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import { displayPath } from '../../../utils/build-preflight.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z
@@ -49,7 +51,15 @@ const baseSchemaObject = z.object({
     .string()
     .optional()
     .describe('Path to .xcworkspace file. Provide EITHER this OR projectPath, not both'),
-  scheme: z.string().describe('The scheme to use (Required)'),
+  scheme: z.string().optional().describe('The scheme to use in source mode'),
+  testProductsPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestproducts package. Cannot be combined with source inputs'),
+  xctestrunPath: z
+    .string()
+    .optional()
+    .describe('Path to a prepared .xctestrun file. Cannot be combined with source inputs'),
   simulatorId: z
     .string()
     .optional()
@@ -84,7 +94,7 @@ const baseSchemaObject = z.object({
 
 const testSimulatorSchema = z.preprocess(
   nullifyEmptyStrings,
-  withSimulatorIdOrName(withProjectOrWorkspace(baseSchemaObject)),
+  withSimulatorIdOrName(withProjectWorkspaceOrTestArtifact(baseSchemaObject)),
 );
 
 type TestSimulatorParams = z.infer<typeof testSimulatorSchema>;
@@ -105,7 +115,8 @@ async function prepareTestSimExecution(
   executor: CommandExecutor,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<PreparedTestSimExecution> {
-  const configuration = params.configuration;
+  const preparedTestSource = hasPreparedTestSource(params);
+  const configuration = preparedTestSource ? undefined : params.configuration;
   const inferred = await inferPlatform(
     {
       projectPath: params.projectPath,
@@ -137,11 +148,15 @@ async function prepareTestSimExecution(
         scheme: params.scheme,
         workspacePath: params.workspacePath,
         projectPath: params.projectPath,
-        derivedDataPath: resolveEffectiveDerivedDataPath(params),
+        derivedDataPath: preparedTestSource ? undefined : resolveEffectiveDerivedDataPath(params),
         configuration,
         platform: inferred.platform,
         simulatorName: params.simulatorName,
         simulatorId: params.simulatorId,
+        testProductsPath: params.testProductsPath
+          ? displayPath(params.testProductsPath)
+          : undefined,
+        xctestrunPath: params.xctestrunPath ? displayPath(params.xctestrunPath) : undefined,
       },
       warningMessage:
         params.simulatorId && params.useLatestOS !== undefined
@@ -151,17 +166,19 @@ async function prepareTestSimExecution(
   }
 
   const destinationName = params.simulatorName ?? simulatorResolution.simulatorName;
-  const preflight = await resolveTestPreflight(
-    {
-      projectPath: params.projectPath,
-      workspacePath: params.workspacePath,
-      scheme: params.scheme,
-      configuration,
-      extraArgs: params.extraArgs,
-      destinationName,
-    },
-    fileSystemExecutor,
-  );
+  const preflight = preparedTestSource
+    ? null
+    : await resolveTestPreflight(
+        {
+          projectPath: params.projectPath,
+          workspacePath: params.workspacePath,
+          scheme: params.scheme!,
+          configuration,
+          extraArgs: params.extraArgs,
+          destinationName,
+        },
+        fileSystemExecutor,
+      );
 
   return {
     configuration,
@@ -172,11 +189,13 @@ async function prepareTestSimExecution(
       scheme: params.scheme,
       workspacePath: params.workspacePath,
       projectPath: params.projectPath,
-      derivedDataPath: resolveEffectiveDerivedDataPath(params),
+      derivedDataPath: preparedTestSource ? undefined : resolveEffectiveDerivedDataPath(params),
       configuration,
       platform: inferred.platform,
       simulatorName: params.simulatorName,
       simulatorId: params.simulatorId,
+      testProductsPath: params.testProductsPath ? displayPath(params.testProductsPath) : undefined,
+      xctestrunPath: params.xctestrunPath ? displayPath(params.xctestrunPath) : undefined,
       onlyTesting: preflight?.selectors.onlyTesting.map((selector) => selector.raw),
       skipTesting: preflight?.selectors.skipTesting.map((selector) => selector.raw),
     },
@@ -212,7 +231,7 @@ export function createTestSimExecutor(
         succeeded: false,
         target: 'simulator',
         artifacts: {
-          buildLogPath: started.pipeline.logPath,
+          buildLogPath: displayPath(started.pipeline.logPath),
         },
         fallbackErrorMessages: [
           resolved.resolutionError ?? 'Failed to resolve simulator identifier for test execution.',
@@ -243,6 +262,8 @@ export function createTestSimExecutor(
         platform: resolved.platform,
         testRunnerEnv: params.testRunnerEnv,
         progress: params.progress,
+        testProductsPath: params.testProductsPath,
+        xctestrunPath: params.xctestrunPath,
       },
       ctx,
     );
@@ -262,7 +283,7 @@ export async function test_simLogic(
   const executeTestSim = createTestSimExecutor(executor, fileSystemExecutor, prepared);
   const result = await executeTestSim(params, executionContext);
 
-  setXcodebuildStructuredOutput(ctx, 'test-result', result);
+  setXcodebuildStructuredOutput(ctx, 'test-result', result, '3');
 }
 
 const publicSchemaObject = baseSchemaObject.omit({
@@ -288,11 +309,10 @@ export const handler = createSessionAwareTool<TestSimulatorParams>({
     test_simLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,
   requirements: [
-    { allOf: ['scheme'], message: 'scheme is required' },
-    { oneOf: ['projectPath', 'workspacePath'], message: 'Provide a project or workspace' },
     { oneOf: ['simulatorId', 'simulatorName'], message: 'Provide simulatorId or simulatorName' },
   ],
   exclusivePairs: [
+    ...TEST_SOURCE_EXCLUSIVE_GROUPS,
     ['projectPath', 'workspacePath'],
     ['simulatorId', 'simulatorName'],
   ],

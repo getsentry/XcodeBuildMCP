@@ -6,7 +6,7 @@ names:
 description: Build for device.
 outputSchema:
   schema: xcodebuildmcp.output.build-result
-  version: "2"
+  version: '3'
 predicates:
   - hideWhenXcodeAgentMode
 annotations:
@@ -14,8 +14,3 @@ annotations:
   readOnlyHint: false
   destructiveHint: false
   openWorldHint: false
-nextSteps:
-  - label: Get built device app path
-    toolId: get_device_app_path
-    priority: 1
-    when: success

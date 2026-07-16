@@ -85,6 +85,12 @@ xcodebuildmcp tools
 
 # Build for simulator
 xcodebuildmcp simulator build --scheme MyApp --project-path ./MyApp.xcodeproj
+
+# Prepare portable test products without running tests
+xcodebuildmcp simulator build --scheme MyApp --project-path ./MyApp.xcodeproj --simulator-name "iPhone 17" --build-for-testing --test-products-path ./MyApp.xctestproducts
+
+# Run previously prepared test products
+xcodebuildmcp simulator test --test-products-path ./MyApp.xctestproducts --simulator-name "iPhone 17"
 ```
 
 Check for updates and upgrade in place:

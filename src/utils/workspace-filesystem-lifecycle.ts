@@ -15,6 +15,7 @@ import { getRuntimeInstance, getRuntimeInstanceIfConfigured } from './runtime-in
 import { tryAcquireFsLock, type AcquiredFsLock } from './fs-lock.ts';
 import { isPidAlive } from './process-liveness.ts';
 import { getResultBundleCompletionMarkerPath } from './result-bundle-path.ts';
+import { pruneManagedTestProductsDirectory } from './test-products-lifecycle.ts';
 
 export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 export const WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES = 10_000;
@@ -95,6 +96,7 @@ interface ResolvedWorkspaceFilesystemLifecycleOptions {
   markerPath: string;
   lockDir: string;
   resultBundleDir: string | null;
+  testProductsDir: string | null;
   now: number;
   maxAgeMs: number;
   maxFiles: number;
@@ -174,6 +176,7 @@ function resolveOptions(
       layout?.filesystemLifecycle.lockDir ??
       path.join(logDir, FALLBACK_LOCK_DIR_NAME),
     resultBundleDir: layout?.resultBundles ?? null,
+    testProductsDir: layout?.testProducts ?? null,
     now: options.now ?? Date.now(),
     maxAgeMs: options.maxAgeMs ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_AGE_MS,
     maxFiles: options.maxFiles ?? WORKSPACE_FILESYSTEM_LIFECYCLE_LOG_MAX_FILES,
@@ -635,14 +638,21 @@ export async function runWorkspaceFilesystemLifecycleSweep(
     const protectedPaths = await collectProtectedLogPaths(resolved);
     const logPrune = await pruneKnownLogDirectory(resolved, protectedPaths);
     const resultBundlePrune = await pruneKnownResultBundleDirectory(resolved);
+    const testProductsPrune = resolved.testProductsDir
+      ? await pruneManagedTestProductsDirectory({
+          testProductsDir: resolved.testProductsDir,
+          now: resolved.now,
+          minVisibleMs: resolved.minVisibleMs,
+        })
+      : { scanned: 0, deleted: 0 };
     await touchCleanupMarker(resolved.markerPath, resolved.now);
 
     return {
       workspaceKey: resolved.workspaceKey,
       trigger: resolved.trigger,
       logDir: resolved.logDir,
-      scanned: logPrune.scanned + resultBundlePrune.scanned,
-      deleted: logPrune.deleted + resultBundlePrune.deleted,
+      scanned: logPrune.scanned + resultBundlePrune.scanned + testProductsPrune.scanned,
+      deleted: logPrune.deleted + resultBundlePrune.deleted + testProductsPrune.deleted,
       stopped,
       skippedByCooldown: false,
       skippedByLock: false,

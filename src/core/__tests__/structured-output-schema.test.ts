@@ -211,6 +211,54 @@ describe('structured output schema bundling', () => {
     ).toBe(true);
   });
 
+  it('accepts prepared test artifacts only in build and test result v3', () => {
+    const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+    const buildV2 = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.build-result', version: '2' }),
+    );
+    const buildV3 = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.build-result', version: '3' }),
+    );
+    const testV3 = ajv.compile(
+      getMcpOutputSchema({ schema: 'xcodebuildmcp.output.test-result', version: '3' }),
+    );
+    const buildEnvelope = {
+      schema: 'xcodebuildmcp.output.build-result',
+      schemaVersion: '3',
+      didError: false,
+      error: null,
+      data: {
+        request: { buildForTesting: true, scheme: 'CalculatorApp' },
+        summary: { status: 'SUCCEEDED', target: 'simulator' },
+        artifacts: {
+          testProductsPath: 'artifacts/CalculatorApp.xctestproducts',
+          xctestrunPaths: ['artifacts/CalculatorApp.xctestproducts/CalculatorApp.xctestrun'],
+        },
+        diagnostics: { warnings: [], errors: [] },
+      },
+    };
+
+    expect(buildV2({ ...buildEnvelope, schemaVersion: '2' })).toBe(false);
+    expect(buildV3(buildEnvelope)).toBe(true);
+    expect(
+      testV3({
+        schema: 'xcodebuildmcp.output.test-result',
+        schemaVersion: '3',
+        didError: false,
+        error: null,
+        data: {
+          request: { testProductsPath: 'artifacts/CalculatorApp.xctestproducts' },
+          summary: { status: 'SUCCEEDED', target: 'simulator' },
+          artifacts: {
+            testProductsPath: 'artifacts/CalculatorApp.xctestproducts',
+            xcresultPath: 'artifacts/test.xcresult',
+          },
+          diagnostics: { warnings: [], errors: [], testFailures: [] },
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('accepts video recording capture payloads in the bumped capture contract', () => {
     const schema = getMcpOutputSchema({
       schema: 'xcodebuildmcp.output.capture-result',
