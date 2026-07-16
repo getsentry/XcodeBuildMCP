@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -124,6 +126,35 @@ describe('event formatting', () => {
     ).toBe(
       ['error: unterminated string literal', '  /tmp/MCPTest/ContentView.swift:16:18'].join('\n'),
     );
+  });
+
+  it('treats glob metacharacters in compiler diagnostic filenames literally', () => {
+    const projectBaseDir = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-diagnostic-'));
+    const sourceDir = join(projectBaseDir, 'Sources');
+    const decoyDir = join(projectBaseDir, 'Decoy');
+    const literalFile = join(sourceDir, 'ContentView[1].swift');
+
+    try {
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(decoyDir, { recursive: true });
+      writeFileSync(literalFile, '');
+      writeFileSync(join(decoyDir, 'ContentView1.swift'), '');
+
+      const rendered = formatHumanCompilerErrorEvent(
+        {
+          type: 'compiler-error',
+          operation: 'BUILD',
+          message: 'unterminated string literal',
+          rawLine: 'ContentView[1].swift:16:18: error: unterminated string literal',
+        },
+        { baseDir: projectBaseDir },
+      );
+
+      expect(rendered).toContain(`${literalFile}:16:18`);
+      expect(rendered).not.toContain('Decoy/ContentView1.swift');
+    } finally {
+      rmSync(projectBaseDir, { recursive: true, force: true });
+    }
   });
 
   it('formats tool-originated errors in xcodebuild-style form', () => {

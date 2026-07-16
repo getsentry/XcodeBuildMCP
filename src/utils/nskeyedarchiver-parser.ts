@@ -126,8 +126,8 @@ export function parseXcuserstate(xcuserstatePath: string): XcodeStateResult {
       return result;
     }
 
-    // Find the dictionary containing ActiveScheme key
-    const parentDict = findDictWithKey(objects, activeSchemeIdx);
+    const parentKeyIdx = activeSchemeIdx !== -1 ? activeSchemeIdx : activeRunDestIdx;
+    const parentDict = findDictWithKey(objects, parentKeyIdx);
     if (!parentDict) {
       return result;
     }
@@ -198,7 +198,8 @@ export function parseXcuserstateBuffer(buffer: Buffer): XcodeStateResult {
       return result;
     }
 
-    const parentDict = findDictWithKey(objects, activeSchemeIdx);
+    const parentKeyIdx = activeSchemeIdx !== -1 ? activeSchemeIdx : activeRunDestIdx;
+    const parentDict = findDictWithKey(objects, parentKeyIdx);
     if (!parentDict) {
       return result;
     }

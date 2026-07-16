@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { parseBuffer as bplistParseBuffer } from 'bplist-parser';
+
+vi.mock('bplist-parser', () => ({
+  parseBuffer: vi.fn(),
+}));
 import {
   parseXcuserstate,
   parseXcuserstateBuffer,
@@ -8,6 +13,12 @@ import {
 } from '../nskeyedarchiver-parser.ts';
 
 describe('NSKeyedArchiver Parser', () => {
+  beforeEach(() => {
+    vi.mocked(bplistParseBuffer).mockImplementation(() => {
+      throw new Error('invalid plist');
+    });
+  });
+
   describe('parseXcuserstate (file path)', () => {
     it('returns empty result for non-existent file', () => {
       const result = parseXcuserstate('/non/existent/file.xcuserstate');
@@ -97,11 +108,27 @@ describe('NSKeyedArchiver Parser', () => {
   });
 
   describe('edge cases', () => {
-    it('handles xcuserstate without ActiveScheme', () => {
-      // This would require a specially crafted test fixture
-      // For now, we just verify the function doesn't crash
-      const result = parseXcuserstateBuffer(Buffer.from('bplist00'));
-      expect(result).toEqual({});
+    it('extracts ActiveRunDestination without ActiveScheme', () => {
+      const simulatorId = '12345678-1234-1234-1234-123456789ABC';
+      vi.mocked(bplistParseBuffer).mockReturnValue([
+        {
+          $archiver: 'NSKeyedArchiver',
+          $objects: [
+            '$null',
+            'ActiveRunDestination',
+            'targetDeviceLocation',
+            { 'NS.keys': [{ UID: 1 }], 'NS.objects': [{ UID: 4 }] },
+            { 'NS.keys': [{ UID: 2 }], 'NS.objects': [{ UID: 5 }] },
+            `dvtdevice-iphonesimulator:${simulatorId}`,
+          ],
+        },
+      ]);
+
+      expect(parseXcuserstateBuffer(Buffer.from('plist'))).toEqual({
+        deviceLocation: `dvtdevice-iphonesimulator:${simulatorId}`,
+        simulatorId,
+        simulatorPlatform: 'iphonesimulator',
+      });
     });
 
     it('handles scheme object without IDENameString', () => {

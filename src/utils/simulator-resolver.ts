@@ -7,6 +7,41 @@ export type SimulatorResolutionResult =
 
 type SimulatorDevice = { udid: string; name: string };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSimulatorDevice(value: unknown): value is SimulatorDevice {
+  return isRecord(value) && typeof value.udid === 'string' && typeof value.name === 'string';
+}
+
+function parseSimulatorDevices(
+  output: string,
+): { devices: Record<string, SimulatorDevice[]> } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output) as unknown;
+  } catch (parseError) {
+    return { error: `Failed to parse simulator list: ${parseError}` };
+  }
+
+  if (!isRecord(parsed) || !isRecord(parsed.devices)) {
+    return { error: 'Failed to parse simulator list: simctl returned an invalid devices payload.' };
+  }
+
+  const devices: Record<string, SimulatorDevice[]> = {};
+  for (const [runtime, runtimeDevices] of Object.entries(parsed.devices)) {
+    if (!Array.isArray(runtimeDevices) || !runtimeDevices.every(isSimulatorDevice)) {
+      return {
+        error: 'Failed to parse simulator list: simctl returned an invalid devices payload.',
+      };
+    }
+    devices[runtime] = runtimeDevices;
+  }
+
+  return { devices };
+}
+
 async function fetchSimulatorDevices(
   executor: CommandExecutor,
 ): Promise<{ devices: Record<string, SimulatorDevice[]> } | { error: string }> {
@@ -20,11 +55,7 @@ async function fetchSimulatorDevices(
     return { error: `Failed to list simulators: ${result.error}` };
   }
 
-  try {
-    return JSON.parse(result.output) as { devices: Record<string, SimulatorDevice[]> };
-  } catch (parseError) {
-    return { error: `Failed to parse simulator list: ${parseError}` };
-  }
+  return parseSimulatorDevices(result.output);
 }
 
 function findSimulator(

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { globSync } from 'glob';
+import { escape, globSync } from 'glob';
 import type {
   ArtifactRenderItem,
   BuildStageRenderItem,
@@ -211,7 +211,7 @@ function resolveDiagnosticPathCandidate(
     return cached ?? filePath;
   }
 
-  const matches = globSync(`**/${filePath}`, {
+  const matches = globSync(`**/${escape(filePath)}`, {
     cwd: options.baseDir,
     nodir: true,
     ignore: DIAGNOSTIC_PATH_IGNORE_PATTERNS,

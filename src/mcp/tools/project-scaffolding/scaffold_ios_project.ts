@@ -14,6 +14,12 @@ import {
   getHandlerContext,
 } from '../../../utils/typed-tool-factory.ts';
 import { createScaffoldDomainResult, setScaffoldStructuredOutput } from './domain-result.ts';
+import {
+  deviceFamiliesToNumeric,
+  orientationToIOSConstant,
+  type IOSDeviceFamily,
+  type IOSOrientation,
+} from './ios-scaffold-settings.ts';
 
 const BaseScaffoldSchema = z.object({
   projectName: z.string().min(1),
@@ -35,40 +41,6 @@ const ScaffoldiOSProjectSchema = BaseScaffoldSchema.extend({
     .array(z.enum(['portrait', 'landscape-left', 'landscape-right', 'portrait-upside-down']))
     .optional(),
 });
-
-/**
- * Convert orientation enum to iOS constant
- */
-function orientationToIOSConstant(orientation: string): string {
-  switch (orientation) {
-    case 'Portrait':
-      return 'UIInterfaceOrientationPortrait';
-    case 'PortraitUpsideDown':
-      return 'UIInterfaceOrientationPortraitUpsideDown';
-    case 'LandscapeLeft':
-      return 'UIInterfaceOrientationLandscapeLeft';
-    case 'LandscapeRight':
-      return 'UIInterfaceOrientationLandscapeRight';
-    default:
-      return orientation;
-  }
-}
-
-/**
- * Convert device family enum to numeric value
- */
-function deviceFamilyToNumeric(family: string): string {
-  switch (family) {
-    case 'iPhone':
-      return '1';
-    case 'iPad':
-      return '2';
-    case 'iPhone+iPad':
-      return '1,2';
-    default:
-      return '1,2';
-  }
-}
 
 /**
  * Update Package.swift file with deployment target
@@ -114,9 +86,11 @@ function updateXCConfigFile(content: string, params: Record<string, unknown>): s
   const currentProjectVersion = params.currentProjectVersion as string | undefined;
   const platform = params.platform as string;
   const deploymentTarget = params.deploymentTarget as string | undefined;
-  const targetedDeviceFamily = params.targetedDeviceFamily as string | undefined;
-  const supportedOrientations = params.supportedOrientations as string[] | undefined;
-  const supportedOrientationsIpad = params.supportedOrientationsIpad as string[] | undefined;
+  const targetedDeviceFamily = params.targetedDeviceFamily as IOSDeviceFamily[] | undefined;
+  const supportedOrientations = params.supportedOrientations as IOSOrientation[] | undefined;
+  const supportedOrientationsIpad = params.supportedOrientationsIpad as
+    | IOSOrientation[]
+    | undefined;
 
   // Update project identity settings
   result = result.replace(/PRODUCT_NAME = .+/g, `PRODUCT_NAME = ${projectName}`);
@@ -148,8 +122,8 @@ function updateXCConfigFile(content: string, params: Record<string, unknown>): s
     }
 
     // Device family
-    if (targetedDeviceFamily) {
-      const deviceFamilyValue = deviceFamilyToNumeric(targetedDeviceFamily);
+    if (targetedDeviceFamily && targetedDeviceFamily.length > 0) {
+      const deviceFamilyValue = deviceFamiliesToNumeric(targetedDeviceFamily);
       result = result.replace(
         /TARGETED_DEVICE_FAMILY = .+/g,
         `TARGETED_DEVICE_FAMILY = ${deviceFamilyValue}`,

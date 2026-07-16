@@ -25,6 +25,16 @@ interface DirentLike {
   isSymbolicLink(): boolean;
 }
 
+function isPathWithin(rootPath: string, candidatePath: string): boolean {
+  const relativePath = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
+  return (
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relativePath))
+  );
+}
+
 function getErrorDetails(
   error: unknown,
   fallbackMessage: string,
@@ -62,8 +72,6 @@ async function _findProjectsRecursive(
   }
 
   log('debug', `Scanning directory: ${currentDirAbs} at depth ${currentDepth}`);
-  const normalizedWorkspaceRoot = path.normalize(workspaceRootAbs);
-
   try {
     const entries = await fileSystemExecutor.readdir(currentDirAbs, { withFileTypes: true });
     for (const rawEntry of entries) {
@@ -81,7 +89,7 @@ async function _findProjectsRecursive(
         continue;
       }
 
-      if (!path.normalize(absoluteEntryPath).startsWith(normalizedWorkspaceRoot)) {
+      if (!isPathWithin(workspaceRootAbs, absoluteEntryPath)) {
         log(
           'warn',
           `Skipping entry outside workspace root: ${absoluteEntryPath} (Workspace: ${workspaceRootAbs})`,
@@ -166,38 +174,26 @@ function isBundleLikePath(workspaceRoot: string): boolean {
   );
 }
 
-function resolveScanBase(workspaceRoot: string, scanPath?: string): string {
-  if (scanPath) {
-    return scanPath;
-  }
-
-  if (isBundleLikePath(workspaceRoot)) {
-    return path.dirname(workspaceRoot);
-  }
-
-  return '.';
-}
-
 async function discoverProjectsOrError(
   params: DiscoverProjectsParams,
   fileSystemExecutor: FileSystemExecutor,
 ): Promise<DiscoverProjectsComputation> {
-  const scanPath = resolveScanBase(params.workspaceRoot, params.scanPath);
+  const scanPath = params.scanPath ?? '.';
   const maxDepth = params.maxDepth ?? DEFAULT_MAX_DEPTH;
   const workspaceRoot = params.workspaceRoot;
 
-  const requestedScanPath = path.resolve(workspaceRoot, scanPath);
-  let absoluteScanPath = requestedScanPath;
   const workspaceBoundary = isBundleLikePath(workspaceRoot)
     ? path.dirname(workspaceRoot)
     : workspaceRoot;
-  const normalizedWorkspaceRoot = path.normalize(workspaceBoundary);
-  if (!path.normalize(absoluteScanPath).startsWith(normalizedWorkspaceRoot)) {
+  const absoluteWorkspaceBoundary = path.resolve(workspaceBoundary);
+  const requestedScanPath = path.resolve(absoluteWorkspaceBoundary, scanPath);
+  let absoluteScanPath = requestedScanPath;
+  if (!isPathWithin(absoluteWorkspaceBoundary, absoluteScanPath)) {
     log(
       'warn',
       `Requested scan path '${scanPath}' resolved outside workspace root '${workspaceRoot}'. Defaulting scan to workspace root.`,
     );
-    absoluteScanPath = normalizedWorkspaceRoot;
+    absoluteScanPath = absoluteWorkspaceBoundary;
   }
 
   const context: DiscoverProjectsExecutionContext = {
@@ -228,7 +224,7 @@ async function discoverProjectsOrError(
   const results: DiscoverProjectsResult = { projects: [], workspaces: [] };
   await _findProjectsRecursive(
     absoluteScanPath,
-    workspaceRoot,
+    absoluteWorkspaceBoundary,
     0,
     maxDepth,
     results,

@@ -130,6 +130,96 @@ describe('discover_projs plugin', () => {
       expect(result.workspaces).toEqual([]);
       expect(readdirCallCount).toBe(3);
     });
+
+    it('defaults prefix-matching sibling scan paths to the workspace root', async () => {
+      const scannedPaths: string[] = [];
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async (filePath) => {
+          scannedPaths.push(filePath);
+          return { isDirectory: () => true, mtimeMs: 0 };
+        },
+        readdir: async (directoryPath) => {
+          scannedPaths.push(directoryPath);
+          return [];
+        },
+      });
+
+      await discoverProjects(
+        { workspaceRoot: '/workspace/app', scanPath: '../application' },
+        mockFileSystemExecutor,
+      );
+
+      expect(scannedPaths).toEqual(['/workspace/app', '/workspace/app']);
+    });
+
+    it('skips recursive entries in prefix-matching sibling directories', async () => {
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+        readdir: async () => [
+          {
+            name: '../application/Outside.xcodeproj',
+            isDirectory: () => true,
+            isSymbolicLink: () => false,
+          },
+        ],
+      });
+
+      const result = await discoverProjects(
+        { workspaceRoot: '/workspace/app' },
+        mockFileSystemExecutor,
+      );
+
+      expect(result.projects).toEqual([]);
+    });
+
+    it('uses the containing directory as the recursive boundary for bundle workspace roots', async () => {
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async () => ({ isDirectory: () => true, mtimeMs: 0 }),
+        readdir: async () => [
+          { name: 'App.xcodeproj', isDirectory: () => true, isSymbolicLink: () => false },
+        ],
+      });
+
+      const result = await discoverProjects(
+        { workspaceRoot: '/workspace/App.xcodeproj' },
+        mockFileSystemExecutor,
+      );
+
+      expect(result.projects).toEqual(['/workspace/App.xcodeproj']);
+    });
+
+    it('uses the containing directory for relative bundle workspace roots', async () => {
+      const scannedPaths: string[] = [];
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async (filePath) => {
+          scannedPaths.push(filePath);
+          return { isDirectory: () => true, mtimeMs: 0 };
+        },
+        readdir: async () => [],
+      });
+
+      await discoverProjects({ workspaceRoot: 'App.xcodeproj' }, mockFileSystemExecutor);
+
+      expect(scannedPaths).toEqual([process.cwd()]);
+    });
+
+    it('resolves an explicit dot scan path from a relative bundle workspace root', async () => {
+      const scannedPaths: string[] = [];
+      const mockFileSystemExecutor = createMockFileSystemExecutor({
+        stat: async (filePath) => {
+          scannedPaths.push(filePath);
+          return { isDirectory: () => true, mtimeMs: 0 };
+        },
+        readdir: async () => [],
+      });
+
+      await discoverProjects(
+        { workspaceRoot: 'App.xcodeproj', scanPath: '.' },
+        mockFileSystemExecutor,
+      );
+
+      expect(scannedPaths).toEqual([process.cwd()]);
+    });
   });
 
   describe('Logic error handling', () => {

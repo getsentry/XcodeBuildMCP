@@ -129,12 +129,16 @@ describe('scaffold_ios_project plugin', () => {
       await initConfigStoreForTest({ iosTemplatePath: '' });
 
       let capturedCommands: string[][] = [];
+      let unzipOptions: unknown;
       const trackingCommandExecutor = createMockExecutor({
         success: true,
         output: 'Command executed successfully',
       });
       const capturingExecutor = async (command: string[], ...args: any[]) => {
         capturedCommands.push(command);
+        if (command[0] === 'unzip') {
+          unzipOptions = args[2];
+        }
         return trackingCommandExecutor(command, ...args);
       };
 
@@ -162,6 +166,9 @@ describe('scaffold_ios_project plugin', () => {
           /https:\/\/github\.com\/getsentry\/XcodeBuildMCP-iOS-Template\/releases\/download\/v\d+\.\d+\.\d+\/XcodeBuildMCP-iOS-Template-\d+\.\d+\.\d+\.zip/,
         ),
       ]);
+      expect(unzipOptions).toEqual({
+        cwd: expect.stringMatching(/xcodebuild-mcp-template-/),
+      });
 
       await initConfigStoreForTest({ iosTemplatePath: '/mock/template/path' });
     });
@@ -242,6 +249,22 @@ describe('scaffold_ios_project plugin', () => {
     });
 
     it('should return success response with all optional parameters', async () => {
+      let writtenXCConfig: string | undefined;
+      const xcconfigFileSystem = createMockFileSystemExecutor({
+        existsSync: (path) => path.includes('/mock/template/path'),
+        readdir: async () => [
+          { name: 'Project.xcconfig', isDirectory: () => false, isFile: () => true } as any,
+        ],
+        readFile: async () =>
+          [
+            'TARGETED_DEVICE_FAMILY = old',
+            'INFOPLIST_KEY_UISupportedInterfaceOrientations = old',
+            'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = old',
+          ].join('\n'),
+        writeFile: async (_path, content) => {
+          writtenXCConfig = content;
+        },
+      });
       const result = await runLogic(() =>
         scaffold_ios_projectLogic(
           {
@@ -258,13 +281,20 @@ describe('scaffold_ios_project plugin', () => {
             supportedOrientationsIpad: ['portrait', 'landscape-left'],
           },
           mockCommandExecutor,
-          mockFileSystemExecutor,
+          xcconfigFileSystem,
         ),
       );
 
       expect(result.isError).toBeFalsy();
       const text = allText(result);
       expect(text).toContain('Project scaffolded successfully');
+      expect(writtenXCConfig).toContain('TARGETED_DEVICE_FAMILY = 1');
+      expect(writtenXCConfig).toContain(
+        'INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait',
+      );
+      expect(writtenXCConfig).toContain(
+        'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft',
+      );
       expect(result.nextStepParams).toEqual({
         build_sim: {
           workspacePath: '/tmp/test-projects/TestIOSApp.xcworkspace',
