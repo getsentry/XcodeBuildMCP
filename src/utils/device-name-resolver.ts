@@ -67,8 +67,13 @@ async function loadDeviceNames(deps: DeviceNameResolverDependencies): Promise<Ma
         devices.set(device.hardwareProperties.udid, name);
       }
     }
+
+    cachedDevices = devices;
+    cacheTimestamp = deps.now();
+    return devices;
   } catch {
-    // Device list unavailable -- retain an empty cache and fall back to UUIDs.
+    // Keep previously resolved names available while a later call retries the refresh.
+    return cachedDevices ?? devices;
   } finally {
     try {
       await deps.removeOutput(outputPath);
@@ -76,10 +81,6 @@ async function loadDeviceNames(deps: DeviceNameResolverDependencies): Promise<Ma
       // The output file may not exist when devicectl fails before creating it.
     }
   }
-
-  cachedDevices = devices;
-  cacheTimestamp = deps.now();
-  return devices;
 }
 
 function refreshDeviceNames(

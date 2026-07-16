@@ -77,4 +77,19 @@ describe('device name resolver', () => {
     expect(formatDeviceId(deviceId, deps)).toBe(deviceId);
     expect(deps.removeOutput).toHaveBeenCalledWith('/tmp/devices.json');
   });
+
+  it('retains stale device names when a background refresh fails', async () => {
+    let now = 1_000;
+    const deps = createDependencies({ now: () => now });
+
+    await expect(resolveDeviceName(deviceId, deps)).resolves.toBe('Cam’s iPhone');
+    now = 31_001;
+    vi.mocked(deps.runDevicectl).mockRejectedValueOnce(new Error('unavailable'));
+
+    expect(formatDeviceId(deviceId, deps)).toBe(`Cam’s iPhone (${deviceId})`);
+    await expect(resolveDeviceName(deviceId, deps)).resolves.toBe('Cam’s iPhone');
+    await expect(resolveDeviceName(deviceId, deps)).resolves.toBe('Cam’s iPhone');
+    expect(formatDeviceId(deviceId, deps)).toBe(`Cam’s iPhone (${deviceId})`);
+    expect(deps.runDevicectl).toHaveBeenCalledTimes(3);
+  });
 });
