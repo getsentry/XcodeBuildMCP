@@ -62,9 +62,17 @@ export async function findSimulatorById(
     return { simulator: null, error: listResult.error ?? 'Failed to list simulators' };
   }
 
-  const simulatorsData = JSON.parse(listResult.output) as {
-    devices: Record<string, unknown[]>;
-  };
+  let simulatorsData: { devices: Record<string, unknown[]> };
+  try {
+    simulatorsData = JSON.parse(listResult.output) as {
+      devices: Record<string, unknown[]>;
+    };
+  } catch (error) {
+    return {
+      simulator: null,
+      error: `Failed to parse simulator list: ${toErrorMessage(error)}`,
+    };
+  }
 
   for (const runtime in simulatorsData.devices) {
     const devices = simulatorsData.devices[runtime];
