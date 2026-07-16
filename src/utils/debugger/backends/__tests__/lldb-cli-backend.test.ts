@@ -13,6 +13,28 @@ function emitSentinel(session: MockInteractiveSession): void {
 }
 
 describe('LldbCliBackend', () => {
+  it('reports a resumed process as running without waiting for it to stop', async () => {
+    const commands: string[] = [];
+    let sentinelCount = 0;
+    const spawner = createMockInteractiveSpawner({
+      onWrite(data, session) {
+        commands.push(data);
+        if (data.includes(SENTINEL_COMMAND) && sentinelCount++ === 0) {
+          emitSentinel(session);
+        }
+      },
+    });
+    const backend = await createLldbCliBackend(spawner);
+
+    await backend.resume();
+    await expect(backend.getExecutionState({ timeoutMs: 10 })).resolves.toEqual({
+      status: 'running',
+      description: 'Process is running',
+    });
+    expect(commands).not.toContain('process status\n');
+    await backend.dispose();
+  });
+
   it('drains continue output before returning the next command output', async () => {
     const spawner = createMockInteractiveSpawner({
       onWrite(data, session) {

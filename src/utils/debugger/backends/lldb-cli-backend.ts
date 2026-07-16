@@ -155,6 +155,10 @@ class LldbCliBackend implements DebuggerBackend {
   }
 
   async getExecutionState(opts?: { timeoutMs?: number }): Promise<DebugExecutionState> {
+    if (this.resumeOutputPending && !COMMAND_SENTINEL_REGEX.test(this.buffer)) {
+      return { status: 'running', description: 'Process is running' };
+    }
+
     try {
       const output = await this.runCommand('process status', {
         timeoutMs: opts?.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS,
