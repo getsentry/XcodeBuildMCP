@@ -14,3 +14,8 @@ annotations:
   readOnlyHint: true
   destructiveHint: false
   openWorldHint: false
+nextSteps:
+  - label: Refresh after UI action
+    toolId: snapshot_ui
+    when: success
+    condition: ui_action_needs_refresh

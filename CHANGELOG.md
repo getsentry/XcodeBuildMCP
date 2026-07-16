@@ -8,6 +8,10 @@
 - Added `extraArgs` as a first-class session-default value. Repo config or runtime defaults can now carry common `xcodebuild` flags (for example `-skipPackagePluginValidation` or `-disableAutomaticPackageResolution`) so they don't need repeating on every build or test call. Per-call `extraArgs` replace matching configured flags or build settings and append after non-matching defaults, while an explicit empty array (`extraArgs: []`) clears the defaults for a single call. The session management tools show, set, sync, and clear `extraArgs` alongside the other defaults.
 - Added reusable test preparation to the existing simulator, device, and macOS build tools. Builds can now return a portable `.xctestproducts` artifact, and test tools can run that artifact—or an advanced `.xctestrun` input—without rebuilding before producing a new `.xcresult` ([#450](https://github.com/getsentry/XcodeBuildMCP/issues/450)).
 
+### Changed
+
+- Tool manifests can now conditionally expose static next steps using handler-activated condition keys, while runtime-generated parameters continue to flow through the existing next-step parameter contract.
+
 ### Fixed
 
 - Fixed `suppressWarnings` being ignored in settled build, build-run, and test output. The flag was honored only while streaming, so warnings still reached the final MCP tool response ([#447](https://github.com/getsentry/XcodeBuildMCP/issues/447)).
@@ -693,4 +697,3 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-

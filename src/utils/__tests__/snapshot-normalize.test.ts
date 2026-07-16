@@ -6,7 +6,9 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const input =
       'Workspace Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-abc123def456/logs\n';
     const result = normalizeSnapshotOutput(input);
-    expect(result).toContain('~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs');
+    expect(result).toContain(
+      '~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs',
+    );
     expect(result).not.toContain('Weather-abc123def456');
   });
 
@@ -50,10 +52,10 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      'Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
+      'Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log',
     );
     expect(result).toContain(
-      'Runtime Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/logs/io.app_<TIMESTAMP>_pid<PID>.log',
+      'Runtime Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/io.app_<TIMESTAMP>_pid<PID>.log',
     );
   });
 
@@ -64,7 +66,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult',
+      '~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult',
     );
     expect(result).not.toContain('Weather-abc123def456');
     expect(result).not.toContain('abcd1234');
@@ -77,7 +79,7 @@ describe('normalizeSnapshotOutput tilde handling', () => {
     const result = normalizeSnapshotOutput(input);
 
     expect(result).toContain(
-      '~/Library/Developer/XcodeBuildMCP/workspaces/Weather-<HASH>/DerivedData/CalculatorApp-<HASH>',
+      '~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>',
     );
     expect(result).not.toContain('Weather-abc123def456');
     expect(result).not.toContain('22d700c6d603');

@@ -199,7 +199,7 @@ export async function buildDeviceLogic(
         ...(params.platform ? { platform: String(mapDevicePlatform(params.platform)) } : {}),
       };
       ctx.nextStepParams = { test_device: nextParams };
-      ctx.nextSteps = [{ tool: 'test_device', label: 'Run prepared tests', params: nextParams }];
+      ctx.nextStepConditionKeys = ['prepared_tests_available'];
     } else if (!prepared.testProductsPath) {
       const nextParams = {
         scheme: params.scheme,
@@ -211,14 +211,7 @@ export async function buildDeviceLogic(
           : {}),
       };
       ctx.nextStepParams = { get_device_app_path: nextParams };
-      ctx.nextSteps = [
-        {
-          tool: 'get_device_app_path',
-          label: 'Get built device app path',
-          params: nextParams,
-          priority: 1,
-        },
-      ];
+      ctx.nextStepConditionKeys = ['app_build_succeeded'];
     }
   }
 }

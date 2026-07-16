@@ -221,6 +221,7 @@ export function startDaemonServer(ctx: DaemonServerContext): net.Server {
                 result: {
                   structuredOutput: handlerContext.structuredOutput ?? null,
                   nextStepParams: handlerContext.nextStepParams,
+                  nextStepConditionKeys: handlerContext.nextStepConditionKeys,
                   nextSteps: handlerContext.nextSteps,
                 },
               };

@@ -291,6 +291,7 @@ describe('build_device plugin', () => {
         scheme: 'MyScheme',
         derivedDataPath: '/tmp/derived-data',
       });
+      expect(result.nextStepConditionKeys).toEqual(['app_build_succeeded']);
     });
 
     it('should return exact build failure response', async () => {
@@ -411,6 +412,7 @@ describe('build_device plugin', () => {
           platform: 'iOS',
         },
       });
+      expect(result.nextStepConditionKeys).toEqual(['prepared_tests_available']);
     });
 
     it('should not suggest running generic device test products without a device', async () => {
@@ -431,6 +433,7 @@ describe('build_device plugin', () => {
 
       expect(spy.commandCalls[0].args).toContain('generic/platform=iOS');
       expect(result.nextStepParams).toBeUndefined();
+      expect(result.nextStepConditionKeys).toBeUndefined();
     });
   });
 });

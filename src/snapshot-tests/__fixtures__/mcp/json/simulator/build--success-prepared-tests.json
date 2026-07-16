@@ -1,0 +1,27 @@
+{
+  "schema": "xcodebuildmcp.output.build-result",
+  "schemaVersion": "3",
+  "didError": false,
+  "error": null,
+  "data": {
+    "summary": {
+      "status": "SUCCEEDED",
+      "durationMs": 1234,
+      "target": "simulator"
+    },
+    "artifacts": {
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log",
+      "testProductsPath": "<TMPDIR>/CalculatorApp Tests.xctestproducts",
+      "xctestrunPaths": [
+        "<TMPDIR>/CalculatorApp Tests.xctestproducts/Tests/0/CalculatorApp.xctestrun"
+      ]
+    },
+    "diagnostics": {
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "nextSteps": [
+    "Run prepared tests: test_sim({ testProductsPath: \"<TMPDIR>/CalculatorApp Tests.xctestproducts\", simulatorName: \"iPhone 17\" })"
+  ]
+}

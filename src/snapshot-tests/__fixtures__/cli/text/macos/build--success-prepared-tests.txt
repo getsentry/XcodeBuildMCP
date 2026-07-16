@@ -1,0 +1,16 @@
+
+🔨 Build
+
+   Scheme: MCPTest
+   Project: example_projects/macOS/MCPTest.xcodeproj
+   Platform: macOS
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  └ Files:
+     ├ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log
+     ├ Test Products: <TMPDIR>/MCPTest Tests.xctestproducts
+     └ XCTest Run: <TMPDIR>/MCPTest Tests.xctestproducts/Tests/0/MCPTest.xctestrun
+
+Next steps:
+1. Run prepared tests: xcodebuildmcp macos test --test-products-path '<TMPDIR>/MCPTest Tests.xctestproducts'

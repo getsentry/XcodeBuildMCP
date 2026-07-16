@@ -475,6 +475,7 @@ describe('build_sim tool', () => {
       expect(result.nextStepParams?.get_sim_app_path).toMatchObject({
         derivedDataPath: '/path/to/derived',
       });
+      expect(result.nextStepConditionKeys).toEqual(['app_build_succeeded']);
     });
 
     it('should handle build failure', async () => {
@@ -589,6 +590,7 @@ describe('build_sim tool', () => {
       expect(result.nextStepParams).toEqual({
         test_sim: { testProductsPath, simulatorName: 'iPhone 17' },
       });
+      expect(result.nextStepConditionKeys).toEqual(['prepared_tests_available']);
     });
   });
 

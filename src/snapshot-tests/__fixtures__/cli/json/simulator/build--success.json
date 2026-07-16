@@ -1,6 +1,6 @@
 {
   "schema": "xcodebuildmcp.output.build-result",
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "didError": false,
   "error": null,
   "data": {

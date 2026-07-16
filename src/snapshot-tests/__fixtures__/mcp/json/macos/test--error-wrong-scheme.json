@@ -1,22 +1,16 @@
 {
   "schema": "xcodebuildmcp.output.test-result",
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "didError": true,
   "error": "Tests failed",
   "data": {
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
-      "counts": {
-        "passed": 0,
-        "failed": 0,
-        "skipped": 0
-      },
       "target": "macos"
     },
     "artifacts": {
-      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log",
-      "xcresultPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],

@@ -1,4 +1,7 @@
 import { describe, it, beforeAll, afterAll, vi } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import { isDeviceAvailable } from '../device-availability.ts';
 import {
@@ -28,14 +31,19 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
 
   describe(`${runtime} device workflow`, () => {
     let harness: WorkflowSnapshotHarness;
+    let testProductsDir: string;
 
     beforeAll(async () => {
       vi.setConfig({ testTimeout: 120_000 });
       harness = await createHarnessForRuntime(runtime);
+      testProductsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'device-build-products-'));
     }, 120_000);
 
     afterAll(async () => {
       await harness.cleanup();
+      if (testProductsDir) {
+        fs.rmSync(testProductsDir, { recursive: true, force: true });
+      }
     });
 
     describe('list', () => {
@@ -54,6 +62,19 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
         expectFixture(text, 'build--success');
       });
 
+      it('success - prepared tests without a selected device', async () => {
+        const { text } = await harness.invoke('device', 'build', {
+          workspacePath: WORKSPACE,
+          scheme: 'CalculatorApp',
+          buildForTesting: true,
+          testProductsPath: path.join(
+            testProductsDir,
+            'Generic CalculatorApp Tests.xctestproducts',
+          ),
+        });
+        expectFixture(text, 'build--success-prepared-tests-generic');
+      });
+
       it('error - wrong scheme', async () => {
         const { text } = await harness.invoke('device', 'build', {
           workspacePath: WORKSPACE,
@@ -69,6 +90,19 @@ export function registerDeviceSnapshotSuite(runtime: SnapshotRuntime): void {
           extraArgs: compilerErrorExtraArgs(),
         });
         expectFixture(text, 'build--error-compiler');
+      });
+
+      it('error - prepared tests with wrong scheme', async () => {
+        const { text } = await harness.invoke('device', 'build', {
+          workspacePath: WORKSPACE,
+          scheme: 'NONEXISTENT',
+          buildForTesting: true,
+          testProductsPath: path.join(
+            testProductsDir,
+            'Invalid CalculatorApp Tests.xctestproducts',
+          ),
+        });
+        expectFixture(text, 'build--error-prepared-tests-wrong-scheme');
       });
     });
 

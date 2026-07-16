@@ -23,6 +23,7 @@ import { createStructuredErrorOutput } from '../utils/structured-error.ts';
 type BuiltTemplateNextStep = {
   step: NextStep;
   templateToolId?: string;
+  condition?: string;
 };
 
 function emitExplicitRuntimeError(params: {
@@ -61,6 +62,7 @@ function buildTemplateNextSteps(
           priority: template.priority,
           when: template.when,
         },
+        condition: template.condition,
       });
       continue;
     }
@@ -79,6 +81,7 @@ function buildTemplateNextSteps(
         when: template.when,
       },
       templateToolId: template.toolId,
+      condition: template.condition,
     });
   }
 
@@ -222,6 +225,7 @@ export function postProcessSession(params: {
 
   const isError = session.isError();
   const nextStepParams = ctx.nextStepParams;
+  const nextStepConditionKeys = new Set(ctx.nextStepConditionKeys ?? []);
   const handlerNextSteps = ctx.nextSteps;
   const suppressNextStepsForStructuredFailure =
     isError && isStructuredXcodebuildFailureSession(session);
@@ -241,9 +245,9 @@ export function postProcessSession(params: {
   const allTemplateSteps = buildTemplateNextSteps(tool, catalog);
   const templateSteps = allTemplateSteps.filter((t) => {
     const when = t.step.when ?? 'always';
-    if (when === 'success') return !isError;
-    if (when === 'failure') return isError;
-    return true;
+    const statusMatches = when === 'success' ? !isError : when === 'failure' ? isError : true;
+    const conditionMatches = !t.condition || nextStepConditionKeys.has(t.condition);
+    return statusMatches && conditionMatches;
   });
 
   let finalSteps: NextStep[];
@@ -502,6 +506,7 @@ export class DefaultToolInvoker implements ToolInvoker {
               },
               attach: (image) => opts.renderSession!.attach(image),
               nextStepParams: daemonResult.nextStepParams,
+              nextStepConditionKeys: daemonResult.nextStepConditionKeys,
               nextSteps: daemonResult.nextSteps,
               structuredOutput,
             };
@@ -547,6 +552,7 @@ export class DefaultToolInvoker implements ToolInvoker {
               },
               attach: (image) => session.attach(image),
               nextStepParams: daemonResult.nextStepParams,
+              nextStepConditionKeys: daemonResult.nextStepConditionKeys,
               nextSteps: daemonResult.nextSteps,
               structuredOutput: daemonResult.structuredOutput ?? undefined,
             };

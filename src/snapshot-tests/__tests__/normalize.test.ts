@@ -175,6 +175,24 @@ describe('normalizeSnapshotOutput', () => {
     ).toBe('~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build.log\n');
   });
 
+  it('normalizes worktree-specific workspace names to the canonical fixture label', () => {
+    expect(
+      normalizeSnapshotOutput(
+        '~/Library/Developer/XcodeBuildMCP/workspaces/issue-450-c5da0cbe19a7/logs/build.log\n',
+      ),
+    ).toBe('~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build.log\n');
+  });
+
+  it('normalizes generated test products process and random suffixes', () => {
+    expect(
+      normalizeSnapshotOutput(
+        '~/Library/Developer/XcodeBuildMCP/workspaces/issue-450-c5da0cbe19a7/test-products/test_sim_2026-07-16T13-20-13-467Z_pid31212_06abe32f.xctestproducts\n',
+      ),
+    ).toBe(
+      '~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/test-products/test_sim_<TIMESTAMP>_pid<PID>.xctestproducts\n',
+    );
+  });
+
   it('normalizes absolute home XcodeBuildMCP paths to ~/', () => {
     expect(
       normalizeSnapshotOutput(

@@ -13,6 +13,7 @@ const PID_NAME_REGEX = /\bPID \d+\b/g;
 const KILL_PID_REGEX = /(\bkill:\s*)\d+(?=:)/g;
 const PID_FILENAME_SUFFIX_REGEX = /_pid\d+(?:_[0-9a-f]{8})?\.log/g;
 const XCRESULT_FILENAME_PID_SUFFIX_REGEX = /_pid\d+_[0-9a-f]{8}\.xcresult/g;
+const XCTESTPRODUCTS_FILENAME_PID_SUFFIX_REGEX = /_pid\d+_[0-9a-f]{8}\.xctestproducts/g;
 const HELPER_PID_FILENAME_SUFFIX_REGEX =
   /_(?:helperpid\d+_ownerpid\d+|ownerpid\d+)_[0-9a-f]{8}\.log/g;
 const PID_JSON_REGEX = /"pid"\s*:\s*\d+/g;
@@ -74,7 +75,7 @@ const CODEX_WORKTREE_NODE_MODULES_REGEX =
   /<HOME>\/\.codex\/worktrees\/[^/:]+\/node_modules\/\.bin/g;
 const XCODEBUILDMCP_HOME_PREFIX_REGEX = /<HOME>(?=\/Library\/Developer\/XcodeBuildMCP(?:\/|$))/g;
 const XCODEBUILDMCP_WORKSPACE_KEY_REGEX =
-  /(~\/Library\/Developer\/XcodeBuildMCP\/workspaces\/[^/\n]+)-[0-9a-f]{12}(?=\/|$)/g;
+  /(~\/Library\/Developer\/XcodeBuildMCP\/workspaces\/)[^/\n]+-[0-9a-f]{12}(?=\/|$)/g;
 const XCODE_IDE_ARTIFACT_OWNER_PID_REGEX = /(\/state\/xcode-ide\/call-tool\/ownerpid)\d+_/g;
 const XCODE_IDE_ARTIFACT_HASH_REGEX =
   /(\/state\/xcode-ide\/call-tool\/[^/\n]+\/[^/\n]+-)[0-9a-f]{8}(?=\.json)/g;
@@ -226,7 +227,7 @@ export function normalizeSnapshotOutput(
     '<TMPDIR>',
   );
   normalized = normalized.replace(XCODEBUILDMCP_HOME_PREFIX_REGEX, '~');
-  normalized = normalized.replace(XCODEBUILDMCP_WORKSPACE_KEY_REGEX, '$1-<HASH>');
+  normalized = normalized.replace(XCODEBUILDMCP_WORKSPACE_KEY_REGEX, '$1XcodeBuildMCP-<HASH>');
   normalized = normalized.replace(XCODE_IDE_ARTIFACT_OWNER_PID_REGEX, '$1<PID>_');
   normalized = normalized.replace(XCODE_IDE_ARTIFACT_HASH_REGEX, '$1<HASH>');
   normalized = normalized.replace(
@@ -258,6 +259,10 @@ export function normalizeSnapshotOutput(
   normalized = normalized.replace(HELPER_PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(PID_FILENAME_SUFFIX_REGEX, '_pid<PID>.log');
   normalized = normalized.replace(XCRESULT_FILENAME_PID_SUFFIX_REGEX, '_pid<PID>.xcresult');
+  normalized = normalized.replace(
+    XCTESTPRODUCTS_FILENAME_PID_SUFFIX_REGEX,
+    '_pid<PID>.xctestproducts',
+  );
   normalized = normalized.replace(PID_JSON_REGEX, '"pid" : <PID>');
   normalized = normalized.replace(PROCESS_ID_REGEX, 'Process ID: <PID>');
   normalized = normalized.replace(PROCESS_INLINE_PID_REGEX, 'process <PID>');

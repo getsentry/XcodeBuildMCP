@@ -93,6 +93,7 @@ describe('daemon tool.invoke streaming', () => {
           stream: 'stderr',
           line: 'Build Log: /tmp/build.log',
         });
+        ctx.nextStepConditionKeys = ['build_artifact_available'];
         ctx.nextSteps = [{ label: 'Open the build log' }];
         ctx.structuredOutput = {
           schema: 'xcodebuildmcp.output.simulator-list',
@@ -147,6 +148,7 @@ describe('daemon tool.invoke streaming', () => {
           simulators: [],
         },
       },
+      nextStepConditionKeys: ['build_artifact_available'],
       nextSteps: [{ label: 'Open the build log' }],
     });
   });

@@ -14,6 +14,7 @@ export interface NextStepTemplate {
   params?: Record<string, string | number | boolean>;
   priority?: number;
   when?: 'always' | 'success' | 'failure';
+  condition?: string;
 }
 
 export type RuntimeKind = 'cli' | 'daemon' | 'mcp';

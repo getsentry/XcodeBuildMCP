@@ -34,6 +34,7 @@ export interface MockToolHandlerResult {
   events: AnyFragment[];
   attachments: ImageAttachment[];
   nextStepParams?: NextStepParamsMap;
+  nextStepConditionKeys?: string[];
   text(): string;
   isError(): boolean;
 }
@@ -61,6 +62,9 @@ export function createMockToolHandlerContext(): {
     attachments,
     get nextStepParams() {
       return ctx.nextStepParams;
+    },
+    get nextStepConditionKeys() {
+      return ctx.nextStepConditionKeys;
     },
     text() {
       return renderCliTextTranscript({

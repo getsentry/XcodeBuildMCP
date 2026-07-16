@@ -98,6 +98,43 @@ describe('schema', () => {
     });
   });
 
+  it('parses a custom next-step condition key', () => {
+    const result = toolManifestEntrySchema.safeParse({
+      id: 'build_sim',
+      module: 'mcp/tools/simulator/build_sim',
+      names: { mcp: 'build_sim' },
+      nextSteps: [
+        {
+          label: 'Run prepared tests',
+          toolId: 'test_sim',
+          when: 'success',
+          condition: 'prepared_tests_available',
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected custom next-step condition to parse');
+    expect(result.data.nextSteps[0]).toMatchObject({
+      when: 'success',
+      condition: 'prepared_tests_available',
+    });
+  });
+
+  it.each(['', 'PreparedTests', 'prepared-tests', 'prepared tests'])(
+    'rejects invalid next-step condition key %j',
+    (condition) => {
+      const result = toolManifestEntrySchema.safeParse({
+        id: 'build_sim',
+        module: 'mcp/tools/simulator/build_sim',
+        names: { mcp: 'build_sim' },
+        nextSteps: [{ label: 'Run prepared tests', condition }],
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
   it('rejects invalid output schema metadata', () => {
     const result = toolManifestEntrySchema.safeParse({
       id: 'list_sims',

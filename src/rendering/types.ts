@@ -40,6 +40,7 @@ export interface ToolHandlerContext {
   emit: (fragment: AnyFragment) => void;
   attach: (image: ImageAttachment) => void;
   nextStepParams?: NextStepParamsMap;
+  nextStepConditionKeys?: string[];
   nextSteps?: NextStep[];
   structuredOutput?: StructuredToolOutput;
 }

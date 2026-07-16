@@ -15,6 +15,9 @@ const SNAPSHOT_COMMAND_TIMEOUT_MS = 120_000;
 const SIMULATOR_STATE_WAIT_TIMEOUT_MS = 15_000;
 const SIMULATOR_STATE_POLL_INTERVAL_MS = 250;
 
+// Snapshot suites intentionally run serially because this harness shares simulator and filesystem
+// state across scenarios. Keep vitest.snapshot.config.ts at one worker unless those resources are
+// isolated per worker.
 export type SnapshotHarness = WorkflowSnapshotHarness;
 export type { SnapshotResult };
 

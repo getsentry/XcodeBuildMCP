@@ -73,6 +73,10 @@ export const manifestNextStepTemplateSchema = z
     params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
     priority: z.number().optional(),
     when: z.enum(['always', 'success', 'failure']).default('always'),
+    condition: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*$/)
+      .optional(),
   })
   .strict();
 

@@ -271,7 +271,7 @@ export async function build_simLogic(
           : { simulatorName: params.simulatorName ?? '' }),
       };
       ctx.nextStepParams = { test_sim: nextParams };
-      ctx.nextSteps = [{ tool: 'test_sim', label: 'Run prepared tests', params: nextParams }];
+      ctx.nextStepConditionKeys = ['prepared_tests_available'];
     } else {
       const nextParams = {
         ...(params.simulatorId
@@ -284,14 +284,7 @@ export async function build_simLogic(
           : {}),
       };
       ctx.nextStepParams = { get_sim_app_path: nextParams };
-      ctx.nextSteps = [
-        {
-          tool: 'get_sim_app_path',
-          label: 'Get built app path in simulator derived data',
-          params: nextParams,
-          priority: 1,
-        },
-      ];
+      ctx.nextStepConditionKeys = ['app_build_succeeded'];
     }
   }
 }

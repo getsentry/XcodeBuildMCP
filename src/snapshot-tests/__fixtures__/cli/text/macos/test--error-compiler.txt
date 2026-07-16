@@ -21,5 +21,4 @@ Compiler Errors (1):
 
 ❌ Test failed. (⏱️ <DURATION>)
   └ Files:
-     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_macos_<TIMESTAMP>_pid<PID>.xcresult
      └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_macos_<TIMESTAMP>_pid<PID>.log

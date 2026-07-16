@@ -224,7 +224,7 @@ export async function buildMacOSLogic(
     if (prepared.testProductsPath) {
       const nextParams = { testProductsPath: displayPath(prepared.testProductsPath) };
       ctx.nextStepParams = { test_macos: nextParams };
-      ctx.nextSteps = [{ tool: 'test_macos', label: 'Run prepared tests', params: nextParams }];
+      ctx.nextStepConditionKeys = ['prepared_tests_available'];
     } else {
       const nextParams = {
         scheme: params.scheme,
@@ -233,14 +233,7 @@ export async function buildMacOSLogic(
           : {}),
       };
       ctx.nextStepParams = { get_mac_app_path: nextParams };
-      ctx.nextSteps = [
-        {
-          tool: 'get_mac_app_path',
-          label: 'Get built macOS app path',
-          params: nextParams,
-          priority: 1,
-        },
-      ];
+      ctx.nextStepConditionKeys = ['app_build_succeeded'];
     }
   }
 }

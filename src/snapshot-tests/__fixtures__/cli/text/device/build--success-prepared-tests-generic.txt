@@ -1,0 +1,13 @@
+
+🔨 Build
+
+   Scheme: CalculatorApp
+   Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
+   Platform: iOS
+   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  └ Files:
+     ├ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log
+     ├ Test Products: <TMPDIR>/Generic CalculatorApp Tests.xctestproducts
+     └ XCTest Run: <TMPDIR>/Generic CalculatorApp Tests.xctestproducts/Tests/0/CalculatorApp.xctestrun

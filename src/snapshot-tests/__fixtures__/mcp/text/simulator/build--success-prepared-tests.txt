@@ -1,0 +1,11 @@
+
+🔨 Build
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  └ Files:
+     ├── <TMPDIR>/CalculatorApp Tests.xctestproducts/ — Test Products
+     │   └── Tests/0/CalculatorApp.xctestrun — XCTest Run
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_sim_<TIMESTAMP>_pid<PID>.log — Build Logs
+
+Next steps:
+1. Run prepared tests: test_sim({ testProductsPath: "<TMPDIR>/CalculatorApp Tests.xctestproducts", simulatorName: "iPhone 17" })

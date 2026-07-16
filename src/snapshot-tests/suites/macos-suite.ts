@@ -62,6 +62,16 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
         expectFixture(text, 'build--success');
       });
 
+      it('success - prepared tests', { timeout: 120000 }, async () => {
+        const { text } = await harness.invoke('macos', 'build', {
+          projectPath: PROJECT,
+          scheme: 'MCPTest',
+          buildForTesting: true,
+          testProductsPath: path.join(tmpDir, 'MCPTest Tests.xctestproducts'),
+        });
+        expectFixture(text, 'build--success-prepared-tests');
+      });
+
       it('error - wrong scheme', { timeout: 120000 }, async () => {
         const { text } = await harness.invoke('macos', 'build', {
           projectPath: PROJECT,
@@ -77,6 +87,16 @@ export function registerMacosSnapshotSuite(runtime: SnapshotRuntime): void {
           extraArgs: compilerErrorExtraArgs(),
         });
         expectFixture(text, 'build--error-compiler');
+      });
+
+      it('error - prepared tests with wrong scheme', { timeout: 120000 }, async () => {
+        const { text } = await harness.invoke('macos', 'build', {
+          projectPath: PROJECT,
+          scheme: 'NONEXISTENT',
+          buildForTesting: true,
+          testProductsPath: path.join(tmpDir, 'Invalid MCPTest Tests.xctestproducts'),
+        });
+        expectFixture(text, 'build--error-prepared-tests-wrong-scheme');
       });
     });
 

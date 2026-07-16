@@ -1,0 +1,11 @@
+
+🔨 Build
+
+✅ Build succeeded. (⏱️ <DURATION>)
+  └ Files:
+     ├── <TMPDIR>/MCPTest Tests.xctestproducts/ — Test Products
+     │   └── Tests/0/MCPTest.xctestrun — XCTest Run
+     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log — Build Logs
+
+Next steps:
+1. Run prepared tests: test_macos({ testProductsPath: "<TMPDIR>/MCPTest Tests.xctestproducts" })

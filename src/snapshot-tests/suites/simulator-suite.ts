@@ -30,15 +30,20 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
   describe(`${runtime} simulator workflow`, () => {
     let harness: WorkflowSnapshotHarness;
     let simulatorUdid: string;
+    let testProductsDir: string;
 
     beforeAll(async () => {
       vi.setConfig({ testTimeout: TEST_TIMEOUT_MS });
       harness = await createHarnessForRuntime(runtime);
       simulatorUdid = await ensureSimulatorBooted(PRIMARY_BOOTED_SIMULATOR);
+      testProductsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-build-products-'));
     }, TEST_TIMEOUT_MS);
 
     afterAll(async () => {
       await harness.cleanup();
+      if (testProductsDir) {
+        fs.rmSync(testProductsDir, { recursive: true, force: true });
+      }
     });
 
     describe('build', () => {
@@ -51,6 +56,21 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
             simulatorName: SIMULATOR_NAME,
           });
           expectFixture(text, 'build--success');
+        },
+        TEST_TIMEOUT_MS,
+      );
+
+      it(
+        'success - prepared tests',
+        async () => {
+          const { text } = await harness.invoke('simulator', 'build', {
+            workspacePath: WORKSPACE,
+            scheme: SCHEME,
+            simulatorName: SIMULATOR_NAME,
+            buildForTesting: true,
+            testProductsPath: path.join(testProductsDir, 'CalculatorApp Tests.xctestproducts'),
+          });
+          expectFixture(text, 'build--success-prepared-tests');
         },
         TEST_TIMEOUT_MS,
       );
@@ -78,6 +98,24 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
             extraArgs: compilerErrorExtraArgs(),
           });
           expectFixture(text, 'build--error-compiler');
+        },
+        TEST_TIMEOUT_MS,
+      );
+
+      it(
+        'error - prepared tests with wrong scheme',
+        async () => {
+          const { text } = await harness.invoke('simulator', 'build', {
+            workspacePath: WORKSPACE,
+            scheme: INVALID_SCHEME,
+            simulatorName: SIMULATOR_NAME,
+            buildForTesting: true,
+            testProductsPath: path.join(
+              testProductsDir,
+              'Invalid CalculatorApp Tests.xctestproducts',
+            ),
+          });
+          expectFixture(text, 'build--error-prepared-tests-wrong-scheme');
         },
         TEST_TIMEOUT_MS,
       );

@@ -14,3 +14,13 @@ annotations:
   readOnlyHint: false
   destructiveHint: false
   openWorldHint: false
+nextSteps:
+  - label: Get built device app path
+    toolId: get_device_app_path
+    priority: 1
+    when: success
+    condition: app_build_succeeded
+  - label: Run prepared tests
+    toolId: test_device
+    when: success
+    condition: prepared_tests_available

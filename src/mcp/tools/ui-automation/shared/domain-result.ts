@@ -1,5 +1,4 @@
 import type { RenderHints, ToolHandlerContext } from '../../../../rendering/types.ts';
-import type { NextStep } from '../../../../types/common.ts';
 import type {
   BasicDiagnostics,
   CapturePayload,
@@ -49,20 +48,6 @@ function createDiagnostics(
 
 function compact(values: Array<string | null | undefined>): string[] {
   return values.filter((value): value is string => typeof value === 'string' && value.length > 0);
-}
-
-function createUiActionSuccessNextSteps(result: UiActionResultDomainResult): NextStep[] {
-  if (result.didError) {
-    return [];
-  }
-
-  return [
-    {
-      label: 'Refresh after UI action',
-      tool: 'snapshot_ui',
-      params: { simulatorId: result.artifacts.simulatorId },
-    },
-  ];
 }
 
 function getUiActionTargetRef(action: UiAction): string | null {
@@ -326,7 +311,10 @@ export function setUiActionStructuredOutput(
     schema: UI_ACTION_SCHEMA,
     schemaVersion: '2',
   };
-  ctx.nextSteps = createUiActionSuccessNextSteps(result);
+  if (!result.didError) {
+    ctx.nextStepParams = { snapshot_ui: { simulatorId: result.artifacts.simulatorId } };
+    ctx.nextStepConditionKeys = ['ui_action_needs_refresh'];
+  }
 }
 
 export function setCaptureStructuredOutput(

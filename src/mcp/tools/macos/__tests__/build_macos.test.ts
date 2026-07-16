@@ -165,6 +165,7 @@ describe('build_macos plugin', () => {
           derivedDataPath: '/path/to/derived-data',
         },
       });
+      expect(result.nextStepConditionKeys).toEqual(['app_build_succeeded']);
     });
 
     it('should return exact exception handling response', async () => {
@@ -407,6 +408,7 @@ describe('build_macos plugin', () => {
         'build-for-testing',
       ]);
       expect(result.nextStepParams).toEqual({ test_macos: { testProductsPath } });
+      expect(result.nextStepConditionKeys).toEqual(['prepared_tests_available']);
     });
   });
 
