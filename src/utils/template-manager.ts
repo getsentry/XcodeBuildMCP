@@ -98,23 +98,15 @@ export class TemplateManager {
         throw new Error(`Failed to download template: ${curlResult.error}`);
       }
 
-      // Extract the zip file
-      // Temporarily change to temp directory for extraction
-      const originalCwd = process.cwd();
-      try {
-        process.chdir(tempDir);
-        const unzipResult = await commandExecutor(
-          ['unzip', '-q', zipPath],
-          'Extract Template',
-          true,
-          undefined,
-        );
+      const unzipResult = await commandExecutor(
+        ['unzip', '-q', zipPath],
+        'Extract Template',
+        true,
+        { cwd: tempDir },
+      );
 
-        if (!unzipResult.success) {
-          throw new Error(`Failed to extract template: ${unzipResult.error}`);
-        }
-      } finally {
-        process.chdir(originalCwd);
+      if (!unzipResult.success) {
+        throw new Error(`Failed to extract template: ${unzipResult.error}`);
       }
 
       // Find the extracted directory and return the template subdirectory

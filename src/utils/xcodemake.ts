@@ -2,12 +2,35 @@ import { log } from './logger.ts';
 import type { CommandResponse } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
 import { existsSync, readdirSync, statSync } from 'fs';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import { getConfig } from './config-store.ts';
 
 let overriddenXcodemakePath: string | null = null;
+
+export const XCODEMAKE_COMMIT = '1749682a99794edc257010b3eaa35c39f0f91c50';
+export const XCODEMAKE_SHA256 = 'b84f2e58326a1c009e5349e28895817d2968f2cb655b6a2a7c7c719971007db7';
+export const XCODEMAKE_DOWNLOAD_URL = `https://raw.githubusercontent.com/cameroncooke/xcodemake/${XCODEMAKE_COMMIT}/xcodemake`;
+
+interface XcodemakeInstallerDependencies {
+  fetch: typeof fetch;
+  mkdir: typeof fs.mkdir;
+  writeFile: typeof fs.writeFile;
+  chmod: typeof fs.chmod;
+  rename: typeof fs.rename;
+  unlink: typeof fs.unlink;
+}
+
+const defaultInstallerDependencies: XcodemakeInstallerDependencies = {
+  fetch,
+  mkdir: fs.mkdir,
+  writeFile: fs.writeFile,
+  chmod: fs.chmod,
+  rename: fs.rename,
+  unlink: fs.unlink,
+};
 
 export function isXcodemakeEnabled(): boolean {
   return getConfig().incrementalBuildsEnabled;
@@ -48,29 +71,47 @@ function overrideXcodemakeCommand(path: string): void {
   log('info', `Using overridden xcodemake path: ${path}`);
 }
 
-async function installXcodemake(): Promise<boolean> {
+/** Verifies downloaded xcodemake bytes against the pinned SHA-256 digest. */
+export function verifyXcodemakeScript(
+  scriptContent: string,
+  expectedSha256 = XCODEMAKE_SHA256,
+): void {
+  const actualSha256 = createHash('sha256').update(scriptContent).digest('hex');
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(
+      `xcodemake checksum mismatch: expected ${expectedSha256}, received ${actualSha256}`,
+    );
+  }
+}
+
+/** Installs the pinned, verified xcodemake script and reports whether installation succeeded. */
+export async function installXcodemake(
+  deps: XcodemakeInstallerDependencies = defaultInstallerDependencies,
+  expectedSha256 = XCODEMAKE_SHA256,
+): Promise<boolean> {
   const tempDir = os.tmpdir();
   const xcodemakeDir = path.join(tempDir, 'xcodebuildmcp');
   const xcodemakePath = path.join(xcodemakeDir, 'xcodemake');
+  const stagingPath = `${xcodemakePath}.${process.pid}.${randomUUID()}.tmp`;
 
   log('info', `Attempting to install xcodemake to ${xcodemakePath}`);
 
   try {
-    await fs.mkdir(xcodemakeDir, { recursive: true });
+    await deps.mkdir(xcodemakeDir, { recursive: true });
 
     log('info', 'Downloading xcodemake from GitHub...');
-    const response = await fetch(
-      'https://raw.githubusercontent.com/cameroncooke/xcodemake/main/xcodemake',
-    );
+    const response = await deps.fetch(XCODEMAKE_DOWNLOAD_URL);
 
     if (!response.ok) {
       throw new Error(`Failed to download xcodemake: ${response.status} ${response.statusText}`);
     }
 
     const scriptContent = await response.text();
-    await fs.writeFile(xcodemakePath, scriptContent, 'utf8');
+    verifyXcodemakeScript(scriptContent, expectedSha256);
+    await deps.writeFile(stagingPath, scriptContent, 'utf8');
 
-    await fs.chmod(xcodemakePath, 0o755);
+    await deps.chmod(stagingPath, 0o755);
+    await deps.rename(stagingPath, xcodemakePath);
     log('info', 'Made xcodemake executable');
 
     overrideXcodemakeCommand(xcodemakePath);
@@ -82,6 +123,12 @@ async function installXcodemake(): Promise<boolean> {
       `Error installing xcodemake: ${error instanceof Error ? error.message : String(error)}`,
     );
     return false;
+  } finally {
+    try {
+      await deps.unlink(stagingPath);
+    } catch {
+      // A successful atomic rename consumes the staged path.
+    }
   }
 }
 
@@ -125,12 +172,14 @@ export function doesMakefileExist(projectDir: string): boolean {
   return existsSync(`${projectDir}/Makefile`);
 }
 
-export function doesMakeLogFileExist(projectDir: string, command: string[]): boolean {
-  const originalDir = process.cwd();
+type ReadDirectory = (path: string) => string[];
 
+export function doesMakeLogFileExist(
+  projectDir: string,
+  command: string[],
+  readDirectory: ReadDirectory = (directory) => readdirSync(directory),
+): boolean {
   try {
-    process.chdir(projectDir);
-
     const xcodemakeCommand = ['xcodemake', ...command.slice(1)];
     const escapedCommand = xcodemakeCommand.map((arg) => {
       // Remove projectDir from arguments if present at the start
@@ -142,9 +191,9 @@ export function doesMakeLogFileExist(projectDir: string, command: string[]): boo
     });
     const commandString = escapedCommand.join(' ');
     const logFileName = `${commandString}.log`;
-    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${process.cwd()}`);
+    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${projectDir}`);
 
-    const files = readdirSync('.');
+    const files = readDirectory(projectDir);
     const exists = files.includes(logFileName);
     log('debug', `Makefile log ${exists ? 'exists' : 'does not exist'}: ${logFileName}`);
     return exists;
@@ -154,8 +203,6 @@ export function doesMakeLogFileExist(projectDir: string, command: string[]): boo
       `Error checking for Makefile log: ${error instanceof Error ? error.message : String(error)}`,
     );
     return false;
-  } finally {
-    process.chdir(originalDir);
   }
 }
 

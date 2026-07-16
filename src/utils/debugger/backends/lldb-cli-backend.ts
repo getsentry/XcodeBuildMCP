@@ -24,6 +24,8 @@ class LldbCliBackend implements DebuggerBackend {
   private queue: Promise<unknown> = Promise.resolve();
   private ready: Promise<void>;
   private disposed = false;
+  // The sentinel queued after continue owns all output until the next command drains it.
+  private resumeOutputPending = false;
 
   constructor(spawner: InteractiveSpawner) {
     this.spawner = spawner;
@@ -76,6 +78,7 @@ class LldbCliBackend implements DebuggerBackend {
         throw new Error('LLDB backend disposed');
       }
       await this.ready;
+      await this.drainResumeOutput(opts?.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS);
       this.process.write(`${command}\n`);
       this.process.write(`script print("${COMMAND_SENTINEL}")\n`);
       const output = await this.waitForSentinel(opts?.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS);
@@ -89,7 +92,10 @@ class LldbCliBackend implements DebuggerBackend {
         throw new Error('LLDB backend disposed');
       }
       await this.ready;
+      await this.drainResumeOutput(DEFAULT_COMMAND_TIMEOUT_MS);
       this.process.write('process continue\n');
+      this.process.write(`script print("${COMMAND_SENTINEL}")\n`);
+      this.resumeOutputPending = true;
     });
   }
 
@@ -99,8 +105,8 @@ class LldbCliBackend implements DebuggerBackend {
   ): Promise<BreakpointInfo> {
     const command =
       spec.kind === 'file-line'
-        ? `breakpoint set --file "${spec.file}" --line ${spec.line}`
-        : `breakpoint set --name "${spec.name}"`;
+        ? `breakpoint set --file ${formatLldbString(spec.file)} --line ${spec.line}`
+        : `breakpoint set --name ${formatLldbString(spec.name)}`;
     const output = await this.runCommand(command);
     assertNoLldbError('breakpoint', output);
 
@@ -202,6 +208,15 @@ class LldbCliBackend implements DebuggerBackend {
     this.checkPending();
   }
 
+  private async drainResumeOutput(timeoutMs: number): Promise<void> {
+    if (!this.resumeOutputPending) {
+      return;
+    }
+
+    await this.waitForSentinel(timeoutMs);
+    this.resumeOutputPending = false;
+  }
+
   private waitForSentinel(timeoutMs: number): Promise<string> {
     if (this.pending) {
       return Promise.reject(new Error('LLDB command already pending'));
@@ -268,9 +283,17 @@ function sanitizeOutput(output: string, prompt: string): string {
   return filtered.join('\n');
 }
 
-function formatConditionForLldb(condition: string): string {
-  const escaped = condition.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+function formatLldbString(value: string): string {
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
   return `"${escaped}"`;
+}
+
+function formatConditionForLldb(condition: string): string {
+  return formatLldbString(condition);
 }
 
 function parseStopReason(output: string): string | undefined {
