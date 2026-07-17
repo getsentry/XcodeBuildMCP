@@ -222,7 +222,7 @@ export function createBuildSimExecutor(
     );
     const succeeded = !buildResult.isError;
 
-    if (resolved.isManagedTestProductsPath) {
+    if (succeeded && resolved.isManagedTestProductsPath) {
       markTestProductsPathCompleted(resolved.testProductsPath);
     }
 
