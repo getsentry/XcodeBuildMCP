@@ -1,7 +1,7 @@
 
 📦 Swift Package Build
 
-   Package: <ROOT>/example_projects/spm
+   Package: <TMPDIR>/spm
 
 ✅ Build succeeded. (⏱️ <DURATION>)
   └ Files:

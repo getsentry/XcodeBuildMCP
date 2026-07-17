@@ -88,9 +88,9 @@ export async function invokeResource(resourceId: string): Promise<ResourceSnapsh
   });
 
   const client = new Client({ name: 'resource-snapshot-client', version: '1.0.0' });
-  await client.connect(transport, { timeout: 30_000 });
 
   try {
+    await client.connect(transport, { timeout: 30_000 });
     const result = await client.readResource({ uri: manifest.uri }, { timeout: 120_000 });
     const rawText = extractResourceText(result);
 

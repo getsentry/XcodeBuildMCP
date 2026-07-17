@@ -3,7 +3,6 @@
 
    Scheme: NONEXISTENT
    Project: example_projects/macOS/MCPTest.xcodeproj
-   Configuration: Debug
    Platform: macOS
 
 Errors (1):

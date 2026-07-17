@@ -1,48 +1,82 @@
-import { describe, it, beforeAll, beforeEach, afterAll, vi } from 'vitest';
+import { describe, it, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureSimulatorBooted } from '../harness.ts';
 import {
   isMcpSnapshotRuntime,
   type SnapshotRuntime,
   type WorkflowSnapshotHarness,
 } from '../contracts.ts';
-import { extractAppPathFromSnapshotResult } from '../output-parsers.ts';
+import { CleanupStack } from '../preflight/cleanup.ts';
+import {
+  ensureSimulatorAppNotInstalled,
+  ensureSimulatorBooted,
+  launchSimulatorApp,
+  prepareSimulatorApp,
+  resolveSimulatorId,
+} from '../preflight/simulator.ts';
+import { buildApp, builtAppPath } from '../preflight/xcodebuild.ts';
 import {
   compilerErrorExtraArgs,
   createHarnessForRuntime,
-  createWorkflowFixtureMatcher,
+  createWorkflowResultFixtureMatcher,
 } from './helpers.ts';
 
 const TEST_TIMEOUT_MS = 120_000;
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
 const SCHEME = 'CalculatorApp';
 const INVALID_SCHEME = 'NONEXISTENT';
-const SIMULATOR_NAME = 'iPhone 17';
-const PRIMARY_BOOTED_SIMULATOR = 'iPhone 17 Pro';
+const CONFIGURED_SIMULATOR = process.env.XCODEBUILDMCP_SNAPSHOT_SIMULATOR_ID ?? 'iPhone 17 Pro';
 const IOS_SIMULATOR_PLATFORM = 'iOS Simulator';
 const CALCULATOR_BUNDLE_ID = 'io.sentry.calculatorapp';
 const NONEXISTENT_BUNDLE_ID = 'com.nonexistent.app';
+
+async function buildSimulatorCalculator(
+  simulatorId: string,
+  derivedDataPath: string,
+): Promise<string> {
+  await buildApp({
+    workspacePath: WORKSPACE,
+    scheme: SCHEME,
+    destination: `platform=iOS Simulator,id=${simulatorId}`,
+    derivedDataPath,
+  });
+  return builtAppPath(derivedDataPath, SCHEME, 'iphonesimulator');
+}
+
 export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
-  const expectFixture = createWorkflowFixtureMatcher(runtime, 'simulator');
+  const expectFixture = createWorkflowResultFixtureMatcher(runtime, 'simulator');
 
   describe(`${runtime} simulator workflow`, () => {
     let harness: WorkflowSnapshotHarness;
     let simulatorUdid: string;
-    let testProductsDir: string;
+    let cleanup: CleanupStack;
+    let derivedDataPath: string;
 
     beforeAll(async () => {
       vi.setConfig({ testTimeout: TEST_TIMEOUT_MS });
-      harness = await createHarnessForRuntime(runtime);
-      simulatorUdid = await ensureSimulatorBooted(PRIMARY_BOOTED_SIMULATOR);
-      testProductsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-build-products-'));
+      simulatorUdid = await resolveSimulatorId(CONFIGURED_SIMULATOR);
     }, TEST_TIMEOUT_MS);
 
-    afterAll(async () => {
-      await harness.cleanup();
-      if (testProductsDir) {
-        fs.rmSync(testProductsDir, { recursive: true, force: true });
+    beforeEach(async () => {
+      harness = await createHarnessForRuntime(runtime);
+      cleanup = new CleanupStack();
+      derivedDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-derived-data-'));
+      cleanup.defer('remove simulator DerivedData', () => {
+        fs.rmSync(derivedDataPath, { recursive: true, force: true });
+      });
+      await ensureSimulatorBooted(simulatorUdid, cleanup);
+      await ensureSimulatorAppNotInstalled(simulatorUdid, CALCULATOR_BUNDLE_ID);
+      cleanup.defer('remove calculator from simulator', () =>
+        ensureSimulatorAppNotInstalled(simulatorUdid, CALCULATOR_BUNDLE_ID),
+      );
+    }, TEST_TIMEOUT_MS);
+
+    afterEach(async () => {
+      try {
+        await cleanup.cleanup();
+      } finally {
+        await harness.cleanup();
       }
     });
 
@@ -50,12 +84,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build', {
+          const result = await harness.invoke('simulator', 'build', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'build--success');
+          expectFixture(result, 'build--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -63,14 +98,15 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success - prepared tests',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build', {
+          const result = await harness.invoke('simulator', 'build', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             buildForTesting: true,
-            testProductsPath: path.join(testProductsDir, 'CalculatorApp Tests.xctestproducts'),
+            testProductsPath: path.join(derivedDataPath, 'CalculatorApp Tests.xctestproducts'),
           });
-          expectFixture(text, 'build--success-prepared-tests');
+          expectFixture(result, 'build--success-prepared-tests', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -78,12 +114,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - wrong scheme',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build', {
+          const result = await harness.invoke('simulator', 'build', {
             workspacePath: WORKSPACE,
             scheme: INVALID_SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'build--error-wrong-scheme');
+          expectFixture(result, 'build--error-wrong-scheme', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -91,13 +128,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build', {
+          const result = await harness.invoke('simulator', 'build', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             extraArgs: compilerErrorExtraArgs(),
           });
-          expectFixture(text, 'build--error-compiler');
+          expectFixture(result, 'build--error-compiler', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -105,17 +143,18 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - prepared tests with wrong scheme',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build', {
+          const result = await harness.invoke('simulator', 'build', {
             workspacePath: WORKSPACE,
             scheme: INVALID_SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             buildForTesting: true,
             testProductsPath: path.join(
-              testProductsDir,
+              derivedDataPath,
               'Invalid CalculatorApp Tests.xctestproducts',
             ),
           });
-          expectFixture(text, 'build--error-prepared-tests-wrong-scheme');
+          expectFixture(result, 'build--error-prepared-tests-wrong-scheme', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -125,12 +164,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build-and-run', {
+          const result = await harness.invoke('simulator', 'build-and-run', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'build-and-run--success');
+          expectFixture(result, 'build-and-run--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -138,12 +178,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - wrong scheme',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build-and-run', {
+          const result = await harness.invoke('simulator', 'build-and-run', {
             workspacePath: WORKSPACE,
             scheme: INVALID_SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'build-and-run--error-wrong-scheme');
+          expectFixture(result, 'build-and-run--error-wrong-scheme', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -151,13 +192,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text } = await harness.invoke('simulator', 'build-and-run', {
+          const result = await harness.invoke('simulator', 'build-and-run', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             extraArgs: compilerErrorExtraArgs(),
           });
-          expectFixture(text, 'build-and-run--error-compiler');
+          expectFixture(result, 'build-and-run--error-compiler', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -167,13 +209,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'test', {
+          const result = await harness.invoke('simulator', 'test', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             extraArgs: ['-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition'],
           });
-          expectFixture(text, 'test--success');
+          expectFixture(result, 'test--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -181,12 +224,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'failure - intentional test failure',
         async () => {
-          const { text } = await harness.invoke('simulator', 'test', {
+          const result = await harness.invoke('simulator', 'test', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'test--failure');
+          expectFixture(result, 'test--failure', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -194,12 +238,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - wrong scheme',
         async () => {
-          const { text } = await harness.invoke('simulator', 'test', {
+          const result = await harness.invoke('simulator', 'test', {
             workspacePath: WORKSPACE,
             scheme: INVALID_SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'test--error-wrong-scheme');
+          expectFixture(result, 'test--error-wrong-scheme', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -207,15 +252,16 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - compiler error',
         async () => {
-          const { text } = await harness.invoke('simulator', 'test', {
+          const result = await harness.invoke('simulator', 'test', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
             extraArgs: compilerErrorExtraArgs([
               '-only-testing:CalculatorAppTests/CalculatorAppTests/testAddition',
             ]),
           });
-          expectFixture(text, 'test--error-compiler');
+          expectFixture(result, 'test--error-compiler', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -225,13 +271,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'get-app-path', {
+          const result = await harness.invoke('simulator', 'get-app-path', {
             workspacePath: WORKSPACE,
             scheme: SCHEME,
             platform: IOS_SIMULATOR_PLATFORM,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'get-app-path--success');
+          expectFixture(result, 'get-app-path--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -239,13 +286,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - wrong scheme',
         async () => {
-          const { text } = await harness.invoke('simulator', 'get-app-path', {
+          const result = await harness.invoke('simulator', 'get-app-path', {
             workspacePath: WORKSPACE,
             scheme: INVALID_SCHEME,
             platform: IOS_SIMULATOR_PLATFORM,
-            simulatorName: SIMULATOR_NAME,
+            simulatorId: simulatorUdid,
+            derivedDataPath,
           });
-          expectFixture(text, 'get-app-path--error-wrong-scheme');
+          expectFixture(result, 'get-app-path--error-wrong-scheme', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -253,8 +301,8 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
 
     describe('list', () => {
       it('success', async () => {
-        const { text } = await harness.invoke('simulator', 'list', {});
-        expectFixture(text, 'list--success');
+        const result = await harness.invoke('simulator', 'list', {});
+        expectFixture(result, 'list--success', 'success');
       });
     });
 
@@ -262,20 +310,12 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const appPathResult = await harness.invoke('simulator', 'get-app-path', {
-            workspacePath: WORKSPACE,
-            scheme: SCHEME,
-            platform: IOS_SIMULATOR_PLATFORM,
-            simulatorName: SIMULATOR_NAME,
-          });
-
-          const appPath = extractAppPathFromSnapshotResult(appPathResult);
-
-          const { text } = await harness.invoke('simulator', 'install', {
+          const appPath = await buildSimulatorCalculator(simulatorUdid, derivedDataPath);
+          const result = await harness.invoke('simulator', 'install', {
             simulatorId: simulatorUdid,
             appPath,
           });
-          expectFixture(text, 'install--success');
+          expectFixture(result, 'install--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -287,11 +327,11 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
           const fakeApp = path.join(tmpDir, 'NotAnApp.app');
           fs.mkdirSync(fakeApp);
           try {
-            const { text } = await harness.invoke('simulator', 'install', {
+            const result = await harness.invoke('simulator', 'install', {
               simulatorId: simulatorUdid,
               appPath: fakeApp,
             });
-            expectFixture(text, 'install--error-invalid-app');
+            expectFixture(result, 'install--error-invalid-app', 'error');
           } finally {
             fs.rmSync(tmpDir, { recursive: true, force: true });
           }
@@ -304,11 +344,13 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'launch-app', {
+          const appPath = await buildSimulatorCalculator(simulatorUdid, derivedDataPath);
+          await prepareSimulatorApp(simulatorUdid, appPath, CALCULATOR_BUNDLE_ID, cleanup);
+          const result = await harness.invoke('simulator', 'launch-app', {
             simulatorId: simulatorUdid,
             bundleId: CALCULATOR_BUNDLE_ID,
           });
-          expectFixture(text, 'launch-app--success');
+          expectFixture(result, 'launch-app--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -316,11 +358,12 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - not installed',
         async () => {
-          const { text } = await harness.invoke('simulator', 'launch-app', {
+          await ensureSimulatorAppNotInstalled(simulatorUdid, NONEXISTENT_BUNDLE_ID);
+          const result = await harness.invoke('simulator', 'launch-app', {
             simulatorId: simulatorUdid,
             bundleId: NONEXISTENT_BUNDLE_ID,
           });
-          expectFixture(text, 'launch-app--error-not-installed');
+          expectFixture(result, 'launch-app--error-not-installed', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -330,11 +373,11 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          const { text } = await harness.invoke('simulator', 'screenshot', {
+          const result = await harness.invoke('simulator', 'screenshot', {
             simulatorId: simulatorUdid,
             returnFormat: 'path',
           });
-          expectFixture(text, 'screenshot--success');
+          expectFixture(result, 'screenshot--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -342,11 +385,11 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - invalid simulator',
         async () => {
-          const { text } = await harness.invoke('simulator', 'screenshot', {
+          const result = await harness.invoke('simulator', 'screenshot', {
             simulatorId: '00000000-0000-0000-0000-000000000000',
             returnFormat: 'path',
           });
-          expectFixture(text, 'screenshot--error-invalid-simulator');
+          expectFixture(result, 'screenshot--error-invalid-simulator', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -356,16 +399,14 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'success',
         async () => {
-          await harness.invoke('simulator', 'launch-app', {
+          const appPath = await buildSimulatorCalculator(simulatorUdid, derivedDataPath);
+          await prepareSimulatorApp(simulatorUdid, appPath, CALCULATOR_BUNDLE_ID, cleanup);
+          await launchSimulatorApp(simulatorUdid, CALCULATOR_BUNDLE_ID);
+          const result = await harness.invoke('simulator', 'stop', {
             simulatorId: simulatorUdid,
             bundleId: CALCULATOR_BUNDLE_ID,
           });
-
-          const { text } = await harness.invoke('simulator', 'stop', {
-            simulatorId: simulatorUdid,
-            bundleId: CALCULATOR_BUNDLE_ID,
-          });
-          expectFixture(text, 'stop--success');
+          expectFixture(result, 'stop--success', 'success');
         },
         TEST_TIMEOUT_MS,
       );
@@ -373,11 +414,12 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
       it(
         'error - no app',
         async () => {
-          const { text } = await harness.invoke('simulator', 'stop', {
+          await ensureSimulatorAppNotInstalled(simulatorUdid, NONEXISTENT_BUNDLE_ID);
+          const result = await harness.invoke('simulator', 'stop', {
             simulatorId: simulatorUdid,
             bundleId: NONEXISTENT_BUNDLE_ID,
           });
-          expectFixture(text, 'stop--error-no-app');
+          expectFixture(result, 'stop--error-no-app', 'error');
         },
         TEST_TIMEOUT_MS,
       );
@@ -386,15 +428,20 @@ export function registerSimulatorSnapshotSuite(runtime: SnapshotRuntime): void {
     if (isMcpSnapshotRuntime(runtime) && runtime !== 'mcp/json') {
       describe('mcp-only extras', () => {
         beforeEach(async () => {
-          await harness.invoke('session-management', 'clear-defaults', { all: true });
+          const result = await harness.invoke('session-management', 'clear-defaults', {
+            all: true,
+          });
+          if (result.isError) {
+            throw new Error(`Failed to clear snapshot session defaults:\n${result.rawText}`);
+          }
         });
 
         // MCP disables session-default hydration in the snapshot harness, while the CLI surface
         // validates and hydrates arguments differently. This makes the empty-args build failure
         // a transport-specific MCP snapshot rather than a shared CLI/MCP parity case.
         it('build -- error missing params', async () => {
-          const { text } = await harness.invoke('simulator', 'build', {});
-          expectFixture(text, 'build--error-missing-params');
+          const result = await harness.invoke('simulator', 'build', {});
+          expectFixture(result, 'build--error-missing-params', 'error');
         });
       });
     }

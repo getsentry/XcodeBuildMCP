@@ -7,10 +7,9 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
-      "configuration": "Debug",
+      "derivedDataPath": "<TMPDIR>",
       "platform": "iOS Simulator",
-      "simulatorName": "iPhone 17"
+      "simulatorId": "<UUID>"
     },
     "summary": {
       "status": "SUCCEEDED",
@@ -18,7 +17,7 @@
       "target": "simulator"
     },
     "artifacts": {
-      "appPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
+      "appPath": "<TMPDIR>/Build/Products/Debug-iphonesimulator/CalculatorApp.app",
       "bundleId": "io.sentry.calculatorapp",
       "processId": 99999,
       "simulatorId": "<UUID>",

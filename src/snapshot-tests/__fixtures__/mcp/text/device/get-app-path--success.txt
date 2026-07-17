@@ -3,9 +3,9 @@
 
 ✅ Success
   └ Files:
-     └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app — App Path
+     └── <TMPDIR>/Build/Products/Debug-iphoneos/CalculatorApp.app — App Path
 
 Next steps:
-1. Get bundle ID: get_app_bundle_id({ appPath: "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app" })
-2. Install app on device: install_app_device({ deviceId: "DEVICE_UDID", appPath: "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app" })
+1. Get bundle ID: get_app_bundle_id({ appPath: "<TMPDIR>/Build/Products/Debug-iphoneos/CalculatorApp.app" })
+2. Install app on device: install_app_device({ deviceId: "DEVICE_UDID", appPath: "<TMPDIR>/Build/Products/Debug-iphoneos/CalculatorApp.app" })
 3. Launch app on device: launch_app_device({ deviceId: "DEVICE_UDID", bundleId: "BUNDLE_ID" })

@@ -26,7 +26,8 @@ export async function createMcpJsonSnapshotHarness(
     return {
       text: formatStructuredEnvelopeFixture(envelope),
       rawText: result.rawText,
-      isError: result.isError || envelope.didError,
+      isError: result.isError,
+      outcome: result.outcome,
       structuredEnvelope: envelope,
     };
   }

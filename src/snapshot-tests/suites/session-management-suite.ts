@@ -1,156 +1,181 @@
-import { describe, it, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'vitest';
+import { getWorkspacesDir, getWorkspaceFilesystemLayout } from '../../utils/log-paths.ts';
+import { workspaceKeyForRoot } from '../../utils/workspace-identity.ts';
 import {
-  isJsonSnapshotRuntime,
   isMcpSnapshotRuntime,
+  type SnapshotResult,
   type SnapshotRuntime,
   type WorkflowSnapshotHarness,
 } from '../contracts.ts';
-import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+import { CleanupStack } from '../preflight/cleanup.ts';
+import { installCalculatorXcodeState } from '../preflight/xcode-state.ts';
+import { createHarnessForRuntime, createWorkflowResultFixtureMatcher } from './helpers.ts';
 
 const WORKSPACE = 'example_projects/iOS_Calculator/CalculatorApp.xcworkspace';
+const CALCULATOR_PROJECT = resolve('example_projects/iOS_Calculator');
+
+function removeOwnedManagedWorkspace(testWorkspace: string): void {
+  const workspaceKey = workspaceKeyForRoot(testWorkspace);
+  const managedWorkspace = getWorkspaceFilesystemLayout(workspaceKey).root;
+  if (
+    dirname(managedWorkspace) !== getWorkspacesDir() ||
+    basename(managedWorkspace) !== workspaceKey
+  ) {
+    throw new Error(`Refusing to remove unowned managed workspace: ${managedWorkspace}`);
+  }
+  rmSync(managedWorkspace, { recursive: true, force: true });
+}
+
+function assertSetupSucceeded(result: SnapshotResult, label: string): void {
+  if (result.isError) {
+    throw new Error(`${label} failed during snapshot setup:\n${result.rawText}`);
+  }
+}
 
 export function registerSessionManagementSnapshotSuite(runtime: SnapshotRuntime): void {
-  const expectFixture = createWorkflowFixtureMatcher(runtime, 'session-management');
+  const expectFixture = createWorkflowResultFixtureMatcher(runtime, 'session-management');
 
   describe(`${runtime} session-management workflow`, () => {
     let harness: WorkflowSnapshotHarness;
+    let cleanup: CleanupStack;
+    let testWorkspace: string;
+
+    async function invokeSetup(
+      workflow: string,
+      tool: string,
+      args: Record<string, unknown>,
+    ): Promise<void> {
+      const result = await harness.invoke(workflow, tool, args);
+      assertSetupSucceeded(result, `${workflow}/${tool}`);
+    }
 
     async function seedSessionDefaults(): Promise<void> {
-      await harness.invoke('session-management', 'clear-defaults', { all: true });
-      await harness.invoke('session-management', 'set-defaults', {
+      await invokeSetup('session-management', 'clear-defaults', { all: true });
+      await invokeSetup('session-management', 'set-defaults', {
         workspacePath: WORKSPACE,
         scheme: 'CalculatorApp',
       });
-      await harness.invoke('session-management', 'set-defaults', {
+      await invokeSetup('session-management', 'set-defaults', {
         profile: 'MyCustomProfile',
         createIfNotExists: true,
         workspacePath: WORKSPACE,
         scheme: 'CalculatorApp',
       });
-      await harness.invoke('session-management', 'use-defaults-profile', { global: true });
+      await invokeSetup('session-management', 'use-defaults-profile', { global: true });
     }
 
-    beforeAll(async () => {
-      harness = await createHarnessForRuntime(runtime);
+    beforeEach(async () => {
+      cleanup = new CleanupStack();
+      try {
+        testWorkspace = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-session-snapshot-'));
+        cleanup.defer('remove session snapshot directory', () =>
+          rmSync(testWorkspace, { recursive: true, force: true }),
+        );
+        cleanup.defer('remove managed session workspace', () =>
+          removeOwnedManagedWorkspace(testWorkspace),
+        );
+
+        const exampleProjects = join(testWorkspace, 'example_projects');
+        mkdirSync(exampleProjects, { recursive: true });
+        cpSync(CALCULATOR_PROJECT, join(exampleProjects, 'iOS_Calculator'), { recursive: true });
+        harness = await createHarnessForRuntime(runtime, { cwd: testWorkspace });
+        cleanup.defer('cleanup session snapshot harness', () => harness.cleanup());
+      } catch (error) {
+        await cleanup.cleanup();
+        throw error;
+      }
     });
 
-    afterAll(async () => {
-      await harness.cleanup();
+    afterEach(async () => {
+      await cleanup.cleanup();
     });
 
     describe('shared snapshots', () => {
-      beforeEach(async () => {
-        if (isJsonSnapshotRuntime(runtime)) {
-          await harness.invoke('session-management', 'clear-defaults', { all: true });
-          return;
-        }
-
-        await seedSessionDefaults();
-      });
-
       describe('session-set-defaults', () => {
         it('success', async () => {
-          const { text } = await harness.invoke('session-management', 'set-defaults', {
+          await invokeSetup('session-management', 'clear-defaults', { all: true });
+          const result = await harness.invoke('session-management', 'set-defaults', {
             scheme: 'CalculatorApp',
             workspacePath: WORKSPACE,
           });
-          expectFixture(text, 'session-set-defaults--success');
+          expectFixture(result, 'session-set-defaults--success', 'success');
         });
       });
 
       describe('session-show-defaults', () => {
         it('success', async () => {
-          if (isJsonSnapshotRuntime(runtime)) {
-            await seedSessionDefaults();
-          }
-
-          const { text } = await harness.invoke('session-management', 'show-defaults', {});
-          expectFixture(text, 'session-show-defaults--success');
+          await seedSessionDefaults();
+          const result = await harness.invoke('session-management', 'show-defaults', {});
+          expectFixture(result, 'session-show-defaults--success', 'success');
         });
       });
 
       describe('session-clear-defaults', () => {
         it('success', async () => {
-          if (isJsonSnapshotRuntime(runtime)) {
-            await harness.invoke('session-management', 'set-defaults', {
-              workspacePath: WORKSPACE,
-              scheme: 'CalculatorApp',
-            });
-          }
-
-          const { text } = await harness.invoke('session-management', 'clear-defaults', {});
-          expectFixture(text, 'session-clear-defaults--success');
+          await seedSessionDefaults();
+          const result = await harness.invoke('session-management', 'clear-defaults', {});
+          expectFixture(result, 'session-clear-defaults--success', 'success');
         });
       });
 
       describe('session-use-defaults-profile', () => {
         it('success', async () => {
-          if (isJsonSnapshotRuntime(runtime)) {
-            await seedSessionDefaults();
-          }
-
-          const { text } = await harness.invoke('session-management', 'use-defaults-profile', {
+          await seedSessionDefaults();
+          const result = await harness.invoke('session-management', 'use-defaults-profile', {
             profile: 'MyCustomProfile',
           });
-          expectFixture(text, 'session-use-defaults-profile--success');
+          expectFixture(result, 'session-use-defaults-profile--success', 'success');
         });
       });
 
       describe('session-sync-xcode-defaults', () => {
         it('success', async () => {
-          if (isJsonSnapshotRuntime(runtime)) {
-            await seedSessionDefaults();
-            await harness.invoke('project-discovery', 'show-build-settings', {
-              workspacePath: WORKSPACE,
-              scheme: 'CalculatorApp',
-            });
-          }
-
-          const { text } = await harness.invoke('session-management', 'sync-xcode-defaults', {});
-          expectFixture(text, 'session-sync-xcode-defaults--success');
+          installCalculatorXcodeState(join(testWorkspace, WORKSPACE));
+          await seedSessionDefaults();
+          await invokeSetup('project-discovery', 'show-build-settings', {
+            workspacePath: WORKSPACE,
+            scheme: 'CalculatorApp',
+          });
+          const result = await harness.invoke('session-management', 'sync-xcode-defaults', {});
+          expectFixture(result, 'session-sync-xcode-defaults--success', 'success');
         });
       });
     });
 
     if (isMcpSnapshotRuntime(runtime)) {
       describe('mcp-only extras', () => {
-        beforeEach(async () => {
-          await harness.invoke('session-management', 'clear-defaults', { all: true });
-        });
-
-        afterEach(async () => {
-          await harness.invoke('session-management', 'use-defaults-profile', {
-            global: true,
-            persist: true,
-          });
-        });
-
         it('session-show-defaults -- empty', async () => {
-          const { text } = await harness.invoke('session-management', 'show-defaults', {});
-          expectFixture(text, 'session-show-defaults--empty');
+          await invokeSetup('session-management', 'clear-defaults', { all: true });
+          const result = await harness.invoke('session-management', 'show-defaults', {});
+          expectFixture(result, 'session-show-defaults--empty', 'success');
         });
 
         it('session-set-defaults -- set scheme', async () => {
-          const { text } = await harness.invoke('session-management', 'set-defaults', {
+          await invokeSetup('session-management', 'clear-defaults', { all: true });
+          const result = await harness.invoke('session-management', 'set-defaults', {
             scheme: 'CalculatorApp',
           });
-          expectFixture(text, 'session-set-defaults--scheme');
+          expectFixture(result, 'session-set-defaults--scheme', 'success');
         });
 
         it('session-use-defaults-profile -- persist success', async () => {
-          await harness.invoke('session-management', 'set-defaults', {
+          await invokeSetup('session-management', 'clear-defaults', { all: true });
+          await invokeSetup('session-management', 'set-defaults', {
             profile: 'MyCustomProfile',
             createIfNotExists: true,
             workspacePath: WORKSPACE,
             scheme: 'CalculatorApp',
           });
-          await harness.invoke('session-management', 'use-defaults-profile', { global: true });
+          await invokeSetup('session-management', 'use-defaults-profile', { global: true });
 
-          const { text } = await harness.invoke('session-management', 'use-defaults-profile', {
+          const result = await harness.invoke('session-management', 'use-defaults-profile', {
             profile: 'MyCustomProfile',
             persist: true,
           });
-          expectFixture(text, 'session-use-defaults-profile--persist-success');
+          expectFixture(result, 'session-use-defaults-profile--persist-success', 'success');
         });
       });
     }

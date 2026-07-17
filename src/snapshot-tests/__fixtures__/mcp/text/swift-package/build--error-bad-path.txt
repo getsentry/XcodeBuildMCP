@@ -3,7 +3,7 @@
 
 Errors (1):
 
-  ✗ chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT
+  ✗ chdir error: No such file or directory (2): <TMPDIR>/spm/NONEXISTENT
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Files:

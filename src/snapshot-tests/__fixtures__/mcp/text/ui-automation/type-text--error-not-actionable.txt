@@ -3,8 +3,8 @@
 
 Recovery
   Code: TARGET_NOT_ACTIONABLE
-  Message: Element ref 'e3' does not support 'typeText'.
-  Element: e3
+  Message: Element ref '<REF>' does not support 'typeText'.
+  Element: <REF>
   Hint: Choose an elementRef that lists the required action, or refresh with snapshot_ui.
 
-❌ Element ref 'e3' does not support 'typeText'.
+❌ Element ref '<REF>' does not support 'typeText'.

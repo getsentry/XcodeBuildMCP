@@ -3,6 +3,12 @@ import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 export type SnapshotTransport = 'cli' | 'mcp';
 export type SnapshotFormat = 'text' | 'json';
 export type SnapshotRuntime = 'cli/text' | 'cli/json' | 'mcp/text' | 'mcp/json';
+export type ExpectedSnapshotOutcome = 'success' | 'error';
+export type SnapshotResultOutcome =
+  | 'success'
+  | 'domain-error'
+  | 'validation-error'
+  | 'infrastructure-error';
 
 export function snapshotRuntimeTransport(runtime: SnapshotRuntime): SnapshotTransport {
   switch (runtime) {
@@ -48,6 +54,7 @@ export interface SnapshotResult {
   text: string;
   rawText: string;
   isError: boolean;
+  outcome: SnapshotResultOutcome;
   structuredEnvelope?: StructuredOutputEnvelope<unknown> | null;
 }
 

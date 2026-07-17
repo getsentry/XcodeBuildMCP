@@ -16,7 +16,7 @@ Running tests (7 completed, 2 failures, 0 skipped)
 CalculatorAppTests
   ✗ testCalculatorServiceFailure:
       - XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
-        example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49
+        <TMPDIR>/spm/Tests/TestLibTests/SimpleTests.swift:49
 
 (Unknown Suite)
   ✗ test:

@@ -167,6 +167,17 @@ describe('normalizeSnapshotOutput', () => {
     );
   });
 
+  it('normalizes both macOS spellings of a temporary directory without leaving a prefix', () => {
+    const tmpDir = '/var/folders/ab/cd/T';
+
+    expect(
+      normalizeSnapshotOutput(
+        [`${tmpDir}/spm-one/Package.swift`, `/private${tmpDir}/spm-two/Package.swift`].join('\n'),
+        { tmpDir },
+      ),
+    ).toBe('<TMPDIR>/Package.swift\n<TMPDIR>/Package.swift\n');
+  });
+
   it('preserves display-formatted home paths while normalizing workspace hashes', () => {
     expect(
       normalizeSnapshotOutput(
@@ -253,6 +264,77 @@ describe('normalizeSnapshotOutput', () => {
         'MCP: tap({ simulatorId: "<UUID>", elementRef: "<REF>" })',
         'JSON: {"action":"tap","elementRef":"<REF>"}',
         'Message: acted on within elementRef <REF>',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('normalizes UI recovery refs and accessibility summary counts', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          "Message: Element ref 'e7' does not support 'swipeWithin'.",
+          '  Element: e7',
+          "❌ Element ref 'e7' does not support 'swipeWithin'.",
+          '✅ Runtime UI snapshot captured with 21 elements, 19 likely targets, and 0 scroll areas.',
+          '✅ Wait completed; runtime UI snapshot refreshed with 28 elements, 19 likely targets, and 0 scroll areas.',
+        ].join('\n'),
+      ),
+    ).toBe(
+      [
+        "Message: Element ref '<REF>' does not support 'swipeWithin'.",
+        '  Element: <REF>',
+        "❌ Element ref '<REF>' does not support 'swipeWithin'.",
+        '✅ Runtime UI snapshot captured with <ELEMENT_COUNT> elements, <LIKELY_TARGET_COUNT> likely targets, and <SCROLL_AREA_COUNT> scroll areas.',
+        '✅ Wait completed; runtime UI snapshot refreshed with <ELEMENT_COUNT> elements, <LIKELY_TARGET_COUNT> likely targets, and <SCROLL_AREA_COUNT> scroll areas.',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('normalizes Swift package target triples', () => {
+    expect(
+      normalizeSnapshotOutput('App Path: <TMPDIR>/spm/.build/arm64-apple-macosx/debug/spm\n'),
+    ).toBe('App Path: <TMPDIR>/spm/.build/<TARGET_TRIPLE>/debug/spm\n');
+  });
+
+  it('normalizes state-dependent swipe follow-up advice', () => {
+    expect(
+      normalizeSnapshotOutput(
+        'Next steps:\n1. Take screenshot for verification: screenshot --simulator-id <UUID>\n',
+      ),
+    ).toBe('Next steps:\n1. <POST_SWIPE_NEXT_STEP>\n');
+    expect(
+      normalizeSnapshotOutput(
+        'Next steps:\n1. Scroll visible content: swipe --simulator-id <UUID> --distance 0.5\n',
+      ),
+    ).toBe('Next steps:\n1. <POST_SWIPE_NEXT_STEP>\n');
+  });
+
+  it('sorts MCP test failures deterministically', () => {
+    expect(
+      normalizeSnapshotOutput(
+        [
+          'Test Failures (2):',
+          '',
+          '  ✗ ZebraSuite / testZebra: failed',
+          '    Zebra.swift:2',
+          '',
+          '  ✗ AlphaSuite / testAlpha: failed',
+          '    Alpha.swift:1',
+          '',
+          '❌ 2 tests failed, 1 passed',
+        ].join('\n'),
+      ),
+    ).toBe(
+      [
+        'Test Failures (2):',
+        '',
+        '  ✗ AlphaSuite / testAlpha: failed',
+        '    Alpha.swift:1',
+        '',
+        '  ✗ ZebraSuite / testZebra: failed',
+        '    Zebra.swift:2',
+        '',
+        '❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped',
       ].join('\n') + '\n',
     );
   });

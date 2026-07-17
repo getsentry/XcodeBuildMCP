@@ -3,12 +3,12 @@
 
 Test Failures (2):
 
-  ✗ CalculatorAppTests / testCalculatorServiceFailure: XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
-    <ROOT>/example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49
-
   ✗ (Unknown Suite) / test: Expectation failed: Bool(false)
     Test failed
     SimpleTests.swift:57
+
+  ✗ CalculatorAppTests / testCalculatorServiceFailure: XCTAssertEqual failed: ("0") is not equal to ("999") - This test should fail - display should be 0, not 999
+    <TMPDIR>/spm/Tests/TestLibTests/SimpleTests.swift:49
 
 ❌ <FAIL_COUNT> tests failed, <PASS_COUNT> passed, <SKIP_COUNT> skipped (⏱️ <DURATION>)
   └ Files:

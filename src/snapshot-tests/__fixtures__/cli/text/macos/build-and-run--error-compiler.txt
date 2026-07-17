@@ -3,14 +3,13 @@
 
    Scheme: MCPTest
    Project: example_projects/macOS/MCPTest.xcodeproj
-   Configuration: Debug
    Platform: macOS
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+   Derived Data: <TMPDIR>/DerivedData
 
 Compiler Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    example_projects/macOS/MCPTest/MCPTestApp.swift:20:42
+    <ROOT>/example_projects/macOS/MCPTest/MCPTestApp.swift:20:42
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Files:

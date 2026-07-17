@@ -3,15 +3,14 @@
 
    Scheme: CalculatorApp
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS Simulator
-   Simulator: iPhone 17
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Simulator: <UUID>
+   Derived Data: <TMPDIR>
 
 Compiler Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33:42
+    <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:53:42
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Files:

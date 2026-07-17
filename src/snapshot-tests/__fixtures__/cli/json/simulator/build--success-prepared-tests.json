@@ -8,9 +8,9 @@
       "buildForTesting": true,
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "<TMPDIR>",
       "platform": "iOS Simulator",
-      "simulatorName": "iPhone 17",
+      "simulatorId": "<UUID>",
       "testProductsPath": "<TMPDIR>/CalculatorApp Tests.xctestproducts"
     },
     "summary": {
@@ -31,6 +31,6 @@
     }
   },
   "nextSteps": [
-    "Run prepared tests: xcodebuildmcp simulator test --test-products-path '<TMPDIR>/CalculatorApp Tests.xctestproducts' --simulator-name 'iPhone 17'"
+    "Run prepared tests: xcodebuildmcp simulator test --test-products-path '<TMPDIR>/CalculatorApp Tests.xctestproducts' --simulator-id <UUID>"
   ]
 }

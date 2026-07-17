@@ -6,4 +6,4 @@
      └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_device_<TIMESTAMP>_pid<PID>.log — Build Logs
 
 Next steps:
-1. Get built device app path: get_device_app_path({ scheme: "CalculatorApp" })
+1. Get built device app path: get_device_app_path({ scheme: "CalculatorApp", derivedDataPath: "<TMPDIR>" })

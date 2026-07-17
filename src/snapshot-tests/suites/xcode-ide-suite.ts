@@ -1,23 +1,33 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
-import { describe, it, beforeAll, afterAll } from 'vitest';
+import { isAbsolute, join, relative, sep } from 'node:path';
+import { describe, it } from 'vitest';
+import { getWorkspaceFilesystemLayout, getWorkspacesDir } from '../../utils/log-paths.ts';
+import { workspaceKeyForRoot } from '../../utils/workspace-identity.ts';
+import type { SnapshotResult, SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
 import {
-  isCliSnapshotRuntime,
-  type SnapshotResult,
-  type SnapshotRuntime,
-  type WorkflowSnapshotHarness,
-} from '../contracts.ts';
-import { getSnapshotHarnessEnv } from '../harness.ts';
-import { isXcodeIdeBridgeAvailable } from '../xcode-ide-availability.ts';
-import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+  isXcodeIdeBridgeAvailable,
+  listAvailableXcodeIdeBridgeToolNames,
+} from '../xcode-ide-availability.ts';
+import { createHarnessForRuntime, createWorkflowResultFixtureMatcher } from './helpers.ts';
 
-const XCODE_IDE_BRIDGE_READY = isXcodeIdeBridgeAvailable();
 const DOCUMENTATION_SEARCH_TOOL = 'DocumentationSearch';
 const DOCUMENTATION_SEARCH_QUERY = 'AVCapturePhotoOutputMaxPhotoQualityPrioritization';
-const CLI_PATH = join(process.cwd(), 'build/cli.js');
-const XCODE_IDE_BRIDGE_SETTLE_MS = 2_000;
+const XCODE_IDE_BRIDGE_POLL_INTERVAL_MS = 250;
+const XCODE_IDE_BRIDGE_READY_TIMEOUT_MS = 15_000;
+const XCODE_IDE_ENV = {
+  XCODEBUILDMCP_ENABLED_WORKFLOWS: 'xcode-ide',
+  XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS: 'true',
+  XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC: '1',
+  XCODEBUILDMCP_XCODE_IDE_DISCOVERY_TIMEOUT_MS: '5000',
+};
+
+interface XcodeIdeTestEnvironment {
+  cwd: string;
+  artifactRoot: string;
+  workspaceKey: string;
+  workspaceRoot: string;
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,7 +58,7 @@ function getArtifactPathFromText(result: SnapshotResult): string | null {
   return treeMatch?.[1]?.trim() ?? null;
 }
 
-function resolveArtifactPath(artifactDisplayPath: string): string {
+function resolveArtifactPath(artifactDisplayPath: string, cwd: string): string {
   if (artifactDisplayPath === '~') {
     return homedir();
   }
@@ -58,132 +68,189 @@ function resolveArtifactPath(artifactDisplayPath: string): string {
   if (isAbsolute(artifactDisplayPath)) {
     return artifactDisplayPath;
   }
-  return join(process.cwd(), artifactDisplayPath);
+  return join(cwd, artifactDisplayPath);
 }
 
-function bridgeListContainsTool(result: SnapshotResult, toolName: string): boolean {
-  const artifactDisplayPath =
-    getArtifactPathFromEnvelope(result) ?? getArtifactPathFromText(result);
-  if (!artifactDisplayPath) {
-    throw new Error('xcode-ide list-tools warm-up did not expose a raw response artifact path.');
-  }
-
-  const artifactPath = resolveArtifactPath(artifactDisplayPath);
-  const artifact = JSON.parse(readFileSync(artifactPath, 'utf8')) as unknown;
-  if (
-    !isRecord(artifact) ||
-    !isRecord(artifact.response) ||
-    !Array.isArray(artifact.response.tools)
-  ) {
-    throw new Error(
-      `xcode-ide list-tools artifact did not contain response.tools: ${artifactPath}`,
-    );
-  }
-
-  return artifact.response.tools.some((tool) => isRecord(tool) && tool.name === toolName);
+function getArtifactPath(result: SnapshotResult, cwd: string): string | null {
+  const displayPath = getArtifactPathFromEnvelope(result) ?? getArtifactPathFromText(result);
+  return displayPath === null ? null : resolveArtifactPath(displayPath, cwd);
 }
 
-if (!XCODE_IDE_BRIDGE_READY) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    '[xcode-ide-suite] xcrun mcpbridge or a running Xcode instance is unavailable. Xcode IDE bridge snapshot tests will be skipped.',
-  );
+export function assertOwnedXcodeIdeArtifactPath(
+  artifactPath: string,
+  artifactRoot: string,
+): string {
+  const artifactStat = lstatSync(artifactPath);
+  if (!artifactStat.isFile() || artifactStat.isSymbolicLink()) {
+    throw new Error(`Refusing to delete non-file Xcode IDE artifact: ${artifactPath}`);
+  }
+
+  const resolvedArtifactRoot = realpathSync(artifactRoot);
+  const resolvedArtifactPath = realpathSync(artifactPath);
+  const relativeArtifactPath = relative(resolvedArtifactRoot, resolvedArtifactPath);
+  const pathParts = relativeArtifactPath.split(sep);
+  const isContained =
+    relativeArtifactPath.length > 0 &&
+    !relativeArtifactPath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativeArtifactPath);
+  const hasOwnedShape =
+    pathParts.length === 2 &&
+    /^ownerpid\d+_[A-Za-z0-9._-]+$/u.test(pathParts[0]) &&
+    pathParts[1].endsWith('.json');
+
+  if (!isContained || !hasOwnedShape) {
+    throw new Error(`Refusing to delete unowned Xcode IDE artifact: ${resolvedArtifactPath}`);
+  }
+
+  return resolvedArtifactPath;
+}
+
+function removeOwnedArtifact(result: SnapshotResult, environment: XcodeIdeTestEnvironment): void {
+  const artifactPath = getArtifactPath(result, environment.cwd);
+  if (artifactPath === null) {
+    return;
+  }
+
+  rmSync(assertOwnedXcodeIdeArtifactPath(artifactPath, environment.artifactRoot));
+}
+
+export function assertOwnedXcodeIdeWorkspaceRoot(
+  workspaceRoot: string,
+  workspaceKey: string,
+): string {
+  const workspaceStat = lstatSync(workspaceRoot);
+  if (!workspaceStat.isDirectory() || workspaceStat.isSymbolicLink()) {
+    throw new Error(`Refusing to delete non-directory Xcode IDE workspace: ${workspaceRoot}`);
+  }
+
+  const relativeWorkspacePath = relative(getWorkspacesDir(), workspaceRoot);
+  if (relativeWorkspacePath !== workspaceKey) {
+    throw new Error(`Refusing to delete unowned Xcode IDE workspace: ${workspaceRoot}`);
+  }
+  return workspaceRoot;
+}
+
+function removeOwnedWorkspace(environment: XcodeIdeTestEnvironment): void {
+  if (!existsSync(environment.workspaceRoot)) {
+    return;
+  }
+  rmSync(assertOwnedXcodeIdeWorkspaceRoot(environment.workspaceRoot, environment.workspaceKey), {
+    recursive: true,
+    force: true,
+  });
+}
+
+async function cleanupXcodeIdeTest(
+  harness: WorkflowSnapshotHarness | undefined,
+  environment: XcodeIdeTestEnvironment,
+  result?: SnapshotResult,
+): Promise<void> {
+  try {
+    if (result !== undefined) {
+      removeOwnedArtifact(result, environment);
+    }
+  } finally {
+    try {
+      await harness?.cleanup();
+    } finally {
+      try {
+        removeOwnedWorkspace(environment);
+      } finally {
+        rmSync(environment.cwd, { recursive: true, force: true });
+      }
+    }
+  }
+}
+
+function createXcodeIdeTestEnvironment(): XcodeIdeTestEnvironment {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'xcodebuildmcp-xcode-ide-snapshot-')));
+  const workspaceKey = workspaceKeyForRoot(cwd);
+  const workspaceLayout = getWorkspaceFilesystemLayout(workspaceKey);
+  const artifactRoot = join(workspaceLayout.state, 'xcode-ide', 'call-tool');
+  return { cwd, artifactRoot, workspaceKey, workspaceRoot: workspaceLayout.root };
+}
+
+async function createXcodeIdeHarness(
+  runtime: SnapshotRuntime,
+  cwd: string,
+): Promise<WorkflowSnapshotHarness> {
+  return createHarnessForRuntime(runtime, {
+    cwd,
+    enabledWorkflows: ['xcode-ide'],
+    env: XCODE_IDE_ENV,
+  });
+}
+
+async function waitForXcodeIdeTool(
+  harness: WorkflowSnapshotHarness,
+  remoteTool: string,
+): Promise<void> {
+  const deadline = Date.now() + XCODE_IDE_BRIDGE_READY_TIMEOUT_MS;
+  do {
+    const result = await harness.invoke('xcode-ide', 'list-tools', { refresh: true });
+    if (result.outcome === 'success' && result.rawText.includes(remoteTool)) {
+      return;
+    }
+    await delay(XCODE_IDE_BRIDGE_POLL_INTERVAL_MS);
+  } while (Date.now() < deadline);
+
+  throw new Error(`Xcode IDE bridge did not expose ${remoteTool} before the readiness timeout.`);
 }
 
 export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
-  const expectFixture = createWorkflowFixtureMatcher(runtime, 'xcode-ide');
+  const expectFixture = createWorkflowResultFixtureMatcher(runtime, 'xcode-ide');
 
-  describe.runIf(XCODE_IDE_BRIDGE_READY)(`${runtime} xcode-ide workflow`, () => {
-    let harness: WorkflowSnapshotHarness;
-    let tempDir: string;
-    let socketPath: string;
-    let daemonEnv: Record<string, string>;
-    let bridgeListReady = false;
-    let documentationSearchReady = false;
-
-    beforeAll(async () => {
-      if (isCliSnapshotRuntime(runtime)) {
-        tempDir = mkdtempSync(join(tmpdir(), 'xcodebuildmcp-xcode-ide-snapshot-'));
-        socketPath = join(tempDir, 'daemon.sock');
-        daemonEnv = {
-          XCODEBUILDMCP_ENABLED_WORKFLOWS: 'xcode-ide',
-          XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS: 'true',
-          XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC: '1',
-          XCODEBUILDMCP_XCODE_IDE_DISCOVERY_TIMEOUT_MS: '5000',
-        };
-        harness = await createHarnessForRuntime(runtime, {
-          env: daemonEnv,
-          globalArgs: ['--socket', socketPath],
-        });
-      } else {
-        harness = await createHarnessForRuntime(runtime, {
-          enabledWorkflows: ['xcode-ide'],
-        });
-      }
-
-      const warmup = await harness.invoke('xcode-ide', 'list-tools', { refresh: true });
-
-      bridgeListReady = warmup.isError === false;
-      documentationSearchReady =
-        bridgeListReady && bridgeListContainsTool(warmup, DOCUMENTATION_SEARCH_TOOL);
-
-      if (!bridgeListReady) {
-        // eslint-disable-next-line no-console
-        console.warn('[xcode-ide-suite] bridge warm-up failed; skipping xcode-ide snapshots.');
-      } else {
-        if (!documentationSearchReady) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[xcode-ide-suite] bridge warm-up did not expose ${DOCUMENTATION_SEARCH_TOOL}; skipping documentation-search snapshot only.`,
-          );
-        }
-        await delay(XCODE_IDE_BRIDGE_SETTLE_MS);
-      }
-    });
-
-    afterAll(async () => {
-      await harness.cleanup();
-      if (isCliSnapshotRuntime(runtime)) {
-        try {
-          execFileSync('node', [CLI_PATH, '--socket', socketPath, 'daemon', 'stop'], {
-            env: getSnapshotHarnessEnv(daemonEnv),
-            stdio: ['ignore', 'ignore', 'ignore'],
-          });
-        } catch {
-          // best effort cleanup
-        }
-        rmSync(tempDir, { recursive: true, force: true });
-      }
-    });
-
+  describe(`${runtime} xcode-ide workflow`, () => {
     describe('list-tools', () => {
       it('success', async (context) => {
-        if (!bridgeListReady) {
+        if (!isXcodeIdeBridgeAvailable()) {
           context.skip();
+          return;
         }
 
-        const { text } = await harness.invoke('xcode-ide', 'list-tools', {
-          refresh: false,
-        });
-
-        expectFixture(text, 'list-tools--success');
+        const environment = createXcodeIdeTestEnvironment();
+        let harness: WorkflowSnapshotHarness | undefined;
+        let result: SnapshotResult | undefined;
+        try {
+          harness = await createXcodeIdeHarness(runtime, environment.cwd);
+          result = await harness.invoke('xcode-ide', 'list-tools', { refresh: true });
+          expectFixture(result, 'list-tools--success', 'success');
+        } finally {
+          await cleanupXcodeIdeTest(harness, environment, result);
+        }
       }, 120_000);
     });
 
     describe('documentation-search', () => {
       it('success', async (context) => {
-        if (!documentationSearchReady) {
+        if (!isXcodeIdeBridgeAvailable()) {
           context.skip();
+          return;
         }
 
-        const { text } = await harness.invoke('xcode-ide', 'call-tool', {
-          remoteTool: DOCUMENTATION_SEARCH_TOOL,
-          arguments: { query: DOCUMENTATION_SEARCH_QUERY, frameworks: ['AVFoundation'] },
-          timeoutMs: 120_000,
-        });
+        const availableToolNames = await listAvailableXcodeIdeBridgeToolNames();
+        if (!availableToolNames.has(DOCUMENTATION_SEARCH_TOOL)) {
+          context.skip();
+          return;
+        }
 
-        expectFixture(text, 'documentation-search--success');
-      }, 120_000);
+        const environment = createXcodeIdeTestEnvironment();
+        let harness: WorkflowSnapshotHarness | undefined;
+        let result: SnapshotResult | undefined;
+        try {
+          harness = await createXcodeIdeHarness(runtime, environment.cwd);
+          await waitForXcodeIdeTool(harness, DOCUMENTATION_SEARCH_TOOL);
+
+          result = await harness.invoke('xcode-ide', 'call-tool', {
+            remoteTool: DOCUMENTATION_SEARCH_TOOL,
+            arguments: { query: DOCUMENTATION_SEARCH_QUERY, frameworks: ['AVFoundation'] },
+            timeoutMs: 120_000,
+          });
+          expectFixture(result, 'documentation-search--success', 'success');
+        } finally {
+          await cleanupXcodeIdeTest(harness, environment, result);
+        }
+      }, 150_000);
     });
   });
 }

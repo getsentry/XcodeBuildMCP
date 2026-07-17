@@ -4,7 +4,7 @@
    Scheme: NONEXISTENT
    Project: example_projects/macOS/MCPTest.xcodeproj
    Platform: macOS
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+   Derived Data: <TMPDIR>/DerivedData
 
 Errors (1):
 

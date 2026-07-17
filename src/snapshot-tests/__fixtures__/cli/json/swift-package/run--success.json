@@ -5,7 +5,7 @@
   "error": null,
   "data": {
     "request": {
-      "packagePath": "<ROOT>/example_projects/spm",
+      "packagePath": "<TMPDIR>/spm",
       "executableName": "spm",
       "target": "swift-package"
     },
@@ -15,8 +15,8 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/spm",
-      "executablePath": "<ROOT>/example_projects/spm/.build/arm64-apple-macosx/debug/spm",
+      "packagePath": "<TMPDIR>/spm",
+      "executablePath": "<TMPDIR>/spm/.build/<TARGET_TRIPLE>/debug/spm",
       "processId": 99999,
       "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
     },
@@ -25,6 +25,13 @@
         "Hello, world!"
       ],
       "stderr": [
+        "Fetching https://github.com/apple/swift-argument-parser.git from cache",
+        "Fetched https://github.com/apple/swift-argument-parser.git from cache (<DURATION>)",
+        "Computing version for https://github.com/apple/swift-argument-parser.git",
+        "Computed https://github.com/apple/swift-argument-parser.git at 1.5.1 (<DURATION>)",
+        "Computed https://github.com/apple/swift-argument-parser.git at 1.5.1 (<DURATION>)",
+        "Creating working copy for https://github.com/apple/swift-argument-parser.git",
+        "Working copy of https://github.com/apple/swift-argument-parser.git resolved at 1.5.1",
         "Building for debugging...",
         "[<STEP>] Applying spm",
         "[<STEP>] Compiling spm main.swift",
@@ -33,7 +40,7 @@
         "[<STEP>] Write Objects.LinkFileList",
         "[<STEP>] Write sources",
         "[<STEP>] Write spm-entitlement.plist",
-        "[<STEP>] Write swift-version--<HASH>.txt",
+        "[<STEP>] Write swift-version-69A768CDF2A0BEE1.txt",
         "Build of product 'spm' complete! (<DURATION>)"
       ]
     },

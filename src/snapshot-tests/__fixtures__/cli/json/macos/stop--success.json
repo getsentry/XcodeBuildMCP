@@ -8,7 +8,8 @@
       "status": "SUCCEEDED"
     },
     "artifacts": {
-      "appName": "MCPTest"
+      "processId": 99999,
+      "appName": "PID <PID>"
     },
     "diagnostics": {
       "warnings": [],

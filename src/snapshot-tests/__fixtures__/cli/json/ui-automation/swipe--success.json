@@ -13,11 +13,11 @@
       "direction": "up",
       "from": {
         "x": 201,
-        "y": 743
+        "y": 468
       },
       "to": {
         "x": 201,
-        "y": 131
+        "y": 406
       }
     },
     "artifacts": {
@@ -28,45 +28,31 @@
       "rs": "1",
       "screenHash": "<SCREEN_HASH>",
       "seq": 1,
-      "count": 144,
-      "targets": [
-        "<REF>|tap|button|Home Screen & App Library||com.apple.settings.homeScreen",
-        "<REF>|typeText|text-field||Search|",
-        "<REF>|tap|button|Camera||com.apple.settings.camera",
-        "<REF>|tap|button|Search||com.apple.settings.search",
-        "<REF>|tap|button|StandBy||com.apple.settings.standBy",
-        "<REF>|tap|button|Screen Time||com.apple.settings.screenTime",
-        "<REF>|tap|button|Passcode||com.apple.settings.passcodeAndBiometrics",
-        "<REF>|tap|button|Privacy & Security||com.apple.settings.privacyAndSecurity",
-        "<REF>|tap|button|Game Center||com.apple.settings.gameCenter",
-        "<REF>|tap|button|iCloud||com.apple.settings.iCloud",
-        "<REF>|tap|button|Apps||com.apple.settings.apps",
-        "<REF>|tap|button|Developer||com.apple.settings.developer",
-        "<REF>|tap|button|Dictate||Dictate",
-        "<REF>|tap|button|Dictate||Dictate"
-      ],
+      "count": 99999,
+      "targets": [],
       "scroll": [
-        "<REF>|swipe|application|Settings||"
+        "<REF>|swipe|scroll-view|||snapshot-scroll-surface"
       ],
       "text": [
-        "<REF>|text|text|Apple Intelligence & Siri||",
-        "<REF>|text|text|Camera||",
-        "<REF>|text|text|Home Screen & App Library||",
-        "<REF>|text|text|Search||",
-        "<REF>|text|text|StandBy||",
-        "<REF>|text|text|Screen Time||",
-        "<REF>|text|text|Passcode||",
-        "<REF>|text|text|Privacy & Security||",
-        "<REF>|text|text|Game Center||",
-        "<REF>|text|text|iCloud||",
-        "<REF>|text|text|Apps||",
-        "<REF>|text|text|Developer||"
+        "<REF>|text|text|Snapshot row 0||",
+        "<REF>|text|text|Snapshot row 1||",
+        "<REF>|text|text|Snapshot row 2||",
+        "<REF>|text|text|Snapshot row 3||",
+        "<REF>|text|text|Snapshot row 4||",
+        "<REF>|text|text|Snapshot row 5||",
+        "<REF>|text|text|Snapshot row 6||",
+        "<REF>|text|text|Snapshot row 7||",
+        "<REF>|text|text|Snapshot row 8||",
+        "<REF>|text|text|Snapshot row 9||",
+        "<REF>|text|text|Snapshot row 10||",
+        "<REF>|text|text|Snapshot row 11||",
+        "<REF>|text|text|Snapshot row 12||",
+        "<REF>|text|text|Snapshot row 13||"
       ],
       "udid": "<UUID>"
     }
   },
   "nextSteps": [
-    "Batch same-screen taps: xcodebuildmcp ui-automation batch --json '{\"simulatorId\":\"<UUID>\",\"steps\":[{\"action\":\"tap\",\"elementRef\":\"<REF>\"},{\"action\":\"tap\",\"elementRef\":\"<REF>\"}]}'",
-    "Tap an elementRef: xcodebuildmcp ui-automation tap --simulator-id <UUID> --element-ref <REF>"
+    "<POST_SWIPE_NEXT_STEP>"
   ]
 }

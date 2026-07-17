@@ -8,7 +8,7 @@
       "buildForTesting": true,
       "scheme": "NONEXISTENT",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
+      "derivedDataPath": "<TMPDIR>",
       "platform": "iOS",
       "target": "device",
       "testProductsPath": "<TMPDIR>/Invalid CalculatorApp Tests.xctestproducts"

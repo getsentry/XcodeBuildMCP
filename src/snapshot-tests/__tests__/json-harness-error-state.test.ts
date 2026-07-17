@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assertCliSnapshotProcessResult, resolveCliJsonSnapshotErrorState } from '../harness.ts';
-import { resolveMcpSnapshotErrorState } from '../mcp-harness.ts';
+import {
+  assertCliSnapshotProcessResult,
+  resolveCliJsonSnapshotErrorState,
+  resolveCliJsonSnapshotOutcome,
+} from '../harness.ts';
+import { resolveMcpSnapshotOutcome } from '../mcp-harness.ts';
 import type { StructuredOutputEnvelope } from '../../types/structured-output.ts';
 
 const successEnvelope: StructuredOutputEnvelope<null> = {
@@ -57,6 +61,8 @@ describe('JSON snapshot harness error state', () => {
   it('uses CLI process status and envelope.didError when they agree', () => {
     expect(resolveCliJsonSnapshotErrorState(0, successEnvelope, 'tool')).toBe(false);
     expect(resolveCliJsonSnapshotErrorState(1, errorEnvelope, 'tool')).toBe(true);
+    expect(resolveCliJsonSnapshotOutcome(0, successEnvelope, 'tool')).toBe('success');
+    expect(resolveCliJsonSnapshotOutcome(1, errorEnvelope, 'tool')).toBe('domain-error');
   });
 
   it('rejects null CLI process status', () => {
@@ -75,18 +81,33 @@ describe('JSON snapshot harness error state', () => {
   });
 
   it('uses MCP transport isError and structuredContent.didError when they agree', () => {
-    expect(resolveMcpSnapshotErrorState(false, false, 'tool')).toBe(false);
-    expect(resolveMcpSnapshotErrorState(true, true, 'tool')).toBe(true);
+    expect(resolveMcpSnapshotOutcome(false, false, 'tool')).toBe('success');
+    expect(resolveMcpSnapshotOutcome(true, true, 'tool')).toBe('domain-error');
+  });
+
+  it('classifies an MCP error without a domain envelope as an infrastructure failure', () => {
+    expect(resolveMcpSnapshotOutcome(true, undefined, 'tool')).toBe('infrastructure-error');
+  });
+
+  it('classifies MCP argument validation separately from infrastructure failures', () => {
+    expect(
+      resolveMcpSnapshotOutcome(
+        true,
+        undefined,
+        'tool',
+        'MCP error -32602: Input validation error: Invalid arguments for tool',
+      ),
+    ).toBe('validation-error');
   });
 
   it('rejects MCP transport isError and structuredContent.didError disagreement', () => {
-    expect(() => resolveMcpSnapshotErrorState(true, false, 'tool')).toThrow(
+    expect(() => resolveMcpSnapshotOutcome(true, false, 'tool')).toThrow(
       'MCP result.isError (true) disagrees with structuredContent.didError (false)',
     );
-    expect(() => resolveMcpSnapshotErrorState(false, true, 'tool')).toThrow(
+    expect(() => resolveMcpSnapshotOutcome(false, true, 'tool')).toThrow(
       'MCP result.isError (false) disagrees with structuredContent.didError (true)',
     );
-    expect(() => resolveMcpSnapshotErrorState(undefined, true, 'tool')).toThrow(
+    expect(() => resolveMcpSnapshotOutcome(undefined, true, 'tool')).toThrow(
       'MCP result.isError (undefined) disagrees with structuredContent.didError (true)',
     );
   });

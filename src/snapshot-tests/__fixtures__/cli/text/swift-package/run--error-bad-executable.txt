@@ -1,7 +1,7 @@
 
 🚀 Swift Package Run
 
-   Package: <ROOT>/example_projects/spm
+   Package: <TMPDIR>/spm
    Executable: nonexistent-executable
 
 Errors (1):

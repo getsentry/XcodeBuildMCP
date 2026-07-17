@@ -1,6 +1,6 @@
 
 🛑 Stop macOS App
 
-   App: MCPTest
+   App: PID <PID>
 
 ✅ App stopped successfully

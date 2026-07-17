@@ -1,78 +1,69 @@
-import { describe, it, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
-import { createHarnessForRuntime, createWorkflowFixtureMatcher } from './helpers.ts';
+import { createHarnessForRuntime, createWorkflowResultFixtureMatcher } from './helpers.ts';
 
 export function registerProjectScaffoldingSnapshotSuite(runtime: SnapshotRuntime): void {
-  const expectFixture = createWorkflowFixtureMatcher(runtime, 'project-scaffolding');
+  const expectFixture = createWorkflowResultFixtureMatcher(runtime, 'project-scaffolding');
 
   describe(`${runtime} project-scaffolding workflow`, () => {
     let harness: WorkflowSnapshotHarness;
     let tmpDir: string;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       harness = await createHarnessForRuntime(runtime);
       tmpDir = mkdtempSync(join(tmpdir(), 'xbm-scaffold-'));
     });
 
-    afterAll(async () => {
-      await harness.cleanup();
-      rmSync(tmpDir, { recursive: true, force: true });
+    afterEach(async () => {
+      try {
+        await harness.cleanup();
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
 
     describe('scaffold-ios', () => {
       it('success', async () => {
-        const outputPath = join(tmpDir, 'ios');
-        const { text } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
+        const result = await harness.invoke('project-scaffolding', 'scaffold-ios', {
           projectName: 'SnapshotTestApp',
-          outputPath,
+          outputPath: join(tmpDir, 'ios'),
         });
-        expectFixture(text, 'scaffold-ios--success');
+        expectFixture(result, 'scaffold-ios--success', 'success');
       }, 120000);
 
       it('error - existing project', async () => {
         const outputPath = join(tmpDir, 'ios-existing');
-        mkdirSync(outputPath, { recursive: true });
+        mkdirSync(join(outputPath, 'SnapshotTestApp.xcworkspace'), { recursive: true });
 
-        await harness.invoke('project-scaffolding', 'scaffold-ios', {
+        const result = await harness.invoke('project-scaffolding', 'scaffold-ios', {
           projectName: 'SnapshotTestApp',
           outputPath,
         });
-
-        const { text } = await harness.invoke('project-scaffolding', 'scaffold-ios', {
-          projectName: 'SnapshotTestApp',
-          outputPath,
-        });
-        expectFixture(text, 'scaffold-ios--error-existing');
+        expectFixture(result, 'scaffold-ios--error-existing', 'error');
       }, 120000);
     });
 
     describe('scaffold-macos', () => {
       it('success', async () => {
-        const outputPath = join(tmpDir, 'macos');
-        const { text } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
+        const result = await harness.invoke('project-scaffolding', 'scaffold-macos', {
           projectName: 'SnapshotTestMacApp',
-          outputPath,
+          outputPath: join(tmpDir, 'macos'),
         });
-        expectFixture(text, 'scaffold-macos--success');
+        expectFixture(result, 'scaffold-macos--success', 'success');
       }, 120000);
 
       it('error - existing project', async () => {
         const outputPath = join(tmpDir, 'macos-existing');
-        mkdirSync(outputPath, { recursive: true });
+        mkdirSync(join(outputPath, 'SnapshotTestMacApp.xcworkspace'), { recursive: true });
 
-        await harness.invoke('project-scaffolding', 'scaffold-macos', {
+        const result = await harness.invoke('project-scaffolding', 'scaffold-macos', {
           projectName: 'SnapshotTestMacApp',
           outputPath,
         });
-
-        const { text } = await harness.invoke('project-scaffolding', 'scaffold-macos', {
-          projectName: 'SnapshotTestMacApp',
-          outputPath,
-        });
-        expectFixture(text, 'scaffold-macos--error-existing');
+        expectFixture(result, 'scaffold-macos--error-existing', 'error');
       }, 120000);
     });
   });

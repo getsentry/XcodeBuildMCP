@@ -6,8 +6,8 @@
   "data": {
     "summary": {
       "status": "SUCCEEDED",
-      "coveragePct": 83.1,
-      "coveredLines": 157,
+      "coveragePct": 55,
+      "coveredLines": 104,
       "executableLines": 189
     },
     "coverageScope": "file",
@@ -25,8 +25,50 @@
           "executableLines": 16
         },
         {
+          "line": 63,
+          "name": "CalculatorService.inputDecimal()",
+          "coveredLines": 0,
+          "executableLines": 14
+        },
+        {
+          "line": 148,
+          "name": "CalculatorService.clear()",
+          "coveredLines": 0,
+          "executableLines": 10
+        },
+        {
+          "line": 134,
+          "name": "CalculatorService.toggleSign()",
+          "coveredLines": 0,
+          "executableLines": 6
+        },
+        {
+          "line": 141,
+          "name": "CalculatorService.percentage()",
+          "coveredLines": 0,
+          "executableLines": 6
+        },
+        {
+          "line": 178,
+          "name": "CalculatorService.setError(_:)",
+          "coveredLines": 0,
+          "executableLines": 5
+        },
+        {
           "line": 58,
           "name": "implicit closure #2 in CalculatorService.inputNumber(_:)",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 68,
+          "name": "implicit closure #1 in CalculatorService.inputDecimal()",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 94,
+          "name": "implicit closure #1 in CalculatorService.calculate()",
           "coveredLines": 0,
           "executableLines": 1
         },
@@ -55,8 +97,38 @@
           "executableLines": 1
         },
         {
+          "line": 209,
+          "name": "implicit closure #3 in CalculatorService.formatNumber(_:)",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
           "line": 214,
           "name": "implicit closure #4 in CalculatorService.formatNumber(_:)",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 221,
+          "name": "CalculatorService.currentValue.getter",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 222,
+          "name": "CalculatorService.previousValue.getter",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 223,
+          "name": "CalculatorService.currentOperation.getter",
+          "coveredLines": 0,
+          "executableLines": 1
+        },
+        {
+          "line": 224,
+          "name": "CalculatorService.willResetDisplay.getter",
           "coveredLines": 0,
           "executableLines": 1
         }
@@ -70,31 +142,38 @@
           "executableLines": 10
         },
         {
+          "line": 93,
+          "name": "CalculatorService.calculate()",
+          "coveragePct": 84.2,
+          "coveredLines": 32,
+          "executableLines": 38
+        },
+        {
+          "line": 47,
+          "name": "CalculatorService.inputNumber(_:)",
+          "coveragePct": 85.7,
+          "coveredLines": 12,
+          "executableLines": 14
+        },
+        {
+          "line": 78,
+          "name": "CalculatorService.setOperation(_:)",
+          "coveragePct": 85.7,
+          "coveredLines": 12,
+          "executableLines": 14
+        },
+        {
           "line": 195,
           "name": "CalculatorService.formatNumber(_:)",
           "coveragePct": 85.7,
           "coveredLines": 18,
           "executableLines": 21
-        },
-        {
-          "line": 93,
-          "name": "CalculatorService.calculate()",
-          "coveragePct": 89.5,
-          "coveredLines": 34,
-          "executableLines": 38
-        },
-        {
-          "line": 63,
-          "name": "CalculatorService.inputDecimal()",
-          "coveragePct": 92.9,
-          "coveredLines": 13,
-          "executableLines": 14
         }
       ],
-      "fullCoverageCount": 28,
-      "notCoveredFunctionCount": 7,
-      "notCoveredLineCount": 22,
-      "partialCoverageFunctionCount": 4
+      "fullCoverageCount": 15,
+      "notCoveredFunctionCount": 19,
+      "notCoveredLineCount": 70,
+      "partialCoverageFunctionCount": 5
     }
   },
   "nextSteps": [

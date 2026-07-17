@@ -3,9 +3,8 @@
 
    Scheme: MCPTest
    Project: example_projects/macOS/MCPTest.xcodeproj
-   Configuration: Debug
    Platform: macOS
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>
+   Derived Data: <TMPDIR>/DerivedData
    Selective Testing:
      MCPTestTests/MCPTestTests/appNameIsCorrect()
      MCPTestTests/MCPTestsXCTests/testAppNameIsCorrect

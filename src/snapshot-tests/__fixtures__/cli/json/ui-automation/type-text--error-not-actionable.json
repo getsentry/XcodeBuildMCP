@@ -2,7 +2,7 @@
   "schema": "xcodebuildmcp.output.ui-action-result",
   "schemaVersion": "2",
   "didError": true,
-  "error": "Element ref 'e3' does not support 'typeText'.",
+  "error": "Element ref '<REF>' does not support 'typeText'.",
   "data": {
     "summary": {
       "status": "FAILED"
@@ -17,7 +17,7 @@
     },
     "uiError": {
       "code": "TARGET_NOT_ACTIONABLE",
-      "message": "Element ref 'e3' does not support 'typeText'.",
+      "message": "Element ref '<REF>' does not support 'typeText'.",
       "recoveryHint": "Choose an elementRef that lists the required action, or refresh with snapshot_ui.",
       "elementRef": "<ELEMENT_REF>",
       "candidates": [],

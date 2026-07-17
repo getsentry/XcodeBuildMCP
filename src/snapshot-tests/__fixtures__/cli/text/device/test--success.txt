@@ -3,10 +3,9 @@
 
    Scheme: CalculatorApp
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS
-   Device: <DEVICE> (<UUID>)
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Device: <UUID>
+   Derived Data: <TMPDIR>
    Selective Testing:
      CalculatorAppTests/CalculatorAppTests/testAddition
 
@@ -17,4 +16,5 @@ Running tests (1 completed, 0 failures, 0 skipped)
 ✅ 1 test passed, 0 failed, 0 skipped (⏱️ <DURATION>)
   └ Files:
      ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult
-     └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log
+     ├ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log
+     └ Test Products: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/test-products/test_device_<TIMESTAMP>_pid<PID>.xctestproducts

@@ -29,9 +29,22 @@ export interface ToolPreflightParams {
   targetFilter?: string;
 }
 
+function normalizeMacosPathAlias(filePath: string): string {
+  const absolutePath = path.resolve(filePath);
+  if (
+    absolutePath === '/tmp' ||
+    absolutePath.startsWith('/tmp/') ||
+    absolutePath === '/var' ||
+    absolutePath.startsWith('/var/')
+  ) {
+    return `/private${absolutePath}`;
+  }
+  return absolutePath;
+}
+
 export function displayPath(filePath: string): string {
   const cwd = process.cwd();
-  const relative = path.relative(cwd, filePath);
+  const relative = path.relative(normalizeMacosPathAlias(cwd), normalizeMacosPathAlias(filePath));
   if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
     return relative;
   }

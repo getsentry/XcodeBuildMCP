@@ -3,7 +3,6 @@
 
    Scheme: NONEXISTENT
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS
 
 Errors (1):

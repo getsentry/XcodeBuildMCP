@@ -1,14 +1,14 @@
 
 🚀 Swift Package Run
 
-   Package: <ROOT>/example_projects/spm
+   Package: <TMPDIR>/spm
    Executable: spm
 
 ✅ Build succeeded. (⏱️ <DURATION>)
 ✅ Build & Run complete
   ├ Process ID: <PID>
   └ Files:
-     ├ App Path: example_projects/spm/.build/arm64-apple-macosx/debug/spm
+     ├ App Path: <TMPDIR>/spm/.build/<TARGET_TRIPLE>/debug/spm
      └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log
 
 Output

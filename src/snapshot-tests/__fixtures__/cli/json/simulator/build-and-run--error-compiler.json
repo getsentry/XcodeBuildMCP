@@ -7,10 +7,9 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
-      "configuration": "Debug",
+      "derivedDataPath": "<TMPDIR>",
       "platform": "iOS Simulator",
-      "simulatorName": "iPhone 17"
+      "simulatorId": "<UUID>"
     },
     "summary": {
       "status": "FAILED",
@@ -25,7 +24,7 @@
       "errors": [
         {
           "message": "cannot convert value of type 'String' to specified type 'Int'",
-          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33"
+          "location": "<ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:53"
         }
       ]
     }

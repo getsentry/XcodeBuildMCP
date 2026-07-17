@@ -8,7 +8,7 @@
       "buildForTesting": true,
       "scheme": "MCPTest",
       "projectPath": "example_projects/macOS/MCPTest.xcodeproj",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/MCPTest-<HASH>",
+      "derivedDataPath": "<TMPDIR>/DerivedData",
       "platform": "macOS",
       "target": "macos",
       "testProductsPath": "<TMPDIR>/MCPTest Tests.xctestproducts"

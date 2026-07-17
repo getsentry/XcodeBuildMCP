@@ -6,6 +6,7 @@ import { normalizeSnapshotOutput } from './normalize.ts';
 import type {
   SnapshotInvokeOptions,
   SnapshotResult,
+  SnapshotResultOutcome,
   WorkflowSnapshotHarness,
 } from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
@@ -34,6 +35,7 @@ export interface McpSnapshotHarness extends WorkflowSnapshotHarness {
 }
 
 export interface CreateMcpSnapshotHarnessOptions {
+  cwd?: string;
   enabledWorkflows?: string[];
   env?: Record<string, string>;
 }
@@ -91,11 +93,12 @@ function createSnapshotHarnessEnv(overrides: Record<string, string>): Record<str
   return { ...env, ...overrides };
 }
 
-export function resolveMcpSnapshotErrorState(
+export function resolveMcpSnapshotOutcome(
   transportDidError: boolean | undefined,
   envelopeDidError: boolean | undefined,
   label: string,
-): boolean {
+  rawText = '',
+): SnapshotResultOutcome {
   const didTransportError = transportDidError ?? false;
   if (envelopeDidError !== undefined && didTransportError !== envelopeDidError) {
     throw new Error(
@@ -103,7 +106,32 @@ export function resolveMcpSnapshotErrorState(
     );
   }
 
-  return didTransportError;
+  if (envelopeDidError === true) {
+    return 'domain-error';
+  }
+  if (didTransportError) {
+    if (/^MCP error -32602: Input validation error:/u.test(rawText.trim())) {
+      return 'validation-error';
+    }
+    return 'infrastructure-error';
+  }
+  return 'success';
+}
+
+export async function connectMcpClientWithCleanup(
+  connect: () => Promise<void>,
+  closeClient: () => Promise<void>,
+  closeTransport: () => Promise<void>,
+): Promise<void> {
+  try {
+    await connect();
+  } catch (error) {
+    await Promise.allSettled([
+      Promise.resolve().then(closeClient),
+      Promise.resolve().then(closeTransport),
+    ]);
+    throw error;
+  }
 }
 
 export async function createMcpSnapshotHarness(
@@ -113,6 +141,7 @@ export async function createMcpSnapshotHarness(
   const transport = new StdioClientTransport({
     command: 'node',
     args: [CLI_PATH, 'mcp'],
+    cwd: opts.cwd,
     env: createSnapshotHarnessEnv({
       ...(opts.env ?? {}),
       XCODEBUILDMCP_ENABLED_WORKFLOWS: enabledWorkflows.join(','),
@@ -124,7 +153,11 @@ export async function createMcpSnapshotHarness(
   });
 
   const client = new Client({ name: 'snapshot-test-client', version: '1.0.0' });
-  await client.connect(transport, { timeout: 30_000 });
+  await connectMcpClientWithCleanup(
+    () => client.connect(transport, { timeout: 30_000 }),
+    () => client.close(),
+    () => transport.close(),
+  );
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<SnapshotResult> {
     const result = await client.callTool({ name, arguments: args }, undefined, {
@@ -133,13 +166,20 @@ export async function createMcpSnapshotHarness(
     const rawText = extractSnapshotTextContent(result);
     const text = normalizeSnapshotOutput(rawText);
     const structuredEnvelope = extractStructuredEnvelope(result);
-    const isError = resolveMcpSnapshotErrorState(
+    const outcome = resolveMcpSnapshotOutcome(
       (result as { isError?: boolean }).isError,
       structuredEnvelope?.didError,
       name,
+      rawText,
     );
 
-    return { text, rawText, isError, structuredEnvelope };
+    return {
+      text,
+      rawText,
+      isError: outcome !== 'success',
+      outcome,
+      structuredEnvelope,
+    };
   }
 
   async function invoke(

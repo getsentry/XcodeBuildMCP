@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { displayPath, formatToolPreflight } from '../build-preflight.ts';
 import { computeScopedDerivedDataPath } from '../derived-data-path.ts';
 import { getWorkspaceFilesystemLayout } from '../log-paths.ts';
@@ -240,6 +240,16 @@ describe('formatToolPreflight', () => {
 
     expect(result).toContain('   Workspace: MyApp.xcworkspace');
     expect(result).not.toContain(cwd);
+  });
+
+  it('shows relative paths when macOS reports the /tmp alias of a /private/tmp cwd', () => {
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue('/private/tmp/worktree');
+
+    try {
+      expect(displayPath('/tmp/worktree/example/App.swift')).toBe('example/App.swift');
+    } finally {
+      cwd.mockRestore();
+    }
   });
 
   it('shows absolute path when outside cwd', () => {

@@ -38,6 +38,14 @@ function normalizeString(
     path.includes('capture') && (path.includes('elements') || path.includes('actions'));
   let result = normalizeBaseString(value, options);
 
+  if (
+    path.includes('nextSteps') &&
+    (result.startsWith('Scroll visible content:') ||
+      result.startsWith('Take screenshot for verification:'))
+  ) {
+    return '<POST_SWIPE_NEXT_STEP>';
+  }
+
   if (parentKey === 'stderr') {
     result = result.replace(/^\[\d+\/\d+\] /, '[<STEP>] ');
   }
@@ -99,6 +107,10 @@ function normalizeBoolean(path: string[], key: string | undefined, value: boolea
 }
 
 function normalizeNumber(path: string[], key: string | undefined, value: number): number {
+  if (key === 'count' && path.includes('capture')) {
+    return 99999;
+  }
+
   if (
     path.includes('capture') &&
     path.includes('elements') &&

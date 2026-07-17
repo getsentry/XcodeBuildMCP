@@ -4,7 +4,7 @@
 Errors (1):
 
   ✗ cannot convert value of type 'String' to specified type 'Int'
-    <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:33
+    <ROOT>/example_projects/iOS_Calculator/CalculatorApp/CalculatorApp.swift:53
 
 ❌ Build failed. (⏱️ <DURATION>)
   └ Files:

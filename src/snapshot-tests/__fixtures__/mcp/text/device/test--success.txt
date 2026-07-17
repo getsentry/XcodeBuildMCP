@@ -8,4 +8,5 @@ Discovered 1 test(s):
   └ Files:
      └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/
          ├── logs/test_device_<TIMESTAMP>_pid<PID>.log — Build Logs
-         └── result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult — Result Bundle
+         ├── result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult — Result Bundle
+         └── test-products/test_device_<TIMESTAMP>_pid<PID>.xctestproducts — Test Products

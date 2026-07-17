@@ -11,8 +11,8 @@
       "type": "touch",
       "elementRef": "<ELEMENT_REF>",
       "event": "touch down+up",
-      "x": 201,
-      "y": 437
+      "x": 61,
+      "y": 490
     },
     "artifacts": {
       "simulatorId": "<UUID>"

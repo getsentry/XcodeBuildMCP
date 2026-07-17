@@ -4,7 +4,7 @@
    Scheme: CalculatorApp
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
    Platform: iOS
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Derived Data: <TMPDIR>
 
 ✅ Build succeeded. (⏱️ <DURATION>)
   └ Files:

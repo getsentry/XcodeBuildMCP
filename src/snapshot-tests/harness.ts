@@ -1,29 +1,88 @@
-import { spawnSync, execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { formatStructuredEnvelopeFixture } from './json-normalize.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
 import type {
   SnapshotInvokeOptions,
   SnapshotResult,
+  SnapshotResultOutcome,
   WorkflowSnapshotHarness,
 } from './contracts.ts';
 import { resolveSnapshotToolManifest } from './tool-manifest-resolver.ts';
 
 const CLI_PATH = path.resolve(process.cwd(), 'build/cli.js');
 const SNAPSHOT_COMMAND_TIMEOUT_MS = 120_000;
-const SIMULATOR_STATE_WAIT_TIMEOUT_MS = 15_000;
-const SIMULATOR_STATE_POLL_INTERVAL_MS = 250;
-
-// Snapshot suites intentionally run serially because this harness shares simulator and filesystem
-// state across scenarios. Keep vitest.snapshot.config.ts at one worker unless those resources are
-// isolated per worker.
+// Snapshot suites remain serial to avoid contention for Apple tooling and connected hardware.
+// Correctness must not depend on execution order; each test owns its mutable setup and cleanup.
 export type SnapshotHarness = WorkflowSnapshotHarness;
 export type { SnapshotResult };
 
 export interface CreateSnapshotHarnessOptions {
+  cwd?: string;
   env?: Record<string, string>;
   globalArgs?: string[];
+}
+
+interface PreparedSnapshotHarnessOptions {
+  invocationOptions: CreateSnapshotHarnessOptions;
+  ownedSocketDir?: string;
+}
+
+function hasExplicitSocket(globalArgs: string[]): boolean {
+  return globalArgs.some((arg) => arg === '--socket' || arg.startsWith('--socket='));
+}
+
+function prepareSnapshotHarnessOptions(
+  options: CreateSnapshotHarnessOptions,
+): PreparedSnapshotHarnessOptions {
+  const globalArgs = options.globalArgs ?? [];
+  if (hasExplicitSocket(globalArgs)) {
+    return { invocationOptions: options };
+  }
+
+  const ownedSocketDir = mkdtempSync(path.join(tmpdir(), 'xcodebuildmcp-snapshot-daemon-'));
+  return {
+    invocationOptions: {
+      ...options,
+      globalArgs: ['--socket', path.join(ownedSocketDir, 'daemon.sock'), ...globalArgs],
+    },
+    ownedSocketDir,
+  };
+}
+
+function cleanupSnapshotHarness(options: PreparedSnapshotHarnessOptions): void {
+  if (!options.ownedSocketDir) {
+    return;
+  }
+
+  try {
+    const result = spawnSync(
+      'node',
+      [CLI_PATH, ...(options.invocationOptions.globalArgs ?? []), 'daemon', 'stop'],
+      {
+        encoding: 'utf8',
+        timeout: SNAPSHOT_COMMAND_TIMEOUT_MS,
+        cwd: options.invocationOptions.cwd ?? process.cwd(),
+        env: getSnapshotHarnessEnv(options.invocationOptions.env),
+      },
+    );
+    if (result.error) {
+      throw new Error(`Failed to stop snapshot daemon: ${result.error.message}`);
+    }
+    if (result.signal || result.status === null) {
+      throw new Error('Snapshot daemon stop process did not exit normally.');
+    }
+    if (result.status !== 0) {
+      const stderr = readProcessOutput(result.stderr).trim();
+      throw new Error(
+        `Failed to stop snapshot daemon: ${stderr || `exit status ${result.status}`}`,
+      );
+    }
+  } finally {
+    rmSync(options.ownedSocketDir, { recursive: true, force: true });
+  }
 }
 
 export function getSnapshotHarnessEnv(
@@ -62,7 +121,7 @@ function runSnapshotCli(
   return spawnSync('node', commandArgs, {
     encoding: 'utf8',
     timeout: SNAPSHOT_COMMAND_TIMEOUT_MS,
-    cwd: process.cwd(),
+    cwd: options.cwd ?? process.cwd(),
     env: getSnapshotHarnessEnv(options.env),
   });
 }
@@ -128,9 +187,19 @@ export function resolveCliJsonSnapshotErrorState(
   return processDidError;
 }
 
+export function resolveCliJsonSnapshotOutcome(
+  status: number | null,
+  envelope: NonNullable<SnapshotResult['structuredEnvelope']>,
+  label: string,
+): SnapshotResultOutcome {
+  return resolveCliJsonSnapshotErrorState(status, envelope, label) ? 'domain-error' : 'success';
+}
+
 export async function createSnapshotHarness(
   options: CreateSnapshotHarnessOptions = {},
 ): Promise<SnapshotHarness> {
+  const preparedOptions = prepareSnapshotHarnessOptions(options);
+
   async function invoke(
     workflow: string,
     cliToolName: string,
@@ -148,7 +217,14 @@ export async function createSnapshotHarness(
     }
 
     const label = `${workflow}/${cliToolName}`;
-    const result = runSnapshotCli(workflow, cliToolName, args, 'text', options, invokeOptions);
+    const result = runSnapshotCli(
+      workflow,
+      cliToolName,
+      args,
+      'text',
+      preparedOptions.invocationOptions,
+      invokeOptions,
+    );
     assertCliSnapshotProcessResult(result, label);
     const stdout = readProcessOutput(result.stdout);
 
@@ -156,10 +232,13 @@ export async function createSnapshotHarness(
       text: normalizeSnapshotOutput(stdout),
       rawText: stdout,
       isError: result.status !== 0,
+      outcome: result.status === 0 ? 'success' : 'domain-error',
     };
   }
 
-  async function cleanup(): Promise<void> {}
+  async function cleanup(): Promise<void> {
+    cleanupSnapshotHarness(preparedOptions);
+  }
 
   return { invoke, cleanup };
 }
@@ -167,6 +246,8 @@ export async function createSnapshotHarness(
 export async function createCliJsonSnapshotHarness(
   options: CreateSnapshotHarnessOptions = {},
 ): Promise<SnapshotHarness> {
+  const preparedOptions = prepareSnapshotHarnessOptions(options);
+
   async function invoke(
     workflow: string,
     cliToolName: string,
@@ -184,31 +265,34 @@ export async function createCliJsonSnapshotHarness(
     }
 
     const label = `${workflow}/${cliToolName}`;
-    const result = runSnapshotCli(workflow, cliToolName, args, 'json', options, invokeOptions);
+    const result = runSnapshotCli(
+      workflow,
+      cliToolName,
+      args,
+      'json',
+      preparedOptions.invocationOptions,
+      invokeOptions,
+    );
     assertCliSnapshotProcessResult(result, label);
     const stdout = readProcessOutput(result.stdout);
     const envelope = parseStructuredEnvelope(stdout, label);
 
+    const outcome = resolveCliJsonSnapshotOutcome(result.status, envelope, label);
     return {
       text: formatStructuredEnvelopeFixture(envelope),
       rawText: stdout,
-      isError: resolveCliJsonSnapshotErrorState(result.status, envelope, label),
+      isError: outcome !== 'success',
+      outcome,
       structuredEnvelope: envelope,
     };
   }
 
-  async function cleanup(): Promise<void> {}
+  async function cleanup(): Promise<void> {
+    cleanupSnapshotHarness(preparedOptions);
+  }
 
   return { invoke, cleanup };
 }
-
-type SimulatorState = 'Booted' | 'Shutdown';
-
-type SimctlAvailableDevice = { udid: string; name: string; state: string };
-
-type SimctlAvailableDevices = {
-  devices: Record<string, SimctlAvailableDevice[]>;
-};
 
 type SimctlRuntime = {
   identifier?: unknown;
@@ -219,28 +303,6 @@ type SimctlRuntime = {
 type SimctlRuntimes = {
   runtimes: SimctlRuntime[];
 };
-
-function getAvailableDevices(): SimctlAvailableDevices {
-  const listOutput = execSync('xcrun simctl list devices available --json', {
-    encoding: 'utf8',
-  });
-
-  return JSON.parse(listOutput) as SimctlAvailableDevices;
-}
-
-function findAvailableDeviceByName(simulatorName: string): SimctlAvailableDevice {
-  const data = getAvailableDevices();
-
-  for (const runtime of Object.values(data.devices)) {
-    for (const device of runtime) {
-      if (device.name === simulatorName) {
-        return device;
-      }
-    }
-  }
-
-  throw new Error(`Simulator "${simulatorName}" not found`);
-}
 
 function parseIosRuntimeVersion(runtime: SimctlRuntime): number[] | null {
   if (typeof runtime.identifier !== 'string') {
@@ -285,79 +347,4 @@ export function selectLatestAvailableIosRuntimeIdentifier(data: SimctlRuntimes):
   }
 
   return latest.runtime.identifier;
-}
-
-function getLatestAvailableIosRuntimeIdentifier(): string {
-  const listOutput = execSync('xcrun simctl list runtimes available --json', {
-    encoding: 'utf8',
-  });
-
-  return selectLatestAvailableIosRuntimeIdentifier(JSON.parse(listOutput) as SimctlRuntimes);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForSimulatorState(
-  simulatorName: string,
-  expectedState: SimulatorState,
-): Promise<SimctlAvailableDevice> {
-  const deadline = Date.now() + SIMULATOR_STATE_WAIT_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const device = findAvailableDeviceByName(simulatorName);
-    if (device.state === expectedState) {
-      return device;
-    }
-
-    await sleep(SIMULATOR_STATE_POLL_INTERVAL_MS);
-  }
-
-  const device = findAvailableDeviceByName(simulatorName);
-  throw new Error(
-    `Simulator "${simulatorName}" did not reach state "${expectedState}" (current: "${device.state}")`,
-  );
-}
-
-export async function ensureSimulatorBooted(simulatorName: string): Promise<string> {
-  const device = findAvailableDeviceByName(simulatorName);
-
-  if (device.state !== 'Booted') {
-    execSync(`xcrun simctl boot ${device.udid}`, { encoding: 'utf8' });
-    execSync(`xcrun simctl bootstatus ${device.udid} -b`, { encoding: 'utf8' });
-  }
-
-  return (await waitForSimulatorState(simulatorName, 'Booted')).udid;
-}
-
-export async function createTemporarySimulator(
-  simulatorName: string,
-  runtimeIdentifier = getLatestAvailableIosRuntimeIdentifier(),
-): Promise<string> {
-  const tempSimulatorName = `xcodebuildmcp-snapshot-${simulatorName}-${randomUUID()}`;
-  const udid = execSync(
-    `xcrun simctl create "${tempSimulatorName}" "${simulatorName}" "${runtimeIdentifier}"`,
-    {
-      encoding: 'utf8',
-    },
-  ).trim();
-
-  if (!udid) {
-    throw new Error(`Failed to create temporary simulator "${tempSimulatorName}"`);
-  }
-
-  return udid;
-}
-
-export async function shutdownSimulator(simulatorId: string): Promise<void> {
-  execSync(`xcrun simctl shutdown ${simulatorId}`, {
-    encoding: 'utf8',
-  });
-}
-
-export async function deleteSimulator(simulatorId: string): Promise<void> {
-  execSync(`xcrun simctl delete ${simulatorId}`, {
-    encoding: 'utf8',
-  });
 }

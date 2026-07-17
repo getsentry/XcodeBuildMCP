@@ -11,8 +11,8 @@
       "type": "long-press",
       "elementRef": "<ELEMENT_REF>",
       "durationMs": 500,
-      "x": 201,
-      "y": 437
+      "x": 61,
+      "y": 490
     },
     "artifacts": {
       "simulatorId": "<UUID>"

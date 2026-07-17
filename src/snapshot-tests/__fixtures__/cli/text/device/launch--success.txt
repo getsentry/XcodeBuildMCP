@@ -1,7 +1,7 @@
 
 🚀 Launch App
 
-   Device: <DEVICE> (<UUID>)
+   Device: <UUID>
    Bundle ID: io.sentry.calculatorapp
 
 ✅ App launched successfully.

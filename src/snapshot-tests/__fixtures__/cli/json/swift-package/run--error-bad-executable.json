@@ -5,7 +5,7 @@
   "error": "Build failed",
   "data": {
     "request": {
-      "packagePath": "<ROOT>/example_projects/spm",
+      "packagePath": "<TMPDIR>/spm",
       "executableName": "nonexistent-executable",
       "target": "swift-package"
     },
@@ -15,7 +15,7 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/spm",
+      "packagePath": "<TMPDIR>/spm",
       "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {

@@ -5,7 +5,7 @@
   "error": null,
   "data": {
     "request": {
-      "packagePath": "<ROOT>/example_projects/spm",
+      "packagePath": "<TMPDIR>/spm",
       "target": "swift-package"
     },
     "summary": {
@@ -14,7 +14,7 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/spm",
+      "packagePath": "<TMPDIR>/spm",
       "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {

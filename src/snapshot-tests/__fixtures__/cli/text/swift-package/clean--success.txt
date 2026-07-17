@@ -1,6 +1,6 @@
 
 🧹 Swift Package Clean
 
-   Package: <ROOT>/example_projects/spm
+   Package: <TMPDIR>/spm
 
 ✅ Swift package cleaned successfully

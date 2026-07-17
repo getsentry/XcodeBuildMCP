@@ -3,6 +3,7 @@ import OSLog
 import CalculatorAppFeature
 
 private let logger = Logger(subsystem: "io.sentry.calculatorapp", category: "lifecycle")
+private let snapshotScrollSurfaceArgument = "--snapshot-scroll-surface"
 
 @main
 struct CalculatorApp: App {
@@ -10,7 +11,11 @@ struct CalculatorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if ProcessInfo.processInfo.arguments.contains(snapshotScrollSurfaceArgument) {
+                SnapshotScrollSurface()
+            } else {
+                ContentView()
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -22,6 +27,21 @@ struct CalculatorApp: App {
                 break
             }
         }
+    }
+}
+
+private struct SnapshotScrollSurface: View {
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(0..<30, id: \.self) { index in
+                    Text("Snapshot row \(index)")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+            .padding()
+        }
+        .accessibilityIdentifier("snapshot-scroll-surface")
     }
 }
 

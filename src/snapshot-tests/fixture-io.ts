@@ -3,7 +3,9 @@ import path from 'node:path';
 import {
   snapshotRuntimeFormat,
   snapshotRuntimeTransport,
+  type ExpectedSnapshotOutcome,
   type FixtureKey,
+  type SnapshotResult,
   type SnapshotRuntime,
 } from './contracts.ts';
 
@@ -274,6 +276,27 @@ export function expectMatchesFixture(
   }
 }
 
+export function expectResultMatchesFixture(
+  result: SnapshotResult,
+  expectedOutcome: ExpectedSnapshotOutcome,
+  key: FixtureKey,
+  options?: FixtureMatchOptions,
+): void {
+  const matchesExpectedOutcome =
+    expectedOutcome === 'success'
+      ? result.outcome === 'success'
+      : result.outcome === 'domain-error' || result.outcome === 'validation-error';
+  if (!matchesExpectedOutcome) {
+    const rawOutput = result.rawText.trim().length > 0 ? result.rawText : '<empty>';
+    throw new Error(
+      `${key.workflow}/${key.scenario}: expected ${expectedOutcome}, received ${result.outcome}.\n` +
+        `Raw output:\n${rawOutput}`,
+    );
+  }
+
+  expectMatchesFixture(result.text, key, options);
+}
+
 export function createFixtureMatcher(
   runtime: SnapshotRuntime,
   workflow: string,
@@ -281,5 +304,19 @@ export function createFixtureMatcher(
 ) {
   return (actual: string, scenario: string): void => {
     expectMatchesFixture(actual, { runtime, workflow, scenario }, options);
+  };
+}
+
+export function createResultFixtureMatcher(
+  runtime: SnapshotRuntime,
+  workflow: string,
+  options?: FixtureMatchOptions,
+) {
+  return (
+    result: SnapshotResult,
+    scenario: string,
+    expectedOutcome: ExpectedSnapshotOutcome,
+  ): void => {
+    expectResultMatchesFixture(result, expectedOutcome, { runtime, workflow, scenario }, options);
   };
 }

@@ -6,6 +6,272 @@
   "data": {
     "simulators": [
       {
+        "name": "Apple Watch Series 11 (46mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 27.0"
+      },
+      {
+        "name": "Apple Watch Series 11 (42mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 27.0"
+      },
+      {
+        "name": "Apple Watch Ultra 3 (49mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 27.0"
+      },
+      {
+        "name": "Apple Watch SE 3 (44mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 27.0"
+      },
+      {
+        "name": "Apple Watch SE 3 (40mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 27.0"
+      },
+      {
+        "name": "iPhone 17 Pro",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17e",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone Air",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Pro 13-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Pro 11-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad mini (A17 Pro)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Air 13-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Air 11-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad (A16)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17 Pro",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17 Pro",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17e",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone Air",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPhone 17",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Pro 13-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Pro 11-inch (M5)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad mini (A17 Pro)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Air 13-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad Air 11-inch (M4)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "iPad (A16)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "iOS <VERSION>"
+      },
+      {
+        "name": "Apple Watch Series 11 (46mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 26.5"
+      },
+      {
+        "name": "Apple Watch Series 11 (42mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 26.5"
+      },
+      {
+        "name": "Apple Watch Ultra 3 (49mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 26.5"
+      },
+      {
+        "name": "Apple Watch SE 3 (44mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 26.5"
+      },
+      {
+        "name": "Apple Watch SE 3 (40mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": true,
+        "runtime": "watchOS 26.5"
+      },
+      {
+        "name": "Apple Watch Series 11 (46mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "watchOS 26.4"
+      },
+      {
+        "name": "Apple Watch Series 11 (42mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "watchOS 26.4"
+      },
+      {
+        "name": "Apple Watch Ultra 3 (49mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "watchOS 26.4"
+      },
+      {
+        "name": "Apple Watch SE 3 (44mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "watchOS 26.4"
+      },
+      {
+        "name": "Apple Watch SE 3 (40mm)",
+        "simulatorId": "<UUID>",
+        "state": "<SIM_STATE>",
+        "isAvailable": false,
+        "runtime": "watchOS 26.4"
+      },
+      {
         "name": "iPhone 17 Pro",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",

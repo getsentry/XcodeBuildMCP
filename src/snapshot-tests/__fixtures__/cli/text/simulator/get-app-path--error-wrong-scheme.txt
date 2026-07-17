@@ -3,9 +3,8 @@
 
    Scheme: NONEXISTENT
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS Simulator
-   Simulator: iPhone 17
+   Simulator: <UUID>
 
 Errors (1):
 

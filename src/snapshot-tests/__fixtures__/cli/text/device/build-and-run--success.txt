@@ -3,10 +3,9 @@
 
    Scheme: CalculatorApp
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS
-   Device: <DEVICE> (<UUID>)
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Device: <UUID>
+   Derived Data: <TMPDIR>
 
 ℹ️ Resolving app path
 ✅ Resolving app path
@@ -19,7 +18,7 @@
   ├ Bundle ID: io.sentry.calculatorapp
   ├ Process ID: <PID>
   └ Files:
-     ├ App Path: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>/Build/Products/Debug-iphoneos/CalculatorApp.app
+     ├ App Path: <TMPDIR>/Build/Products/Debug-iphoneos/CalculatorApp.app
      └ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_run_device_<TIMESTAMP>_pid<PID>.log
 
 Next steps:

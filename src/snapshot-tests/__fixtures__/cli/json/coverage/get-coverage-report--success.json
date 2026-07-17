@@ -6,8 +6,8 @@
   "data": {
     "summary": {
       "status": "SUCCEEDED",
-      "coveragePct": 94.9,
-      "coveredLines": 371,
+      "coveragePct": 4.6,
+      "coveredLines": 18,
       "executableLines": 391
     },
     "coverageScope": "report",
@@ -18,8 +18,8 @@
     "targets": [
       {
         "name": "CalculatorAppTests.xctest",
-        "coveragePct": 94.9,
-        "coveredLines": 371,
+        "coveragePct": 4.6,
+        "coveredLines": 18,
         "executableLines": 391
       }
     ]

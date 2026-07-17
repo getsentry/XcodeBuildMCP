@@ -32,7 +32,7 @@ Tips
   - Refs are snapshot-specific; after snapshot_ui or wait_for_ui, use refs from the latest output.
   - Use wait_for_ui for text/assertions or changing UI.
 
-✅ Wait completed; runtime UI snapshot refreshed with 28 elements, 19 likely targets, and 0 scroll areas.
+✅ Wait completed; runtime UI snapshot refreshed with <ELEMENT_COUNT> elements, <LIKELY_TARGET_COUNT> likely targets, and <SCROLL_AREA_COUNT> scroll areas.
 
 Next steps:
 1. Capture a fresh runtime UI snapshot: xcodebuildmcp ui-automation snapshot-ui --simulator-id <UUID>

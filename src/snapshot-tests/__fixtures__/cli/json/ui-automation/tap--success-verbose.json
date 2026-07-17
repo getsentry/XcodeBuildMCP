@@ -149,7 +149,7 @@
         {
           "ref": "e8",
           "role": "text",
-          "label": "7",
+          "label": "0",
           "frame": {
             "x": 0,
             "y": 0,
@@ -608,12 +608,12 @@
         {
           "action": "longPress",
           "elementRef": "e8",
-          "label": "7"
+          "label": "0"
         },
         {
           "action": "touch",
           "elementRef": "e8",
-          "label": "7"
+          "label": "0"
         },
         {
           "action": "longPress",

@@ -7,4 +7,4 @@
      └── ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_macos_<TIMESTAMP>_pid<PID>.log — Build Logs
 
 Next steps:
-1. Get built macOS app path: get_mac_app_path({ scheme: "MCPTest" })
+1. Get built macOS app path: get_mac_app_path({ scheme: "MCPTest", derivedDataPath: "<TMPDIR>/DerivedData" })

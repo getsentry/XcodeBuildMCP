@@ -7,10 +7,9 @@
     "request": {
       "scheme": "CalculatorApp",
       "workspacePath": "example_projects/iOS_Calculator/CalculatorApp.xcworkspace",
-      "derivedDataPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>",
-      "configuration": "Debug",
+      "derivedDataPath": "<TMPDIR>",
       "platform": "iOS Simulator",
-      "simulatorName": "iPhone 17"
+      "simulatorId": "<UUID>"
     },
     "summary": {
       "status": "SUCCEEDED",
@@ -26,6 +25,6 @@
     }
   },
   "nextSteps": [
-    "Get built app path in simulator derived data: xcodebuildmcp simulator get-app-path --simulator-name 'iPhone 17' --scheme CalculatorApp --platform 'iOS Simulator'"
+    "Get built app path in simulator derived data: xcodebuildmcp simulator get-app-path --simulator-id <UUID> --scheme CalculatorApp --platform 'iOS Simulator' --derived-data-path <TMPDIR>"
   ]
 }

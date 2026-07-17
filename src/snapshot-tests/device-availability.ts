@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,9 +19,8 @@ interface DevicectlListOutput {
 
 /**
  * Checks whether a physical Apple device is reachable for test execution.
- * Returns true only when the device is paired AND its CoreDevice tunnel is
- * currently connected. A paired-but-disconnected device will cause xcodebuild
- * to hang for minutes while it waits for the tunnel, so we skip in that state.
+ * Returns true when devicectl reports the requested device as paired. CoreDevice
+ * can establish the tunnel on demand for a paired device.
  */
 export function isDeviceAvailable(deviceId: string | undefined): boolean {
   if (!deviceId) {
@@ -32,10 +31,17 @@ export function isDeviceAvailable(deviceId: string | undefined): boolean {
   const outputPath = join(tempDir, 'devices.json');
 
   try {
-    execSync(`xcrun devicectl list devices --json-output ${JSON.stringify(outputPath)}`, {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      timeout: DEVICE_PROBE_TIMEOUT_MS,
-    });
+    const result = spawnSync(
+      'xcrun',
+      ['devicectl', 'list', 'devices', '--json-output', outputPath],
+      {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        timeout: DEVICE_PROBE_TIMEOUT_MS,
+      },
+    );
+    if (result.error || result.signal || result.status !== 0) {
+      return false;
+    }
   } catch {
     return false;
   }

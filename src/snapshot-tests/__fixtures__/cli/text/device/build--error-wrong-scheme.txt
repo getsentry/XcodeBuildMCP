@@ -3,9 +3,8 @@
 
    Scheme: NONEXISTENT
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
-   Configuration: Debug
    Platform: iOS
-   Derived Data: ~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/DerivedData/CalculatorApp-<HASH>
+   Derived Data: <TMPDIR>
 
 Errors (1):
 

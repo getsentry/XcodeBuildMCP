@@ -1,5 +1,14 @@
-import type { SnapshotRuntime, WorkflowSnapshotHarness } from '../contracts.ts';
-import { createFixtureMatcher, type FixtureMatchOptions } from '../fixture-io.ts';
+import type {
+  ExpectedSnapshotOutcome,
+  SnapshotResult,
+  SnapshotRuntime,
+  WorkflowSnapshotHarness,
+} from '../contracts.ts';
+import {
+  createFixtureMatcher,
+  createResultFixtureMatcher,
+  type FixtureMatchOptions,
+} from '../fixture-io.ts';
 import {
   createCliJsonSnapshotHarness,
   createSnapshotHarness,
@@ -46,6 +55,18 @@ export function createWorkflowFixtureMatcher(
   const fixtureRuntime = options.fixtureRuntime ?? runtime;
 
   return createFixtureMatcher(fixtureRuntime, workflow, {
+    allowUpdate: options.allowUpdate ?? runtime === fixtureRuntime,
+  });
+}
+
+export function createWorkflowResultFixtureMatcher(
+  runtime: SnapshotRuntime,
+  workflow: string,
+  options: WorkflowFixtureMatcherOptions = {},
+): (result: SnapshotResult, scenario: string, expectedOutcome: ExpectedSnapshotOutcome) => void {
+  const fixtureRuntime = options.fixtureRuntime ?? runtime;
+
+  return createResultFixtureMatcher(fixtureRuntime, workflow, {
     allowUpdate: options.allowUpdate ?? runtime === fixtureRuntime,
   });
 }
