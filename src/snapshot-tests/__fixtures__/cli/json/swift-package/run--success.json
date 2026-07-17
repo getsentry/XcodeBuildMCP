@@ -40,7 +40,7 @@
         "[<STEP>] Write Objects.LinkFileList",
         "[<STEP>] Write sources",
         "[<STEP>] Write spm-entitlement.plist",
-        "[<STEP>] Write swift-version-69A768CDF2A0BEE1.txt",
+        "[<STEP>] Write swift-version--<HASH>.txt",
         "Build of product 'spm' complete! (<DURATION>)"
       ]
     },

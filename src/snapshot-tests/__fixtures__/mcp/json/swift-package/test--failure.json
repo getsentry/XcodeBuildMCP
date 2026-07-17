@@ -25,7 +25,7 @@
           "suite": "CalculatorAppTests",
           "test": "testCalculatorServiceFailure",
           "message": "XCTAssertEqual failed: (\"0\") is not equal to (\"999\") - This test should fail - display should be 0, not 999",
-          "location": "<ROOT>/example_projects/spm/Tests/TestLibTests/SimpleTests.swift:49"
+          "location": "<TMPDIR>/spm/Tests/TestLibTests/SimpleTests.swift:49"
         },
         {
           "suite": "(Unknown Suite)",

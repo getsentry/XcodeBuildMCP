@@ -5,6 +5,7 @@ import type { CommandExecutor } from './execution/index.ts';
 import { setStructuredErrorOutput } from './structured-error.ts';
 
 import { sessionStore, type SessionDefaults } from './session-store.ts';
+import { filterPreparedTestExtraArgs } from './test-source.ts';
 import { isSessionDefaultsOptOutEnabled } from './environment.ts';
 import { mergeSessionDefaultArgs, type ExclusiveParameterGroup } from './session-default-args.ts';
 
@@ -235,6 +236,26 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
       }
 
       const sessionDefaults = filterSessionDefaultsForSchema(sessionStore.getAll(), internalSchema);
+      const hasExplicitPreparedSource =
+        sanitizedArgs.testProductsPath !== undefined || sanitizedArgs.xctestrunPath !== undefined;
+      if (hasExplicitPreparedSource) {
+        for (const key of [
+          'projectPath',
+          'workspacePath',
+          'scheme',
+          'configuration',
+          'derivedDataPath',
+        ]) {
+          delete sessionDefaults[key];
+        }
+        const sessionExtraArgs = sessionDefaults.extraArgs;
+        if (
+          Array.isArray(sessionExtraArgs) &&
+          sessionExtraArgs.every((argument): argument is string => typeof argument === 'string')
+        ) {
+          sessionDefaults.extraArgs = filterPreparedTestExtraArgs(sessionExtraArgs);
+        }
+      }
       const merged = mergeSessionDefaultArgs({
         defaults: sessionDefaults,
         explicitArgs: sanitizedArgs,

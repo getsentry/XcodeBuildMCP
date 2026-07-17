@@ -347,6 +347,7 @@ describe('normalizeSnapshotOutput', () => {
           '  e48|tap|button|Camera||com.apple.settings.camera',
           '  e1|swipe|application|Settings||',
           '  [5/8] Write swift-version--58304C5D6DBC2206.txt',
+          '  [6/8] Write swift-version-69A768CDF2A0BEE1.txt',
         ].join('\n') + '\n',
       ),
     ).toBe(
@@ -355,6 +356,7 @@ describe('normalizeSnapshotOutput', () => {
         '  <REF>|tap|button|Camera||com.apple.settings.camera',
         '  <REF>|swipe|application|Settings||',
         '  [5/8] Write swift-version--<HASH>.txt',
+        '  [6/8] Write swift-version--<HASH>.txt',
       ].join('\n') + '\n',
     );
   });

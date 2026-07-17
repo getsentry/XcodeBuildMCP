@@ -80,7 +80,7 @@ async function waitForSimulatorState(
   runner: ExternalCommandRunner,
 ): Promise<void> {
   const deadline = Date.now() + SIMULATOR_STATE_TIMEOUT_MS;
-  let lastState = 'unknown';
+  let lastState: string | undefined;
   do {
     const simulator = await readSimulator(simulatorId, runner);
     lastState = simulator.state;
@@ -91,7 +91,7 @@ async function waitForSimulatorState(
   } while (Date.now() < deadline);
 
   throw new Error(
-    `Simulator ${simulatorId} did not reach ${expectedState}; last state was ${lastState}`,
+    `Simulator ${simulatorId} did not reach ${expectedState}; last state was ${lastState ?? 'unknown'}`,
   );
 }
 

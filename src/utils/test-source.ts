@@ -17,6 +17,8 @@ const conflictingPreparedTestArgKeys = new Set([
   '-destination',
   '-project',
   '-scheme',
+  '-only-testing',
+  '-skip-testing',
   '-testProductsPath',
   '-workspace',
   '-xctestrun',
