@@ -22,6 +22,7 @@ import {
 } from '../log-paths.ts';
 import { getResultBundleCompletionMarkerPath } from '../result-bundle-path.ts';
 import { getTestProductsCompletionMarkerPath } from '../test-products-path.ts';
+import { TEST_PRODUCTS_MAX_COUNT } from '../test-products-lifecycle.ts';
 import { writeDaemonRegistryEntry } from '../../daemon/daemon-registry.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
@@ -340,13 +341,18 @@ describe('workspace filesystem lifecycle', () => {
     expect(existsSync(newBundle)).toBe(true);
   });
 
-  it('passes lifecycle retention options to managed test products pruning', async () => {
+  it('uses the dedicated test-products retention cap instead of the log cap', async () => {
     const now = Date.UTC(2026, 4, 2, 12);
     const layout = getWorkspaceFilesystemLayout('workspace-a');
-    const oldProducts = path.join(layout.testProducts, managedTestProductsName('test_old'));
-    const newProducts = path.join(layout.testProducts, managedTestProductsName('test_new'));
-    writeTestProductsWithMtime(oldProducts, now - 2 * 24 * 60 * 60 * 1000);
-    writeTestProductsWithMtime(newProducts, now - 1 * 24 * 60 * 60 * 1000);
+    const products = Array.from({ length: TEST_PRODUCTS_MAX_COUNT + 1 }, (_, index) => {
+      const productsPath = path.join(
+        layout.testProducts,
+        managedTestProductsName(`test_${String(index).padStart(3, '0')}`),
+      );
+      writeTestProductsWithMtime(productsPath, now - (TEST_PRODUCTS_MAX_COUNT - index) * 1000);
+      writeFileSync(getTestProductsCompletionMarkerPath(productsPath), 'completed');
+      return productsPath;
+    });
 
     const result = await runWorkspaceFilesystemLifecycleSweep({
       workspaceKey: 'workspace-a',
@@ -358,10 +364,10 @@ describe('workspace filesystem lifecycle', () => {
       maxFiles: 1,
     });
 
-    expect(result).toMatchObject({ scanned: 2, deleted: 1 });
-    expect(existsSync(oldProducts)).toBe(false);
-    expect(existsSync(newProducts)).toBe(true);
-    expect(existsSync(getTestProductsCompletionMarkerPath(oldProducts))).toBe(false);
+    expect(result).toMatchObject({ scanned: TEST_PRODUCTS_MAX_COUNT + 1, deleted: 1 });
+    expect(existsSync(products[0]!)).toBe(false);
+    expect(existsSync(products.at(-1)!)).toBe(true);
+    expect(existsSync(getTestProductsCompletionMarkerPath(products[0]!))).toBe(false);
   });
 
   it('protects live managed result bundles until their completion marker exists', async () => {
