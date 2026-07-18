@@ -27,7 +27,11 @@ import {
 } from './test-products-path.ts';
 import { resolvePathFromCwd } from './path.ts';
 import { displayPath } from './build-preflight.ts';
-import { filterPreparedTestExtraArgs, getPreparedTestDestinationArgs } from './test-source.ts';
+import {
+  filterPreparedTestExtraArgs,
+  filterTestProductsPathArgs,
+  getPreparedTestDestinationArgs,
+} from './test-source.ts';
 
 import type {
   BuildTarget,
@@ -269,7 +273,11 @@ export function createTestExecutor(
           {
             ...params,
             scheme: params.scheme!,
-            extraArgs: [...executionPlan.buildArgs, '-testProductsPath', testProductsPath],
+            extraArgs: [
+              ...filterTestProductsPathArgs(executionPlan.buildArgs),
+              '-testProductsPath',
+              testProductsPath,
+            ],
           },
           platformOptions,
           params.preferXcodebuild,

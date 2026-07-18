@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { mergeSessionDefaultArgs } from '../session-default-args.ts';
 import {
   TEST_SOURCE_EXCLUSIVE_GROUPS,
+  filterTestProductsPathArgs,
   withProjectWorkspaceOrTestArtifact,
 } from '../test-source.ts';
 
@@ -57,5 +58,20 @@ describe('prepared test source validation', () => {
       simulatorId: 'SIM-123',
       testProductsPath: '/tmp/Tests.xctestproducts',
     });
+  });
+});
+
+describe('test products path arguments', () => {
+  it('removes all test products path forms while preserving other arguments', () => {
+    expect(
+      filterTestProductsPathArgs([
+        '-quiet',
+        '-testProductsPath',
+        '/tmp/first.xctestproducts',
+        '-testProductsPath:/tmp/second.xctestproducts',
+        '-testProductsPath=/tmp/third.xctestproducts',
+        '-only-testing:Tests/Example',
+      ]),
+    ).toEqual(['-quiet', '-only-testing:Tests/Example']);
   });
 });

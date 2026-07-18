@@ -177,6 +177,7 @@ describe('createTestExecutor', () => {
         configuration: 'Debug',
         simulatorId: 'A2C64636-37E9-4B68-B872-E7F0A82A5670',
         platform: XcodePlatform.iOSSimulator,
+        extraArgs: ['-testProductsPath', '/tmp/caller.xctestproducts'],
       },
       new DefaultStreamingExecutionContext({
         onFragment: (fragment) => emitted.push(fragment),
@@ -390,10 +391,12 @@ describe('createTestExecutor', () => {
     expect(commands).toHaveLength(2);
     expect(commands[0]).not.toContain('-resultBundlePath');
     expect(commands[0]).toContain('-testProductsPath');
+    expect(commands[0]).not.toContain('/tmp/caller.xctestproducts');
     expect(commands[0]!.at(-1)).toBe('build-for-testing');
     const testResultBundlePath = expectDefaultResultBundlePath(commands[1]!, 'test_sim');
     expect(commands[1]!.at(-1)).toBe('test-without-building');
     expect(commands[1]).toContain('-testProductsPath');
+    expect(commands[1]).not.toContain('/tmp/caller.xctestproducts');
     expect(commands[1]).not.toContain('-project');
     expect(commands[1]).not.toContain('-scheme');
     expect(commands[1]).not.toContain('-derivedDataPath');

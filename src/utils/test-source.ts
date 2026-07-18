@@ -74,6 +74,26 @@ export function filterPreparedTestExtraArgs(extraArgs: string[]): string[] {
   return filteredArgs;
 }
 
+export function filterTestProductsPathArgs(extraArgs: string[]): string[] {
+  const filteredArgs: string[] = [];
+
+  for (let index = 0; index < extraArgs.length; index += 1) {
+    const argument = extraArgs[index]!;
+    const argumentKey = getArgumentKey(argument);
+
+    if (argumentKey === '-testProductsPath') {
+      if (argument === argumentKey && index + 1 < extraArgs.length) {
+        index += 1;
+      }
+      continue;
+    }
+
+    filteredArgs.push(argument);
+  }
+
+  return filteredArgs;
+}
+
 export function getPreparedTestDestinationArgs(extraArgs: string[]): string[] {
   const destinationArgs: string[] = [];
 

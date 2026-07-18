@@ -30,6 +30,7 @@ import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts'
 import { displayPath } from '../../../utils/build-preflight.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { resolvePathFromCwd } from '../../../utils/path.ts';
+import { filterTestProductsPathArgs } from '../../../utils/test-source.ts';
 import {
   createDefaultTestProductsPath,
   findXctestrunPaths,
@@ -55,7 +56,11 @@ function prepareBuildDeviceExecution(params: BuildDeviceParams): PreparedBuildDe
   const sharedBuildParams = testProductsPath
     ? {
         ...params,
-        extraArgs: [...(params.extraArgs ?? []), '-testProductsPath', testProductsPath],
+        extraArgs: [
+          ...filterTestProductsPathArgs(params.extraArgs ?? []),
+          '-testProductsPath',
+          testProductsPath,
+        ],
       }
     : params;
 
