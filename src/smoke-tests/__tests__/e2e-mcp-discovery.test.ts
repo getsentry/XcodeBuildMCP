@@ -81,7 +81,7 @@ describe('MCP Discovery (e2e)', () => {
     const result = await harness.client.listTools();
     const expectedSchemas = new Map([
       ['list_sims', { schema: 'xcodebuildmcp.output.simulator-list', version: '2' }],
-      ['build_sim', { schema: 'xcodebuildmcp.output.build-result', version: '2' }],
+      ['build_sim', { schema: 'xcodebuildmcp.output.build-result', version: '3' }],
       ['session_show_defaults', { schema: 'xcodebuildmcp.output.session-defaults', version: '2' }],
       ['show_build_settings', { schema: 'xcodebuildmcp.output.build-settings', version: '2' }],
     ]);
