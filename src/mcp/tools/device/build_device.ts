@@ -154,7 +154,7 @@ export function createBuildDeviceExecutor(
     );
     const succeeded = !buildResult.isError;
 
-    if (succeeded && resolved.isManagedTestProductsPath) {
+    if (resolved.isManagedTestProductsPath) {
       markTestProductsPathCompleted(resolved.testProductsPath);
     }
 
