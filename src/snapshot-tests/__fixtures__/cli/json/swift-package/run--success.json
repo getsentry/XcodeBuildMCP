@@ -25,13 +25,6 @@
         "Hello, world!"
       ],
       "stderr": [
-        "Fetching https://github.com/apple/swift-argument-parser.git from cache",
-        "Fetched https://github.com/apple/swift-argument-parser.git from cache (<DURATION>)",
-        "Computing version for https://github.com/apple/swift-argument-parser.git",
-        "Computed https://github.com/apple/swift-argument-parser.git at 1.5.1 (<DURATION>)",
-        "Computed https://github.com/apple/swift-argument-parser.git at 1.5.1 (<DURATION>)",
-        "Creating working copy for https://github.com/apple/swift-argument-parser.git",
-        "Working copy of https://github.com/apple/swift-argument-parser.git resolved at 1.5.1",
         "Building for debugging...",
         "[<STEP>] Applying spm",
         "[<STEP>] Compiling spm main.swift",
