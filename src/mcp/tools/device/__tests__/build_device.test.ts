@@ -70,6 +70,17 @@ describe('build_device plugin', () => {
         'testProductsPath requires buildForTesting to be true',
       );
     });
+
+    it('should reject deviceId without buildForTesting', async () => {
+      const result = await callHandler(handler, {
+        projectPath: '/path/to/MyProject.xcodeproj',
+        scheme: 'MyScheme',
+        deviceId: 'DEVICE-UDID',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('deviceId requires buildForTesting to be true');
+    });
   });
 
   describe('XOR Validation', () => {

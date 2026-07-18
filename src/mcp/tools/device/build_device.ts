@@ -109,10 +109,13 @@ const baseSchemaObject = z.object({
 
 const buildDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
-  withProjectOrWorkspace(baseSchemaObject).refine(
-    (params) => params.testProductsPath === undefined || params.buildForTesting === true,
-    { message: 'testProductsPath requires buildForTesting to be true' },
-  ),
+  withProjectOrWorkspace(baseSchemaObject)
+    .refine((params) => params.testProductsPath === undefined || params.buildForTesting === true, {
+      message: 'testProductsPath requires buildForTesting to be true',
+    })
+    .refine((params) => params.deviceId === undefined || params.buildForTesting === true, {
+      message: 'deviceId requires buildForTesting to be true',
+    }),
 );
 
 export type BuildDeviceParams = z.infer<typeof buildDeviceSchema>;
