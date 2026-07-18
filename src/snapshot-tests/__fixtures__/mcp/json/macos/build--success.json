@@ -19,6 +19,6 @@
     }
   },
   "nextSteps": [
-    "Get built macOS app path: get_mac_app_path({ scheme: \"MCPTest\" })"
+    "Get built macOS app path: get_mac_app_path({ scheme: \"MCPTest\", derivedDataPath: \"<TMPDIR>/DerivedData\" })"
   ]
 }

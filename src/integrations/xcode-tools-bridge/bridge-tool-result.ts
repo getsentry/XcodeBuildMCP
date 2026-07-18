@@ -41,6 +41,7 @@ export interface BridgeToolResult {
   isError?: boolean;
   errorMessage?: string;
   nextStepParams?: NextStepParamsMap;
+  nextStepConditionKeys?: string[];
   payload?: BridgeToolPayload;
 }
 
@@ -50,6 +51,8 @@ export function callToolResultToBridgeResult(result: CallToolResult): BridgeTool
     ? result.content.filter(isBridgeCallContentItem).map((item) => ({ ...item }))
     : [];
   const errorMessage = result.isError ? extractErrorMessage(content) : undefined;
+  const nextStepConditionKeys = (result as Record<string, unknown>)
+    .nextStepConditionKeys as BridgeToolResult['nextStepConditionKeys'];
 
   for (const item of result.content ?? []) {
     if (item.type === 'image' && 'data' in item && 'mimeType' in item) {
@@ -63,6 +66,7 @@ export function callToolResultToBridgeResult(result: CallToolResult): BridgeTool
     ...(errorMessage ? { errorMessage } : {}),
     nextStepParams: (result as Record<string, unknown>)
       .nextStepParams as BridgeToolResult['nextStepParams'],
+    ...(nextStepConditionKeys ? { nextStepConditionKeys } : {}),
     payload: {
       kind: 'call-result',
       succeeded: !result.isError,

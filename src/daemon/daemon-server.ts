@@ -61,6 +61,7 @@ function bridgeResultToDaemonResult(
     },
     isError: result.didError,
     nextStepParams: bridgeResult.nextStepParams,
+    nextStepConditionKeys: bridgeResult.nextStepConditionKeys,
   };
 }
 
