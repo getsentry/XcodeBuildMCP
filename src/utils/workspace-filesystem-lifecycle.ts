@@ -643,6 +643,8 @@ export async function runWorkspaceFilesystemLifecycleSweep(
           testProductsDir: resolved.testProductsDir,
           now: resolved.now,
           minVisibleMs: resolved.minVisibleMs,
+          maxAgeMs: resolved.maxAgeMs,
+          maxCount: resolved.maxFiles,
         })
       : { scanned: 0, deleted: 0 };
     await touchCleanupMarker(resolved.markerPath, resolved.now);

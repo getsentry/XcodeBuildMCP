@@ -21,6 +21,7 @@ import {
   setXcodeBuildMCPAppDirOverrideForTests,
 } from '../log-paths.ts';
 import { getResultBundleCompletionMarkerPath } from '../result-bundle-path.ts';
+import { getTestProductsCompletionMarkerPath } from '../test-products-path.ts';
 import { writeDaemonRegistryEntry } from '../../daemon/daemon-registry.ts';
 import { setRuntimeInstanceForTests } from '../runtime-instance.ts';
 import {
@@ -52,6 +53,17 @@ function writeResultBundleWithMtime(bundlePath: string, mtimeMs: number): void {
   writeFileSync(path.join(bundlePath, 'Info.plist'), 'stub');
   const mtime = new Date(mtimeMs);
   utimesSync(bundlePath, mtime, mtime);
+}
+
+function managedTestProductsName(name: string): string {
+  return `${name}_2026-05-02T12-00-00-000Z_pid${DEAD_OWNER_PID}_abcdef12.xctestproducts`;
+}
+
+function writeTestProductsWithMtime(productsPath: string, mtimeMs: number): void {
+  mkdirSync(productsPath, { recursive: true });
+  writeFileSync(path.join(productsPath, 'Info.plist'), 'stub');
+  const mtime = new Date(mtimeMs);
+  utimesSync(productsPath, mtime, mtime);
 }
 
 function createTrackedChild(pid: number, onKill: () => void): ChildProcess {
@@ -326,6 +338,30 @@ describe('workspace filesystem lifecycle', () => {
     expect(result).toMatchObject({ scanned: 2, deleted: 1 });
     expect(existsSync(oldBundle)).toBe(false);
     expect(existsSync(newBundle)).toBe(true);
+  });
+
+  it('passes lifecycle retention options to managed test products pruning', async () => {
+    const now = Date.UTC(2026, 4, 2, 12);
+    const layout = getWorkspaceFilesystemLayout('workspace-a');
+    const oldProducts = path.join(layout.testProducts, managedTestProductsName('test_old'));
+    const newProducts = path.join(layout.testProducts, managedTestProductsName('test_new'));
+    writeTestProductsWithMtime(oldProducts, now - 2 * 24 * 60 * 60 * 1000);
+    writeTestProductsWithMtime(newProducts, now - 1 * 24 * 60 * 60 * 1000);
+
+    const result = await runWorkspaceFilesystemLifecycleSweep({
+      workspaceKey: 'workspace-a',
+      trigger: 'manual',
+      now,
+      force: true,
+      minVisibleMs: 0,
+      maxAgeMs: 3 * 24 * 60 * 60 * 1000,
+      maxFiles: 1,
+    });
+
+    expect(result).toMatchObject({ scanned: 2, deleted: 1 });
+    expect(existsSync(oldProducts)).toBe(false);
+    expect(existsSync(newProducts)).toBe(true);
+    expect(existsSync(getTestProductsCompletionMarkerPath(oldProducts))).toBe(false);
   });
 
   it('protects live managed result bundles until their completion marker exists', async () => {
