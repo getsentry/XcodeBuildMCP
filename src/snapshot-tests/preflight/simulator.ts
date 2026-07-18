@@ -74,7 +74,7 @@ async function readSimulator(
   return match;
 }
 
-async function waitForSimulatorState(
+export async function waitForSimulatorState(
   simulatorId: string,
   expectedState: string,
   runner: ExternalCommandRunner,

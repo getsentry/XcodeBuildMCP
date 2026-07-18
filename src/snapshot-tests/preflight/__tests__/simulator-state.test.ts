@@ -31,6 +31,7 @@ describe('simulator state preflight', () => {
       .mockResolvedValueOnce(simulatorList('Booted'))
       .mockResolvedValueOnce(result())
       .mockResolvedValueOnce(simulatorList('Shutdown'))
+      .mockResolvedValueOnce(simulatorList('Shutdown'))
       .mockResolvedValueOnce(result())
       .mockResolvedValueOnce(result());
     const cleanup = new CleanupStack();
@@ -42,6 +43,7 @@ describe('simulator state preflight', () => {
       ['simctl', 'list', 'devices', 'SIM-1', '--json'],
       ['simctl', 'list', 'devices', 'SIM-1', '--json'],
       ['simctl', 'shutdown', 'SIM-1'],
+      ['simctl', 'list', 'devices', 'available', '--json'],
       ['simctl', 'list', 'devices', 'SIM-1', '--json'],
       ['simctl', 'boot', 'SIM-1'],
       ['simctl', 'bootstatus', 'SIM-1', '-b'],

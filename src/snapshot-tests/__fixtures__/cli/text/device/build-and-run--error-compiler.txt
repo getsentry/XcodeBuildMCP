@@ -4,7 +4,7 @@
    Scheme: CalculatorApp
    Workspace: example_projects/iOS_Calculator/CalculatorApp.xcworkspace
    Platform: iOS
-   Device: <UUID>
+   Device: <DEVICE> (<UUID>)
    Derived Data: <TMPDIR>
 
 Compiler Errors (1):

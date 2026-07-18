@@ -4,6 +4,7 @@ import {
   runExternalCommandChecked,
   type ExternalCommandRunner,
 } from './command-runner.ts';
+import { waitForSimulatorState } from './simulator.ts';
 
 type SimulatorBootState = 'Booted' | 'Shutdown';
 export type SimulatorAppearance = 'light' | 'dark';
@@ -55,6 +56,8 @@ async function setSimulatorBootState(
       { timeoutMs: 60_000 },
       runner,
     );
+  } else {
+    await waitForSimulatorState(simulatorId, 'Shutdown', runner);
   }
 }
 

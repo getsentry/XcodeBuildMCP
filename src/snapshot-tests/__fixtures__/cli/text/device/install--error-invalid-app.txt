@@ -1,7 +1,7 @@
 
 📦 Install App
 
-   Device: <UUID>
+   Device: <DEVICE> (<UUID>)
    App: /tmp/nonexistent.app
 
 Errors (1):

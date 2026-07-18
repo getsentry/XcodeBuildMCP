@@ -1,7 +1,7 @@
 
 🚀 Launch App
 
-   Device: <UUID>
+   Device: <DEVICE> (<UUID>)
    Bundle ID: com.nonexistent.app
 
 Errors (1):

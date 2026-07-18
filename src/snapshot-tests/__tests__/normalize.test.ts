@@ -54,6 +54,12 @@ describe('normalizeSnapshotOutput', () => {
     );
   });
 
+  it('normalizes both cached and uncached device labels', () => {
+    expect(normalizeSnapshotOutput('Device: iPhone 16 (<UUID>)\nDevice: <UUID>\n')).toBe(
+      'Device: <DEVICE> (<UUID>)\nDevice: <DEVICE> (<UUID>)\n',
+    );
+  });
+
   it('normalizes volatile CoreDevice not-found preambles', () => {
     expect(
       normalizeSnapshotOutput(

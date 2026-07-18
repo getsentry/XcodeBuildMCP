@@ -9,13 +9,13 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/NONEXISTENT"
+      "packagePath": "<TMPDIR>/spm/NONEXISTENT"
     },
     "diagnostics": {
       "warnings": [],
       "errors": [
         {
-          "message": "chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT"
+          "message": "chdir error: No such file or directory (2): <TMPDIR>/spm/NONEXISTENT"
         }
       ]
     }

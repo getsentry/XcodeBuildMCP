@@ -10,14 +10,14 @@
       "target": "swift-package"
     },
     "artifacts": {
-      "packagePath": "<ROOT>/example_projects/NONEXISTENT",
+      "packagePath": "<TMPDIR>/spm/NONEXISTENT",
       "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/build_spm_<TIMESTAMP>_pid<PID>.log"
     },
     "diagnostics": {
       "warnings": [],
       "errors": [
         {
-          "message": "chdir error: No such file or directory (2): <ROOT>/example_projects/NONEXISTENT"
+          "message": "chdir error: No such file or directory (2): <TMPDIR>/spm/NONEXISTENT"
         }
       ]
     }

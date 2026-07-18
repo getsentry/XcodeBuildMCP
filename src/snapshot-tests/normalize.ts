@@ -41,7 +41,7 @@ const SWIFT_TESTING_DURATION_REGEX = /after \d+\.\d+ seconds/g;
 const TEST_SUMMARY_COUNTS_REGEX =
   /\(Total: \d+(?:, Passed: \d+)?(?:, Failed: \d+)?(?:, Skipped: \d+)?, /g;
 const COVERAGE_CALL_COUNT_REGEX = /called \d+x\)/g;
-const DEVICE_LABEL_REGEX = /Device: .+ \(<UUID>\)/g;
+const DEVICE_LABEL_REGEX = /Device: (?:.+ \(<UUID>\)|<UUID>)/g;
 const UPTIME_REGEX = /Uptime: \d+s/g;
 const RESULT_BUNDLE_LINE_REGEX = /\S+\[\d+:\d+\] Writing error result bundle to \S+/g;
 const DEVICE_TRANSPORT_TYPE_REGEX = /\b(wired|localNetwork)\b/g;
