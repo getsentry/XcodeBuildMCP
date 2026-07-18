@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CleanupStack } from '../cleanup.ts';
 import type { ExternalCommandRunner } from '../command-runner.ts';
-import { prepareSimulatorApp, resolveSimulatorId } from '../simulator.ts';
+import { ensureSimulatorBooted, prepareSimulatorApp, resolveSimulatorId } from '../simulator.ts';
 
 function commandResult(
   stdout = '',
@@ -70,6 +70,36 @@ describe('simulator preflight target resolution', () => {
 });
 
 describe('simulator app preflight ownership', () => {
+  it('waits for a boot that wins the state check race', async () => {
+    const runner = vi
+      .fn<ExternalCommandRunner>()
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Shutdown' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(commandResult('', { exitCode: 405, stderr: 'Already booted' }))
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Booted' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(commandResult());
+
+    await expect(ensureSimulatorBooted('SIM-1', undefined, runner)).resolves.toBeUndefined();
+
+    expect(runner.mock.calls.map(([, args]) => args)).toEqual([
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'boot', 'SIM-1'],
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'bootstatus', 'SIM-1', '-b'],
+    ]);
+  });
+
   it('replaces and cleans up a pre-existing fixture app', async () => {
     const cleanup = new CleanupStack();
     const runner = vi
@@ -132,6 +162,62 @@ describe('simulator app preflight ownership', () => {
       ['simctl', 'get_app_container', 'SIM-1', 'io.sentry.calculatorapp', 'app'],
       ['simctl', 'install', 'SIM-1', '/test/CalculatorApp.app'],
       ['simctl', 'terminate', 'SIM-1', 'io.sentry.calculatorapp'],
+      ['simctl', 'uninstall', 'SIM-1', 'io.sentry.calculatorapp'],
+    ]);
+  });
+
+  it('boots the simulator again when cleanup races with a shutdown', async () => {
+    const cleanup = new CleanupStack();
+    const runner = vi
+      .fn<ExternalCommandRunner>()
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Booted' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(commandResult('', { exitCode: 2 }))
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult('', { exitCode: 2, stderr: 'Simulator is shutdown' }))
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Shutdown' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Shutdown' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult());
+
+    await prepareSimulatorApp(
+      'SIM-1',
+      '/test/CalculatorApp.app',
+      'io.sentry.calculatorapp',
+      cleanup,
+      runner,
+    );
+    await cleanup.cleanup();
+
+    expect(runner.mock.calls.map(([, args]) => args)).toEqual([
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'get_app_container', 'SIM-1', 'io.sentry.calculatorapp', 'app'],
+      ['simctl', 'install', 'SIM-1', '/test/CalculatorApp.app'],
+      ['simctl', 'terminate', 'SIM-1', 'io.sentry.calculatorapp'],
+      ['simctl', 'uninstall', 'SIM-1', 'io.sentry.calculatorapp'],
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'boot', 'SIM-1'],
+      ['simctl', 'bootstatus', 'SIM-1', '-b'],
       ['simctl', 'uninstall', 'SIM-1', 'io.sentry.calculatorapp'],
     ]);
   });

@@ -131,7 +131,18 @@ export async function ensureSimulatorBooted(
     throw new Error(`Simulator ${simulatorId} is in unsupported state ${simulator.state}`);
   }
 
-  await runExternalCommandChecked('xcrun', ['simctl', 'boot', simulatorId], {}, runner);
+  const bootResult = await runner('xcrun', ['simctl', 'boot', simulatorId]);
+  if (
+    bootResult.exitCode !== 0 ||
+    bootResult.signal !== null ||
+    bootResult.timedOut ||
+    bootResult.spawnError
+  ) {
+    const currentState = (await readSimulator(simulatorId, runner)).state;
+    if (currentState !== 'Booted' && currentState !== 'Booting') {
+      assertExternalCommandSucceeded(bootResult, `Boot simulator ${simulatorId}`);
+    }
+  }
   if (options.shutdownOnCleanup !== false) {
     cleanup?.defer(`shut down simulator ${simulatorId}`, async () => {
       const result = await runner('xcrun', ['simctl', 'shutdown', simulatorId]);
@@ -237,7 +248,24 @@ export async function prepareSimulatorApp(
 
   await installSimulatorApp(simulatorId, appPath, runner);
   cleanup.defer(`uninstall simulator app ${bundleId}`, async () => {
-    await uninstallSimulatorApp(simulatorId, bundleId, runner);
+    const uninstallResult = await runner('xcrun', ['simctl', 'uninstall', simulatorId, bundleId]);
+    if (
+      uninstallResult.exitCode === 0 &&
+      uninstallResult.signal === null &&
+      !uninstallResult.timedOut &&
+      !uninstallResult.spawnError
+    ) {
+      return;
+    }
+
+    const currentState = (await readSimulator(simulatorId, runner)).state;
+    if (currentState !== 'Booted') {
+      await ensureSimulatorBooted(simulatorId, undefined, runner, { shutdownOnCleanup: false });
+      await uninstallSimulatorApp(simulatorId, bundleId, runner);
+      return;
+    }
+
+    assertExternalCommandSucceeded(uninstallResult, `Uninstall simulator app ${bundleId}`);
   });
   cleanup.defer(`stop simulator app ${bundleId}`, async () => {
     await runner('xcrun', ['simctl', 'terminate', simulatorId, bundleId]);
