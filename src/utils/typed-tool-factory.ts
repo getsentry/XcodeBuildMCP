@@ -170,6 +170,7 @@ export function createSessionAwareTool<TParams>(opts: {
   getExecutor: () => CommandExecutor;
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
+  clearSessionDeviceIdUnlessPrepared?: boolean;
 }): ToolHandler {
   return createSessionAwareHandler({
     internalSchema: opts.internalSchema,
@@ -177,6 +178,7 @@ export function createSessionAwareTool<TParams>(opts: {
     getContext: opts.getExecutor,
     requirements: opts.requirements,
     exclusivePairs: opts.exclusivePairs,
+    clearSessionDeviceIdUnlessPrepared: opts.clearSessionDeviceIdUnlessPrepared,
   });
 }
 
@@ -186,6 +188,7 @@ export function createSessionAwareToolWithContext<TParams, TContext>(opts: {
   getContext: () => TContext;
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
+  clearSessionDeviceIdUnlessPrepared?: boolean;
 }): ToolHandler {
   return createSessionAwareHandler(opts);
 }
@@ -196,6 +199,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
   getContext: () => TContext;
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
+  clearSessionDeviceIdUnlessPrepared?: boolean;
 }): ToolHandler {
   const {
     internalSchema,
@@ -203,6 +207,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
     getContext,
     requirements = [],
     exclusivePairs = [],
+    clearSessionDeviceIdUnlessPrepared = false,
   } = opts;
 
   const impl = async (
@@ -236,7 +241,10 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
       }
 
       const sessionDefaults = filterSessionDefaultsForSchema(sessionStore.getAll(), internalSchema);
-      if (sanitizedArgs.buildForTesting === true && sanitizedArgs.deviceId === undefined) {
+      if (
+        sanitizedArgs.deviceId === undefined &&
+        (sanitizedArgs.buildForTesting === true || clearSessionDeviceIdUnlessPrepared)
+      ) {
         delete sessionDefaults.deviceId;
       }
       const hasExplicitPreparedSource =

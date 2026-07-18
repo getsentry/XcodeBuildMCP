@@ -228,6 +228,7 @@ export const handler = createSessionAwareTool<BuildDeviceParams>({
   internalSchema: toInternalSchema<BuildDeviceParams>(buildDeviceSchema),
   logicFunction: buildDeviceLogic,
   getExecutor: getDefaultCommandExecutor,
+  clearSessionDeviceIdUnlessPrepared: true,
   requirements: [
     { allOf: ['scheme'], message: 'scheme is required' },
     { oneOf: ['projectPath', 'workspacePath'], message: 'Provide a project or workspace' },
