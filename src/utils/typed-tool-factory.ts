@@ -236,6 +236,9 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
       }
 
       const sessionDefaults = filterSessionDefaultsForSchema(sessionStore.getAll(), internalSchema);
+      if (sanitizedArgs.buildForTesting === true && sanitizedArgs.deviceId === undefined) {
+        delete sessionDefaults.deviceId;
+      }
       const hasExplicitPreparedSource =
         sanitizedArgs.testProductsPath !== undefined || sanitizedArgs.xctestrunPath !== undefined;
       if (hasExplicitPreparedSource) {

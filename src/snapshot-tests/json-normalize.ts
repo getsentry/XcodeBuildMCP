@@ -12,8 +12,9 @@ function isElementRef(value: string): boolean {
   return /^e\d+$/.test(value);
 }
 
-function isIosRuntimeLabel(value: string): boolean {
-  return /^iOS \d+(?:\.\d+)*$/.test(value);
+function parseRuntimeLabel(value: string): { platform: 'iOS' | 'watchOS' } | undefined {
+  const match = /^(iOS|watchOS) \d+(?:\.\d+)*$/.exec(value);
+  return match ? { platform: match[1] as 'iOS' | 'watchOS' } : undefined;
 }
 
 type NormalizeStructuredEnvelopeOptions = NormalizeSnapshotOutputOptions;
@@ -91,8 +92,9 @@ function normalizeString(
     return '<OS_VERSION>';
   }
 
-  if (key === 'runtime' && isIosRuntimeLabel(result)) {
-    return 'iOS <VERSION>';
+  if (key === 'runtime') {
+    const runtime = parseRuntimeLabel(result);
+    if (runtime) return `${runtime.platform} <VERSION>`;
   }
 
   return result;
@@ -363,7 +365,13 @@ function normalizeDiagnosticTestFailure(item: unknown): unknown {
 }
 
 function normalizeDiagnosticTestFailures(items: unknown[]): unknown[] {
-  return items.map(normalizeDiagnosticTestFailure);
+  return items.map(normalizeDiagnosticTestFailure).sort((left, right) => {
+    const leftFailure = left as { suite?: string; test?: string; location?: string };
+    const rightFailure = right as { suite?: string; test?: string; location?: string };
+    return `${leftFailure.suite ?? ''}|${leftFailure.test ?? ''}|${leftFailure.location ?? ''}`.localeCompare(
+      `${rightFailure.suite ?? ''}|${rightFailure.test ?? ''}|${rightFailure.location ?? ''}`,
+    );
+  });
 }
 
 function isSpringBoardHomeCompactCapture(value: Record<string, unknown>): boolean {

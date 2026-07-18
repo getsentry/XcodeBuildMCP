@@ -104,7 +104,7 @@ describe('normalizeStructuredEnvelope', () => {
     });
   });
 
-  it('preserves simulator diagnostic test failure order while normalizing volatile Swift Testing suite name', () => {
+  it('sorts diagnostic test failures while normalizing volatile Swift Testing suite names', () => {
     const envelope: StructuredOutputEnvelope<unknown> = {
       schema: 'xcodebuildmcp.output.test-result',
       schemaVersion: '2',
@@ -114,16 +114,16 @@ describe('normalizeStructuredEnvelope', () => {
         diagnostics: {
           testFailures: [
             {
-              suite: 'Calculator Basic Functionality',
-              test: 'This test should fail to verify error reporting',
-              message: 'Expectation failed',
-              location: 'CalculatorServiceTests.swift:37',
-            },
-            {
               suite: 'CalculatorAppTests',
               test: 'testCalculatorServiceFailure',
               message: 'XCTAssertEqual failed',
               location: '<ROOT>/example_projects/iOS_Calculator/CalculatorAppTests.swift:52',
+            },
+            {
+              suite: 'Calculator Basic Functionality',
+              test: 'This test should fail to verify error reporting',
+              message: 'Expectation failed',
+              location: 'CalculatorServiceTests.swift:37',
             },
           ],
         },
@@ -153,6 +153,21 @@ describe('normalizeStructuredEnvelope', () => {
           ],
         },
       },
+    });
+  });
+
+  it('normalizes iOS and watchOS simulator runtime versions', () => {
+    const envelope = {
+      schema: 'xcodebuildmcp.output.simulators-result',
+      schemaVersion: '1',
+      didError: false,
+      error: null,
+      data: { simulators: [{ runtime: 'iOS 26.4' }, { runtime: 'watchOS 27.0' }] },
+    } as StructuredOutputEnvelope<unknown>;
+
+    expect(normalizeStructuredEnvelope(envelope)).toEqual({
+      ...envelope,
+      data: { simulators: [{ runtime: 'iOS <VERSION>' }, { runtime: 'watchOS <VERSION>' }] },
     });
   });
 

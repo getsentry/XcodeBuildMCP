@@ -11,8 +11,8 @@
       "type": "long-press",
       "elementRef": "<ELEMENT_REF>",
       "durationMs": 500,
-      "x": 61,
-      "y": 490
+      "x": 201,
+      "y": 437
     },
     "artifacts": {
       "simulatorId": "<UUID>"
@@ -22,7 +22,7 @@
       "rs": "1",
       "screenHash": "<SCREEN_HASH>",
       "seq": 1,
-      "count": 28,
+      "count": 99999,
       "targets": [
         "<REF>|tap|button|7||",
         "<REF>|tap|button|8||",

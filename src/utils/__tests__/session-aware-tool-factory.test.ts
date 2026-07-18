@@ -615,4 +615,26 @@ describe('createSessionAwareTool', () => {
     const parsed = JSON.parse(result.text.replace(/\n/g, '').replace(/^.*?(\[.*\]).*$/, '$1'));
     expect(parsed).toEqual([]);
   });
+
+  it('does not inherit a session device for a generic build-for-testing request', async () => {
+    const schema = z.object({
+      scheme: z.string(),
+      buildForTesting: z.boolean().optional(),
+      deviceId: z.string().optional(),
+    });
+    const handler = createSessionAwareTool<z.infer<typeof schema>>({
+      internalSchema: schema,
+      logicFunction: async (params) => {
+        getHandlerContext().emit(statusFragment('success', JSON.stringify(params)));
+      },
+      getExecutor: () => createMockExecutor({ success: true }),
+      requirements: [{ allOf: ['scheme'] }],
+    });
+
+    sessionStore.setDefaults({ scheme: 'App', deviceId: 'DEVICE-1' });
+
+    const result = await invokeAndCollect(handler, { buildForTesting: true });
+    expect(result.isError).toBe(false);
+    expect(result.text).toContain('{"scheme":"App","buildForTesting":true}');
+  });
 });

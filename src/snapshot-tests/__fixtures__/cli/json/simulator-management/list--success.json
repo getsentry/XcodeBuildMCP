@@ -10,35 +10,35 @@
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 27.0"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Series 11 (42mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 27.0"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Ultra 3 (49mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 27.0"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (44mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 27.0"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (40mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 27.0"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "iPhone 17 Pro",
@@ -206,70 +206,70 @@
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 26.5"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Series 11 (42mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 26.5"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Ultra 3 (49mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 26.5"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (44mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 26.5"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (40mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": true,
-        "runtime": "watchOS 26.5"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Series 11 (46mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": false,
-        "runtime": "watchOS 26.4"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Series 11 (42mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": false,
-        "runtime": "watchOS 26.4"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch Ultra 3 (49mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": false,
-        "runtime": "watchOS 26.4"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (44mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": false,
-        "runtime": "watchOS 26.4"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "Apple Watch SE 3 (40mm)",
         "simulatorId": "<UUID>",
         "state": "<SIM_STATE>",
         "isAvailable": false,
-        "runtime": "watchOS 26.4"
+        "runtime": "watchOS <VERSION>"
       },
       {
         "name": "iPhone 17 Pro",

@@ -15,7 +15,7 @@
       "rs": "1",
       "screenHash": "<SCREEN_HASH>",
       "seq": 1,
-      "count": 28,
+      "count": 99999,
       "targets": [
         "<REF>|tap|button|7||",
         "<REF>|tap|button|8||",
