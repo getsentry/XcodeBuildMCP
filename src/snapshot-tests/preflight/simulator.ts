@@ -146,7 +146,13 @@ export async function ensureSimulatorBooted(
   if (options.shutdownOnCleanup !== false) {
     cleanup?.defer(`shut down simulator ${simulatorId}`, async () => {
       const result = await runner('xcrun', ['simctl', 'shutdown', simulatorId]);
-      assertExternalCommandSucceeded(result, `Shut down simulator ${simulatorId}`);
+      if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.spawnError) {
+        const currentState = (await readSimulator(simulatorId, runner)).state;
+        if (currentState === 'Shutdown') {
+          return;
+        }
+        assertExternalCommandSucceeded(result, `Shut down simulator ${simulatorId}`);
+      }
       await waitForSimulatorState(simulatorId, 'Shutdown', runner);
     });
   }

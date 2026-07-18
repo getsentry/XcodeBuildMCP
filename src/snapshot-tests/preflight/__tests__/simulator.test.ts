@@ -100,6 +100,40 @@ describe('simulator app preflight ownership', () => {
     ]);
   });
 
+  it('tolerates a cleanup shutdown that loses a race', async () => {
+    const cleanup = new CleanupStack();
+    const runner = vi
+      .fn<ExternalCommandRunner>()
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Shutdown' }] },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult())
+      .mockResolvedValueOnce(commandResult('', { exitCode: 2, stderr: 'Already shutdown' }))
+      .mockResolvedValueOnce(
+        commandResult(
+          JSON.stringify({
+            devices: { runtime: [{ udid: 'SIM-1', name: 'iPhone 17', state: 'Shutdown' }] },
+          }),
+        ),
+      );
+
+    await ensureSimulatorBooted('SIM-1', cleanup, runner);
+    await expect(cleanup.cleanup()).resolves.toBeUndefined();
+
+    expect(runner.mock.calls.map(([, args]) => args)).toEqual([
+      ['simctl', 'list', 'devices', 'available', '--json'],
+      ['simctl', 'boot', 'SIM-1'],
+      ['simctl', 'bootstatus', 'SIM-1', '-b'],
+      ['simctl', 'shutdown', 'SIM-1'],
+      ['simctl', 'list', 'devices', 'available', '--json'],
+    ]);
+  });
+
   it('replaces and cleans up a pre-existing fixture app', async () => {
     const cleanup = new CleanupStack();
     const runner = vi

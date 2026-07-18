@@ -7,17 +7,11 @@
     "summary": {
       "status": "FAILED",
       "durationMs": 1234,
-      "counts": {
-        "passed": 0,
-        "failed": 0,
-        "skipped": 0
-      },
       "target": "device"
     },
     "artifacts": {
       "deviceId": "<UUID>",
-      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log",
-      "xcresultPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/result-bundles/test_device_<TIMESTAMP>_pid<PID>.xcresult"
+      "buildLogPath": "~/Library/Developer/XcodeBuildMCP/workspaces/XcodeBuildMCP-<HASH>/logs/test_device_<TIMESTAMP>_pid<PID>.log"
     },
     "tests": {
       "selected": [
