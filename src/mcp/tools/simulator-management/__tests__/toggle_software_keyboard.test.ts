@@ -50,7 +50,6 @@ describe('toggle_software_keyboard tool', () => {
       const { executor } = fifo([
         { success: true, output: BOOTED_JSON },
         { success: true, output: '' },
-        { success: true, output: 'OK' },
         { success: true, output: '' },
       ]);
 
@@ -82,11 +81,10 @@ describe('toggle_software_keyboard tool', () => {
       expect(result.isError).toBe(true);
     });
 
-    it('sends Cmd+K keystroke without shift modifier', async () => {
+    it('uses the Device Hub software keyboard menu item', async () => {
       const { executor, commands } = fifo([
         { success: true, output: BOOTED_JSON },
         { success: true, output: '' },
-        { success: true, output: 'OK' },
         { success: true, output: '' },
       ]);
 
@@ -94,10 +92,9 @@ describe('toggle_software_keyboard tool', () => {
         toggle_software_keyboardLogic({ simulatorId: 'test-uuid-123' }, executor),
       );
 
-      const keystroke = commands[3].join(' ');
-      expect(keystroke).toContain('keystroke "k"');
-      expect(keystroke).toContain('command down');
-      expect(keystroke).not.toContain('shift down');
+      const menuAction = commands[2].join(' ');
+      expect(menuAction).toContain('com.apple.dt.Devices');
+      expect(menuAction).toContain('Toggle Software Keyboard');
     });
 
     it('returns error when executor throws', async () => {

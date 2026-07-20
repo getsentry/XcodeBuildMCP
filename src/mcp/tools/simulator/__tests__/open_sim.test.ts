@@ -119,8 +119,8 @@ describe('open_sim tool', () => {
 
       expect(calls).toHaveLength(1);
       expect(calls[0]).toEqual({
-        command: ['open', '-a', 'Simulator'],
-        description: 'Open Simulator',
+        command: ['open', '-a', 'DeviceHub'],
+        description: 'Open Device Hub',
         hideOutput: false,
         opts: undefined,
       });

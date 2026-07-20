@@ -27,7 +27,7 @@ describe('Claude UI benchmark preflight commands', () => {
       'killall -9 RocketSim || true',
       'sleep 2',
       'open -gja RocketSim',
-      'open -a Simulator --args -CurrentDeviceUDID SIM-123',
+      "open 'devices:///manage/select?id=SIM-123' || open -a Simulator --args -CurrentDeviceUDID SIM-123",
       'sleep 10',
     ]);
   });
@@ -46,9 +46,9 @@ describe('Claude UI benchmark preflight commands', () => {
       }),
     ).toEqual([
       'open RocketSim',
-      'open -a Simulator --args -CurrentDeviceUDID SIM-123',
+      "open 'devices:///manage/select?id=SIM-123' || open -a Simulator --args -CurrentDeviceUDID SIM-123",
       'open /Applications/RocketSim.app',
-      'open -a Simulator --args -CurrentDeviceUDID SIM-123',
+      "open 'devices:///manage/select?id=SIM-123' || open -a Simulator --args -CurrentDeviceUDID SIM-123",
     ]);
   });
 
@@ -60,11 +60,11 @@ describe('Claude UI benchmark preflight commands', () => {
       }),
     ).toEqual([
       'open -a RocketSim.app',
-      "open -a Simulator --args -CurrentDeviceUDID 'SIM'\"'\"'123'",
+      "open 'devices:///manage/select?id=SIM%27123' || open -a Simulator --args -CurrentDeviceUDID 'SIM'\"'\"'123'",
     ]);
   });
 
-  it('does not inject Simulator.app focus commands in headless launch mode', () => {
+  it('does not inject simulator frontend focus commands in headless launch mode', () => {
     process.env[HEADLESS_ENV_VAR] = '1';
     const commands = ['open -gja RocketSim'];
 

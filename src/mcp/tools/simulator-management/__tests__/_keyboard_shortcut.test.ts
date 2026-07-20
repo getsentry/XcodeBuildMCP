@@ -73,11 +73,10 @@ describe('sendKeyboardShortcut', () => {
     }
   });
 
-  it('sends Cmd+K for software-keyboard when simulator is booted and window exists', async () => {
+  it('uses Device Hub to toggle the software keyboard when available', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
       { success: true, output: '' },
-      { success: true, output: 'OK' },
       { success: true, output: '' },
     ]);
 
@@ -85,21 +84,17 @@ describe('sendKeyboardShortcut', () => {
 
     expect(result.success).toBe(true);
     expect(calls[0].command).toEqual(['xcrun', 'simctl', 'list', 'devices', '--json']);
-    expect(calls[1].command).toEqual(['open', '-a', 'Simulator']);
+    expect(calls[1].command).toEqual(['open', 'devices:///manage/select?id=test-uuid-123']);
     expect(calls[2].command[0]).toBe('osascript');
-    expect(calls[2].command.join(' ')).toContain('iPhone 15 Pro');
-    expect(calls[3].command[0]).toBe('osascript');
-    const keystrokeScript = calls[3].command.join(' ');
-    expect(keystrokeScript).toContain('keystroke "k"');
-    expect(keystrokeScript).toContain('command down');
-    expect(keystrokeScript).not.toContain('shift down');
+    const menuScript = calls[2].command.join(' ');
+    expect(menuScript).toContain('com.apple.dt.Devices');
+    expect(menuScript).toContain('Toggle Software Keyboard');
   });
 
-  it('sends Cmd+Shift+K for connect-hardware-keyboard', async () => {
+  it('uses Device Hub to simulate a hardware keyboard connection', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
       { success: true, output: '' },
-      { success: true, output: 'OK' },
       { success: true, output: '' },
     ]);
 
@@ -110,15 +105,14 @@ describe('sendKeyboardShortcut', () => {
     );
 
     expect(result.success).toBe(true);
-    const keystrokeScript = calls[3].command.join(' ');
-    expect(keystrokeScript).toContain('keystroke "k"');
-    expect(keystrokeScript).toContain('command down');
-    expect(keystrokeScript).toContain('shift down');
+    const menuScript = calls[2].command.join(' ');
+    expect(menuScript).toContain('Simulate Hardware Keyboard');
   });
 
   it('escapes backslashes before embedding simulator names in the focus AppleScript', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: ESCAPED_NAME_JSON },
+      { success: false, error: 'Device Hub unavailable' },
       { success: true, output: '' },
       { success: true, output: 'OK' },
       { success: true, output: '' },
@@ -127,12 +121,13 @@ describe('sendKeyboardShortcut', () => {
     const result = await sendKeyboardShortcut('escaped-uuid', 'software-keyboard', executor);
 
     expect(result.success).toBe(true);
-    expect(calls[2].command[2]).toContain('Test\\\\Device\\"');
+    expect(calls[3].command[2]).toContain('Test\\\\Device\\"');
   });
 
   it('matches the simulator window by exact title or runtime suffix instead of substring contains', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: PREFIX_NAME_JSON },
+      { success: false, error: 'Device Hub unavailable' },
       { success: true, output: '' },
       { success: true, output: 'OK' },
       { success: true, output: '' },
@@ -141,9 +136,9 @@ describe('sendKeyboardShortcut', () => {
     const result = await sendKeyboardShortcut('prefix-uuid', 'software-keyboard', executor);
 
     expect(result.success).toBe(true);
-    expect(calls[2].command[2]).toContain('title is "iPhone 15"');
-    expect(calls[2].command[2]).toContain('title starts with "iPhone 15 –"');
-    expect(calls[2].command[2]).not.toContain('title contains');
+    expect(calls[3].command[2]).toContain('title is "iPhone 15"');
+    expect(calls[3].command[2]).toContain('title starts with "iPhone 15 –"');
+    expect(calls[3].command[2]).not.toContain('title contains');
   });
 
   it('errors when simulator UUID is not found', async () => {
@@ -200,24 +195,28 @@ describe('sendKeyboardShortcut', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('errors when `open -a Simulator` fails', async () => {
+  it('errors when neither simulator frontend can be opened', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
-      { success: false, error: 'could not open' },
+      { success: false, error: 'Device Hub unavailable' },
+      { success: false, error: 'Simulator unavailable' },
     ]);
 
     const result = await sendKeyboardShortcut('test-uuid-123', 'software-keyboard', executor);
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain('Simulator app');
+      expect(result.error).toContain('simulator frontend');
+      expect(result.error).toContain('Device Hub unavailable');
+      expect(result.error).toContain('Simulator unavailable');
     }
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
   });
 
   it('errors and does not send keystroke when window lookup returns NO_WINDOW', async () => {
     const { executor, calls } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
+      { success: false, error: 'Device Hub unavailable' },
       { success: true, output: '' },
       { success: true, output: 'NO_WINDOW' },
     ]);
@@ -230,7 +229,7 @@ describe('sendKeyboardShortcut', () => {
       expect(result.error).toContain('without a device window');
       expect(result.error).toContain('retry the keyboard shortcut');
     }
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
   });
 
   it('errors when simctl list fails', async () => {
@@ -244,11 +243,10 @@ describe('sendKeyboardShortcut', () => {
     }
   });
 
-  it('errors when keystroke osascript fails', async () => {
+  it('errors when the Device Hub menu action fails', async () => {
     const { executor } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
       { success: true, output: '' },
-      { success: true, output: 'OK' },
       { success: false, error: 'accessibility denied' },
     ]);
 

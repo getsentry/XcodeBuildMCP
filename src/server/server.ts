@@ -53,7 +53,7 @@ Simulator run flow:
 - If session_show_defaults confirms project/workspace + scheme + simulator are set, call build_run_sim immediately (often with empty arguments).
 - Use discover_projs only when session_show_defaults shows project/workspace is missing or wrong.
 - Never call discover_projs speculatively or in parallel with session_show_defaults.
-- Do not call boot_sim or open_sim as prerequisites for build_run_sim; build_run_sim boots and opens Simulator as needed.`,
+- Do not call boot_sim or open_sim as prerequisites for build_run_sim; build_run_sim boots and opens the simulator frontend as needed.`,
       capabilities: {
         tools: {
           listChanged: true,

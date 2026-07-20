@@ -1,3 +1,5 @@
+import type { CommandExecutor } from './execution/index.ts';
+
 /**
  * Headless launch policy.
  *
@@ -5,8 +7,8 @@
  * otherwise steal window focus on macOS are suppressed:
  *
  * - macOS app launches use `open -g` (run in background, no foreground steal).
- * - Simulator.app launches are skipped entirely; `simctl boot` alone keeps
- *   the simulator runtime available for `simctl` UI automation without
+ * - Simulator frontend launches are skipped entirely; `simctl boot` alone
+ *   keeps the simulator runtime available for `simctl` UI automation without
  *   surfacing a window.
  *
  * This is intended for snapshot/smoke tests and other CI-style runs. It is
@@ -52,4 +54,69 @@ export function buildOpenSimulatorAppCommand(opts?: { simulatorId?: string }): s
     command.push('--args', '-CurrentDeviceUDID', opts.simulatorId);
   }
   return command;
+}
+
+export type SimulatorFrontend = 'device-hub' | 'simulator';
+
+export interface SimulatorFrontendCommand {
+  frontend: SimulatorFrontend;
+  command: string[];
+}
+
+/**
+ * Build launch candidates in preference order. Device Hub is the primary
+ * frontend on Xcode 27 and can display simulators from legacy runtimes.
+ */
+export function buildOpenSimulatorFrontendCommands(opts?: {
+  simulatorId?: string;
+}): SimulatorFrontendCommand[] | null {
+  if (isHeadlessLaunchMode()) {
+    return null;
+  }
+
+  const encodedSimulatorId = opts?.simulatorId
+    ? encodeURIComponent(opts.simulatorId).replace(/'/g, '%27')
+    : undefined;
+  const deviceHubCommand = encodedSimulatorId
+    ? ['open', `devices:///manage/select?id=${encodedSimulatorId}`]
+    : ['open', '-a', 'DeviceHub'];
+  const simulatorCommand = buildOpenSimulatorAppCommand(opts);
+
+  return [
+    { frontend: 'device-hub', command: deviceHubCommand },
+    { frontend: 'simulator', command: simulatorCommand ?? ['open', '-a', 'Simulator'] },
+  ];
+}
+
+export type OpenSimulatorFrontendResult =
+  | { success: true; frontend: SimulatorFrontend | null }
+  | { success: false; error: string };
+
+/**
+ * Open Device Hub when available, falling back to Simulator.app for hosts that
+ * do not have Device Hub installed.
+ */
+export async function openSimulatorFrontend(
+  executor: CommandExecutor,
+  opts?: { simulatorId?: string },
+): Promise<OpenSimulatorFrontendResult> {
+  const candidates = buildOpenSimulatorFrontendCommands(opts);
+  if (candidates === null) {
+    return { success: true, frontend: null };
+  }
+
+  const errors: string[] = [];
+  for (const candidate of candidates) {
+    const label = candidate.frontend === 'device-hub' ? 'Device Hub' : 'Simulator.app';
+    const result = await executor(candidate.command, `Open ${label}`, false);
+    if (result.success) {
+      return { success: true, frontend: candidate.frontend };
+    }
+    errors.push(`${label}: ${result.error ?? 'unknown error'}`);
+  }
+
+  return {
+    success: false,
+    error: `Failed to open a simulator frontend. ${errors.join('; ')}`,
+  };
 }

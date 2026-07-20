@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { appendFile } from 'node:fs/promises';
-import { buildOpenSimulatorAppCommand } from '../../utils/focus-policy.ts';
 import type { BenchmarkConfig } from './types.ts';
+import { openBenchmarkSimulatorFrontend } from './simulator-frontend.ts';
 
 type SessionDefaultKey = keyof NonNullable<BenchmarkConfig['sessionDefaults']>;
 
@@ -212,59 +212,15 @@ async function bootAndOpenSimulator(opts: {
     );
   }
 
-  const openCommand = buildOpenSimulatorAppCommand({ simulatorId: opts.simulatorId });
-  if (openCommand === null) {
-    await appendLifecycleLog(
-      opts.logPath,
-      'Simulator.app launch skipped by headless launch policy',
-      opts.logWriter,
-    );
-  } else {
-    const [openExecutable, ...openArgs] = openCommand;
-    if (openExecutable === undefined) {
-      throw new Error(`${opts.configName}: Simulator.app launch command was empty`);
-    }
-
-    opts.onEvent?.(`opening Simulator.app for ${opts.simulatorId}`);
-    let openResult: LoggedCommandResult | undefined;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      openResult = await opts.executor({
-        command: openExecutable,
-        args: openArgs,
-        cwd: opts.cwd,
-        logPath: opts.logPath,
-      });
-      if (openResult.exitCode === 0) break;
-      if (attempt === 3) {
-        throw new Error(
-          `${opts.configName}: failed to open Simulator.app with ${commandText(openExecutable, openArgs)} (exit ${openResult.exitCode}); see ${opts.logPath}`,
-        );
-      }
-      const delayMs = attempt * 2_000;
-      await appendLifecycleLog(
-        opts.logPath,
-        `Open Simulator.app attempt ${attempt} failed with exit ${openResult.exitCode}; retrying in ${(delayMs / 1000).toFixed(1)}s`,
-        opts.logWriter,
-      );
-      if (/error -1712/i.test(commandOutput(openResult))) {
-        await appendLifecycleLog(
-          opts.logPath,
-          'Simulator.app did not respond to LaunchServices; terminating the UI process before retry',
-          opts.logWriter,
-        );
-        await opts.executor({
-          command: 'killall',
-          args: ['-9', 'Simulator'],
-          cwd: opts.cwd,
-          logPath: opts.logPath,
-        });
-      }
-      opts.onEvent?.(`Simulator.app open attempt ${attempt} failed; retrying`);
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, delayMs);
-      });
-    }
-  }
+  await openBenchmarkSimulatorFrontend({
+    simulatorId: opts.simulatorId,
+    configName: opts.configName,
+    cwd: opts.cwd,
+    logPath: opts.logPath,
+    executor: opts.executor,
+    appendLog: (message) => appendLifecycleLog(opts.logPath, message, opts.logWriter),
+    onEvent: opts.onEvent,
+  });
 
   await waitForReadinessDelay({
     logPath: opts.logPath,

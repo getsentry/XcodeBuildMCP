@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
-import { buildOpenSimulatorAppCommand } from '../../utils/focus-policy.ts';
+import { buildOpenSimulatorFrontendCommands } from '../../utils/focus-policy.ts';
 
 interface CapturedCommandResult {
   exitCode: number | null;
@@ -34,10 +34,14 @@ export function preflightCommandsWithFocusResign(opts: {
   const commands = opts.commands ?? [];
   if (!opts.simulatorId) return commands;
 
-  const focusSimulatorCommand = buildOpenSimulatorAppCommand({ simulatorId: opts.simulatorId });
-  if (focusSimulatorCommand === null) return commands;
+  const focusSimulatorCommands = buildOpenSimulatorFrontendCommands({
+    simulatorId: opts.simulatorId,
+  });
+  if (focusSimulatorCommands === null) return commands;
 
-  const focusSimulatorShellCommand = shellCommandFromArgs(focusSimulatorCommand);
+  const focusSimulatorShellCommand = focusSimulatorCommands
+    .map(({ command }) => shellCommandFromArgs(command))
+    .join(' || ');
   return commands.flatMap((command) =>
     isRocketSimAppLaunchCommand(command) ? [command, focusSimulatorShellCommand] : [command],
   );

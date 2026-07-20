@@ -3,7 +3,7 @@ module: mcp/tools/simulator/open_sim
 names:
   mcp: open_sim
   cli: open
-description: Open Simulator.app for visibility/manual workflows. Not required before simulator build-and-run (build_run_sim).
+description: Open Device Hub when available, otherwise Simulator.app, for visibility and manual workflows. Not required before simulator build-and-run (build_run_sim).
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
   version: "2"

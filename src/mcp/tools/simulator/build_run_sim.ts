@@ -49,7 +49,7 @@ import {
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
-import { buildOpenSimulatorAppCommand } from '../../../utils/focus-policy.ts';
+import { openSimulatorFrontend } from '../../../utils/focus-policy.ts';
 
 const baseOptions = {
   scheme: z.string().describe('The scheme to use (Required)'),
@@ -375,19 +375,16 @@ export function createBuildRunSimExecutor(
         status: 'succeeded',
       });
 
-      const openSimulatorCommand = buildOpenSimulatorAppCommand();
-      if (openSimulatorCommand !== null) {
-        try {
-          const openResult = await executor(openSimulatorCommand, 'Open Simulator App');
-          if (!openResult.success) {
-            throw new Error(openResult.error ?? 'Failed to open Simulator app');
-          }
-        } catch (error) {
-          log(
-            'warn',
-            `Warning: Could not open Simulator app: ${error instanceof Error ? error.message : String(error)}`,
-          );
+      try {
+        const openResult = await openSimulatorFrontend(executor, { simulatorId });
+        if (!openResult.success) {
+          throw new Error(openResult.error);
         }
+      } catch (error) {
+        log(
+          'warn',
+          `Warning: Could not open simulator frontend: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       ctx.emitFragment({

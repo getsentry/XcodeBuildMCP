@@ -53,7 +53,6 @@ describe('toggle_connect_hardware_keyboard tool', () => {
       const { executor } = fifo([
         { success: true, output: BOOTED_JSON },
         { success: true, output: '' },
-        { success: true, output: 'OK' },
         { success: true, output: '' },
       ]);
 
@@ -64,11 +63,10 @@ describe('toggle_connect_hardware_keyboard tool', () => {
       expect(result.isError).toBeFalsy();
     });
 
-    it('sends Cmd+Shift+K keystroke', async () => {
+    it('uses the Device Hub hardware keyboard menu item', async () => {
       const { executor, commands } = fifo([
         { success: true, output: BOOTED_JSON },
         { success: true, output: '' },
-        { success: true, output: 'OK' },
         { success: true, output: '' },
       ]);
 
@@ -76,10 +74,9 @@ describe('toggle_connect_hardware_keyboard tool', () => {
         toggle_connect_hardware_keyboardLogic({ simulatorId: 'test-uuid-123' }, executor),
       );
 
-      const keystroke = commands[3].join(' ');
-      expect(keystroke).toContain('keystroke "k"');
-      expect(keystroke).toContain('command down');
-      expect(keystroke).toContain('shift down');
+      const menuAction = commands[2].join(' ');
+      expect(menuAction).toContain('com.apple.dt.Devices');
+      expect(menuAction).toContain('Simulate Hardware Keyboard');
     });
 
     it('returns error when simulator not found', async () => {

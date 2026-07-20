@@ -184,13 +184,13 @@ describe('Claude UI temporary simulator lifecycle', () => {
       ['xcrun', 'simctl', 'create', 'Claude UI weather 20260522T120000Z', 'iPhone 17 Pro Max'],
       ['xcrun', 'simctl', 'boot', 'TEMP-SIM-123'],
       ['xcrun', 'simctl', 'bootstatus', 'TEMP-SIM-123', '-b'],
-      ['open', '-a', 'Simulator', '--args', '-CurrentDeviceUDID', 'TEMP-SIM-123'],
+      ['open', 'devices:///manage/select?id=TEMP-SIM-123'],
     ]);
     expect(events).toEqual([
       'creating simulator Claude UI weather 20260522T120000Z',
       'booting simulator TEMP-SIM-123',
       'waiting for simulator TEMP-SIM-123 bootstatus',
-      'opening Simulator.app for TEMP-SIM-123',
+      'opening Device Hub for TEMP-SIM-123',
       'simulator ready TEMP-SIM-123',
     ]);
 
@@ -206,7 +206,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
     expect(log.messages.join('\n')).toContain('Temporary simulator ready: TEMP-SIM-123');
   });
 
-  it('does not open Simulator.app when headless launch mode is enabled', async () => {
+  it('does not open a simulator frontend when headless launch mode is enabled', async () => {
     const previousHeadlessValue = process.env[HEADLESS_ENV_VAR];
     process.env[HEADLESS_ENV_VAR] = '1';
     try {
@@ -249,7 +249,7 @@ describe('Claude UI temporary simulator lifecycle', () => {
         'simulator ready TEMP-SIM-123',
       ]);
       expect(log.messages.join('\n')).toContain(
-        'Simulator.app launch skipped by headless launch policy',
+        'Simulator frontend launch skipped by headless launch policy',
       );
     } finally {
       if (previousHeadlessValue === undefined) {
