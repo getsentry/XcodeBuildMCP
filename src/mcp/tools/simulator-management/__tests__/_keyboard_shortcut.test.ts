@@ -86,9 +86,10 @@ describe('sendKeyboardShortcut', () => {
     expect(calls[0].command).toEqual(['xcrun', 'simctl', 'list', 'devices', '--json']);
     expect(calls[1].command).toEqual(['open', 'devices:///manage/select?id=test-uuid-123']);
     expect(calls[2].command[0]).toBe('osascript');
-    const menuScript = calls[2].command.join(' ');
-    expect(menuScript).toContain('com.apple.dt.Devices');
-    expect(menuScript).toContain('Toggle Software Keyboard');
+    const keystrokeScript = calls[2].command.join(' ');
+    expect(keystrokeScript).toContain('com.apple.dt.Devices');
+    expect(keystrokeScript).toContain('keystroke "k" using {command down}');
+    expect(keystrokeScript).not.toContain('Toggle Software Keyboard');
   });
 
   it('uses Device Hub to simulate a hardware keyboard connection', async () => {
@@ -105,8 +106,9 @@ describe('sendKeyboardShortcut', () => {
     );
 
     expect(result.success).toBe(true);
-    const menuScript = calls[2].command.join(' ');
-    expect(menuScript).toContain('Simulate Hardware Keyboard');
+    const keystrokeScript = calls[2].command.join(' ');
+    expect(keystrokeScript).toContain('keystroke "k" using {command down, shift down}');
+    expect(keystrokeScript).not.toContain('Simulate Hardware Keyboard');
   });
 
   it('escapes backslashes before embedding simulator names in the focus AppleScript', async () => {
@@ -243,7 +245,7 @@ describe('sendKeyboardShortcut', () => {
     }
   });
 
-  it('errors when the Device Hub menu action fails', async () => {
+  it('errors when the Device Hub keyboard shortcut fails', async () => {
     const { executor } = makeFifoExecutor([
       { success: true, output: BOOTED_JSON },
       { success: true, output: '' },

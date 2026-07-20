@@ -57,18 +57,16 @@ function buildKeystrokeScript(shortcut: KeyboardShortcut): string {
   ].join('\n');
 }
 
-function buildDeviceHubMenuScript(shortcut: KeyboardShortcut): string {
-  const menuItem =
-    shortcut === 'connect-hardware-keyboard'
-      ? 'Simulate Hardware Keyboard'
-      : 'Toggle Software Keyboard';
+function buildDeviceHubKeystrokeScript(shortcut: KeyboardShortcut): string {
+  const modifiers =
+    shortcut === 'connect-hardware-keyboard' ? '{command down, shift down}' : '{command down}';
   return [
     'tell application "System Events"',
     '  set deviceHubProcess to first application process whose bundle identifier is "com.apple.dt.Devices"',
     '  set frontmost of deviceHubProcess to true',
     '  delay 0.5',
     '  tell deviceHubProcess',
-    `    click menu item "${menuItem}" of menu 1 of menu item "Keyboard" of menu 1 of menu bar item "Device" of menu bar 1`,
+    `    keystroke "k" using ${modifiers}`,
     '  end tell',
     'end tell',
   ].join('\n');
@@ -135,15 +133,15 @@ export async function sendKeyboardShortcut(
   }
 
   if (openResult.frontend === 'device-hub') {
-    const menuResult = await executor(
-      ['osascript', '-e', buildDeviceHubMenuScript(shortcut)],
-      'Use Device Hub Keyboard Menu',
+    const keystrokeResult = await executor(
+      ['osascript', '-e', buildDeviceHubKeystrokeScript(shortcut)],
+      'Send Device Hub Keyboard Shortcut',
       false,
     );
-    if (!menuResult.success) {
+    if (!keystrokeResult.success) {
       return {
         success: false,
-        error: `Failed to use Device Hub keyboard menu: ${menuResult.error ?? 'unknown error'}`,
+        error: `Failed to send Device Hub keyboard shortcut: ${keystrokeResult.error ?? 'unknown error'}`,
       };
     }
     return { success: true };
