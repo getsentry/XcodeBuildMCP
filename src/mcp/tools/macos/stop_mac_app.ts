@@ -15,7 +15,12 @@ import {
 
 const stopMacAppSchema = z.object({
   appName: z.string().min(1).optional(),
-  processId: z.number().int().positive().optional(),
+  processId: z
+    .number()
+    .int()
+    .positive()
+    .refine(Number.isSafeInteger, 'processId must be a positive safe integer.')
+    .optional(),
 });
 
 type StopMacAppParams = z.infer<typeof stopMacAppSchema>;
