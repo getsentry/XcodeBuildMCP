@@ -3,10 +3,11 @@ name: Warden watchdog
 on:
   workflow_run:
     workflows: [Warden]
-    types: [requested]
+    # GitHub omits `requested` for reruns, so reruns are caught when they enter `in_progress`.
+    types: [requested, in_progress]
 
 concurrency:
-  group: warden-watchdog-${{ github.event.workflow_run.id }}
+  group: warden-watchdog-${{ github.event.workflow_run.id }}-${{ github.event.action }}-${{ github.event.workflow_run.run_attempt }}
   cancel-in-progress: true
 
 permissions:
@@ -15,7 +16,9 @@ permissions:
 
 jobs:
   enforce-timeout:
-    if: github.event.workflow_run.event == 'pull_request'
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.action == 'requested' || github.event.workflow_run.run_attempt > 1)
     runs-on: ubuntu-latest
     timeout-minutes: 11
     steps:

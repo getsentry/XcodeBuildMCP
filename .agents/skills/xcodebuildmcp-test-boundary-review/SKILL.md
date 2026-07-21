@@ -17,6 +17,7 @@ Review guardrails for test isolation, scope, and contract validation.
 - `src/**/__tests__/**`
 - `src/test-utils/**`
 - `src/snapshot-tests/**`
+- `scripts/**/__tests__/**`
 - `package.json`
 - `xcodebuildmcp.com/app/docs/_content/testing.mdx`
 - `xcodebuildmcp.com/app/docs/_content/contributing.mdx`

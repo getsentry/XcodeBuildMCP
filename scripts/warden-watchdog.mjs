@@ -6,8 +6,17 @@ export function isPullRequestRun(run) {
   return run.event === 'pull_request';
 }
 
+export function runStartTimeMs(run) {
+  const startTime = run.run_attempt > 1 ? run.run_started_at : run.created_at;
+  const startTimeMs = Date.parse(startTime);
+  if (Number.isNaN(startTimeMs)) {
+    throw new Error('Warden run has an invalid start timestamp');
+  }
+  return startTimeMs;
+}
+
 export function runtimeSeconds(run, nowMs) {
-  return Math.max(0, Math.floor((nowMs - Date.parse(run.created_at)) / 1000));
+  return Math.max(0, Math.floor((nowMs - runStartTimeMs(run)) / 1000));
 }
 
 export async function monitorWardenRun({
@@ -24,7 +33,7 @@ export async function monitorWardenRun({
     return { cancelled: false, ignored: true };
   }
 
-  const deadlineMs = Date.parse(run.created_at) + maxRuntimeSeconds * 1000;
+  const deadlineMs = runStartTimeMs(run) + maxRuntimeSeconds * 1000;
   while (run.status !== 'completed') {
     const remainingMs = deadlineMs - now();
     if (remainingMs <= 0) {
@@ -39,13 +48,14 @@ export async function monitorWardenRun({
     return { cancelled: false, ignored: false };
   }
 
-  if (await cancelRun()) {
-    return { cancelled: true, ignored: false };
-  }
-
+  const cancellationAccepted = await cancelRun();
   run = await getRun();
   if (run.status === 'completed') {
-    return { cancelled: false, ignored: false };
+    return { cancelled: cancellationAccepted && run.conclusion === 'cancelled', ignored: false };
+  }
+
+  if (cancellationAccepted) {
+    return { cancelled: true, ignored: false };
   }
 
   throw new Error('Warden run remained active after cancellation was rejected');
