@@ -80,6 +80,61 @@ ignorePaths = [
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
 
+# Targeted domain reviews run only when explicitly selected for high-risk changes.
+[[skills]]
+name = "xcodebuildmcp-runtime-boundary-review"
+maxTurns = 8
+maxFindings = 5
+paths = [
+  "src/runtime/tool-catalog.ts",
+  "src/runtime/tool-invoker.ts",
+  "src/runtime/types.ts",
+  "src/cli/**",
+  "src/daemon/**",
+  "manifests/tools/*.yaml",
+  "manifests/workflows/*.yaml",
+  "xcodebuildmcp.com/app/docs/_content/architecture-runtime-boundaries.mdx",
+  "xcodebuildmcp.com/app/docs/_content/architecture-manifest-visibility.mdx",
+]
+
+[[skills.triggers]]
+type = "local"
+
+[[skills]]
+name = "xcodebuildmcp-test-boundary-review"
+maxTurns = 8
+maxFindings = 5
+paths = [
+  "src/**/__tests__/**",
+  "src/test-utils/**",
+  "src/snapshot-tests/**",
+  "package.json",
+  "xcodebuildmcp.com/app/docs/_content/testing.mdx",
+  "xcodebuildmcp.com/app/docs/_content/contributing.mdx",
+]
+ignorePaths = ["src/snapshot-tests/__fixtures__/**"]
+
+[[skills.triggers]]
+type = "local"
+
+[[skills]]
+name = "xcodebuildmcp-tool-contract-review"
+maxTurns = 8
+maxFindings = 5
+paths = [
+  "src/mcp/tools/**",
+  "src/core/manifest/schema.ts",
+  "src/runtime/tool-catalog.ts",
+  "src/runtime/types.ts",
+  "manifests/tools/*.yaml",
+  "manifests/workflows/*.yaml",
+  "xcodebuildmcp.com/app/docs/_content/tool-authoring.mdx",
+  "xcodebuildmcp.com/app/docs/_content/architecture-manifest-visibility.mdx",
+]
+
+[[skills.triggers]]
+type = "local"
+
 # Local and scheduled security reviews are retained outside the PR critical path.
 [[skills]]
 name = "wrdn-pii"
