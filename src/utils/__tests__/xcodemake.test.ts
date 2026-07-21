@@ -58,19 +58,40 @@ describe('executeXcodemakeCommand', () => {
 });
 
 describe('doesMakeLogFileExist', () => {
-  it('reads the project directory without mutating process cwd', () => {
+  it('finds the hashed log for normalized absolute build paths without mutating cwd', () => {
     const originalCwd = process.cwd();
-    const readDirectory = vi.fn(() => ['xcodemake -scheme App.log']);
+    const readDirectory = vi.fn(() => [
+      'xcodemake_-workspace_App.xcworkspace_-scheme_App_-derivedDataPath_DerivedData_App_build-50984a29036188e0dab05cf48b9b6573.log',
+    ]);
 
     const exists = doesMakeLogFileExist(
       '/tmp/project',
-      ['xcodebuild', '-scheme', 'App'],
+      [
+        'xcodebuild',
+        '-workspace',
+        '/tmp/project/App.xcworkspace',
+        '-scheme',
+        'App',
+        '-derivedDataPath',
+        '/tmp/project/DerivedData/App',
+        'build',
+      ],
       readDirectory,
     );
 
     expect(exists).toBe(true);
     expect(readDirectory).toHaveBeenCalledWith('/tmp/project');
     expect(process.cwd()).toBe(originalCwd);
+  });
+
+  it('does not reuse a hashed log from different build arguments', () => {
+    const readDirectory = vi.fn(() => [
+      'xcodemake_-scheme_Other-68f67685244564619c1ad4d3c9ef3bad.log',
+    ]);
+
+    expect(
+      doesMakeLogFileExist('/tmp/project', ['xcodebuild', '-scheme', 'App'], readDirectory),
+    ).toBe(false);
   });
 });
 

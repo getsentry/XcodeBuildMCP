@@ -10,8 +10,8 @@ import { getConfig } from './config-store.ts';
 
 let overriddenXcodemakePath: string | null = null;
 
-export const XCODEMAKE_COMMIT = '1749682a99794edc257010b3eaa35c39f0f91c50';
-export const XCODEMAKE_SHA256 = 'b84f2e58326a1c009e5349e28895817d2968f2cb655b6a2a7c7c719971007db7';
+export const XCODEMAKE_COMMIT = '7d20fab4ba128f7f533dd27d709daf1bff3c30e2';
+export const XCODEMAKE_SHA256 = '8f2b2c071628959a6564882dd14897489054716eac18766cbcb20164f9d81da8';
 export const XCODEMAKE_DOWNLOAD_URL = `https://raw.githubusercontent.com/cameroncooke/xcodemake/${XCODEMAKE_COMMIT}/xcodemake`;
 
 interface XcodemakeInstallerDependencies {
@@ -180,8 +180,7 @@ export function doesMakeLogFileExist(
   readDirectory: ReadDirectory = (directory) => readdirSync(directory),
 ): boolean {
   try {
-    const xcodemakeCommand = ['xcodemake', ...command.slice(1)];
-    const escapedCommand = xcodemakeCommand.map((arg) => {
+    const xcodemakeArgs = command.slice(1).map((arg) => {
       // Remove projectDir from arguments if present at the start
       const prefix = projectDir + '/';
       if (arg.startsWith(prefix)) {
@@ -189,13 +188,15 @@ export function doesMakeLogFileExist(
       }
       return arg;
     });
-    const commandString = escapedCommand.join(' ');
-    const logFileName = `${commandString}.log`;
-    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${projectDir}`);
+    const argsHash = createHash('md5').update(xcodemakeArgs.join('\0')).digest('hex');
+    const logFileSuffix = `-${argsHash}.log`;
+    log('debug', `Checking for xcodemake log ending in ${logFileSuffix} in ${projectDir}`);
 
     const files = readDirectory(projectDir);
-    const exists = files.includes(logFileName);
-    log('debug', `Makefile log ${exists ? 'exists' : 'does not exist'}: ${logFileName}`);
+    const exists = files.some(
+      (fileName) => fileName.startsWith('xcodemake') && fileName.endsWith(logFileSuffix),
+    );
+    log('debug', `xcodemake log ${exists ? 'exists' : 'does not exist'}: ${logFileSuffix}`);
     return exists;
   } catch (error) {
     log(
