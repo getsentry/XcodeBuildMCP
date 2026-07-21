@@ -1,0 +1,32 @@
+name: Warden watchdog
+
+on:
+  workflow_run:
+    workflows: [Warden]
+    types: [in_progress]
+
+concurrency:
+  group: warden-watchdog-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  enforce-timeout:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Enforce Warden timeout
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_RUN_ID: ${{ github.event.workflow_run.id }}
+          WARDEN_MAX_RUNTIME_SECONDS: 600
+          WARDEN_POLL_SECONDS: 15
+        run: node scripts/warden-watchdog.mjs

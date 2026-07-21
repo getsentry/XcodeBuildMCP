@@ -1,28 +1,18 @@
 # Warden Configuration
 # https://github.com/getsentry/warden
 #
-# Warden reviews code using AI-powered skills triggered by GitHub events.
-# Skills live in .agents/skills/ or .claude/skills/, or are pulled from GitHub
-# via the remote field.
-#
-# Add skills with: warden add <skill-name>
+# PR reviews are executed by the organization-managed Warden workflow. The repository watchdog
+# cancels any Warden run that exceeds ten minutes. Keep this PR skill set intentionally small:
+# each automatic check must have demonstrated unique, actionable findings.
 
 version = 1
 
-# Default settings inherited by all skills
 [defaults]
-# Severity levels: critical, high, medium, low, info
-# failOn: minimum severity that fails the check
 failOn = "high"
-# reportOn: minimum severity that creates PR annotations
 reportOn = "medium"
-# Avoid noisy no-op PR reporting.
 reportOnSuccess = false
 
-# warden-sweep is a full-repo sweep. PR-trigger is intentionally omitted so
-# it does not run on every PR. It runs:
-#   - On schedule via .github/workflows/warden-sweep.yml (workflow_dispatch + cron)
-#   - Locally via `warden --skill warden-sweep`
+# Full-repository review remains scheduled and never runs on PR events.
 [[skills]]
 name = "warden-sweep"
 paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,sh,ts}"]
@@ -41,98 +31,12 @@ issueTitle = "Warden weekly sweep"
 createFixPR = true
 fixBranchPrefix = "warden-sweep"
 
-[[skills]]
-name = "xcodebuildmcp-docs-release-review"
-maxTurns = 10
-maxFindings = 5
-paths = [
-  "README.md",
-  "CHANGELOG.md",
-  "package.json",
-  "scripts/build-website-manifest.mjs",
-  "scripts/generate-github-release-notes.mjs",
-  "scripts/release.sh",
-  "xcodebuildmcp.com/app/docs/_content/**",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-docs-command-review"
-maxTurns = 8
-maxFindings = 5
-paths = [
-  "CHANGELOG.md",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-packaging-resource-review"
-maxTurns = 10
-maxFindings = 5
-paths = [
-  "package.json",
-  "scripts/copy-build-assets.js",
-  "scripts/package-macos-portable.sh",
-  "scripts/build-website-manifest.mjs",
-  "schemas/**",
-  "manifests/**",
-  "skills/**",
-  "bundled/**",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-rendering-streaming-review"
-maxTurns = 10
-maxFindings = 5
-paths = [
-  "src/rendering/**",
-  "src/types/domain-fragments.ts",
-  "src/types/runtime-status.ts",
-  "src/runtime/tool-invoker.ts",
-  "src/runtime/__tests__/tool-invoker.test.ts",
-  "xcodebuildmcp.com/app/docs/_content/architecture-rendering-output.mdx",
-  "xcodebuildmcp.com/app/docs/_content/architecture-tool-lifecycle.mdx",
-  "xcodebuildmcp.com/app/docs/_content/output-formats.mdx",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-runtime-boundary-review"
-maxTurns = 8
-maxFindings = 5
-paths = [
-  "src/runtime/tool-catalog.ts",
-  "src/runtime/tool-invoker.ts",
-  "src/runtime/types.ts",
-  "src/cli/**",
-  "src/daemon/**",
-  "manifests/tools/*.yaml",
-  "manifests/workflows/*.yaml",
-  "xcodebuildmcp.com/app/docs/_content/architecture-runtime-boundaries.mdx",
-  "xcodebuildmcp.com/app/docs/_content/architecture-manifest-visibility.mdx",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
+# High-value PR reviews. maxTurns is deliberately capped so a single skill cannot monopolize the
+# ten-minute workflow budget.
 [[skills]]
 name = "xcodebuildmcp-snapshot-fixture-review"
-maxTurns = 10
-maxFindings = 5
+maxTurns = 3
+maxFindings = 3
 paths = [
   "src/snapshot-tests/contracts.ts",
   "src/snapshot-tests/fixture-io.ts",
@@ -140,183 +44,17 @@ paths = [
   "src/snapshot-tests/__tests__/json-normalize.test.ts",
   "src/snapshot-tests/__tests__/json-fixture-schema.test.ts",
   "src/snapshot-tests/__fixtures__/**",
-  "xcodebuildmcp.com/app/docs/_content/testing.mdx",
 ]
 
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-structured-output-review"
-maxTurns = 8
-maxFindings = 5
-paths = [
-  "schemas/structured-output/**",
-  "src/core/structured-output-schema.ts",
-  "src/core/__tests__/structured-output-schema.test.ts",
-  "src/snapshot-tests/__fixtures__/json/**",
-  "src/snapshot-tests/__tests__/json-fixture-schema.test.ts",
-  "xcodebuildmcp.com/app/docs/_content/schema-versioning.mdx",
-  "xcodebuildmcp.com/app/docs/_content/output-formats.mdx",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-test-boundary-review"
-maxTurns = 15
-maxFindings = 10
-paths = [
-  "src/**/__tests__/**",
-  "src/test-utils/**",
-  "src/snapshot-tests/**",
-  "package.json",
-  "xcodebuildmcp.com/app/docs/_content/testing.mdx",
-  "xcodebuildmcp.com/app/docs/_content/contributing.mdx",
-]
-ignorePaths = [
-  "src/snapshot-tests/__fixtures__/**",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "xcodebuildmcp-tool-contract-review"
-maxTurns = 8
-maxFindings = 5
-paths = [
-  "src/mcp/tools/**",
-  "src/core/manifest/schema.ts",
-  "src/runtime/tool-catalog.ts",
-  "src/runtime/types.ts",
-  "manifests/tools/*.yaml",
-  "manifests/workflows/*.yaml",
-  "xcodebuildmcp.com/app/docs/_content/tool-authoring.mdx",
-  "xcodebuildmcp.com/app/docs/_content/architecture-manifest-visibility.mdx",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-# Remote security skills from getsentry/warden-skills
-
-[[skills]]
-name = "wrdn-pii"
-remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
-paths = [
-  "src/**/*.ts",
-  "scripts/**/*.{js,mjs,sh,ts}",
-  ".github/workflows/*.yml",
-  ".github/workflows/*.yaml",
-  "README.md",
-  "CHANGELOG.md",
-  "xcodebuildmcp.com/app/docs/_content/**",
-]
-ignorePaths = [
-  "**/*.test.ts",
-  "**/__tests__/**",
-  "**/__fixtures__/**",
-  "**/__snapshots__/**",
-  "src/snapshot-tests/__fixtures__/**",
-]
-
-# Temporarily local-only until the Pi model selector failure seen in PR checks is resolved.
-[[skills.triggers]]
-type = "local"
-
-[[skills]]
-name = "wrdn-authz"
-remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
-maxTurns = 15
-maxFindings = 5
-paths = ["src/**/*.ts"]
-ignorePaths = [
-  "**/*.test.ts",
-  "**/__tests__/**",
-  "**/__fixtures__/**",
-  "**/__snapshots__/**",
-]
-
-[[skills.triggers]]
-type = "schedule"
-
-[[skills]]
-name = "wrdn-code-execution"
-remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
-maxTurns = 10
-maxFindings = 5
-paths = [
-  "src/cli.ts",
-  "src/cli/**",
-  "src/daemon.ts",
-  "src/daemon/**",
-  "src/doctor-cli.ts",
-  "src/integrations/**",
-  "src/mcp/resources/**",
-  "src/mcp/tools/**",
-  "src/runtime/tool-invoker.ts",
-  "src/utils/execution/**",
-  "src/utils/xcodemake/**",
-  "scripts/**/*.{js,mjs,sh,ts}",
-]
-ignorePaths = [
-  "**/*.test.ts",
-  "**/__tests__/**",
-  "**/__fixtures__/**",
-  "**/__snapshots__/**",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "wrdn-data-exfil"
-remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
-maxTurns = 15
-maxFindings = 5
-paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,sh,ts}"]
-ignorePaths = [
-  "**/*.test.ts",
-  "**/__tests__/**",
-  "**/__fixtures__/**",
-  "**/__snapshots__/**",
-]
-
-[[skills.triggers]]
-type = "schedule"
-
-[[skills]]
-name = "wrdn-gha-workflows"
-remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
-maxTurns = 8
-maxFindings = 5
-paths = [
-  ".github/workflows/*.yml",
-  ".github/workflows/*.yaml",
-  ".github/actions/**/*.yml",
-  ".github/actions/**/*.yaml",
-  "action.yml",
-  "action.yaml",
-]
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-
-# Remote code-quality skills from getsentry/skills
 
 [[skills]]
 name = "find-bugs"
 remote = "getsentry/skills@b10e2db21d3165de1904bdf3fa64285016765fe5"
-maxTurns = 10
-maxFindings = 5
+maxTurns = 4
+maxFindings = 3
 paths = [
   "src/cli.ts",
   "src/cli/**",
@@ -341,6 +79,62 @@ ignorePaths = [
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
+
+# Local and scheduled security reviews are retained outside the PR critical path.
+[[skills]]
+name = "wrdn-pii"
+remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
+paths = [
+  "src/**/*.ts",
+  "scripts/**/*.{js,mjs,sh,ts}",
+  ".github/workflows/*.yml",
+  ".github/workflows/*.yaml",
+  "README.md",
+  "CHANGELOG.md",
+  "xcodebuildmcp.com/app/docs/_content/**",
+]
+ignorePaths = [
+  "**/*.test.ts",
+  "**/__tests__/**",
+  "**/__fixtures__/**",
+  "**/__snapshots__/**",
+  "src/snapshot-tests/__fixtures__/**",
+]
+
+[[skills.triggers]]
+type = "local"
+
+[[skills]]
+name = "wrdn-authz"
+remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
+maxTurns = 15
+maxFindings = 5
+paths = ["src/**/*.ts"]
+ignorePaths = [
+  "**/*.test.ts",
+  "**/__tests__/**",
+  "**/__fixtures__/**",
+  "**/__snapshots__/**",
+]
+
+[[skills.triggers]]
+type = "schedule"
+
+[[skills]]
+name = "wrdn-data-exfil"
+remote = "getsentry/warden-skills@6f720b5c4894e374f7a09707bae0de60d8b825df"
+maxTurns = 15
+maxFindings = 5
+paths = ["src/**/*.ts", "scripts/**/*.{js,mjs,sh,ts}"]
+ignorePaths = [
+  "**/*.test.ts",
+  "**/__tests__/**",
+  "**/__fixtures__/**",
+  "**/__snapshots__/**",
+]
+
+[[skills.triggers]]
+type = "schedule"
 
 [[skills]]
 name = "code-review"

@@ -25,6 +25,7 @@ When reading issues:
 - CLI design note: do not rely on CLI session-default writes. CLI is intentionally deterministic for CI/scripting and should use explicit command arguments as the primary input surface.
 - When working on skill sources in `skills/`, use the `skill-creator` skill workflow.
 - After modifying any skill source, run `npx skill-check <skill-directory>` and address all errors/warnings before handoff.
+- Before handoff, run the matching manual Warden review for high-risk changes: runtime/CLI/daemon boundaries → `xcodebuildmcp-runtime-boundary-review`; test infrastructure or harnesses → `xcodebuildmcp-test-boundary-review`; tool manifests, schemas, or contracts → `xcodebuildmcp-tool-contract-review`. Invoke only applicable skills with `warden --skill <name>`.
 -
 ## Multi-process filesystem state
 - XcodeBuildMCP explicitly supports multiple concurrent MCP server, daemon, CLI, test, and helper processes for the same or different workspaces.

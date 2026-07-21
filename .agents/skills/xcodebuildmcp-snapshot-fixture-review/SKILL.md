@@ -30,11 +30,15 @@ Review guardrails for fixture and snapshot contract integrity.
 - JSON fixtures preserve stable structured output envelopes.
 - Volatile values are normalized in code, not patched ad hoc in fixtures.
 - Missing fixtures are generated through the snapshot update flow.
+- Verify project-defined normalization sentinels in normalization code and tests before reporting
+  them as implausible fixture values. In particular, `99999` is an intentional sentinel for
+  volatile UI capture counts.
+- Group every occurrence of the same root cause into one finding and list the affected fixtures.
+  Do not emit separate findings for equivalent CLI, MCP, text, or JSON drift.
+- Do not repeat a finding that is already resolved by the current diff.
 
-## Validation
+## Review limits
 
-- `npm run test:snapshots`
-- `npm run test:schema-fixtures`
-- `npm test -- src/snapshot-tests/__tests__/fixture-io.test.ts`
-- `npm test -- src/snapshot-tests/__tests__/json-normalize.test.ts`
-- `npx skill-check .agents/skills/xcodebuildmcp-snapshot-fixture-review`
+- Review the changed fixtures and the directly relevant normalization or contract code only.
+- Do not run snapshot or smoke suites as part of an automated PR review.
+- Prefer one high-confidence cross-fixture finding over multiple speculative discrepancies.
