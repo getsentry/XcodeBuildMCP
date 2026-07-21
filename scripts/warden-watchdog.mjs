@@ -76,20 +76,23 @@ export async function monitorWardenRun({
   throw new Error('Warden run remained active after cancellation was rejected');
 }
 
-async function githubRequest(path, options = {}) {
+export async function githubRequest(path, options = {}) {
+  const { allowConflict = false, ...requestOptions } = options;
   const response = await globalThis.fetch(`https://api.github.com${path}`, {
-    ...options,
+    ...requestOptions,
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
       'X-GitHub-Api-Version': '2022-11-28',
-      ...options.headers,
+      ...requestOptions.headers,
     },
     signal: globalThis.AbortSignal.timeout(30_000),
   });
 
-  if (!response.ok && response.status !== 409) {
-    throw new Error(`GitHub API ${options.method ?? 'GET'} ${path} failed: ${response.status}`);
+  if (!response.ok && !(allowConflict && response.status === 409)) {
+    throw new Error(
+      `GitHub API ${requestOptions.method ?? 'GET'} ${path} failed: ${response.status}`,
+    );
   }
 
   if (response.status === 202 || response.status === 204) {
@@ -137,6 +140,7 @@ async function main() {
     cancelRun: async () => {
       const response = await githubRequest(`/repos/${repository}/actions/runs/${runId}/cancel`, {
         method: 'POST',
+        allowConflict: true,
       });
       return response !== null;
     },

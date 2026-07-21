@@ -4,6 +4,7 @@ import test from 'node:test';
 import { URL } from 'node:url';
 
 import {
+  githubRequest,
   isPullRequestRun,
   monitorWardenRun,
   runStartTimeMs,
@@ -22,6 +23,17 @@ function wardenRun(overrides = {}) {
     ...overrides,
   };
 }
+
+test('githubRequest scopes conflict handling to callers that allow it', async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => ({ ok: false, status: 409 });
+
+  await assert.rejects(githubRequest('/run'), /GitHub API GET \/run failed: 409/);
+  assert.equal(await githubRequest('/cancel', { method: 'POST', allowConflict: true }), null);
+});
 
 test('workflow starts the watchdog for initial runs and reruns', () => {
   const workflow = readFileSync(
