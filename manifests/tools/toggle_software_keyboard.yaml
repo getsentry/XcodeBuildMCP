@@ -3,7 +3,7 @@ module: mcp/tools/simulator-management/toggle_software_keyboard
 names:
   mcp: toggle_software_keyboard
   cli: toggle-software-keyboard
-description: Toggle the iOS Simulator software keyboard. Uses Device Hub when available, otherwise Simulator.app (Cmd+K). Shows or hides the on-screen keyboard. Requires the simulator to be booted and Accessibility permission for the MCP host.
+description: Toggle the iOS Simulator software keyboard. Shows or hides the on-screen keyboard. Requires the simulator to be booted and Accessibility permission for the MCP host.
 outputSchema:
   schema: xcodebuildmcp.output.simulator-action-result
   version: "2"
