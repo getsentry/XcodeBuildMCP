@@ -56,7 +56,7 @@ test('monitorWardenRun returns when the Warden run completes', async () => {
   assert.deepEqual(result, { cancelled: false, ignored: false });
 });
 
-test('monitorWardenRun cancels a Warden run at the runtime limit', async () => {
+test('monitorWardenRun cancels a queued Warden run at the runtime limit', async () => {
   let cancelled = false;
 
   const result = await monitorWardenRun({
@@ -64,7 +64,7 @@ test('monitorWardenRun cancels a Warden run at the runtime limit', async () => {
     pollSeconds: 15,
     now: () => Date.parse('2026-07-21T09:10:00Z'),
     sleep: async () => assert.fail('stale run must be cancelled immediately'),
-    getRun: async () => wardenRun(),
+    getRun: async () => wardenRun({ status: 'queued' }),
     cancelRun: async () => {
       cancelled = true;
       return true;
@@ -73,6 +73,26 @@ test('monitorWardenRun cancels a Warden run at the runtime limit', async () => {
 
   assert.equal(cancelled, true);
   assert.deepEqual(result, { cancelled: true, ignored: false });
+});
+
+test('monitorWardenRun calculates each delay from one clock reading', async () => {
+  const runs = [wardenRun(), wardenRun({ status: 'completed' })];
+  const times = [Date.parse('2026-07-21T09:09:59.999Z'), Date.parse('2026-07-21T09:10:00.001Z')];
+  let sleptMilliseconds = 0;
+
+  const result = await monitorWardenRun({
+    maxRuntimeSeconds: 600,
+    pollSeconds: 15,
+    now: () => times.shift(),
+    sleep: async (milliseconds) => {
+      sleptMilliseconds = milliseconds;
+    },
+    getRun: async () => runs.shift(),
+    cancelRun: async () => assert.fail('completed run must not be cancelled'),
+  });
+
+  assert.equal(sleptMilliseconds, 1);
+  assert.deepEqual(result, { cancelled: false, ignored: false });
 });
 
 test('monitorWardenRun never sleeps past the runtime limit', async () => {

@@ -27,8 +27,13 @@ export async function monitorWardenRun({
   }
 
   const deadlineMs = Date.parse(run.created_at) + maxRuntimeSeconds * 1000;
-  while (run.status !== 'completed' && now() < deadlineMs) {
-    await sleep(Math.min(pollSeconds * 1000, deadlineMs - now()));
+  while (run.status !== 'completed') {
+    const remainingMs = deadlineMs - now();
+    if (remainingMs <= 0) {
+      break;
+    }
+
+    await sleep(Math.min(pollSeconds * 1000, remainingMs));
     run = await getRun();
   }
 
