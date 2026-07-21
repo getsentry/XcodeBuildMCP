@@ -14,12 +14,16 @@ import {
 } from '../../../utils/app-lifecycle-results.ts';
 
 const stopMacAppSchema = z.object({
-  appName: z.string().optional(),
-  processId: z.number().optional(),
+  appName: z.string().min(1).optional(),
+  processId: z.number().int().positive().optional(),
 });
 
 type StopMacAppParams = z.infer<typeof stopMacAppSchema>;
 type StopMacAppResult = StopResultDomainResult;
+
+function escapeExtendedRegularExpression(value: string): string {
+  return value.replace(/[\\.^$*+?()[\]{}|]/g, '\\$&');
+}
 
 export async function stop_mac_appLogic(
   params: StopMacAppParams,
@@ -60,14 +64,14 @@ export function createStopMacAppExecutor(
       return buildStopFailure(artifacts, 'Either appName or processId must be provided.');
     }
 
-    const target = params.processId ? `PID ${params.processId}` : params.appName!;
+    const target = params.processId !== undefined ? `PID ${params.processId}` : params.appName!;
     log('info', `Stopping macOS app: ${target}`);
 
     try {
       const command =
         params.processId !== undefined
           ? ['kill', String(params.processId)]
-          : ['pkill', '-f', params.appName!];
+          : ['pkill', '-x', '--', escapeExtendedRegularExpression(params.appName!)];
       const result = await executor(command, 'Stop macOS App');
 
       if (!result.success) {

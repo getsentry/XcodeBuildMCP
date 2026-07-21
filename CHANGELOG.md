@@ -18,6 +18,7 @@
 - Fixed `suppressWarnings` being ignored in settled build, build-run, and test output. The flag was honored only while streaming, so warnings still reached the final MCP tool response ([#447](https://github.com/getsentry/XcodeBuildMCP/issues/447)).
 - Fixed iOS scaffold orientation and device-family settings, LLDB command isolation and argument escaping, run-destination parsing without an active scheme, concurrent working-directory mutations, blocking physical-device name lookup, and unverified `xcodemake` downloads ([#459](https://github.com/getsentry/XcodeBuildMCP/issues/459)).
 - Fixed simulator UI launching and keyboard controls to prefer Xcode 27's Device Hub when available, with Simulator.app as the legacy fallback.
+- Fixed `stop_mac_app` app-name targeting so it no longer terminates unrelated processes whose command lines contain the app name, and reject unsafe process IDs before execution ([#306](https://github.com/getsentry/XcodeBuildMCP/issues/306)).
 
 ## [2.6.2]
 
