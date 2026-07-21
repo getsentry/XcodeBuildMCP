@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { isWardenPullRequestRun, monitorWardenRun, runtimeSeconds } from '../warden-watchdog.mjs';
+import { isPullRequestRun, monitorWardenRun, runtimeSeconds } from '../warden-watchdog.mjs';
 
 function wardenRun(overrides = {}) {
   return {
@@ -14,10 +14,10 @@ function wardenRun(overrides = {}) {
   };
 }
 
-test('isWardenPullRequestRun requires the workflow name and PR event', () => {
-  assert.equal(isWardenPullRequestRun(wardenRun()), true);
-  assert.equal(isWardenPullRequestRun(wardenRun({ name: 'Tests' })), false);
-  assert.equal(isWardenPullRequestRun(wardenRun({ event: 'push' })), false);
+test('isPullRequestRun accepts an omitted workflow name and requires a PR event', () => {
+  assert.equal(isPullRequestRun(wardenRun()), true);
+  assert.equal(isPullRequestRun(wardenRun({ name: '' })), true);
+  assert.equal(isPullRequestRun(wardenRun({ event: 'push' })), false);
 });
 
 test('runtimeSeconds includes queue time and never returns a negative duration', () => {
@@ -27,12 +27,12 @@ test('runtimeSeconds includes queue time and never returns a negative duration',
   assert.equal(runtimeSeconds(run, Date.parse('2026-07-21T08:59:00Z')), 0);
 });
 
-test('monitorWardenRun ignores non-Warden runs', async () => {
+test('monitorWardenRun ignores non-PR runs', async () => {
   const result = await monitorWardenRun({
     maxRuntimeSeconds: 600,
     pollSeconds: 15,
-    getRun: async () => wardenRun({ name: 'Tests' }),
-    cancelRun: async () => assert.fail('non-Warden run must not be cancelled'),
+    getRun: async () => wardenRun({ event: 'push' }),
+    cancelRun: async () => assert.fail('non-PR run must not be cancelled'),
   });
 
   assert.deepEqual(result, { cancelled: false, ignored: true });

@@ -2,10 +2,8 @@ import process from 'node:process';
 import { setTimeout as sleepTimer } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
-const WARDEN_WORKFLOW_NAME = 'Warden';
-
-export function isWardenPullRequestRun(run) {
-  return run.name === WARDEN_WORKFLOW_NAME && run.event === 'pull_request';
+export function isPullRequestRun(run) {
+  return run.event === 'pull_request';
 }
 
 export function runtimeSeconds(run, nowMs) {
@@ -22,7 +20,7 @@ export async function monitorWardenRun({
 }) {
   let run = await getRun();
 
-  if (!isWardenPullRequestRun(run)) {
+  if (!isPullRequestRun(run)) {
     return { cancelled: false, ignored: true };
   }
 
