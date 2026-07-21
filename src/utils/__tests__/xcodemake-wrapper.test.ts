@@ -14,17 +14,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { XCODEMAKE_COMMIT, XCODEMAKE_SHA256 } from '../xcodemake.ts';
 
-const PINNED_FIXTURE_PATH = path.join(
-  process.cwd(),
-  'src',
-  'utils',
-  '__tests__',
-  'fixtures',
-  'xcodemake',
-  `xcodemake-${XCODEMAKE_COMMIT}`,
+const PINNED_FIXTURE_PATH = fileURLToPath(
+  new URL(`./fixtures/xcodemake/xcodemake-${XCODEMAKE_COMMIT}`, import.meta.url),
 );
 
 function writeExecutable(filePath: string, contents: string): void {
