@@ -1,7 +1,7 @@
 import { log } from './logger.ts';
 import type { CommandResponse } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'path';
 import * as os from 'os';
@@ -172,41 +172,6 @@ export function doesMakefileExist(projectDir: string): boolean {
   return existsSync(`${projectDir}/Makefile`);
 }
 
-type ReadDirectory = (path: string) => string[];
-
-export function doesMakeLogFileExist(
-  projectDir: string,
-  command: string[],
-  readDirectory: ReadDirectory = (directory) => readdirSync(directory),
-): boolean {
-  try {
-    const xcodemakeArgs = command.slice(1).map((arg) => {
-      // Remove projectDir from arguments if present at the start
-      const prefix = projectDir + '/';
-      if (arg.startsWith(prefix)) {
-        return arg.substring(prefix.length);
-      }
-      return arg;
-    });
-    const argsHash = createHash('md5').update(xcodemakeArgs.join('\0')).digest('hex');
-    const logFileSuffix = `-${argsHash}.log`;
-    log('debug', `Checking for xcodemake log ending in ${logFileSuffix} in ${projectDir}`);
-
-    const files = readDirectory(projectDir);
-    const exists = files.some(
-      (fileName) => fileName.startsWith('xcodemake') && fileName.endsWith(logFileSuffix),
-    );
-    log('debug', `xcodemake log ${exists ? 'exists' : 'does not exist'}: ${logFileSuffix}`);
-    return exists;
-  } catch (error) {
-    log(
-      'error',
-      `Error checking for Makefile log: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return false;
-  }
-}
-
 export async function executeXcodemakeCommand(
   projectDir: string,
   buildArgs: string[],
@@ -221,13 +186,5 @@ export async function executeXcodemakeCommand(
     return arg;
   });
 
-  return getDefaultCommandExecutor()(command, logPrefix, false, { cwd: projectDir });
-}
-
-export async function executeMakeCommand(
-  projectDir: string,
-  logPrefix: string,
-): Promise<CommandResponse> {
-  const command = ['make'];
   return getDefaultCommandExecutor()(command, logPrefix, false, { cwd: projectDir });
 }
