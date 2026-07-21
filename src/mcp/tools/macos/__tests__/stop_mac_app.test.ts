@@ -24,6 +24,8 @@ describe('stop_mac_app plugin', () => {
       expect(schema.processId.safeParse(0).success).toBe(false);
       expect(schema.processId.safeParse(-1).success).toBe(false);
       expect(schema.processId.safeParse(1.5).success).toBe(false);
+      expect(schema.processId.safeParse(Number.NaN).success).toBe(false);
+      expect(schema.processId.safeParse(Number.MAX_SAFE_INTEGER + 1).success).toBe(false);
     });
   });
 
@@ -34,6 +36,20 @@ describe('stop_mac_app plugin', () => {
       expect(result.isError).toBe(true);
       expect(allText(result)).toContain('appName or processId');
     });
+
+    it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+      'should reject unsafe process ID %s at the execution boundary',
+      async (processId) => {
+        const calls: string[][] = [];
+        const executor = createMockExecutor({ onExecute: (command) => calls.push(command) });
+
+        const result = await runLogic(() => stop_mac_appLogic({ processId }, executor));
+
+        expect(result.isError).toBe(true);
+        expect(allText(result)).toContain('processId must be a positive safe integer');
+        expect(calls).toHaveLength(0);
+      },
+    );
   });
 
   describe('Command Generation', () => {
