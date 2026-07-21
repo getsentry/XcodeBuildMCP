@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { XCODEMAKE_COMMIT, XCODEMAKE_SHA256 } from '../xcodemake.ts';
 
+const FILESYSTEM_TIMESTAMP_TOLERANCE_MS = 1_000;
 const PINNED_FIXTURE_PATH = fileURLToPath(
   new URL(`./fixtures/xcodemake/xcodemake-${XCODEMAKE_COMMIT}`, import.meta.url),
 );
@@ -139,7 +140,9 @@ describe('pinned xcodemake wrapper lifecycle', () => {
     expect(readLines(xcodebuildInvocationLog)).toHaveLength(2);
     expect(readLines(makeInvocationLog)).toHaveLength(2);
     expect(captureLogs()).toHaveLength(1);
-    expect(statSync(makefilePath).mtimeMs).toBeGreaterThan(Date.now() + 30_000);
+    expect(
+      Math.abs(statSync(makefilePath).mtimeMs - futureMakefileTime.getTime()),
+    ).toBeLessThanOrEqual(FILESYSTEM_TIMESTAMP_TOLERANCE_MS);
 
     const changedArguments = initialArguments.map((argument) =>
       argument === 'Debug' ? 'Release' : argument,
