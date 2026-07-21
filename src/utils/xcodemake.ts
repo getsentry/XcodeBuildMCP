@@ -10,8 +10,8 @@ import { getConfig } from './config-store.ts';
 
 let overriddenXcodemakePath: string | null = null;
 
-export const XCODEMAKE_COMMIT = '7d20fab4ba128f7f533dd27d709daf1bff3c30e2';
-export const XCODEMAKE_SHA256 = '8f2b2c071628959a6564882dd14897489054716eac18766cbcb20164f9d81da8';
+export const XCODEMAKE_COMMIT = '75f47d4b69c1604cb886ab37d348c2c245d18329';
+export const XCODEMAKE_SHA256 = '0934f784661f8b295f51064b8e94659c986ca25affc5062f20d5210ae0e25201';
 export const XCODEMAKE_DOWNLOAD_URL = `https://raw.githubusercontent.com/cameroncooke/xcodemake/${XCODEMAKE_COMMIT}/xcodemake`;
 
 interface XcodemakeInstallerDependencies {

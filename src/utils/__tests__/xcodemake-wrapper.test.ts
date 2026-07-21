@@ -68,7 +68,7 @@ describe('pinned xcodemake wrapper lifecycle', () => {
     );
     writeExecutable(
       path.join(fakeBinDirectory, 'make'),
-      '#!/bin/sh\nprintf \'make\\n\' >> "$XCODEMAKE_TEST_MAKE_LOG"\n',
+      '#!/bin/sh\nprintf \'make\\n\' >> "$XCODEMAKE_TEST_MAKE_LOG"\nattempts=0\nwhile IFS= read -r _; do attempts=$((attempts + 1)); done < "$XCODEMAKE_TEST_MAKE_LOG"\nif [ "${XCODEMAKE_TEST_FAIL_FIRST_MAKE:-0}" = "1" ] && [ "$attempts" -eq 1 ]; then\n  exit 1\nfi\n',
     );
   });
 
@@ -76,7 +76,7 @@ describe('pinned xcodemake wrapper lifecycle', () => {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   });
 
-  function runWrapper(arguments_: string[]): void {
+  function runWrapper(arguments_: string[], environment: Record<string, string> = {}): void {
     execFileSync('perl', [PINNED_FIXTURE_PATH, ...arguments_], {
       cwd: projectDirectory,
       encoding: 'utf8',
@@ -88,6 +88,7 @@ describe('pinned xcodemake wrapper lifecycle', () => {
         OBJROOT: path.join(temporaryDirectory, 'objroot'),
         XCODEMAKE_TEST_XCODEBUILD_LOG: xcodebuildInvocationLog,
         XCODEMAKE_TEST_MAKE_LOG: makeInvocationLog,
+        ...environment,
       },
     });
   }
@@ -122,6 +123,9 @@ describe('pinned xcodemake wrapper lifecycle', () => {
 
     const initialXcodebuildInvocations = readLines(xcodebuildInvocationLog);
     expect(initialXcodebuildInvocations).toHaveLength(2);
+    expect(initialXcodebuildInvocations).not.toContainEqual(
+      expect.stringContaining('-config Debug'),
+    );
     expect(initialXcodebuildInvocations[0]).toContain(derivedDataPath);
     expect(initialXcodebuildInvocations[0]).toMatch(/ clean$/);
     expect(initialXcodebuildInvocations[1]).not.toMatch(/ clean$/);
@@ -131,11 +135,16 @@ describe('pinned xcodemake wrapper lifecycle', () => {
       derivedDataPath,
     );
 
+    const makefilePath = path.join(projectDirectory, 'Makefile');
+    const futureMakefileTime = new Date(Date.now() + 60_000);
+    utimesSync(makefilePath, futureMakefileTime, futureMakefileTime);
+
     runWrapper(initialArguments);
 
     expect(readLines(xcodebuildInvocationLog)).toHaveLength(2);
     expect(readLines(makeInvocationLog)).toHaveLength(2);
     expect(captureLogs()).toHaveLength(1);
+    expect(statSync(makefilePath).mtimeMs).toBeGreaterThan(Date.now() + 30_000);
 
     const changedArguments = initialArguments.map((argument) =>
       argument === 'Debug' ? 'Release' : argument,
@@ -160,5 +169,29 @@ describe('pinned xcodemake wrapper lifecycle', () => {
     expect(readLines(xcodebuildInvocationLog)).toHaveLength(6);
     expect(readLines(makeInvocationLog)).toHaveLength(4);
     expect(captureLogs()).toHaveLength(2);
+  });
+
+  it('preserves the long configuration option when direct xcodebuild fallback is required', () => {
+    runWrapper(
+      [
+        '-workspace',
+        'MyWorkspace.xcworkspace',
+        '-scheme',
+        'MyScheme',
+        '-configuration',
+        'Release',
+        'build',
+      ],
+      { XCODEMAKE_TEST_FAIL_FIRST_MAKE: '1' },
+    );
+
+    const xcodebuildInvocations = readLines(xcodebuildInvocationLog);
+    expect(xcodebuildInvocations).toHaveLength(5);
+    expect(
+      xcodebuildInvocations.every((invocation) => invocation.includes('-configuration Release')),
+    ).toBe(true);
+    expect(xcodebuildInvocations).not.toContainEqual(expect.stringContaining('-config Debug'));
+    expect(xcodebuildInvocations[2]).not.toMatch(/ clean$/);
+    expect(readLines(makeInvocationLog)).toHaveLength(2);
   });
 });

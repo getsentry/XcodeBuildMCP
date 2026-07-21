@@ -44,6 +44,23 @@ sub shellEscape {
     $_[0] =~ s/ /\\ /g;
 }
 
+sub hasConfigurationArgument {
+    return scalar grep { /^--?(?:config|configuration)$/ } @_;
+}
+
+sub fileContainsLiteral {
+    my ($file, $literal) = @_;
+    open my $fh, "<", $file or return 0;
+    while (my $line = <$fh>) {
+        if (index($line, $literal) != -1) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
+}
+
 # --- Global Variables ---
 my $log_tag = join "_", ("xcodemake", @original_ARGV);
 $log_tag =~ s{[/:]+}{_}g;
@@ -61,13 +78,10 @@ my $make = "Makefile";
 
 my $xcodebuild = ($ENV{DEVELOPER_BIN_DIR}||'/usr/bin')."/xcodebuild";
 my $archs = $ENV{ARCHS}||'arm64';
-# Define $args based on original_ARGV, but check *original_ARGV* for -config
-my $args_for_variant = join ' ', map { "'$_'" } @original_ARGV;
-my $has_config_in_original = grep { /^-config$/ } @original_ARGV;
-$args_for_variant .= " -config Debug" unless $has_config_in_original;
+my $has_config_in_original = hasConfigurationArgument(@original_ARGV);
 
 my $variant = "$xcodebuild ARCHS=$archs @original_ARGV";
-$variant .= " -config Debug" unless $has_config_in_original; # Match how $args_for_variant is built
+$variant .= " -config Debug" unless $has_config_in_original;
 
 my $builddb = ($ENV{OBJROOT}||'/tmp')."/XCBuildData/build.db";
 
@@ -83,9 +97,8 @@ $fileArg = "$notSpace+(?:\\\\.$notSpace*)*";
 # Recapture xcodebuild output if paramaters change or project has been edited
 captureXcodebuild() if ! -f $log || `find . -name project.pbxproj -newer '$log'`;
 
-# Regenerate Makefile (if script newer or different xcodebuild or arguments)
-# Use the potentially modified $variant string for the grep check
-generateMakefile() if ! -f $make || -M $0 < -M $make || !`grep -Fq '$variant' Makefile`;
+# Regenerate Makefile if the script, xcodebuild path, or arguments changed.
+generateMakefile() if ! -f $make || -M $0 < -M $make || !fileContainsLiteral($make, $variant);
 
 exit $EXIT_SUCCESS if $EXIT_SUCCESS == system "make";
 
@@ -128,7 +141,7 @@ sub captureXcodebuild {
     my @cmd_args = @original_ARGV;
     # Add default -config Debug if necessary *to the list*
     # Check original args for all possible configuration argument formats
-    my $has_config = grep { /^-config$/ || /^--config$/ || /^-configuration$/ || /^--configuration$/ } @original_ARGV;
+    my $has_config = hasConfigurationArgument(@original_ARGV);
     push @cmd_args, ('-config', 'Debug') unless $has_config;
 
 
