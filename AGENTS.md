@@ -50,7 +50,7 @@ ESM TypeScript project (`type: module`). Key layers:
 - Do not add fallback behavior by default. If required context, configuration, runtime state, or dependencies are missing, fail loudly and fix the caller/setup instead of silently switching to an alternate path. Add a fallback only when explicitly requested or when it is a documented product requirement.
 - Review the complete merge-base diff and trace changed contracts through callers, consumers, tests, and operational configuration.
 - Verify standard quality commands include every changed path and exercise exact entry points and argument variants; validate explicitly when they do not.
-- For asynchronous, workflow, or process-boundary changes, enumerate lifecycle states and race transitions; test terminal outcomes and missing or optional metadata.
+- For asynchronous, workflow, or process-boundary changes, enumerate lifecycle states, retries, supersession, and race transitions; test terminal outcomes and missing or optional metadata.
 
 ## Import Conventions
 - ESM with explicit `.ts` extensions in `src/` (tsup rewrites to `.js` at build)

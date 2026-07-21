@@ -32,6 +32,14 @@ test('workflow starts the watchdog for initial runs and reruns', () => {
   assert.match(workflow, /types: \[requested, in_progress\]/);
   assert.match(workflow, /github\.event\.action == 'requested'/);
   assert.match(workflow, /github\.event\.workflow_run\.run_attempt > 1/);
+  assert.match(
+    workflow,
+    / {4}concurrency:\n {6}group: warden-watchdog-\$\{\{ github\.event\.workflow_run\.id \}\}\n {6}cancel-in-progress: true/,
+  );
+  assert.match(
+    workflow,
+    /TARGET_RUN_ATTEMPT: \$\{\{ github\.event\.workflow_run\.run_attempt \}\}/,
+  );
 });
 
 test('isPullRequestRun classifies runs using only the event', () => {
@@ -47,20 +55,20 @@ test('runtimeSeconds includes queue time and never returns a negative duration',
   assert.equal(runtimeSeconds(run, Date.parse('2026-07-21T08:59:00Z')), 0);
 });
 
-test('runStartTimeMs uses the current attempt start for reruns', () => {
+test('runStartTimeMs includes queue time from attempt-scoped rerun metadata', () => {
   const rerun = wardenRun({
     run_attempt: 3,
-    created_at: '2026-07-20T21:07:18Z',
+    created_at: '2026-07-21T09:30:00Z',
     run_started_at: '2026-07-21T09:36:28Z',
   });
 
-  assert.equal(runStartTimeMs(rerun), Date.parse('2026-07-21T09:36:28Z'));
-  assert.equal(runtimeSeconds(rerun, Date.parse('2026-07-21T09:46:28Z')), 600);
+  assert.equal(runStartTimeMs(rerun), Date.parse('2026-07-21T09:30:00Z'));
+  assert.equal(runtimeSeconds(rerun, Date.parse('2026-07-21T09:40:00Z')), 600);
 });
 
 test('runStartTimeMs rejects a rerun without a valid attempt timestamp', () => {
   assert.throws(
-    () => runStartTimeMs(wardenRun({ run_attempt: 2, run_started_at: null })),
+    () => runStartTimeMs(wardenRun({ run_attempt: 2, created_at: null })),
     /invalid start timestamp/,
   );
 });
@@ -153,6 +161,21 @@ test('monitorWardenRun never sleeps past the runtime limit', async () => {
   assert.deepEqual(result, { cancelled: true, ignored: false });
 });
 
+test('monitorWardenRun does not cancel a newer run attempt', async () => {
+  const result = await monitorWardenRun({
+    maxRuntimeSeconds: 600,
+    pollSeconds: 15,
+    expectedRunAttempt: 1,
+    now: () => Date.parse('2026-07-21T09:10:00Z'),
+    sleep: async () => assert.fail('stale run must check the current attempt immediately'),
+    getRun: async () => wardenRun({ run_attempt: 1 }),
+    getCurrentRun: async () => wardenRun({ run_attempt: 2 }),
+    cancelRun: async () => assert.fail('a superseded attempt must not cancel the current run'),
+  });
+
+  assert.deepEqual(result, { cancelled: false, ignored: false, superseded: true });
+});
+
 test('monitorWardenRun handles a run completing naturally during cancellation', async () => {
   const runs = [wardenRun(), wardenRun({ status: 'completed', conclusion: 'success' })];
 
@@ -162,6 +185,7 @@ test('monitorWardenRun handles a run completing naturally during cancellation', 
     now: () => Date.parse('2026-07-21T09:10:00Z'),
     sleep: async () => assert.fail('stale run must attempt cancellation immediately'),
     getRun: async () => runs.shift(),
+    getCurrentRun: async () => wardenRun(),
     cancelRun: async () => true,
   });
 
@@ -177,6 +201,7 @@ test('monitorWardenRun reports a completed cancellation', async () => {
     now: () => Date.parse('2026-07-21T09:10:00Z'),
     sleep: async () => assert.fail('stale run must attempt cancellation immediately'),
     getRun: async () => runs.shift(),
+    getCurrentRun: async () => wardenRun(),
     cancelRun: async () => true,
   });
 
@@ -192,6 +217,7 @@ test('monitorWardenRun handles a run completing after cancellation is rejected',
     now: () => Date.parse('2026-07-21T09:10:00Z'),
     sleep: async () => assert.fail('stale run must attempt cancellation immediately'),
     getRun: async () => runs.shift(),
+    getCurrentRun: async () => wardenRun(),
     cancelRun: async () => false,
   });
 

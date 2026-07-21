@@ -7,8 +7,7 @@ export function isPullRequestRun(run) {
 }
 
 export function runStartTimeMs(run) {
-  const startTime = run.run_attempt > 1 ? run.run_started_at : run.created_at;
-  const startTimeMs = Date.parse(startTime);
+  const startTimeMs = Date.parse(run.created_at);
   if (Number.isNaN(startTimeMs)) {
     throw new Error('Warden run has an invalid start timestamp');
   }
@@ -21,7 +20,9 @@ export function runtimeSeconds(run, nowMs) {
 
 export async function monitorWardenRun({
   getRun,
+  getCurrentRun = getRun,
   cancelRun,
+  expectedRunAttempt,
   maxRuntimeSeconds,
   pollSeconds,
   now = Date.now,
@@ -31,6 +32,11 @@ export async function monitorWardenRun({
 
   if (!isPullRequestRun(run)) {
     return { cancelled: false, ignored: true };
+  }
+
+  const monitoredAttempt = expectedRunAttempt ?? run.run_attempt;
+  if (run.run_attempt !== monitoredAttempt) {
+    throw new Error(`Expected Warden run attempt ${monitoredAttempt}, received ${run.run_attempt}`);
   }
 
   const deadlineMs = runStartTimeMs(run) + maxRuntimeSeconds * 1000;
@@ -45,6 +51,15 @@ export async function monitorWardenRun({
   }
 
   if (run.status === 'completed') {
+    return { cancelled: false, ignored: false };
+  }
+
+  const currentRun = await getCurrentRun();
+  if (currentRun.run_attempt !== monitoredAttempt) {
+    return { cancelled: false, ignored: false, superseded: true };
+  }
+
+  if (currentRun.status === 'completed') {
     return { cancelled: false, ignored: false };
   }
 
@@ -107,13 +122,18 @@ function positiveIntegerEnvironment(name) {
 async function main() {
   const repository = requiredEnvironment('GITHUB_REPOSITORY');
   const runId = positiveIntegerEnvironment('TARGET_RUN_ID');
+  const runAttempt = positiveIntegerEnvironment('TARGET_RUN_ATTEMPT');
   const maxRuntimeSeconds = positiveIntegerEnvironment('WARDEN_MAX_RUNTIME_SECONDS');
   requiredEnvironment('GITHUB_TOKEN');
 
   const result = await monitorWardenRun({
     maxRuntimeSeconds,
     pollSeconds: positiveIntegerEnvironment('WARDEN_POLL_SECONDS'),
-    getRun: () => githubRequest(`/repos/${repository}/actions/runs/${runId}`),
+    expectedRunAttempt: runAttempt,
+    // The generic run endpoint retains attempt 1's created_at across reruns.
+    getRun: () =>
+      githubRequest(`/repos/${repository}/actions/runs/${runId}/attempts/${runAttempt}`),
+    getCurrentRun: () => githubRequest(`/repos/${repository}/actions/runs/${runId}`),
     cancelRun: async () => {
       const response = await githubRequest(`/repos/${repository}/actions/runs/${runId}/cancel`, {
         method: 'POST',
@@ -124,6 +144,11 @@ async function main() {
 
   if (result.cancelled) {
     throw new Error(`Cancelled Warden run ${runId} after exceeding ${maxRuntimeSeconds} seconds`);
+  }
+
+  if (result.superseded) {
+    globalThis.console.log(`Warden run attempt ${runAttempt} was superseded`);
+    return;
   }
 
   globalThis.console.log(result.ignored ? 'Ignored non-PR Warden run' : 'Warden run completed');
