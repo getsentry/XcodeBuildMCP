@@ -82,7 +82,7 @@ export async function executeXcodeBuildCommand(
       projectPath,
     });
 
-    let projectDir = '';
+    let projectDir = process.cwd();
     if (workspacePath) {
       projectDir = path.dirname(workspacePath);
       command.push('-workspace', workspacePath);

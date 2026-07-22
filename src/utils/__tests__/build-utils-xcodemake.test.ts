@@ -78,4 +78,34 @@ describe('build-utils xcodemake lifecycle', () => {
       'iOS Simulator Build',
     );
   });
+
+  it('uses the current working directory when no project or workspace path is provided', async () => {
+    const derivedDataPath =
+      '/Users/developer/Library/Developer/XcodeBuildMCP/DerivedData/MyScheme-57a542dedf16';
+    const executorCall = vi.fn();
+    const executor = createMockExecutor({ onExecute: executorCall });
+
+    const result = await executeXcodeBuildCommand(
+      {
+        scheme: 'MyScheme',
+        derivedDataPath,
+      },
+      {
+        platform: XcodePlatform.iOSSimulator,
+        simulatorId: 'SIMULATOR-UDID',
+        logPrefix: 'iOS Simulator Build',
+      },
+      false,
+      'build',
+      executor,
+    );
+
+    expect(result.isError).toBeFalsy();
+    expect(executorCall).not.toHaveBeenCalled();
+    expect(executeXcodemakeCommandMock).toHaveBeenCalledWith(
+      process.cwd(),
+      expect.arrayContaining(['-derivedDataPath', derivedDataPath]),
+      'iOS Simulator Build',
+    );
+  });
 });
