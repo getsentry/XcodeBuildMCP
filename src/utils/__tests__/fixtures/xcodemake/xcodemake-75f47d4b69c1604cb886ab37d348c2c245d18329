@@ -1,0 +1,605 @@
+#!/usr/bin/env perl -w
+#
+# "xcodemake"
+#
+# Derived from: https://github.com/johnno1962/xcodemake
+#
+# A short script to convert xcodebuild output into a Makefile.
+# Once a Makefile has been generated you can use the much
+# faster "make" command for most builds instead of launching
+# the more ponderous xcodebuild for each iteration. Sure,
+# this could be rewritten in python and use ninja instead.
+#
+# xcodebuild re-run if its arguments change or make fails or project modified.
+# Makefile re-generated if script modified or xcodebuild recaptured.
+#
+
+use IO::File;
+use strict;
+use JSON::PP;
+use Digest::MD5 qw(md5_hex);
+
+my @original_ARGV = @ARGV;
+
+# --- Global Utility Functions ---
+sub escape {
+    # Escape characters in $_[1] listed in $_[0] with a backslash
+    $_[1] =~ s/([$_[0]])/\\$1/g;
+}
+sub unescape {
+    # Unescape characters in $_[1] listed in $_[0] preceded by a backslash
+    $_[1] =~ s/\\([$_[0]])/$1/g;
+}
+
+# escape literal '$' for make --> '$$'
+sub dollarEscape {
+    # $_[0] is the variable passed by reference implicitly
+    $_[0] =~ s/\$/\$\$/g;
+}
+# escape characters sensitive to the shell/make for file paths
+sub shellEscape {
+     # $_[0] is the variable passed by reference implicitly
+    escape("()#&\$", $_[0]); # Escape shell metacharacters & Make '$'
+    # Escape spaces for shell commands separately
+    $_[0] =~ s/ /\\ /g;
+}
+
+sub hasConfigurationArgument {
+    return scalar grep { /^--?(?:config|configuration)$/ } @_;
+}
+
+sub fileContainsLiteral {
+    my ($file, $literal) = @_;
+    open my $fh, "<", $file or return 0;
+    while (my $line = <$fh>) {
+        if (index($line, $literal) != -1) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
+}
+
+# --- Global Variables ---
+my $log_tag = join "_", ("xcodemake", @original_ARGV);
+$log_tag =~ s{[/:]+}{_}g;
+$log_tag =~ s{[^[:alnum:]._+=,@ -]+}{_}g;
+$log_tag =~ s{\s+}{_}g;
+$log_tag =~ s{_+}{_}g;
+$log_tag =~ s{^_+|_+$}{}g;
+$log_tag ||= "xcodemake";
+my $max_log_name_length = 150;
+my $log_suffix = "-" . md5_hex(join "\0", @original_ARGV) . ".log";
+$log_tag = substr($log_tag, 0, $max_log_name_length - length($log_suffix));
+$log_tag =~ s{_+$}{};
+my $log = ($log_tag || "xcodemake") . $log_suffix;
+my $make = "Makefile";
+
+my $xcodebuild = ($ENV{DEVELOPER_BIN_DIR}||'/usr/bin')."/xcodebuild";
+my $archs = $ENV{ARCHS}||'arm64';
+my $has_config_in_original = hasConfigurationArgument(@original_ARGV);
+
+my $variant = "$xcodebuild ARCHS=$archs @original_ARGV";
+$variant .= " -config Debug" unless $has_config_in_original;
+
+my $builddb = ($ENV{OBJROOT}||'/tmp')."/XCBuildData/build.db";
+
+my $EXIT_SUCCESS = 0;
+my ($LOG, $fileArg); # $LOG will be lexical to generateMakefile
+
+# regex for file path argument (handles spaces escaped with backslash)
+my $notSpace = "[^\\\\\\s]";
+$fileArg = "$notSpace+(?:\\\\.$notSpace*)*";
+
+# --- Main Logic ---
+
+# Recapture xcodebuild output if paramaters change or project has been edited
+captureXcodebuild() if ! -f $log || `find . -name project.pbxproj -newer '$log'`;
+
+# Regenerate Makefile if the script, xcodebuild path, or arguments changed.
+generateMakefile() if ! -f $make || -M $0 < -M $make || !fileContainsLiteral($make, $variant);
+
+exit $EXIT_SUCCESS if $EXIT_SUCCESS == system "make";
+
+rename $builddb, $builddb.".save" if -f $builddb;
+
+# If make failed, try running xcodebuild directly. If it succeeds, regenerate and try make again.
+# Prepare command array for direct xcodebuild run (needs env)
+my @direct_build_cmd_parts = ($xcodebuild);
+# Use the original arguments captured at the start
+my @direct_build_args = @original_ARGV;
+push @direct_build_args, ('-config', 'Debug') unless $has_config_in_original;
+my @direct_build_cmd = (@direct_build_cmd_parts, @direct_build_args);
+
+my $direct_build_status;
+{
+    local $ENV{ARCHS} = $archs; # Set environment for direct build too
+    $direct_build_status = system(@direct_build_cmd);
+}
+
+if ($direct_build_status == $EXIT_SUCCESS) {
+    captureXcodebuild(); # Recapture if direct build worked
+    generateMakefile();
+    exit $EXIT_SUCCESS if $EXIT_SUCCESS == system "make"; # Try make again
+}
+
+rename $builddb.".save", $builddb if -f $builddb.".save";
+exit !$EXIT_SUCCESS; # Exit with failure if direct build or second make failed
+
+# --- Subroutines ---
+
+sub captureXcodebuild {
+    # Move Xcode's build database to one side
+    rename $builddb, $builddb.".save" if -f $builddb;
+
+    # --- Prepare Arguments for List system() ---
+    # Simply use xcodebuild directly, inheriting the environment
+    my @base_cmd_parts = ($xcodebuild);
+
+    # Use the *original* @ARGV captured at the script start
+    my @cmd_args = @original_ARGV;
+    # Add default -config Debug if necessary *to the list*
+    # Check original args for all possible configuration argument formats
+    my $has_config = hasConfigurationArgument(@original_ARGV);
+    push @cmd_args, ('-config', 'Debug') unless $has_config;
+
+
+    # Handle -resultBundlePath removal for the command array
+    my $rm_cmd;
+    # Use the potentially modified $variant string for matching here
+    if (my ($bundle) = $variant =~ /-resultBundlePath ($fileArg)/) {
+        my $rm_bundle = $bundle;
+        unescape("'\\\\'", $rm_bundle);
+        $rm_cmd = ['rm', '-rf', $rm_bundle];
+    }
+
+    # --- Execute Commands ---
+    # 1. Optional: Remove result bundle
+    if ($rm_cmd) {
+        warn "Executing: @$rm_cmd\n";
+        system(@$rm_cmd) == 0 or warn "Warning: rm command failed: \$? = $?\n";
+    }
+
+    # --- Environment for xcodebuild ---
+    # We need ARCHS=$archs in the environment for the child process
+    my %child_env;
+    $child_env{ARCHS} = $archs;
+
+    # 2. Execute Clean Command
+    my @clean_cmd = (@base_cmd_parts, @cmd_args, 'clean');
+    warn "Executing clean: @clean_cmd\n";
+    my $clean_status;
+    {
+        # Set environment locally for this block
+        local $ENV{ARCHS} = $child_env{ARCHS};
+        $clean_status = system(@clean_cmd);
+    }
+    if ($clean_status != $EXIT_SUCCESS) {
+        # Exit status calculation needs $? which was set by system()
+        my $clean_raw_status = $?;
+        my $clean_exit_code  = $clean_raw_status >> 8;
+        my $clean_signal     = $clean_raw_status & 0x7F;
+        warn "Error: xcodebuild clean failed: exit code=$clean_exit_code, signal=$clean_signal, raw(\$?)=$clean_raw_status\n";
+        rename $builddb.".save", $builddb if -f $builddb.".save";
+        exit !$EXIT_SUCCESS; # Exit with a non-zero status
+    }
+
+    # 3. Execute Build Command and Capture Output
+    my @build_cmd = (@base_cmd_parts, @cmd_args);
+    warn "Executing build and capturing output: @build_cmd\n";
+
+    my $build_pid;
+    my $build_fh;
+    {
+        # Set environment locally for the fork/exec done by open()
+        local $ENV{ARCHS} = $child_env{ARCHS};
+        $build_pid = open($build_fh, "-|", @build_cmd);
+    }
+    unless (defined $build_pid) { # Check if open succeeded
+         warn "Error: Cannot fork for xcodebuild: $!";
+         rename $builddb.".save", $builddb if -f $builddb.".save";
+         exit !$EXIT_SUCCESS; # Exit with a non-zero status
+    }
+
+    # Open log file for writing
+    my $log_fh;
+    unless (open $log_fh, ">", $log) {
+        warn "Error: Cannot open log file $log for writing: $!";
+         # Need to ensure we don't leave the child process running
+         eval { close($build_fh); }; # Try to close the pipe
+         waitpid($build_pid, 0) if $build_pid > 0; # Wait if pid is valid
+         rename $builddb.".save", $builddb if -f $builddb.".save";
+         exit !$EXIT_SUCCESS; # Exit with a non-zero status
+    }
+
+    # Read from build output, write to log and stderr (simulate tee)
+    while (my $output_line = <$build_fh>) {
+        print $log_fh $output_line;
+        print STDERR $output_line; # Print to terminal like tee does
+    }
+
+    close $log_fh;
+    # Important: Close the file handle *before* checking status
+    # Closing the pipe sends EOF to the reader and waits for the process
+    unless (close($build_fh)) {
+        # close returns false if the process exited non-zero or the pipe had errors
+        # $? is set by close() on the pipe!
+         my $build_status = $?;
+         my $build_exit_code = $build_status >> 8;
+         my $build_signal    = $build_status & 0x7F;
+         warn "Error: xcodebuild build command failed (detected by close pipe): exit code=$build_exit_code, signal=$build_signal, raw(\$?)=$build_status\n";
+         unlink $log if -f $log; # Remove potentially incomplete log
+         rename $builddb.".save", $builddb if -f $builddb.".save";
+         exit !$EXIT_SUCCESS; # Exit with a non-zero status
+    }
+
+    # If close($build_fh) succeeded, $? should reflect the child's exit status
+    # (0 for success, or potentially > 0 if xcodebuild reported success but exited non-zero)
+    my $build_status = $?;
+    my $build_exit_code = $build_status >> 8;
+    my $build_signal    = $build_status & 0x7F;
+
+    # Explicitly check for exit code 0 and no signal for success
+    if ($build_exit_code != $EXIT_SUCCESS || $build_signal != 0) {
+        warn "Error: xcodebuild build command finished but indicated failure: exit code=$build_exit_code, signal=$build_signal, raw(\$?)=$build_status\n";
+        unlink $log if -f $log; # Remove potentially incomplete log
+        rename $builddb.".save", $builddb if -f $builddb.".save";
+        exit !$EXIT_SUCCESS; # Exit with a non-zero status
+    }
+
+    # Build succeeded!
+    unlink $make; # Force Makefile regeneration
+
+    rename $builddb.".save", $builddb if -f $builddb.".save";
+}
+
+
+sub generateMakefile {
+    # Use lexical filehandle for safety
+    my $log_fh;
+    unless (open $log_fh, "<", $log) {
+        die "Could not open $log: $!";
+    }
+    my $make_fh;
+     unless (open $make_fh, ">", $make) {
+        die "Could not create $make: $!";
+    }
+
+    # Get next line from log
+    # Using closure to capture $log_fh
+    my $nextLine = sub {
+        my $line = <$log_fh>;
+        return undef unless defined $line; # Return undef on EOF
+        chomp $line;
+        return $line;
+    };
+
+    # Get next 'cd' line and prepare prefix for make recipe
+    # Using closure to capture $nextLine
+    my $nextCD = sub {
+        my $line = &$nextLine();
+        # Check if it's actually a cd line before trying to process
+        return undef unless defined $line && $line =~ s/^\s*cd //;
+        # Handle potential '/usr/bin/time' prefix added by the script itself if re-parsing
+        $line =~ s{^\s*/usr/bin/time\s+}{};
+        my $cd = $line;
+        unescape("^\$'()&", $cd);
+        escape(" ", $cd);
+        dollarEscape($cd);
+        return "\t\tcd $cd\n\t\t"; # Just return the cd line and tabs
+    };
+
+    # Extract values for the option (e.g., -o file, -primary-file file) from a command line
+    # Using closure to capture $fileArg
+    my $extractOption = sub {
+        my ($line, $option) = @_;
+        # Match " option path" where path is captured by $fileArg
+        my @values = $line =~ m/ $option\s+($fileArg)/g;
+        # Unescape paths extracted via regex
+        for (@values) {
+             unescape("'\\\\'", $_);
+        }
+        return @values;
+    };
+
+    # --- Makefile Generation ---
+    print $make_fh <<HEADER;
+#
+# Generated @{[scalar localtime()]} from
+# $variant
+#
+
+default: main
+
+HEADER
+
+    my (%rules, @linked, @codesigns);
+    my $json_decoder = JSON::PP->new->utf8; # For decoding JSON output map
+
+    while (defined(my $line = &$nextLine())) {
+        print $make_fh "# $line\n";
+
+        # --- CompileC Handling (Objective-C/C/C++) ---
+        if (my ($object, $source) = $line =~
+            /^CompileC ($fileArg) ($fileArg) /) {
+            my $cd = &$nextCD();
+            unless (defined $cd) {
+                warn "Warning: Expected 'cd' after CompileC line, but not found. Skipping rule for $object.\n";
+                next;
+            }
+            my $compile_cmd_line;
+            do {
+                $compile_cmd_line = &$nextLine();
+                last unless defined $compile_cmd_line; # Break if EOF
+            } while ($compile_cmd_line =~ /^\s*$|response file/); # Skip blank lines/response file info
+
+            unless (defined $compile_cmd_line && $compile_cmd_line !~ /^\s*$/) {
+                 warn "Warning: Expected compile command after 'cd' for $object, but not found. Skipping rule.\n";
+                 next;
+            }
+
+            # Prepare paths for Make rule
+            my $make_target_object = $object;
+            my $make_dep_source = $source;
+            unescape("{}()", $make_target_object);
+            escape("\$& ", $make_target_object);
+            dollarEscape($make_dep_source);
+            unescape("'", $make_dep_source);
+            unescape(" ", $make_dep_source);
+            escape(" ", $make_dep_source);
+
+            # Add rule to Makefile
+            print $make_fh "\n$make_target_object: $make_dep_source\n";
+
+            # Prepare command for recipe
+            dollarEscape($compile_cmd_line);
+
+            # Touch command needs escaped object path suitable for shell
+            my $shell_touch_object = $object;
+            shellEscape($shell_touch_object);
+
+            print $make_fh "$cd$compile_cmd_line && touch $shell_touch_object\n\n";
+            $rules{$make_target_object} = 1; # Mark object as known (using Make-escaped form)
+
+        # --- SwiftDriver Handling (Xcode 16.3+) ---
+        } elsif ($line =~ /^SwiftDriver .* com\.apple\.xcode\.tools\.swift\.compiler/) {
+            my $cd = &$nextCD();
+            unless (defined $cd) {
+                warn "Warning: Expected 'cd' after SwiftDriver line, but not found. Skipping Swift rules.\n";
+                next;
+            }
+
+            # Get the line containing the actual command invocation
+            my $build_invocation_line = &$nextLine();
+            unless (defined $build_invocation_line) {
+                 warn "Warning: Expected command line after 'cd' for SwiftDriver, but found EOF.\nSkipping Swift rules.\n";
+                 next;
+            }
+
+            # Extract the actual command (e.g., /path/to/swiftc ...) by removing the prefix
+            my $swift_actual_cmd = $build_invocation_line;
+            unless ($swift_actual_cmd =~ s/^\s*builtin-SwiftDriver\s+--\s+//) {
+                 warn "Warning: Expected 'builtin-SwiftDriver -- ' prefix, but found: $build_invocation_line\nSkipping Swift rules.\n";
+                 next;
+            }
+            # Now $swift_actual_cmd contains "/Applications/.../swiftc ..."
+
+            $swift_actual_cmd =~ s/\s+-use-frontend-parseable-output//;
+
+            # Extract the output file map path *from the original build invocation line*
+            my ($output_map_file) = $build_invocation_line =~ /-output-file-map\s+($fileArg)/;
+            unless (defined $output_map_file) {
+                # Fallback: check the extracted swiftc command itself? Less likely needed.
+                ($output_map_file) = $swift_actual_cmd =~ /-output-file-map\s+($fileArg)/;
+            }
+             unless (defined $output_map_file) {
+                warn "Warning: Could not find -output-file-map in SwiftDriver line: $build_invocation_line\nSkipping Swift rules.\n";
+                next;
+            }
+            unescape("'\\\\'", $output_map_file);
+
+            # Read and parse the JSON Output File Map
+            my $map_content;
+            my $MAP_FH;
+            eval {
+                $MAP_FH = IO::File->new("< $output_map_file") or die "Cannot open output map $output_map_file: $!";
+                local $/; # Slurp mode
+                $map_content = <$MAP_FH>;
+                close $MAP_FH;
+            };
+            if ($@ || !defined $map_content) {
+                warn "Warning: Could not read output map file $output_map_file: $@\nSkipping Swift rules.\n";
+                next;
+            }
+
+            my $output_map;
+            eval {
+                $output_map = $json_decoder->decode($map_content);
+            };
+            if ($@ || ref $output_map ne 'HASH') {
+                 warn "Warning: Could not decode JSON from output map file $output_map_file: $@\nSkipping Swift rules.\n";
+                 next;
+            }
+
+            # Prepare the actual command for the Makefile recipe
+            my $make_swift_cmd = $swift_actual_cmd; # Use the extracted command
+            dollarEscape($make_swift_cmd);
+
+            # Generate rules for each source file in the map
+            foreach my $source (keys %{$output_map}) {
+                next unless $source =~ /\.swift$/; # Process only Swift source entries
+                next unless exists $output_map->{$source}{object}; # Ensure object mapping exists
+
+                my $object = $output_map->{$source}{object};
+
+                # Prepare paths for Make rule
+                my $make_target_object = $object;
+                my $make_dep_source = $source;
+                unescape("{}()", $make_target_object);
+                escape("\$& ", $make_target_object);
+                dollarEscape($make_dep_source);
+                unescape("'", $make_dep_source);
+                unescape(" ", $make_dep_source);
+                escape(" ", $make_dep_source);
+
+                # Use make-escaped version for the hash key check
+                next if $rules{$make_target_object}++;
+
+                print $make_fh "\n$make_target_object: $make_dep_source\n";
+
+                # Touch command needs object path escaped for shell
+                my $shell_touch_object = $object;
+                shellEscape($shell_touch_object);
+
+                # Use the extracted swiftc command for the recipe
+                print $make_fh "$cd$make_swift_cmd && touch $shell_touch_object\n\n";
+            }
+
+        # --- SwiftCompile Handling (Older Xcode / Fallback) ---
+        } elsif ($line =~ /^SwiftCompile \w+ \w+/) {
+            my $cd = &$nextCD();
+             unless (defined $cd) {
+                # Might be an informational line without a command, skip silently
+                next;
+            }
+            my $compile_cmd_line = &$nextLine();
+            # Check if it looks like a real frontend command
+            unless (defined $compile_cmd_line && $compile_cmd_line =~ m/swift-frontend.*-c /) {
+                 # Likely an informational line or unexpected format
+                 next;
+            }
+
+            # Attempt to extract options like the original script
+            my @sources = &$extractOption($compile_cmd_line, "-primary-file");
+            my @objects = &$extractOption($compile_cmd_line, "-o");
+
+            unless (@sources && @objects && $#sources == $#objects) {
+                warn "Warning: Could not extract matching -primary-file/-o pairs from SwiftCompile command. This might be an unsupported format or whole module optimization.\nCMD: $compile_cmd_line\n";
+                next; # Skip if we can't get source/object pairs
+            }
+
+            # Prepare command for recipe
+            dollarEscape($compile_cmd_line);
+
+            foreach my $i (0..$#sources) {
+                 # Prepare paths for Make rule
+                my $make_target_object = $objects[$i];
+                my $make_dep_source = $sources[$i];
+                unescape("{}()", $make_target_object);
+                escape("\$& ", $make_target_object);
+                dollarEscape($make_dep_source);
+                unescape("'", $make_dep_source);
+                unescape(" ", $make_dep_source);
+                escape(" ", $make_dep_source);
+
+                # Use make-escaped version for hash key check
+                next if $rules{$make_target_object}++;
+
+                print $make_fh "\n$make_target_object: $make_dep_source\n";
+
+                # Touch command needs object path escaped for shell
+                my $shell_touch_object = $objects[$i]; # Use original path here
+                shellEscape($shell_touch_object);
+
+                print $make_fh "$cd$compile_cmd_line && touch $shell_touch_object\n\n";
+            }
+
+        # --- Ld Handling (Linking) ---
+        } elsif (my ($executable) = $line =~ /^Ld ($fileArg) /) {
+            my $cd = &$nextCD();
+            unless (defined $cd) {
+                 warn "Warning: Expected 'cd' after Ld line for $executable, but not found. Trying to continue.\n";
+                 $cd = "\t\t"; # Use empty cd prefix
+            }
+
+            my $link_cmd_line = &$nextLine();
+            unless (defined $link_cmd_line && $link_cmd_line !~ /^\s*$/) {
+                 warn "Warning: Expected link command after 'cd' for $executable, but not found. Skipping rule.\n";
+                 next;
+            }
+
+            # Use lookbehind to avoid matching -Xlinker immediately before -filelist
+            my ($linkfile) = $link_cmd_line =~ /(?<!-Xlinker)\s-filelist\s+($fileArg)/;
+
+            # Prepare executable path for Make target
+            my $make_target_executable = $executable;
+            unescape("{}()", $make_target_executable);
+            escape("\$& ", $make_target_executable);
+
+            # Prepare link command for recipe
+            my $make_link_cmd_line = $link_cmd_line;
+            dollarEscape($make_link_cmd_line);
+
+            # Print start of rule
+            print $make_fh "\n$make_target_executable:";
+
+            unless (defined $linkfile) {
+                 warn "Warning: Could not find -filelist in link command for $executable: $link_cmd_line\nLinking without specific object dependencies.\n";
+            } else {
+                 unescape("'\\\\'", $linkfile);
+                 print "Link file for $executable: $linkfile\n";
+
+                 my $OBJS_FH;
+                 eval {
+                     $OBJS_FH = IO::File->new("< $linkfile") or die "Cannot open link file list $linkfile: $!";
+                 };
+                 unless (defined $OBJS_FH) {
+                     warn "Warning: Could not open link file list $linkfile for $executable: $@. Linking without specific object dependencies.\n";
+                 } else {
+                    # Add object file dependencies if linkfile was read
+                    while (my $object = <$OBJS_FH>) {
+                        chomp $object;
+
+                        # Create the canonical, Make-escaped version for hash lookup
+                        my $canonical_object = $object;
+                        unescape("{}()", $canonical_object);
+                        escape("\$& ", $canonical_object);
+
+                        if ($rules{$canonical_object}) { # Check if we know how to build this object
+                            # Escape object path for dependency list (spaces are separators)
+                            my $dep_object = $object;
+                            $dep_object =~ s/ /\\ /g;
+                            escape("'", $dep_object);
+                            print $make_fh " $dep_object";
+                        } else {
+                            # Also check if it's a module object file that might have a rule
+                            # Some objects might not be in %rules if they're from packages
+                            if ($object =~ /\.o$/) {
+                                # Escape object path for dependency list anyway
+                                my $dep_object = $object;
+                                $dep_object =~ s/ /\\ /g;
+                                escape("'", $dep_object);
+                                print $make_fh " $dep_object";
+                            }
+                            # Optional: Warn about objects in link list not generated by known rules?
+                            # warn "Object $object listed in $linkfile but no rule found to build it.";
+                        }
+                    }
+                    close $OBJS_FH;
+                 }
+            }
+            # Finish rule definition and add recipe
+            print $make_fh "\n$cd$make_link_cmd_line\n\n";
+
+            # Add executable/dylib to the list for the 'main' target
+             if ($executable !~ /\.o$/) {
+                 # Use the Make-escaped version for the @linked array
+                 push @linked, $make_target_executable;
+             }
+
+        # --- codesign / touch Handling ---
+        } elsif ($line =~ m@^\s+/usr/bin/(codesign|touch)@) {
+            dollarEscape($line);
+            push @codesigns, $line;
+        }
+    }
+
+    # --- Final 'main' Target ---
+    print $make_fh "main: @linked\n";
+    print $make_fh join "\n", map {"\t$_"} @codesigns; # Use stored codesign/touch lines
+    print $make_fh "\n";
+
+    close $make_fh;
+    close $log_fh;
+}

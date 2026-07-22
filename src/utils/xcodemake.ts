@@ -1,7 +1,7 @@
 import { log } from './logger.ts';
 import type { CommandResponse } from './command.ts';
 import { getDefaultCommandExecutor } from './command.ts';
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'path';
 import * as os from 'os';
@@ -10,8 +10,8 @@ import { getConfig } from './config-store.ts';
 
 let overriddenXcodemakePath: string | null = null;
 
-export const XCODEMAKE_COMMIT = '1749682a99794edc257010b3eaa35c39f0f91c50';
-export const XCODEMAKE_SHA256 = 'b84f2e58326a1c009e5349e28895817d2968f2cb655b6a2a7c7c719971007db7';
+export const XCODEMAKE_COMMIT = '75f47d4b69c1604cb886ab37d348c2c245d18329';
+export const XCODEMAKE_SHA256 = '0934f784661f8b295f51064b8e94659c986ca25affc5062f20d5210ae0e25201';
 export const XCODEMAKE_DOWNLOAD_URL = `https://raw.githubusercontent.com/cameroncooke/xcodemake/${XCODEMAKE_COMMIT}/xcodemake`;
 
 interface XcodemakeInstallerDependencies {
@@ -172,40 +172,6 @@ export function doesMakefileExist(projectDir: string): boolean {
   return existsSync(`${projectDir}/Makefile`);
 }
 
-type ReadDirectory = (path: string) => string[];
-
-export function doesMakeLogFileExist(
-  projectDir: string,
-  command: string[],
-  readDirectory: ReadDirectory = (directory) => readdirSync(directory),
-): boolean {
-  try {
-    const xcodemakeCommand = ['xcodemake', ...command.slice(1)];
-    const escapedCommand = xcodemakeCommand.map((arg) => {
-      // Remove projectDir from arguments if present at the start
-      const prefix = projectDir + '/';
-      if (arg.startsWith(prefix)) {
-        return arg.substring(prefix.length);
-      }
-      return arg;
-    });
-    const commandString = escapedCommand.join(' ');
-    const logFileName = `${commandString}.log`;
-    log('debug', `Checking for Makefile log: ${logFileName} in directory: ${projectDir}`);
-
-    const files = readDirectory(projectDir);
-    const exists = files.includes(logFileName);
-    log('debug', `Makefile log ${exists ? 'exists' : 'does not exist'}: ${logFileName}`);
-    return exists;
-  } catch (error) {
-    log(
-      'error',
-      `Error checking for Makefile log: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return false;
-  }
-}
-
 export async function executeXcodemakeCommand(
   projectDir: string,
   buildArgs: string[],
@@ -220,13 +186,5 @@ export async function executeXcodemakeCommand(
     return arg;
   });
 
-  return getDefaultCommandExecutor()(command, logPrefix, false, { cwd: projectDir });
-}
-
-export async function executeMakeCommand(
-  projectDir: string,
-  logPrefix: string,
-): Promise<CommandResponse> {
-  const command = ['make'];
   return getDefaultCommandExecutor()(command, logPrefix, false, { cwd: projectDir });
 }

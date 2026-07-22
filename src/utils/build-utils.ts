@@ -2,14 +2,7 @@ import { log } from './logger.ts';
 import { XcodePlatform, constructDestinationString } from './xcode.ts';
 import type { CommandExecutor, CommandExecOptions } from './command.ts';
 import type { SharedBuildParams, PlatformBuildOptions } from '../types/common.ts';
-import {
-  isXcodemakeEnabled,
-  isXcodemakeAvailable,
-  executeXcodemakeCommand,
-  executeMakeCommand,
-  doesMakefileExist,
-  doesMakeLogFileExist,
-} from './xcodemake.ts';
+import { isXcodemakeEnabled, isXcodemakeAvailable, executeXcodemakeCommand } from './xcodemake.ts';
 import path from 'path';
 import os from 'node:os';
 import { resolveEffectiveDerivedDataPath } from './derived-data-path.ts';
@@ -89,7 +82,7 @@ export async function executeXcodeBuildCommand(
       projectPath,
     });
 
-    let projectDir = '';
+    let projectDir = process.cwd();
     if (workspacePath) {
       projectDir = path.dirname(workspacePath);
       command.push('-workspace', workspacePath);
@@ -184,23 +177,12 @@ export async function executeXcodeBuildCommand(
 
     let result;
     if (useXcodemake) {
-      const makefileExists = doesMakefileExist(projectDir);
-      log('debug', 'Makefile exists: ' + makefileExists);
-
-      const makeLogFileExists = doesMakeLogFileExist(projectDir, command);
-      log('debug', 'Makefile log exists: ' + makeLogFileExists);
-
-      if (makefileExists && makeLogFileExists) {
-        addBuildMessage('ℹ️ Using make for incremental build');
-        result = await executeMakeCommand(projectDir, platformOptions.logPrefix);
-      } else {
-        addBuildMessage('ℹ️ Generating Makefile with xcodemake (first build may take longer)');
-        result = await executeXcodemakeCommand(
-          projectDir,
-          command.slice(1),
-          platformOptions.logPrefix,
-        );
-      }
+      addBuildMessage('ℹ️ Running incremental build with xcodemake');
+      result = await executeXcodemakeCommand(
+        projectDir,
+        command.slice(1),
+        platformOptions.logPrefix,
+      );
     } else {
       const streamHandlers = pipeline
         ? {

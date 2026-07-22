@@ -19,6 +19,7 @@
 - Fixed iOS scaffold orientation and device-family settings, LLDB command isolation and argument escaping, run-destination parsing without an active scheme, concurrent working-directory mutations, blocking physical-device name lookup, and unverified `xcodemake` downloads ([#459](https://github.com/getsentry/XcodeBuildMCP/issues/459)).
 - Fixed simulator UI launching and keyboard controls to prefer Xcode 27's Device Hub when available, with Simulator.app as the legacy fallback.
 - Fixed `stop_mac_app` app-name targeting so it no longer terminates unrelated processes whose command lines contain the app name, and reject unsafe process IDs before execution ([#306](https://github.com/getsentry/XcodeBuildMCP/issues/306)).
+- Fixed incremental `xcodemake` builds when DerivedData uses an absolute path by updating the pinned wrapper and delegating Makefile reuse to it so its argument and freshness checks are always applied ([#466](https://github.com/getsentry/XcodeBuildMCP/issues/466)).
 
 ## [2.6.2]
 

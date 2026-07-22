@@ -13,7 +13,6 @@ import {
   XCODEMAKE_COMMIT,
   XCODEMAKE_DOWNLOAD_URL,
   XCODEMAKE_SHA256,
-  doesMakeLogFileExist,
   executeXcodemakeCommand,
   installXcodemake,
   verifyXcodemakeScript,
@@ -53,23 +52,6 @@ describe('executeXcodemakeCommand', () => {
       'xcodemake failed',
     );
 
-    expect(process.cwd()).toBe(originalCwd);
-  });
-});
-
-describe('doesMakeLogFileExist', () => {
-  it('reads the project directory without mutating process cwd', () => {
-    const originalCwd = process.cwd();
-    const readDirectory = vi.fn(() => ['xcodemake -scheme App.log']);
-
-    const exists = doesMakeLogFileExist(
-      '/tmp/project',
-      ['xcodebuild', '-scheme', 'App'],
-      readDirectory,
-    );
-
-    expect(exists).toBe(true);
-    expect(readDirectory).toHaveBeenCalledWith('/tmp/project');
     expect(process.cwd()).toBe(originalCwd);
   });
 });
