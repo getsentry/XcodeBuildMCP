@@ -91,7 +91,7 @@ describe('stop_mac_app plugin', () => {
       expect(calls[0]).toEqual(['killall', '--', 'Brimday']);
     });
 
-    it('should preserve long app executable names', async () => {
+    it('should pass long app executable names to killall', async () => {
       const calls: string[][] = [];
       const mockExecutor = createMockExecutor({
         onExecute: (command) => calls.push(command),
