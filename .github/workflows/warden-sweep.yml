@@ -24,12 +24,11 @@ jobs:
     timeout-minutes: 120
     env:
       WARDEN_MODEL: ${{ secrets.WARDEN_MODEL }}
+      WARDEN_OPENROUTER_API_KEY: ${{ secrets.WARDEN_OPENROUTER_API_KEY }}
       WARDEN_SENTRY_DSN: ${{ secrets.WARDEN_SENTRY_DSN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      - uses: getsentry/warden@2130c979dec0163048d954d9599504e2d9fa2b07
-        with:
-          anthropic-api-key: ${{ secrets.WARDEN_ANTHROPIC_API_KEY }}
+      - uses: getsentry/warden@v0
 
       - name: Summarize Warden results
         if: always()
