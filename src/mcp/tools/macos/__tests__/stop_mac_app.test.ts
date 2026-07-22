@@ -88,8 +88,7 @@ describe('stop_mac_app plugin', () => {
       );
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual(['pkill', '-x', '--', 'Brimday']);
-      expect(calls[0]).not.toContain('-f');
+      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?Brimday( |$)']);
     });
 
     it('should preserve long app executable names', async () => {
@@ -107,7 +106,7 @@ describe('stop_mac_app plugin', () => {
         ),
       );
 
-      expect(calls[0]).toEqual(['pkill', '-x', '--', 'ThisIsAVeryLongApplicationName']);
+      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?ThisIsAVeryLongApplicationName( |$)']);
     });
 
     it('should treat app names as literal process names', async () => {
@@ -125,7 +124,7 @@ describe('stop_mac_app plugin', () => {
         ),
       );
 
-      expect(calls[0]).toEqual(['pkill', '-x', '--', '-Example\\.\\*\\[Test\\]']);
+      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?-Example\\.\\*\\[Test\\]( |$)']);
     });
 
     it('should prioritize processId over appName', async () => {

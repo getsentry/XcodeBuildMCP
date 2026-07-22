@@ -83,7 +83,12 @@ export function createStopMacAppExecutor(
       const command =
         params.processId !== undefined
           ? ['kill', String(params.processId)]
-          : ['pkill', '-x', '--', escapeExtendedRegularExpression(params.appName!)];
+          : [
+              'pkill',
+              '-f',
+              '--',
+              `^(.*/)?${escapeExtendedRegularExpression(params.appName!)}( |$)`,
+            ];
       const result = await executor(command, 'Stop macOS App');
 
       if (!result.success) {
