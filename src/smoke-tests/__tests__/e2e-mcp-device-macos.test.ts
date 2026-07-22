@@ -20,7 +20,7 @@ beforeAll(async () => {
       'xctrace list devices': { success: true, output: 'No devices found.' },
       open: { success: true, output: '' },
       kill: { success: true, output: '' },
-      pkill: { success: true, output: '' },
+      killall: { success: true, output: '' },
       'defaults read': { success: true, output: 'io.sentry.MyApp' },
       PlistBuddy: { success: true, output: 'io.sentry.MyApp' },
       xcresulttool: { success: true, output: '{}' },
@@ -328,7 +328,7 @@ describe('MCP Device and macOS Tool Invocation (e2e)', () => {
       expect(commandStrs.some((c) => c.includes('kill') && c.includes('54321'))).toBe(true);
     });
 
-    it('stop_mac_app captures pkill command with appName', async () => {
+    it('stop_mac_app captures killall command with appName', async () => {
       harness.resetCapturedCommands();
       const result = await harness.client.callTool({
         name: 'stop_mac_app',
@@ -338,7 +338,7 @@ describe('MCP Device and macOS Tool Invocation (e2e)', () => {
       expectContent(result);
 
       const commandStrs = harness.capturedCommands.map((c) => c.command.join(' '));
-      expect(commandStrs.some((c) => c.includes('MyMacApp'))).toBe(true);
+      expect(commandStrs.some((c) => c === 'killall -- MyMacApp')).toBe(true);
     });
 
     it('get_mac_app_path captures xcodebuild showBuildSettings command', async () => {

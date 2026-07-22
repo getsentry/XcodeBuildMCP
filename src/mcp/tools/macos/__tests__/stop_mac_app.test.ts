@@ -72,7 +72,7 @@ describe('stop_mac_app plugin', () => {
       expect(calls[0]).toEqual(['kill', '1234']);
     });
 
-    it('should avoid matching app names in unrelated process arguments', async () => {
+    it('should target app names by literal process name', async () => {
       const calls: string[][] = [];
       const mockExecutor = createMockExecutor({
         onExecute: (command) => calls.push(command),
@@ -88,7 +88,7 @@ describe('stop_mac_app plugin', () => {
       );
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?Brimday( |$)']);
+      expect(calls[0]).toEqual(['killall', '--', 'Brimday']);
     });
 
     it('should preserve long app executable names', async () => {
@@ -106,7 +106,7 @@ describe('stop_mac_app plugin', () => {
         ),
       );
 
-      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?ThisIsAVeryLongApplicationName( |$)']);
+      expect(calls[0]).toEqual(['killall', '--', 'ThisIsAVeryLongApplicationName']);
     });
 
     it('should treat app names as literal process names', async () => {
@@ -124,7 +124,7 @@ describe('stop_mac_app plugin', () => {
         ),
       );
 
-      expect(calls[0]).toEqual(['pkill', '-f', '--', '^(.*/)?-Example\\.\\*\\[Test\\]( |$)']);
+      expect(calls[0]).toEqual(['killall', '--', '-Example.*[Test]']);
     });
 
     it('should prioritize processId over appName', async () => {

@@ -26,10 +26,6 @@ const stopMacAppSchema = z.object({
 type StopMacAppParams = z.infer<typeof stopMacAppSchema>;
 type StopMacAppResult = StopResultDomainResult;
 
-function escapeExtendedRegularExpression(value: string): string {
-  return value.replace(/[\\.^$*+?()[\]{}|]/g, '\\$&');
-}
-
 export async function stop_mac_appLogic(
   params: StopMacAppParams,
   executor: CommandExecutor,
@@ -83,12 +79,7 @@ export function createStopMacAppExecutor(
       const command =
         params.processId !== undefined
           ? ['kill', String(params.processId)]
-          : [
-              'pkill',
-              '-f',
-              '--',
-              `^(.*/)?${escapeExtendedRegularExpression(params.appName!)}( |$)`,
-            ];
+          : ['killall', '--', params.appName!];
       const result = await executor(command, 'Stop macOS App');
 
       if (!result.success) {
