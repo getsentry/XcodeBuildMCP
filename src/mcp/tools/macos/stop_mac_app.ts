@@ -59,19 +59,21 @@ export function createStopMacAppExecutor(
   executor: CommandExecutor,
 ): NonStreamingExecutor<StopMacAppParams, StopMacAppResult> {
   return async (params) => {
-    const artifacts = createStopMacAppArtifacts(params);
-
     if (!params.appName && params.processId === undefined) {
-      return buildStopFailure(artifacts, 'Either appName or processId must be provided.');
+      return buildStopFailure({ appName: '' }, 'Either appName or processId must be provided.');
     }
 
     if (
       params.processId !== undefined &&
       (!Number.isSafeInteger(params.processId) || params.processId <= 0)
     ) {
-      return buildStopFailure(artifacts, 'processId must be a positive safe integer.');
+      return buildStopFailure(
+        { appName: params.appName ?? '' },
+        'processId must be a positive safe integer.',
+      );
     }
 
+    const artifacts = createStopMacAppArtifacts(params);
     const target = params.processId !== undefined ? `PID ${params.processId}` : params.appName!;
     log('info', `Stopping macOS app: ${target}`);
 

@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { schema, handler, stop_mac_appLogic } from '../stop_mac_app.ts';
-import { allText, runLogic } from '../../../../test-utils/test-helpers.ts';
+import {
+  allText,
+  createMockToolHandlerContext,
+  runLogic,
+} from '../../../../test-utils/test-helpers.ts';
 import { createMockExecutor, createNoopExecutor } from '../../../../test-utils/mock-executors.ts';
 
 describe('stop_mac_app plugin', () => {
@@ -42,11 +46,18 @@ describe('stop_mac_app plugin', () => {
       async (processId) => {
         const calls: string[][] = [];
         const executor = createMockExecutor({ onExecute: (command) => calls.push(command) });
+        const { ctx, result, run } = createMockToolHandlerContext();
 
-        const result = await runLogic(() => stop_mac_appLogic({ processId }, executor));
+        await run(() => stop_mac_appLogic({ processId }, executor));
 
-        expect(result.isError).toBe(true);
-        expect(allText(result)).toContain('processId must be a positive safe integer');
+        expect(result.isError()).toBe(true);
+        expect(result.text()).toContain('processId must be a positive safe integer');
+        const structuredResult = ctx.structuredOutput?.result;
+        expect(structuredResult?.kind).toBe('stop-result');
+        if (structuredResult?.kind !== 'stop-result') {
+          throw new Error('Expected stop-result structured output.');
+        }
+        expect(structuredResult.artifacts).toEqual({ appName: '' });
         expect(calls).toHaveLength(0);
       },
     );
