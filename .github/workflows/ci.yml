@@ -48,23 +48,51 @@ jobs:
         run: npm run test:schema-fixtures
 
       - name: Publish preview package for pull requests
+        id: pkg_pr_new_pull_request
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         run: npx pkg-pr-new publish --comment=update
+
+      - name: Report pull request preview failure
+        if: github.event_name == 'pull_request' && steps.pkg_pr_new_pull_request.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          echo "::warning title=Package preview unavailable::pkg.pr.new failed; build and test validation is unaffected."
+          {
+            echo "## pkg.new preview"
+            echo
+            echo "Preview publication failed. Build and test validation is unaffected."
+            echo
+            echo "See the \`Publish preview package for pull requests\` step for details."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish preview package for main
         id: pkg_pr_new_main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
           set -euo pipefail
           npx pkg-pr-new publish --comment=off --json=pkg-pr-new-main.json
 
       - name: Summarize pkg.new output for main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always()
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          PUBLISH_OUTCOME: ${{ steps.pkg_pr_new_main.outcome }}
         run: |
+          set -euo pipefail
+
+          if [ "$PUBLISH_OUTCOME" = "failure" ]; then
+            echo "::warning title=Package preview unavailable::pkg.pr.new failed; build and test validation is unaffected."
+          fi
+
           {
             echo "## pkg.new preview for main"
             echo
-            if [ -f pkg-pr-new-main.json ]; then
+            if [ "$PUBLISH_OUTCOME" = "failure" ]; then
+              echo "Preview publication failed. Build and test validation is unaffected."
+              echo
+            elif [ -f pkg-pr-new-main.json ]; then
               echo "Install commands and preview links:"
               echo '```text'
               jq -r '.. | strings | select(test("pkg\\.pr\\.new|pkg\\.new|npm (i|install) "))' pkg-pr-new-main.json | sort -u
@@ -75,7 +103,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload pkg.new metadata for main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always()
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.pkg_pr_new_main.outcome == 'success'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: pkg-pr-new-main-${{ github.sha }}
