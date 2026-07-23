@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { __getRealCommandExecutor } from '../command.ts';
 
 describe('defaultExecutor', () => {
-  it('passes shell-mode arguments without interpreting metacharacters', async () => {
+  it('passes arguments literally when shell execution is requested', async () => {
     const executor = __getRealCommandExecutor();
     const argumentsWithMetacharacters = [
       '$(printf injected)',
@@ -28,7 +28,7 @@ describe('defaultExecutor', () => {
     });
   });
 
-  it('treats a leading-dash shell-mode executable as a command name', async () => {
+  it('treats a leading-dash executable as a command name when shell execution is requested', async () => {
     const executableDirectory = await mkdtemp(join(tmpdir(), 'xcodebuildmcp-command-'));
     const executablePath = join(executableDirectory, '-c');
     await writeFile(executablePath, '#!/bin/sh\nprintf "%s\\n" "$@"\n', 'utf8');
@@ -48,6 +48,20 @@ describe('defaultExecutor', () => {
     } finally {
       await rm(executableDirectory, { recursive: true, force: true });
     }
+  });
+
+  it('returns an exit response when a shell-mode executable is missing', async () => {
+    const executor = __getRealCommandExecutor();
+    const result = await executor(
+      ['xcodebuildmcp-command-that-does-not-exist'],
+      'Missing Shell Executable Test',
+      true,
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      exitCode: 127,
+    });
   });
 
   it('settles after exit even when child close is delayed', async () => {
