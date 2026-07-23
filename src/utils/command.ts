@@ -18,17 +18,15 @@ async function defaultExecutor(
   opts?: CommandExecOptions,
   detached: boolean = false,
 ): Promise<CommandResponse> {
-  let escapedCommand = command;
-  if (useShell) {
-    const commandString = command.map((arg) => shellEscapeArg(arg)).join(' ');
+  let executable = command[0];
+  let args = command.slice(1);
 
-    escapedCommand = ['/bin/sh', '-c', commandString];
+  if (useShell) {
+    executable = '/bin/sh';
+    args = ['-c', 'exec "$@"', 'xcodebuildmcp', ...command];
   }
 
   return new Promise((resolve, reject) => {
-    let executable = escapedCommand[0];
-    let args = escapedCommand.slice(1);
-
     if (!useShell && executable === 'xcodebuild') {
       const xcrunPath = '/usr/bin/xcrun';
       if (existsSync(xcrunPath)) {
@@ -37,8 +35,9 @@ async function defaultExecutor(
       }
     }
 
-    const displayCommand =
-      useShell && escapedCommand.length === 3 ? escapedCommand[2] : [executable, ...args].join(' ');
+    const displayCommand = useShell
+      ? command.map((arg) => shellEscapeArg(arg)).join(' ')
+      : [executable, ...args].join(' ');
     log('debug', `Executing ${logPrefix ?? ''} command: ${displayCommand}`);
 
     const emitTranscript = transcriptEmitterStorage.getStore();

@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { __getRealCommandExecutor } from '../command.ts';
 
 describe('defaultExecutor', () => {
+  it('passes shell-mode arguments without interpreting metacharacters', async () => {
+    const executor = __getRealCommandExecutor();
+    const argumentsWithMetacharacters = [
+      '$(printf injected)',
+      '`printf injected`',
+      'value; printf injected',
+      '$HOME',
+      "single'quote",
+    ];
+
+    const result = await executor(
+      ['/usr/bin/printf', '%s\n', ...argumentsWithMetacharacters],
+      'Shell Argument Test',
+      true,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      exitCode: 0,
+      output: `${argumentsWithMetacharacters.join('\n')}\n`,
+    });
+  });
+
   it('settles after exit even when child close is delayed', async () => {
     const executor = __getRealCommandExecutor();
     const startedAt = Date.now();
