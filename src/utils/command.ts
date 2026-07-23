@@ -23,7 +23,7 @@ async function defaultExecutor(
 
   if (useShell) {
     executable = '/bin/sh';
-    args = ['-c', 'exec "$@"', 'xcodebuildmcp', ...command];
+    args = ['-c', 'exec -- "$@"', 'xcodebuildmcp', ...command];
   }
 
   return new Promise((resolve, reject) => {
