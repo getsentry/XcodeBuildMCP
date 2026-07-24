@@ -1,3 +1,5 @@
+[![mcpindex](https://mcpindex.ai/api/v1/badge/com-xcodebuildmcp-xcodebuildmcp)](https://mcpindex.ai/server/com-xcodebuildmcp-xcodebuildmcp)
+
 <img src="assets/banner.png" alt="XcodeBuild MCP" width="600"/>
 
 A Model Context Protocol (MCP) server and CLI that provides tools for agent use when working on iOS and macOS projects.
