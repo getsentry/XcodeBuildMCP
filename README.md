@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fgetsentry%2FXcodeBuildMCP.svg)](https://mcptoplist.com/server/glama%2Fgetsentry%2FXcodeBuildMCP)
+
 <img src="assets/banner.png" alt="XcodeBuild MCP" width="600"/>
 
 A Model Context Protocol (MCP) server and CLI that provides tools for agent use when working on iOS and macOS projects.
