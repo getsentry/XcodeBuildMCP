@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed Codex MCP tool-schema compatibility and added fail-closed static contract baselines for adaptive and full session-default schemas ([#491](https://github.com/getsentry/XcodeBuildMCP/issues/491)).
+
 ## [2.7.0]
 
 ### New! Xcode 27 Device Hub simulator support
@@ -749,4 +755,3 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-

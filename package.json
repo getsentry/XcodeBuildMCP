@@ -47,6 +47,7 @@
     "license:check": "npx -y license-checker --production --onlyAllow 'MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Unlicense;FSL-1.1-MIT;BlueOak-1.0.0'",
     "knip": "knip",
     "test": "vitest run",
+    "test:tool-contracts": "npm run build && vitest run --config vitest.contract.config.ts",
     "posttest": "npm run test:warden-watchdog",
     "test:warden-watchdog": "node --test scripts/__tests__/warden-watchdog.test.mjs",
     "test:schema-fixtures": "vitest run src/snapshot-tests/__tests__/json-fixture-schema.test.ts",

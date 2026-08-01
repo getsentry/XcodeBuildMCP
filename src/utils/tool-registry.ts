@@ -1,4 +1,4 @@
-import { type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { type McpServer, type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { server } from '../server/server-state.ts';
 import type { ToolResponse } from '../types/common.ts';
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
@@ -21,6 +21,7 @@ import { createRenderSession } from '../rendering/render.ts';
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 import { toStructuredEnvelope } from './structured-output-envelope.ts';
 import { getMcpOutputSchemaForRegistration } from '../core/structured-output-schema.ts';
+import { getMcpInputSchemaForRegistration } from './mcp-input-schema.ts';
 
 type RenderSession = ReturnType<typeof createRenderSession>;
 
@@ -294,6 +295,27 @@ async function invokeRegisteredTool(
   }
 }
 
+export function createMcpToolRegistrationConfig(
+  toolManifest: ToolManifestEntry,
+  toolModule: ImportedToolModule,
+): {
+  description: string;
+  inputSchema: ReturnType<typeof getMcpInputSchemaForRegistration>;
+  outputSchema?: ReturnType<typeof getMcpOutputSchemaForRegistration>;
+  annotations: ToolManifestEntry['annotations'];
+} {
+  const outputSchema = toolManifest.outputSchema
+    ? getMcpOutputSchemaForRegistration(toolManifest.outputSchema)
+    : undefined;
+
+  return {
+    description: toolManifest.description ?? '',
+    inputSchema: getMcpInputSchemaForRegistration(toolModule.schema),
+    ...(outputSchema ? { outputSchema } : {}),
+    annotations: toolManifest.annotations,
+  };
+}
+
 function registerToolFromManifest(
   toolManifest: ToolManifestEntry,
   toolModule: ImportedToolModule,
@@ -307,21 +329,21 @@ function registerToolFromManifest(
     return;
   }
 
-  const outputSchema = toolManifest.outputSchema
-    ? getMcpOutputSchemaForRegistration(toolManifest.outputSchema)
-    : undefined;
+  const registeredTool = registerMcpTool(server, toolManifest, toolModule);
+  registryState.tools.set(toolName, registeredTool);
+}
 
-  const registeredTool = server.registerTool(
+export function registerMcpTool(
+  mcpServer: McpServer,
+  toolManifest: ToolManifestEntry,
+  toolModule: ImportedToolModule,
+): RegisteredTool {
+  const toolName = toolManifest.names.mcp;
+  return mcpServer.registerTool(
     toolName,
-    {
-      description: toolManifest.description ?? '',
-      inputSchema: toolModule.schema,
-      ...(outputSchema ? { outputSchema } : {}),
-      annotations: toolManifest.annotations,
-    },
+    createMcpToolRegistrationConfig(toolManifest, toolModule),
     (args: unknown): Promise<ToolResponse> => invokeRegisteredTool(toolName, toolModule, args),
   );
-  registryState.tools.set(toolName, registeredTool);
 }
 
 function shouldExposeTool(

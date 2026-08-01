@@ -21,6 +21,7 @@ export default defineConfig({
       '**/experiments/**',
       '**/__pycache__/**',
       '**/dist/**',
+      'src/contract-tests/**',
       'src/smoke-tests/**',
       'src/snapshot-tests/__tests__/**/*.snapshot.test.ts',
     ],
