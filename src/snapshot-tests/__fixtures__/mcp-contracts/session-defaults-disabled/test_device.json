@@ -1,0 +1,303 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Test Device"},
+  "description": "Test on device.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "configuration": {"description":"Build configuration (Debug, Release)","type":"string"},
+      "derivedDataPath": {"type":"string"},
+      "deviceId": {"description":"UDID of the device (obtained from list_devices)","type":"string"},
+      "extraArgs": {
+        "items": {"type":"string"},
+        "type": "array"
+      },
+      "platform": {
+        "description": "Device platform: iOS, watchOS, tvOS, or visionOS. Defaults to iOS.",
+        "enum": ["iOS","watchOS","tvOS","visionOS"],
+        "type": "string"
+      },
+      "preferXcodebuild": {"type":"boolean"},
+      "progress": {"description":"Show detailed test progress output (MCP defaults to true, CLI defaults to false)","type":"boolean"},
+      "projectPath": {"description":"Path to the .xcodeproj file","type":"string"},
+      "scheme": {"description":"The scheme to test in source mode","type":"string"},
+      "testProductsPath": {"description":"Path to a prepared .xctestproducts package. Cannot be combined with source inputs","type":"string"},
+      "testRunnerEnv": {
+        "description": "Environment variables to pass to the test runner (TEST_RUNNER_ prefix added automatically)",
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {"minLength":1,"type":"string"},
+            "value": {"type":"string"}
+          },
+          "required": ["key","value"],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "workspacePath": {"description":"Path to the .xcworkspace file","type":"string"},
+      "xctestrunPath": {"description":"Path to a prepared .xctestrun file. Cannot be combined with source inputs","type":"string"}
+    },
+    "required": ["deviceId"],
+    "type": "object"
+  },
+  "name": "test_device",
+  "outputSchema": {
+    "$defs": {
+      "buildInvocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "arch": {"type":"string"},
+          "buildForTesting": {"type":"boolean"},
+          "configuration": {"type":"string"},
+          "derivedDataPath": {"type":"string"},
+          "deviceId": {"type":"string"},
+          "executableName": {"type":"string"},
+          "onlyTesting": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "packagePath": {"type":"string"},
+          "platform": {"type":"string"},
+          "projectPath": {"type":"string"},
+          "scheme": {"type":"string"},
+          "simulatorId": {"type":"string"},
+          "simulatorName": {"type":"string"},
+          "skipTesting": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "target": {
+            "enum": ["simulator","device","macos","swift-package"]
+          },
+          "targetName": {"type":"string"},
+          "testProductsPath": {"type":"string"},
+          "workspacePath": {"type":"string"},
+          "xctestrunPath": {"type":"string"}
+        },
+        "type": "object"
+      },
+      "counts": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {"minimum":0,"type":"integer"},
+          "passed": {"minimum":0,"type":"integer"},
+          "skipped": {"minimum":0,"type":"integer"}
+        },
+        "required": ["passed","failed","skipped"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      },
+      "testDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "testFailures": {
+            "items": {"$ref":"#/$defs/testFailureEntry"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors","testFailures"],
+        "type": "object"
+      },
+      "testFailureEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"},
+          "suite": {"type":"string"},
+          "test": {"type":"string"}
+        },
+        "required": ["suite","test","message"],
+        "type": "object"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.test-result/3.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "buildLogPath": {"type":"string"},
+                  "deviceId": {"type":"string"},
+                  "packagePath": {"type":"string"},
+                  "testProductsPath": {"type":"string"},
+                  "xcresultPath": {"type":"string"},
+                  "xctestrunPath": {"type":"string"}
+                },
+                "required": [],
+                "type": "object"
+              },
+              "diagnostics": {"$ref":"#/$defs/testDiagnostics"},
+              "request": {"$ref":"#/$defs/buildInvocationRequest"},
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "counts": {"$ref":"#/$defs/counts"},
+                  "durationMs": {"minimum":0,"type":"integer"},
+                  "status": {
+                    "enum": ["SUCCEEDED","FAILED"]
+                  },
+                  "target": {
+                    "enum": ["simulator","device","macos","swift-package"]
+                  }
+                },
+                "required": ["status"],
+                "type": "object"
+              },
+              "testCases": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "durationMs": {"minimum":0,"type":"integer"},
+                    "status": {
+                      "enum": ["passed","failed","skipped"]
+                    },
+                    "suite": {"type":"string"},
+                    "test": {"type":"string"}
+                  },
+                  "required": ["test","status"],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "tests": {
+                "additionalProperties": false,
+                "properties": {
+                  "discovered": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "items": {
+                        "items": {"type":"string"},
+                        "type": "array"
+                      },
+                      "total": {"minimum":0,"type":"integer"}
+                    },
+                    "required": ["total","items"],
+                    "type": "object"
+                  },
+                  "selected": {
+                    "items": {"type":"string"},
+                    "type": "array"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            },
+            "required": ["summary","artifacts","diagnostics"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.test-result"},
+          "schemaVersion": {"const":"3"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

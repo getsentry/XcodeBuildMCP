@@ -37,6 +37,10 @@ import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts'
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 import { displayPath } from '../../../utils/build-preflight.ts';
+import {
+  normalizeEnvironmentVariableArgument,
+  testRunnerEnvironmentSchema,
+} from '../../../utils/environment-variable-input.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z.string().optional().describe('Path to the .xcodeproj file'),
@@ -73,10 +77,24 @@ const testDeviceSchema = z.preprocess(
   withProjectWorkspaceOrTestArtifact(baseSchemaObject),
 );
 
+const mcpFullSchemaObject = baseSchemaObject.extend({
+  testRunnerEnv: testRunnerEnvironmentSchema,
+});
+
 export type TestDeviceParams = z.infer<typeof testDeviceSchema>;
 type TestDeviceResult = TestResultDomainResult;
 
 const publicSchemaObject = baseSchemaObject.omit({
+  projectPath: true,
+  workspacePath: true,
+  scheme: true,
+  deviceId: true,
+  configuration: true,
+  derivedDataPath: true,
+  preferXcodebuild: true,
+} as const);
+
+const mcpPublicSchemaObject = mcpFullSchemaObject.omit({
   projectPath: true,
   workspacePath: true,
   scheme: true,
@@ -192,6 +210,11 @@ export const schema = getSessionAwareToolSchemaShape({
   legacy: baseSchemaObject,
 });
 
+export const mcpSchema = getSessionAwareToolSchemaShape({
+  sessionAware: mcpPublicSchemaObject,
+  legacy: mcpFullSchemaObject,
+});
+
 export const handler = createSessionAwareTool<TestDeviceParams>({
   internalSchema: toInternalSchema<TestDeviceParams>(testDeviceSchema),
   logicFunction: (params, executor) =>
@@ -199,4 +222,5 @@ export const handler = createSessionAwareTool<TestDeviceParams>({
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['deviceId'], message: 'Provide deviceId' }],
   exclusivePairs: [...TEST_SOURCE_EXCLUSIVE_GROUPS, ['projectPath', 'workspacePath']],
+  normalizeExplicitArgs: (args) => normalizeEnvironmentVariableArgument(args, 'testRunnerEnv'),
 });

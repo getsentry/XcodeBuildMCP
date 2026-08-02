@@ -1,0 +1,10 @@
+{
+  "schema": "xcodebuildmcp.output.workflow-selection",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "enabledWorkflows": [],
+    "registeredToolCount": 0
+  }
+}

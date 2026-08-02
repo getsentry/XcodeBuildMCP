@@ -1,0 +1,492 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Batch UI Actions"},
+  "description": "UI automation batch for multiple same-screen elementRef taps, especially visible settings switches that can be toggled without intermediate assertions. The input key is steps, never commands, and each step is an object such as {\"action\":\"tap\",\"elementRef\":\"e1\"}; do not pass raw command strings. Use refs from the latest snapshot_ui or wait_for_ui output, for example {\"steps\":[{\"action\":\"tap\",\"elementRef\":\"e1\"},{\"action\":\"tap\",\"elementRef\":\"e2\"}]}. Omit preDelay/postDelay for switch elementRefs; switches execute as touch down/up steps and reject delays.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "axCache": {
+        "enum": ["perBatch","perStep","none"],
+        "type": "string"
+      },
+      "pollInterval": {"exclusiveMinimum":0,"type":"number"},
+      "simulatorId": {"format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$","type":"string"},
+      "steps": {
+        "description": "Required array of step objects, for example [{\"action\":\"tap\",\"elementRef\":\"e1\"}]. Do not use commands or raw command strings.",
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {"const":"tap","type":"string"},
+            "elementRef": {"description":"Runtime elementRef from the latest snapshot_ui or wait_for_ui output","minLength":1,"type":"string"},
+            "postDelay": {"description":"Seconds after this step. Omit for switch elementRefs.","maximum":10,"minimum":0,"type":"number"},
+            "preDelay": {"description":"Seconds before this step. Omit for switch elementRefs.","maximum":10,"minimum":0,"type":"number"}
+          },
+          "required": ["action","elementRef"],
+          "type": "object"
+        },
+        "maxItems": 100,
+        "minItems": 1,
+        "type": "array"
+      },
+      "waitTimeout": {"minimum":0,"type":"number"}
+    },
+    "required": ["simulatorId","steps"],
+    "type": "object"
+  },
+  "name": "batch",
+  "outputSchema": {
+    "$defs": {
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "compactRuntimeSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {"minimum":0,"type":"integer"},
+          "evidence": {
+            "description": "Non-actionable semantic evidence rows in role|label|value|identifier format. These rows intentionally omit element refs.",
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "rs": {"const":"1"},
+          "screenHash": {"minLength":1,"type":"string"},
+          "scroll": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "seq": {"minimum":0,"type":"integer"},
+          "targets": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "text": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "type": {"const":"runtime-snapshot"},
+          "udid": {"type":"string"}
+        },
+        "required": ["type","rs","screenHash","seq","count","targets","scroll","udid"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "direction": {
+        "enum": ["up","down","left","right"]
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "frame": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {"type":"number"},
+          "width": {"type":"number"},
+          "x": {"type":"number"},
+          "y": {"type":"number"}
+        },
+        "required": ["x","y","width","height"],
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      },
+      "point": {
+        "additionalProperties": false,
+        "properties": {
+          "x": {"type":"number"},
+          "y": {"type":"number"}
+        },
+        "required": ["x","y"],
+        "type": "object"
+      },
+      "recoverableUiError": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "oneOf": [
+                {"$ref":"#/$defs/runtimeElement"},
+                {"type":"string"}
+              ]
+            },
+            "type": "array"
+          },
+          "code": {
+            "enum": ["SNAPSHOT_MISSING","SNAPSHOT_EXPIRED","SNAPSHOT_PARSE_FAILED","SNAPSHOT_CAPTURE_FAILED","ELEMENT_REF_NOT_FOUND","TARGET_NOT_FOUND","TARGET_AMBIGUOUS","TARGET_NOT_ACTIONABLE","WAIT_TIMEOUT","UI_STATE_CHANGED","ACTION_FAILED"]
+          },
+          "elementRef": {"type":"string"},
+          "message": {"type":"string"},
+          "recoveryHint": {"type":"string"},
+          "snapshotAgeMs": {"minimum":0,"type":"integer"},
+          "timeoutMs": {"minimum":0,"type":"integer"}
+        },
+        "required": ["code","message","recoveryHint"],
+        "type": "object"
+      },
+      "runtimeActionName": {
+        "enum": ["tap","typeText","longPress","touch","swipeWithin"]
+      },
+      "runtimeElement": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {"$ref":"#/$defs/runtimeActionName"},
+            "type": "array"
+          },
+          "frame": {"$ref":"#/$defs/frame"},
+          "identifier": {"type":"string"},
+          "label": {"type":"string"},
+          "ref": {"pattern":"^e[1-9][0-9]*$","type":"string"},
+          "role": {"$ref":"#/$defs/runtimeElementRole"},
+          "state": {"$ref":"#/$defs/runtimeElementState"},
+          "value": {"type":"string"}
+        },
+        "required": ["ref","frame","actions"],
+        "type": "object"
+      },
+      "runtimeElementRole": {
+        "enum": ["application","button","cell","image","keyboard-key","list","menu","other","scroll-view","slider","switch","tab","text","text-field","window"]
+      },
+      "runtimeElementState": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {"type":"boolean"},
+          "focused": {"type":"boolean"},
+          "selected": {"type":"boolean"},
+          "visible": {"type":"boolean"}
+        },
+        "type": "object"
+      },
+      "statusSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["SUCCEEDED","FAILED"]
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.ui-action-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elementRef": {"type":"string"},
+                      "type": {"const":"tap"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","elementRef"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {"const":"tap"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","x","y"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "direction": {"$ref":"#/$defs/direction"},
+                      "durationSeconds": {"minimum":0,"type":"number"},
+                      "from": {"$ref":"#/$defs/point"},
+                      "to": {"$ref":"#/$defs/point"},
+                      "type": {"const":"swipe"},
+                      "withinElementRef": {"type":"string"}
+                    },
+                    "required": ["type","withinElementRef","direction"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "durationSeconds": {"minimum":0,"type":"number"},
+                      "from": {"$ref":"#/$defs/point"},
+                      "to": {"$ref":"#/$defs/point"},
+                      "type": {"const":"swipe"}
+                    },
+                    "required": ["type","from","to"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {"const":"swipe"}
+                    },
+                    "required": ["type"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "direction": {"$ref":"#/$defs/direction"},
+                      "durationSeconds": {"minimum":0,"type":"number"},
+                      "elementRef": {"type":"string"},
+                      "from": {"$ref":"#/$defs/point"},
+                      "steps": {"minimum":1,"type":"integer"},
+                      "to": {"$ref":"#/$defs/point"},
+                      "type": {"const":"drag"}
+                    },
+                    "required": ["type","elementRef","direction"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elementRef": {"type":"string"},
+                      "event": {"type":"string"},
+                      "type": {"const":"touch"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","elementRef"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "event": {"type":"string"},
+                      "type": {"const":"touch"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","x","y"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {"const":"touch"}
+                    },
+                    "required": ["type"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "durationMs": {"minimum":0,"type":"integer"},
+                      "elementRef": {"type":"string"},
+                      "type": {"const":"long-press"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","elementRef","durationMs"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "durationMs": {"minimum":0,"type":"integer"},
+                      "type": {"const":"long-press"},
+                      "x": {"type":"number"},
+                      "y": {"type":"number"}
+                    },
+                    "required": ["type","x","y","durationMs"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "button": {"type":"string"},
+                      "type": {"const":"button"}
+                    },
+                    "required": ["type","button"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "gesture": {"type":"string"},
+                      "type": {"const":"gesture"}
+                    },
+                    "required": ["type","gesture"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elementRef": {"type":"string"},
+                      "textLength": {"minimum":0,"type":"integer"},
+                      "type": {"const":"type-text"}
+                    },
+                    "required": ["type","elementRef"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "textLength": {"minimum":0,"type":"integer"},
+                      "type": {"const":"type-text"}
+                    },
+                    "required": ["type"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "keyCode": {"minimum":0,"type":"integer"},
+                      "type": {"const":"key-press"}
+                    },
+                    "required": ["type","keyCode"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "keyCodes": {
+                        "items": {"minimum":0,"type":"integer"},
+                        "type": "array"
+                      },
+                      "type": {"const":"key-sequence"}
+                    },
+                    "required": ["type","keyCodes"],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "stepCount": {"minimum":1,"type":"integer"},
+                      "type": {"const":"batch"}
+                    },
+                    "required": ["type","stepCount"],
+                    "type": "object"
+                  }
+                ]
+              },
+              "artifacts": {
+                "additionalProperties": false,
+                "properties": {
+                  "simulatorId": {"type":"string"}
+                },
+                "required": ["simulatorId"],
+                "type": "object"
+              },
+              "capture": {"$ref":"#/$defs/compactRuntimeSnapshot"},
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"},
+              "summary": {"$ref":"#/$defs/statusSummary"},
+              "uiError": {"$ref":"#/$defs/recoverableUiError"}
+            },
+            "required": ["summary","action","artifacts"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.ui-action-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

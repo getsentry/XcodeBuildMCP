@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { getStructuredOutputSchemasDir } from './resource-root.ts';
-import { normalizeMcpSchemaForCodex } from '../utils/mcp-input-schema.ts';
 
 const SCHEMA_PATTERN = /^xcodebuildmcp\.output\.[a-z0-9-]+$/;
 const SCHEMA_VERSION_PATTERN = /^[0-9]+$/;
@@ -270,7 +269,7 @@ function getMcpOutputSchemaForRegistrationJson(ref: StructuredOutputSchemaRef): 
     registrationSchema.$defs = defs;
   }
 
-  return normalizeMcpSchemaForCodex(registrationSchema) as JsonObject;
+  return registrationSchema;
 }
 
 export function getMcpOutputSchemaForRegistration(ref: StructuredOutputSchemaRef): McpOutputSchema {

@@ -1,0 +1,21 @@
+{
+  "schema": "xcodebuildmcp.output.xcode-bridge-status",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "action": "status",
+    "status": {
+      "workflowEnabled": false,
+      "bridgeAvailable": false,
+      "bridgePath": null,
+      "xcodeRunning": null,
+      "connected": false,
+      "bridgePid": null,
+      "proxiedToolCount": 0,
+      "lastError": null,
+      "xcodePid": null,
+      "xcodeSessionId": null
+    }
+  }
+}

@@ -15,7 +15,7 @@ export interface FixtureMatchOptions {
   allowUpdate?: boolean;
 }
 
-function shouldUpdateSnapshots(options?: FixtureMatchOptions): boolean {
+export function shouldUpdateSnapshots(options?: FixtureMatchOptions): boolean {
   if (options?.allowUpdate === false) {
     return false;
   }

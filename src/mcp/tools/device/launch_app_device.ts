@@ -27,6 +27,10 @@ import {
   buildLaunchSuccess,
   setLaunchResultStructuredOutput,
 } from '../../../utils/app-lifecycle-results.ts';
+import {
+  createEnvironmentVariableInputSchema,
+  normalizeEnvironmentVariableArgument,
+} from '../../../utils/environment-variable-input.ts';
 
 const launchAppDeviceSchema = z.object({
   deviceId: z.string().describe('UDID of the device (obtained from list_devices)'),
@@ -41,7 +45,18 @@ const launchAppDeviceSchema = z.object({
     .describe('Environment variables to pass to the launched app (as key-value dictionary)'),
 });
 
+const mcpFullSchemaObject = launchAppDeviceSchema.extend({
+  env: createEnvironmentVariableInputSchema(
+    'Environment variables to pass to the launched app as key-value entries',
+  ),
+});
+
 const publicSchemaObject = launchAppDeviceSchema.omit({
+  deviceId: true,
+  bundleId: true,
+} as const);
+
+const mcpPublicSchemaObject = mcpFullSchemaObject.omit({
   deviceId: true,
   bundleId: true,
 } as const);
@@ -118,10 +133,16 @@ export const schema = getSessionAwareToolSchemaShape({
   legacy: launchAppDeviceSchema,
 });
 
+export const mcpSchema = getSessionAwareToolSchemaShape({
+  sessionAware: mcpPublicSchemaObject,
+  legacy: mcpFullSchemaObject,
+});
+
 export const handler = createSessionAwareTool<LaunchAppDeviceParams>({
   internalSchema: toInternalSchema<LaunchAppDeviceParams>(launchAppDeviceSchema),
   logicFunction: (params, executor) =>
     launch_app_deviceLogic(params, executor, getDefaultFileSystemExecutor()),
   getExecutor: getDefaultCommandExecutor,
   requirements: [{ allOf: ['deviceId', 'bundleId'], message: 'Provide deviceId and bundleId' }],
+  normalizeExplicitArgs: (args) => normalizeEnvironmentVariableArgument(args, 'env'),
 });

@@ -1,0 +1,143 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Swift Package List"},
+  "description": "List SwiftPM processes.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {},
+    "type": "object"
+  },
+  "name": "swift_package_list",
+  "outputSchema": {
+    "$defs": {
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.process-list/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "processes": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "artifacts": {
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "properties": {
+                        "packagePath": {"type":"string"}
+                      },
+                      "required": [],
+                      "type": "object"
+                    },
+                    "name": {"type":"string"},
+                    "processId": {"minimum":1,"type":"integer"},
+                    "uptimeSeconds": {"minimum":0,"type":"integer"}
+                  },
+                  "required": ["name","processId","uptimeSeconds"],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "runningProcessCount": {"minimum":0,"type":"integer"}
+                },
+                "required": ["runningProcessCount"],
+                "type": "object"
+              }
+            },
+            "required": ["summary","processes"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.process-list"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

@@ -22,6 +22,10 @@ import {
   setLaunchResultStructuredOutput,
   type LaunchResultArtifacts,
 } from '../../../utils/app-lifecycle-results.ts';
+import {
+  createEnvironmentVariableInputSchema,
+  normalizeEnvironmentVariableArgument,
+} from '../../../utils/environment-variable-input.ts';
 
 const baseSchemaObject = z.object({
   simulatorId: z
@@ -55,6 +59,12 @@ const internalSchemaObject = z.object({
   bundleId: z.string(),
   launchArgs: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+});
+
+const mcpFullSchemaObject = baseSchemaObject.extend({
+  env: createEnvironmentVariableInputSchema(
+    'Environment variables to pass to the launched app as key-value entries (SIMCTL_CHILD_ prefix added automatically)',
+  ),
 });
 
 export type LaunchAppSimParams = z.infer<typeof internalSchemaObject>;
@@ -183,9 +193,22 @@ const publicSchemaObject = z.strictObject(
   } as const).shape,
 );
 
+const mcpPublicSchemaObject = z.strictObject(
+  mcpFullSchemaObject.omit({
+    simulatorId: true,
+    simulatorName: true,
+    bundleId: true,
+  } as const).shape,
+);
+
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,
   legacy: baseSchemaObject,
+});
+
+export const mcpSchema = getSessionAwareToolSchemaShape({
+  sessionAware: mcpPublicSchemaObject,
+  legacy: mcpFullSchemaObject,
 });
 
 export const handler = createSessionAwareTool<LaunchAppSimParams>({
@@ -197,4 +220,5 @@ export const handler = createSessionAwareTool<LaunchAppSimParams>({
     { allOf: ['bundleId'], message: 'bundleId is required' },
   ],
   exclusivePairs: [['simulatorId', 'simulatorName']],
+  normalizeExplicitArgs: (args) => normalizeEnvironmentVariableArgument(args, 'env'),
 });

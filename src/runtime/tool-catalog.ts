@@ -173,7 +173,7 @@ export async function buildToolCatalogFromManifest(opts: {
         annotations: toolManifest.annotations,
         outputSchema: toolManifest.outputSchema,
         nextStepTemplates: toolManifest.nextSteps,
-        mcpSchema: toolModule.schema,
+        mcpSchema: toolModule.mcpSchema,
         cliSchema: toolModule.schema,
         stateful: toolManifest.routing?.stateful ?? false,
         handler: toolModule.handler as ToolDefinition['handler'],

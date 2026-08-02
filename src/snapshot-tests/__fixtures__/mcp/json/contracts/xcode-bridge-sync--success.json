@@ -1,0 +1,26 @@
+{
+  "schema": "xcodebuildmcp.output.xcode-bridge-sync",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "sync": {
+      "added": 0,
+      "updated": 0,
+      "removed": 0,
+      "total": 0
+    },
+    "status": {
+      "workflowEnabled": false,
+      "bridgeAvailable": false,
+      "bridgePath": null,
+      "xcodeRunning": null,
+      "connected": false,
+      "bridgePid": null,
+      "proxiedToolCount": 0,
+      "lastError": null,
+      "xcodePid": null,
+      "xcodeSessionId": null
+    }
+  }
+}

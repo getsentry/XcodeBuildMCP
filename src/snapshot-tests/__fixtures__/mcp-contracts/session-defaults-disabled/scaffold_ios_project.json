@@ -1,0 +1,196 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Scaffold iOS Project"},
+  "description": "Scaffold iOS project.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "bundleIdentifier": {"type":"string"},
+      "currentProjectVersion": {"type":"string"},
+      "customizeNames": {"default":true,"type":"boolean"},
+      "deploymentTarget": {"type":"string"},
+      "displayName": {"type":"string"},
+      "marketingVersion": {"type":"string"},
+      "outputPath": {"type":"string"},
+      "projectName": {"minLength":1,"type":"string"},
+      "supportedOrientations": {
+        "items": {
+          "enum": ["portrait","landscape-left","landscape-right","portrait-upside-down"],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "supportedOrientationsIpad": {
+        "items": {
+          "enum": ["portrait","landscape-left","landscape-right","portrait-upside-down"],
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "targetedDeviceFamily": {
+        "items": {
+          "enum": ["iphone","ipad","universal"],
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": ["projectName","outputPath"],
+    "type": "object"
+  },
+  "name": "scaffold_ios_project",
+  "outputSchema": {
+    "$defs": {
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.scaffold-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": false,
+                "properties": {
+                  "outputPath": {"type":"string"},
+                  "projectName": {"type":"string"},
+                  "workspacePath": {"type":"string"}
+                },
+                "required": ["projectName","outputPath"],
+                "type": "object"
+              },
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"},
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "platform": {
+                    "enum": ["iOS","macOS"]
+                  },
+                  "status": {
+                    "enum": ["SUCCEEDED","FAILED"]
+                  }
+                },
+                "required": ["status","platform"],
+                "type": "object"
+              }
+            },
+            "required": ["summary","artifacts"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.scaffold-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

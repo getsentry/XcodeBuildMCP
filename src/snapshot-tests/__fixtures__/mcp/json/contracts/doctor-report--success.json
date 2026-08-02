@@ -1,0 +1,10 @@
+{
+  "schema": "xcodebuildmcp.output.doctor-report",
+  "schemaVersion": "2",
+  "didError": false,
+  "error": null,
+  "data": {
+    "serverVersion": "0.0.0-contract",
+    "checks": []
+  }
+}

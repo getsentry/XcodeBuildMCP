@@ -1,0 +1,228 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Get Coverage Report"},
+  "description": "Show per-target code coverage from an xcresult bundle.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "showFiles": {"default":false,"description":"When true, include per-file coverage breakdown under each target","type":"boolean"},
+      "target": {"description":"Filter results to a specific target name","type":"string"},
+      "xcresultPath": {"description":"Path to the .xcresult bundle","type":"string"}
+    },
+    "required": ["xcresultPath"],
+    "type": "object"
+  },
+  "name": "get_coverage_report",
+  "outputSchema": {
+    "$defs": {
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.coverage-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": false,
+                "properties": {
+                  "file": {"type":"string"},
+                  "sourceFilePath": {"type":"string"},
+                  "target": {"type":"string"},
+                  "xcresultPath": {"type":"string"}
+                },
+                "required": ["xcresultPath"],
+                "type": "object"
+              },
+              "coverageScope": {
+                "enum": ["report","file"]
+              },
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"},
+              "functions": {
+                "additionalProperties": false,
+                "properties": {
+                  "fullCoverageCount": {"minimum":0,"type":"integer"},
+                  "notCovered": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "coveredLines": {"minimum":0,"type":"integer"},
+                        "executableLines": {"minimum":0,"type":"integer"},
+                        "line": {"minimum":1,"type":"integer"},
+                        "name": {"type":"string"}
+                      },
+                      "required": ["line","name","coveredLines","executableLines"],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "notCoveredFunctionCount": {"minimum":0,"type":"integer"},
+                  "notCoveredLineCount": {"minimum":0,"type":"integer"},
+                  "partialCoverage": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "coveragePct": {"maximum":100,"minimum":0,"type":"number"},
+                        "coveredLines": {"minimum":0,"type":"integer"},
+                        "executableLines": {"minimum":0,"type":"integer"},
+                        "line": {"minimum":1,"type":"integer"},
+                        "name": {"type":"string"}
+                      },
+                      "required": ["line","name","coveragePct","coveredLines","executableLines"],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "partialCoverageFunctionCount": {"minimum":0,"type":"integer"}
+                },
+                "required": ["fullCoverageCount","notCoveredFunctionCount","notCoveredLineCount","partialCoverageFunctionCount"],
+                "type": "object"
+              },
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "coveragePct": {"maximum":100,"minimum":0,"type":"number"},
+                  "coveredLines": {"minimum":0,"type":"integer"},
+                  "executableLines": {"minimum":0,"type":"integer"},
+                  "status": {
+                    "enum": ["SUCCEEDED","FAILED"]
+                  }
+                },
+                "required": ["status"],
+                "type": "object"
+              },
+              "targets": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "coveragePct": {"maximum":100,"minimum":0,"type":"number"},
+                    "coveredLines": {"minimum":0,"type":"integer"},
+                    "executableLines": {"minimum":0,"type":"integer"},
+                    "name": {"type":"string"}
+                  },
+                  "required": ["name","coveragePct","coveredLines","executableLines"],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": ["summary","coverageScope","artifacts"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.coverage-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

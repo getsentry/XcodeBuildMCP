@@ -171,6 +171,7 @@ export function createSessionAwareTool<TParams>(opts: {
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
   clearSessionDeviceIdUnlessPrepared?: boolean;
+  normalizeExplicitArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 }): ToolHandler {
   return createSessionAwareHandler({
     internalSchema: opts.internalSchema,
@@ -179,6 +180,7 @@ export function createSessionAwareTool<TParams>(opts: {
     requirements: opts.requirements,
     exclusivePairs: opts.exclusivePairs,
     clearSessionDeviceIdUnlessPrepared: opts.clearSessionDeviceIdUnlessPrepared,
+    normalizeExplicitArgs: opts.normalizeExplicitArgs,
   });
 }
 
@@ -189,6 +191,7 @@ export function createSessionAwareToolWithContext<TParams, TContext>(opts: {
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
   clearSessionDeviceIdUnlessPrepared?: boolean;
+  normalizeExplicitArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 }): ToolHandler {
   return createSessionAwareHandler(opts);
 }
@@ -200,6 +203,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
   requirements?: SessionRequirement[];
   exclusivePairs?: readonly ExclusiveParameterGroup[];
   clearSessionDeviceIdUnlessPrepared?: boolean;
+  normalizeExplicitArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 }): ToolHandler {
   const {
     internalSchema,
@@ -208,6 +212,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
     requirements = [],
     exclusivePairs = [],
     clearSessionDeviceIdUnlessPrepared = false,
+    normalizeExplicitArgs,
   } = opts;
 
   const impl = async (
@@ -227,9 +232,12 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
         if (typeof v === 'string' && v.trim() === '') continue;
         sanitizedArgs[k] = v;
       }
+      const explicitArgs = normalizeExplicitArgs
+        ? normalizeExplicitArgs(sanitizedArgs)
+        : sanitizedArgs;
 
       for (const pair of exclusivePairs) {
-        const provided = pair.filter((k) => Object.prototype.hasOwnProperty.call(sanitizedArgs, k));
+        const provided = pair.filter((k) => Object.prototype.hasOwnProperty.call(explicitArgs, k));
         if (provided.length >= 2) {
           setValidationErrorOutput(
             ctx,
@@ -242,13 +250,13 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
 
       const sessionDefaults = filterSessionDefaultsForSchema(sessionStore.getAll(), internalSchema);
       if (
-        sanitizedArgs.deviceId === undefined &&
-        (sanitizedArgs.buildForTesting === true || clearSessionDeviceIdUnlessPrepared)
+        explicitArgs.deviceId === undefined &&
+        (explicitArgs.buildForTesting === true || clearSessionDeviceIdUnlessPrepared)
       ) {
         delete sessionDefaults.deviceId;
       }
       const hasExplicitPreparedSource =
-        sanitizedArgs.testProductsPath !== undefined || sanitizedArgs.xctestrunPath !== undefined;
+        explicitArgs.testProductsPath !== undefined || explicitArgs.xctestrunPath !== undefined;
       if (hasExplicitPreparedSource) {
         for (const key of [
           'projectPath',
@@ -269,7 +277,7 @@ function createSessionAwareHandler<TParams, TContext>(opts: {
       }
       const merged = mergeSessionDefaultArgs({
         defaults: sessionDefaults,
-        explicitArgs: sanitizedArgs,
+        explicitArgs,
         exclusivePairs,
       });
 

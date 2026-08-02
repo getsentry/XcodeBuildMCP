@@ -1,0 +1,391 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Snapshot UI"},
+  "description": "Capture a semantic rs/1 runtime UI snapshot with elementRef targets. Observe once, use tap for one target or batch for multiple same-screen targets, and refresh after navigation, scrolling, sheet changes, or obvious layout changes.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "simulatorId": {"format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$","type":"string"},
+      "sinceScreenHash": {"description":"Return an unchanged response when the current screen hash matches this value","minLength":1,"type":"string"}
+    },
+    "required": ["simulatorId"],
+    "type": "object"
+  },
+  "name": "snapshot_ui",
+  "outputSchema": {
+    "$defs": {
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "compactRuntimeSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {"minimum":0,"type":"integer"},
+          "evidence": {
+            "description": "Non-actionable semantic evidence rows in role|label|value|identifier format. These rows intentionally omit element refs.",
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "rs": {"const":"1"},
+          "screenHash": {"minLength":1,"type":"string"},
+          "scroll": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "seq": {"minimum":0,"type":"integer"},
+          "targets": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "text": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "type": {"const":"runtime-snapshot"},
+          "udid": {"type":"string"}
+        },
+        "required": ["type","rs","screenHash","seq","count","targets","scroll","udid"],
+        "type": "object"
+      },
+      "compactRuntimeSnapshotUnchanged": {
+        "additionalProperties": false,
+        "properties": {
+          "rs": {"const":"1"},
+          "screenHash": {"minLength":1,"type":"string"},
+          "seq": {"minimum":0,"type":"integer"},
+          "type": {"const":"runtime-snapshot-unchanged"},
+          "udid": {"type":"string"},
+          "unchanged": {"const":true}
+        },
+        "required": ["type","rs","screenHash","seq","unchanged","udid"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "frame": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {"type":"number"},
+          "width": {"type":"number"},
+          "x": {"type":"number"},
+          "y": {"type":"number"}
+        },
+        "required": ["x","y","width","height"],
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      },
+      "recoverableUiError": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "oneOf": [
+                {"$ref":"#/$defs/runtimeElement"},
+                {"type":"string"}
+              ]
+            },
+            "type": "array"
+          },
+          "code": {
+            "enum": ["SNAPSHOT_MISSING","SNAPSHOT_EXPIRED","SNAPSHOT_PARSE_FAILED","SNAPSHOT_CAPTURE_FAILED","ELEMENT_REF_NOT_FOUND","TARGET_NOT_FOUND","TARGET_AMBIGUOUS","TARGET_NOT_ACTIONABLE","WAIT_TIMEOUT","UI_STATE_CHANGED","ACTION_FAILED"]
+          },
+          "elementRef": {"type":"string"},
+          "message": {"type":"string"},
+          "recoveryHint": {"type":"string"},
+          "snapshotAgeMs": {"minimum":0,"type":"integer"},
+          "timeoutMs": {"minimum":0,"type":"integer"}
+        },
+        "required": ["code","message","recoveryHint"],
+        "type": "object"
+      },
+      "runtimeActionHint": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {"$ref":"#/$defs/runtimeActionName"},
+          "elementRef": {"pattern":"^e[1-9][0-9]*$","type":"string"},
+          "label": {"type":"string"}
+        },
+        "required": ["action","elementRef"],
+        "type": "object"
+      },
+      "runtimeActionName": {
+        "enum": ["tap","typeText","longPress","touch","swipeWithin"]
+      },
+      "runtimeElement": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {"$ref":"#/$defs/runtimeActionName"},
+            "type": "array"
+          },
+          "frame": {"$ref":"#/$defs/frame"},
+          "identifier": {"type":"string"},
+          "label": {"type":"string"},
+          "ref": {"pattern":"^e[1-9][0-9]*$","type":"string"},
+          "role": {"$ref":"#/$defs/runtimeElementRole"},
+          "state": {"$ref":"#/$defs/runtimeElementState"},
+          "value": {"type":"string"}
+        },
+        "required": ["ref","frame","actions"],
+        "type": "object"
+      },
+      "runtimeElementRole": {
+        "enum": ["application","button","cell","image","keyboard-key","list","menu","other","scroll-view","slider","switch","tab","text","text-field","window"]
+      },
+      "runtimeElementState": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {"type":"boolean"},
+          "focused": {"type":"boolean"},
+          "selected": {"type":"boolean"},
+          "visible": {"type":"boolean"}
+        },
+        "type": "object"
+      },
+      "runtimeSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {"$ref":"#/$defs/runtimeActionHint"},
+            "type": "array"
+          },
+          "capturedAtMs": {"minimum":0,"type":"integer"},
+          "elements": {
+            "items": {"$ref":"#/$defs/runtimeElement"},
+            "type": "array"
+          },
+          "expiresAtMs": {"minimum":0,"type":"integer"},
+          "protocol": {"const":"rs/1"},
+          "screenHash": {"minLength":1,"type":"string"},
+          "seq": {"minimum":0,"type":"integer"},
+          "simulatorId": {"type":"string"},
+          "type": {"const":"runtime-snapshot"}
+        },
+        "required": ["type","protocol","simulatorId","screenHash","seq","capturedAtMs","expiresAtMs","elements","actions"],
+        "type": "object"
+      },
+      "runtimeSnapshotUnchanged": {
+        "additionalProperties": false,
+        "properties": {
+          "protocol": {"const":"rs/1"},
+          "screenHash": {"minLength":1,"type":"string"},
+          "seq": {"minimum":0,"type":"integer"},
+          "simulatorId": {"type":"string"},
+          "type": {"const":"runtime-snapshot-unchanged"}
+        },
+        "required": ["type","protocol","simulatorId","screenHash","seq"],
+        "type": "object"
+      },
+      "statusSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["SUCCEEDED","FAILED"]
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "uiHierarchyCapture": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {"const":"ui-hierarchy"},
+          "uiHierarchy": {
+            "items": {"$ref":"#/$defs/uiHierarchyNode"},
+            "type": "array"
+          }
+        },
+        "required": ["type","uiHierarchy"],
+        "type": "object"
+      },
+      "uiHierarchyNode": {"type":"object"},
+      "videoRecordingCapture": {
+        "additionalProperties": false,
+        "properties": {
+          "fps": {"minimum":1,"type":"integer"},
+          "outputFile": {"type":"string"},
+          "sessionId": {"type":"string"},
+          "state": {
+            "enum": ["started","stopped"]
+          },
+          "type": {"const":"video-recording"}
+        },
+        "required": ["type","state"],
+        "type": "object"
+      },
+      "waitMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "matches": {
+            "items": {
+              "oneOf": [
+                {"$ref":"#/$defs/runtimeElement"},
+                {"type":"string"}
+              ]
+            },
+            "type": "array"
+          },
+          "predicate": {"$ref":"#/$defs/waitPredicate"}
+        },
+        "required": ["predicate","matches"],
+        "type": "object"
+      },
+      "waitPredicate": {
+        "enum": ["exists","gone","enabled","focused","textContains","settled"]
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.capture-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": false,
+                "properties": {
+                  "screenshotPath": {"type":"string"},
+                  "simulatorId": {"type":"string"}
+                },
+                "required": ["simulatorId"],
+                "type": "object"
+              },
+              "capture": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "format": {"type":"string"},
+                      "height": {"minimum":0,"type":"integer"},
+                      "width": {"minimum":0,"type":"integer"}
+                    },
+                    "required": ["format","width","height"],
+                    "type": "object"
+                  },
+                  {"$ref":"#/$defs/uiHierarchyCapture"},
+                  {"$ref":"#/$defs/runtimeSnapshot"},
+                  {"$ref":"#/$defs/compactRuntimeSnapshot"},
+                  {"$ref":"#/$defs/videoRecordingCapture"},
+                  {"$ref":"#/$defs/runtimeSnapshotUnchanged"},
+                  {"$ref":"#/$defs/compactRuntimeSnapshotUnchanged"}
+                ]
+              },
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"},
+              "summary": {"$ref":"#/$defs/statusSummary"},
+              "uiError": {"$ref":"#/$defs/recoverableUiError"},
+              "waitMatch": {"$ref":"#/$defs/waitMatch"}
+            },
+            "required": ["summary","artifacts"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.capture-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { globSync } from 'glob';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 const FIXTURE_ROOT = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
 const JSON_FIXTURE_BUCKETS = ['cli/json', 'mcp/json'] as const;
@@ -35,6 +36,7 @@ export interface StructuredFixtureSchemaValidator {
   fixtures: readonly DiscoveredJsonFixture[];
   compileAllSchemas(): void;
   validateFixture(fixture: DiscoveredJsonFixture): void;
+  validateRegisteredOutputSchemas(tools: readonly Tool[]): void;
 }
 
 function toRelative(absolutePath: string): string {
@@ -185,6 +187,126 @@ function formatAjvErrors(errors: ErrorObject[] | null | undefined): string {
     .join('\n');
 }
 
+function resolveLocalReference(root: unknown, reference: string, label: string): unknown {
+  if (!reference.startsWith('#/')) {
+    throw new Error(`${label}: output schema contains non-local $ref ${reference}.`);
+  }
+
+  let current: unknown = root;
+  for (const rawSegment of reference.slice(2).split('/')) {
+    const segment = rawSegment.replaceAll('~1', '/').replaceAll('~0', '~');
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        throw new Error(`${label}: unresolved local $ref ${reference}.`);
+      }
+      current = current[index];
+      continue;
+    }
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, segment)) {
+      throw new Error(`${label}: unresolved local $ref ${reference}.`);
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function assertLocalReferencesResolve(value: unknown, root: unknown, label: string): void {
+  if (Array.isArray(value)) {
+    value.forEach((child) => assertLocalReferencesResolve(child, root, label));
+    return;
+  }
+  if (!isRecord(value)) return;
+
+  if (typeof value.$ref === 'string') {
+    resolveLocalReference(root, value.$ref, label);
+  }
+  Object.values(value).forEach((child) => assertLocalReferencesResolve(child, root, label));
+}
+
+function collectEnvelopeRoutes(value: unknown, routes: Set<string>): void {
+  if (Array.isArray(value)) {
+    value.forEach((child) => collectEnvelopeRoutes(child, routes));
+    return;
+  }
+  if (!isRecord(value)) return;
+
+  const properties = value.properties;
+  if (isRecord(properties)) {
+    const schema = properties.schema;
+    const schemaVersion = properties.schemaVersion;
+    if (
+      isRecord(schema) &&
+      typeof schema.const === 'string' &&
+      isRecord(schemaVersion) &&
+      typeof schemaVersion.const === 'string'
+    ) {
+      routes.add(`${schema.const}@${schemaVersion.const}`);
+    }
+  }
+  Object.values(value).forEach((child) => collectEnvelopeRoutes(child, routes));
+}
+
+function validateRegisteredOutputSchema(
+  tool: Tool,
+  fixtures: readonly DiscoveredJsonFixture[],
+): number {
+  if (!tool.outputSchema) {
+    throw new Error(`${tool.name}: live MCP registration omitted its output schema.`);
+  }
+  const label = `${tool.name} output schema`;
+  assertLocalReferencesResolve(tool.outputSchema, tool.outputSchema, label);
+
+  const ajv = new Ajv2020({ allErrors: true, strict: true, validateSchema: true });
+  const validate = ajv.compile(tool.outputSchema);
+  const routes = new Set<string>();
+  collectEnvelopeRoutes(tool.outputSchema, routes);
+  if (!routes.has('xcodebuildmcp.output.error@1')) {
+    throw new Error(`${label}: standard error envelope branch is missing.`);
+  }
+
+  const domainRoutes = [...routes].filter((route) => route !== 'xcodebuildmcp.output.error@1');
+  if (domainRoutes.length === 0) {
+    throw new Error(`${label}: successful structured-output branch is missing.`);
+  }
+
+  let validatedFixtureCount = 0;
+  for (const route of domainRoutes) {
+    const matchingFixtures = fixtures.filter(
+      (fixture) =>
+        fixture.relativePath.startsWith('mcp/json/') &&
+        fixture.envelope.didError === false &&
+        `${fixture.envelope.schema}@${fixture.envelope.schemaVersion}` === route,
+    );
+    if (matchingFixtures.length === 0) {
+      throw new Error(`${label}: no successful MCP JSON fixture matches ${route}.`);
+    }
+    for (const fixture of matchingFixtures) {
+      const parsed = readJsonDocument(fixture.absolutePath, `fixture ${fixture.relativePath}`);
+      if (!validate(parsed)) {
+        throw new Error(
+          `${label}: fixture ${fixture.relativePath} failed live output-schema validation.\n${formatAjvErrors(validate.errors)}`,
+        );
+      }
+      validatedFixtureCount += 1;
+    }
+  }
+
+  const standardError = {
+    schema: 'xcodebuildmcp.output.error',
+    schemaVersion: '1',
+    didError: true,
+    error: 'Contract validation error',
+    data: { category: 'validation', code: 'CONTRACT_VALIDATION' },
+  };
+  if (!validate(standardError)) {
+    throw new Error(
+      `${label}: standard error envelope failed live output-schema validation.\n${formatAjvErrors(validate.errors)}`,
+    );
+  }
+  return validatedFixtureCount;
+}
+
 export function createStructuredFixtureSchemaValidator(): StructuredFixtureSchemaValidator {
   const schemaDocuments = discoverSchemaDocuments();
   const schemaIdsByPath = new Map(
@@ -258,6 +380,15 @@ export function createStructuredFixtureSchemaValidator(): StructuredFixtureSchem
           formatAjvErrors(validate.errors),
         ].join('\n'),
       );
+    },
+    validateRegisteredOutputSchemas(tools: readonly Tool[]): void {
+      let validatedFixtureCount = 0;
+      for (const tool of tools) {
+        validatedFixtureCount += validateRegisteredOutputSchema(tool, fixtures);
+      }
+      if (validatedFixtureCount === 0) {
+        throw new Error('No successful MCP JSON fixture matched a live registered output schema.');
+      }
     },
   };
 }

@@ -179,7 +179,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
   it('call handler forwards remote tool calls and writes a raw response artifact', async () => {
     const result = await callHandler(ideCallToolHandler, {
       remoteTool: 'toolA',
-      arguments: { foo: 'bar' },
+      arguments: '{"foo":"bar"}',
     });
     const text = allText(result);
     const artifactDir = join(
@@ -212,6 +212,27 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
     expect(clientMocks.disconnect).not.toHaveBeenCalled();
   });
 
+  it('call handler preserves already-decoded CLI arguments', async () => {
+    const result = await callHandler(ideCallToolHandler, {
+      remoteTool: 'toolA',
+      arguments: { foo: 'bar' },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(clientMocks.callTool).toHaveBeenCalledWith('toolA', { foo: 'bar' }, {});
+  });
+
+  it('reports invalid MCP JSON at the arguments field', async () => {
+    const result = await callHandler(ideCallToolHandler, {
+      remoteTool: 'toolA',
+      arguments: 'not-json',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(allText(result)).toContain('arguments: Invalid input');
+    expect(allText(result)).not.toContain('arguments.arguments');
+  });
+
   it('call handler hard-fails when the raw response artifact cannot be written', async () => {
     const blockingAppDir = join(tempAppDir, 'app-dir-file');
     writeFileSync(blockingAppDir, 'not a directory');
@@ -224,7 +245,7 @@ describe('xcode-ide bridge tools (standalone fallback)', () => {
 
     const result = await callHandler(ideCallToolHandler, {
       remoteTool: 'toolA',
-      arguments: { foo: 'bar' },
+      arguments: '{"foo":"bar"}',
     });
     const text = allText(result);
 

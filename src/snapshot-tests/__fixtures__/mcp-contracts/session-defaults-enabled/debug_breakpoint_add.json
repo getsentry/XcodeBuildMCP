@@ -1,0 +1,220 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Debug Breakpoint Add"},
+  "description": "Add breakpoint.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "condition": {"description":"Expression for breakpoint condition","type":"string"},
+      "debugSessionId": {"description":"default: current session","type":"string"},
+      "file": {"type":"string"},
+      "function": {"type":"string"},
+      "line": {"exclusiveMinimum":0,"maximum":9007199254740991,"type":"integer"}
+    },
+    "type": "object"
+  },
+  "name": "debug_breakpoint_add",
+  "outputSchema": {
+    "$defs": {
+      "addFileLineBreakpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "breakpointId": {"minimum":1,"type":"integer"},
+          "file": {"type":"string"},
+          "kind": {"const":"file-line"},
+          "line": {"minimum":1,"type":"integer"}
+        },
+        "required": ["kind","file","line"],
+        "type": "object"
+      },
+      "addFunctionBreakpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "breakpointId": {"minimum":1,"type":"integer"},
+          "kind": {"const":"function"},
+          "name": {"type":"string"}
+        },
+        "required": ["kind","name"],
+        "type": "object"
+      },
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      },
+      "removeBreakpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "breakpointId": {"minimum":1,"type":"integer"}
+        },
+        "required": ["breakpointId"],
+        "type": "object"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.debug-breakpoint-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "action": {"const":"add"}
+                  },
+                  "required": ["action"]
+                },
+                "then": {
+                  "properties": {
+                    "breakpoint": {
+                      "oneOf": [
+                        {"$ref":"#/$defs/addFileLineBreakpoint"},
+                        {"$ref":"#/$defs/addFunctionBreakpoint"}
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {"const":"remove"}
+                  },
+                  "required": ["action"]
+                },
+                "then": {
+                  "properties": {
+                    "breakpoint": {"$ref":"#/$defs/removeBreakpoint"}
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "action": {
+                "enum": ["add","remove"]
+              },
+              "breakpoint": {
+                "oneOf": [
+                  {"$ref":"#/$defs/addFileLineBreakpoint"},
+                  {"$ref":"#/$defs/addFunctionBreakpoint"},
+                  {"$ref":"#/$defs/removeBreakpoint"}
+                ]
+              },
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"}
+            },
+            "required": ["action","breakpoint"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.debug-breakpoint-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

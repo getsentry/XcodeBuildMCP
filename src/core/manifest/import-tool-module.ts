@@ -11,6 +11,7 @@ import { getPackageRoot } from './load-manifest.ts';
 
 export interface ImportedToolModule {
   schema: ToolSchemaShape;
+  mcpSchema: ToolSchemaShape;
   handler: (params: Record<string, unknown>, ctx?: ToolHandlerContext) => Promise<unknown>;
 }
 
@@ -19,7 +20,7 @@ const moduleCache = new Map<string, ImportedToolModule>();
 /**
  * Import a tool module by its manifest module path.
  *
- * Accepts named exports only: `export const schema = ...` and `export const handler = ...`
+ * Accepts named exports only: `schema`, optional MCP-specific `mcpSchema`, and `handler`.
  *
  * @param moduleId - Extensionless module path (e.g., 'mcp/tools/simulator/build_sim')
  * @returns Imported tool module with schema and handler
@@ -50,6 +51,7 @@ export async function importToolModule(moduleId: string): Promise<ImportedToolMo
 
   const result: ImportedToolModule = {
     schema: mod.schema as ToolSchemaShape,
+    mcpSchema: (mod.mcpSchema ?? mod.schema) as ToolSchemaShape,
     handler: mod.handler as (
       params: Record<string, unknown>,
       ctx?: ToolHandlerContext,

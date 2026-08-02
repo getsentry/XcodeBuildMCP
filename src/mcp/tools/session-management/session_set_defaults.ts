@@ -21,6 +21,10 @@ import type { CommandExecutor } from '../../../utils/execution/index.ts';
 import { getDefaultCommandExecutor } from '../../../utils/execution/index.ts';
 import { formatProfileLabel } from './session-format-helpers.ts';
 import { toErrorMessage } from '../../../utils/errors.ts';
+import {
+  createEnvironmentVariableInputSchema,
+  normalizeEnvironmentVariableArgument,
+} from '../../../utils/environment-variable-input.ts';
 
 const schemaObj = sessionDefaultsSchema.extend({
   profile: z
@@ -39,7 +43,22 @@ const schemaObj = sessionDefaultsSchema.extend({
     .describe('Persist provided defaults to .xcodebuildmcp/config.yaml'),
 });
 
+const mcpSchemaObj = schemaObj.extend({
+  env: createEnvironmentVariableInputSchema(
+    'Default environment variables to pass to launched apps as key-value entries',
+  ),
+});
+
 type Params = z.input<typeof schemaObj>;
+
+const internalSchema: z.ZodType<Params, unknown> = z.preprocess((input) => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return input;
+  }
+
+  const args = input as Record<string, unknown>;
+  return normalizeEnvironmentVariableArgument(args, 'env');
+}, schemaObj);
 
 type SessionSetDefaultsContext = {
   executor: CommandExecutor;
@@ -242,7 +261,8 @@ export async function sessionSetDefaultsLogic(
 }
 
 export const schema = schemaObj.shape;
+export const mcpSchema = mcpSchemaObj.shape;
 
-export const handler = createTypedToolWithContext(schemaObj, sessionSetDefaultsLogic, () => ({
+export const handler = createTypedToolWithContext(internalSchema, sessionSetDefaultsLogic, () => ({
   executor: getDefaultCommandExecutor(),
 }));

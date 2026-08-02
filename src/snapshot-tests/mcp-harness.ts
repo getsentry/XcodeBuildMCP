@@ -36,6 +36,7 @@ export interface McpSnapshotHarness extends WorkflowSnapshotHarness {
 
 export interface CreateMcpSnapshotHarnessOptions {
   cwd?: string;
+  disableSessionDefaults?: boolean;
   enabledWorkflows?: string[];
   env?: Record<string, string>;
 }
@@ -145,7 +146,7 @@ export async function createMcpSnapshotHarness(
     env: createSnapshotHarnessEnv({
       ...(opts.env ?? {}),
       XCODEBUILDMCP_ENABLED_WORKFLOWS: enabledWorkflows.join(','),
-      XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS: 'true',
+      XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS: String(opts.disableSessionDefaults ?? true),
       XCODEBUILDMCP_DISABLE_XCODE_AUTO_SYNC: '1',
       XCODEBUILDMCP_TEST_FORCE_TOOL_EXPOSURE: 'sync_xcode_defaults',
     }),

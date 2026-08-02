@@ -1,0 +1,258 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Show Session Defaults"},
+  "description": "Show current active defaults. Required before your first build/run/test call in a session — do not assume defaults are configured.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {},
+    "type": "object"
+  },
+  "name": "session_show_defaults",
+  "outputSchema": {
+    "$defs": {
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      },
+      "sessionDefaultsOperation": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": {"const":"show"}
+            },
+            "required": ["type"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": {"const":"sync-xcode"}
+            },
+            "required": ["type"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "activatedProfile": {"type":"string"},
+              "changedKeys": {
+                "items": {"type":"string"},
+                "type": "array"
+              },
+              "notices": {
+                "items": {"type":"string"},
+                "type": "array"
+              },
+              "persisted": {"type":"boolean"},
+              "type": {"const":"set"}
+            },
+            "required": ["type"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "clearedKeys": {
+                "items": {"type":"string"},
+                "type": "array"
+              },
+              "profile": {"type":"string"},
+              "scope": {
+                "enum": ["all","profile","current"]
+              },
+              "type": {"const":"clear"}
+            },
+            "required": ["type","scope"],
+            "type": "object"
+          }
+        ]
+      },
+      "sessionDefaultsProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "arch": {
+            "anyOf": [
+              {"const":null},
+              {
+                "enum": ["arm64","x86_64"]
+              }
+            ]
+          },
+          "bundleId": {
+            "type": ["string","null"]
+          },
+          "configuration": {
+            "type": ["string","null"]
+          },
+          "derivedDataPath": {
+            "type": ["string","null"]
+          },
+          "deviceId": {
+            "type": ["string","null"]
+          },
+          "env": {
+            "anyOf": [
+              {"const":null},
+              {
+                "additionalProperties": {"type":"string"},
+                "propertyNames": {"minLength":1,"type":"string"},
+                "type": "object"
+              }
+            ]
+          },
+          "extraArgs": {
+            "anyOf": [
+              {"const":null},
+              {
+                "items": {"type":"string"},
+                "type": "array"
+              }
+            ]
+          },
+          "platform": {
+            "type": ["string","null"]
+          },
+          "preferXcodebuild": {
+            "type": ["boolean","null"]
+          },
+          "projectPath": {
+            "type": ["string","null"]
+          },
+          "scheme": {
+            "type": ["string","null"]
+          },
+          "simulatorId": {
+            "type": ["string","null"]
+          },
+          "simulatorName": {
+            "type": ["string","null"]
+          },
+          "simulatorPlatform": {
+            "anyOf": [
+              {"const":null},
+              {
+                "enum": ["iOS Simulator","watchOS Simulator","tvOS Simulator","visionOS Simulator"]
+              }
+            ]
+          },
+          "suppressWarnings": {
+            "type": ["boolean","null"]
+          },
+          "useLatestOS": {
+            "type": ["boolean","null"]
+          },
+          "workspacePath": {
+            "type": ["string","null"]
+          }
+        },
+        "required": ["projectPath","workspacePath","scheme","configuration","simulatorName","simulatorId","simulatorPlatform","deviceId","useLatestOS","arch","suppressWarnings","derivedDataPath","preferXcodebuild","platform","bundleId","env"],
+        "type": "object"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.session-defaults/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "currentProfile": {"type":"string"},
+              "operation": {"$ref":"#/$defs/sessionDefaultsOperation"},
+              "profiles": {
+                "additionalProperties": {"$ref":"#/$defs/sessionDefaultsProfile"},
+                "properties": {
+                  "(default)": {"$ref":"#/$defs/sessionDefaultsProfile"}
+                },
+                "required": ["(default)"],
+                "type": "object"
+              }
+            },
+            "required": ["currentProfile","profiles"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.session-defaults"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

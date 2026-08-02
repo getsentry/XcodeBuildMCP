@@ -36,6 +36,10 @@ import {
 } from '../../../utils/xcodebuild-domain-results.ts';
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
+import {
+  createEnvironmentVariableInputSchema,
+  normalizeEnvironmentVariableArgument,
+} from '../../../utils/environment-variable-input.ts';
 
 function createBuildRunDeviceRequest(params: BuildRunDeviceParams): BuildInvocationRequest {
   return {
@@ -77,6 +81,12 @@ const buildRunDeviceSchema = z.preprocess(
   nullifyEmptyStrings,
   withProjectOrWorkspace(baseSchemaObject),
 );
+
+const mcpFullSchemaObject = baseSchemaObject.extend({
+  env: createEnvironmentVariableInputSchema(
+    'Environment variables to pass to the launched app as key-value entries',
+  ),
+});
 
 export type BuildRunDeviceParams = z.infer<typeof buildRunDeviceSchema>;
 type BuildRunDeviceResult = BuildRunResultDomainResult;
@@ -300,6 +310,16 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
+const mcpPublicSchemaObject = mcpFullSchemaObject.omit({
+  projectPath: true,
+  workspacePath: true,
+  scheme: true,
+  deviceId: true,
+  configuration: true,
+  derivedDataPath: true,
+  preferXcodebuild: true,
+} as const);
+
 export async function build_run_deviceLogic(
   params: BuildRunDeviceParams,
   executor: CommandExecutor,
@@ -335,6 +355,11 @@ export const schema = getSessionAwareToolSchemaShape({
   legacy: baseSchemaObject,
 });
 
+export const mcpSchema = getSessionAwareToolSchemaShape({
+  sessionAware: mcpPublicSchemaObject,
+  legacy: mcpFullSchemaObject,
+});
+
 export const handler = createSessionAwareTool<BuildRunDeviceParams>({
   internalSchema: toInternalSchema<BuildRunDeviceParams>(buildRunDeviceSchema),
   logicFunction: (params, executor) =>
@@ -345,4 +370,5 @@ export const handler = createSessionAwareTool<BuildRunDeviceParams>({
     { oneOf: ['projectPath', 'workspacePath'], message: 'Provide a project or workspace' },
   ],
   exclusivePairs: [['projectPath', 'workspacePath']],
+  normalizeExplicitArgs: (args) => normalizeEnvironmentVariableArgument(args, 'env'),
 });

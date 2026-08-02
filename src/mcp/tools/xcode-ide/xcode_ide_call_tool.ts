@@ -12,13 +12,8 @@ import {
   toBridgeCallResultDomainResult,
 } from './shared.ts';
 
-const schemaObject = z.object({
+const baseSchemaObject = z.object({
   remoteTool: z.string().min(1).describe('Exact remote Xcode MCP tool name.'),
-  arguments: z
-    .record(z.string(), z.unknown())
-    .optional()
-    .default({})
-    .describe('Arguments payload to forward to the remote Xcode MCP tool.'),
   timeoutMs: z
     .number()
     .int()
@@ -28,7 +23,55 @@ const schemaObject = z.object({
     .describe('Optional timeout override in milliseconds for this single tool call.'),
 });
 
-type Params = z.infer<typeof schemaObject>;
+const argumentsRecordSchema = z.record(z.string(), z.unknown());
+
+const argumentsJsonSchema = z.string().transform((argumentsJson, ctx) => {
+  let parsedArguments: unknown;
+  try {
+    parsedArguments = JSON.parse(argumentsJson);
+  } catch {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Must be valid JSON encoding an object.',
+    });
+    return z.NEVER;
+  }
+
+  if (
+    typeof parsedArguments !== 'object' ||
+    parsedArguments === null ||
+    Array.isArray(parsedArguments)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Must be a JSON object.',
+    });
+    return z.NEVER;
+  }
+
+  return parsedArguments as Record<string, unknown>;
+});
+
+const schemaObject = baseSchemaObject.extend({
+  arguments: argumentsRecordSchema
+    .optional()
+    .default({})
+    .describe('Arguments for the remote Xcode MCP tool.'),
+});
+
+const mcpSchemaObject = baseSchemaObject.extend({
+  arguments: z
+    .string()
+    .optional()
+    .default('{}')
+    .describe('JSON object string containing arguments for the remote Xcode MCP tool.'),
+});
+
+const internalSchema = baseSchemaObject.extend({
+  arguments: z.union([argumentsRecordSchema, argumentsJsonSchema]).optional().default({}),
+});
+
+type Params = z.output<typeof internalSchema>;
 
 export function createXcodeIdeCallToolExecutor() {
   return createBridgeToolExecutor<Params, XcodeBridgeCallResultDomainResult>({
@@ -61,9 +104,10 @@ export async function xcodeIdeCallToolLogic(params: Params): Promise<void> {
 }
 
 export const schema = schemaObject.shape;
+export const mcpSchema = mcpSchemaObject.shape;
 
 export const handler = createTypedToolWithContext(
-  schemaObject,
+  internalSchema,
   (params: Params) => xcodeIdeCallToolLogic(params),
   () => undefined,
 );

@@ -41,6 +41,10 @@ import type { BuildInvocationRequest } from '../../../types/domain-fragments.ts'
 import { resolveEffectiveDerivedDataPath } from '../../../utils/derived-data-path.ts';
 import { createBuildInvocationFragment } from '../../../utils/xcodebuild-pipeline.ts';
 import { displayPath } from '../../../utils/build-preflight.ts';
+import {
+  normalizeEnvironmentVariableArgument,
+  testRunnerEnvironmentSchema,
+} from '../../../utils/environment-variable-input.ts';
 
 const baseSchemaObject = z.object({
   projectPath: z
@@ -96,6 +100,10 @@ const testSimulatorSchema = z.preprocess(
   nullifyEmptyStrings,
   withSimulatorIdOrName(withProjectWorkspaceOrTestArtifact(baseSchemaObject)),
 );
+
+const mcpFullSchemaObject = baseSchemaObject.extend({
+  testRunnerEnv: testRunnerEnvironmentSchema,
+});
 
 type TestSimulatorParams = z.infer<typeof testSimulatorSchema>;
 type TestSimulatorResult = TestResultDomainResult;
@@ -298,9 +306,26 @@ const publicSchemaObject = baseSchemaObject.omit({
   preferXcodebuild: true,
 } as const);
 
+const mcpPublicSchemaObject = mcpFullSchemaObject.omit({
+  projectPath: true,
+  workspacePath: true,
+  scheme: true,
+  simulatorId: true,
+  simulatorName: true,
+  configuration: true,
+  useLatestOS: true,
+  derivedDataPath: true,
+  preferXcodebuild: true,
+} as const);
+
 export const schema = getSessionAwareToolSchemaShape({
   sessionAware: publicSchemaObject,
   legacy: baseSchemaObject,
+});
+
+export const mcpSchema = getSessionAwareToolSchemaShape({
+  sessionAware: mcpPublicSchemaObject,
+  legacy: mcpFullSchemaObject,
 });
 
 export const handler = createSessionAwareTool<TestSimulatorParams>({
@@ -316,4 +341,5 @@ export const handler = createSessionAwareTool<TestSimulatorParams>({
     ['projectPath', 'workspacePath'],
     ['simulatorId', 'simulatorName'],
   ],
+  normalizeExplicitArgs: (args) => normalizeEnvironmentVariableArgument(args, 'testRunnerEnv'),
 });

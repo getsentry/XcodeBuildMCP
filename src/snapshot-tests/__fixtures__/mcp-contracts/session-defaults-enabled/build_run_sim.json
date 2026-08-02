@@ -1,0 +1,231 @@
+{
+  "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Build Run Simulator"},
+  "description": "Build, install, and launch on iOS Simulator, booting it when needed. Runtime logs are captured automatically and the log file path is included in the response. Preferred single-step run tool when defaults are set.",
+  "execution": {"taskSupport":"forbidden"},
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "extraArgs": {
+        "description": "Additional xcodebuild/build-settings arguments (not app launch arguments)",
+        "items": {"type":"string"},
+        "type": "array"
+      },
+      "launchArgs": {
+        "description": "Arguments passed to the launched app process on simulator runtime",
+        "items": {"type":"string"},
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "name": "build_run_sim",
+  "outputSchema": {
+    "$defs": {
+      "basicDiagnostics": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          },
+          "rawOutput": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "warnings": {
+            "items": {"$ref":"#/$defs/diagnosticEntry"},
+            "type": "array"
+          }
+        },
+        "required": ["warnings","errors"],
+        "type": "object"
+      },
+      "buildInvocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "arch": {"type":"string"},
+          "configuration": {"type":"string"},
+          "derivedDataPath": {"type":"string"},
+          "deviceId": {"type":"string"},
+          "executableName": {"type":"string"},
+          "onlyTesting": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "packagePath": {"type":"string"},
+          "platform": {"type":"string"},
+          "projectPath": {"type":"string"},
+          "scheme": {"type":"string"},
+          "simulatorId": {"type":"string"},
+          "simulatorName": {"type":"string"},
+          "skipTesting": {
+            "items": {"type":"string"},
+            "type": "array"
+          },
+          "target": {
+            "enum": ["simulator","device","macos","swift-package"]
+          },
+          "targetName": {"type":"string"},
+          "workspacePath": {"type":"string"}
+        },
+        "type": "object"
+      },
+      "diagnosticEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {"type":"string"},
+          "message": {"type":"string"}
+        },
+        "required": ["message"],
+        "type": "object"
+      },
+      "errorConsistency": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":false}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"type":"null"}
+              },
+              "required": ["error"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "didError": {"const":true}
+              },
+              "required": ["didError"]
+            },
+            "then": {
+              "properties": {
+                "error": {"minLength":1,"type":"string"}
+              },
+              "required": ["error"]
+            }
+          }
+        ],
+        "properties": {
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          }
+        },
+        "type": "object"
+      },
+      "nextSteps": {
+        "items": {"minLength":1,"type":"string"},
+        "minItems": 1,
+        "type": "array"
+      }
+    },
+    "$id": "https://xcodebuildmcp.com/schemas/structured-output/xcodebuildmcp.output.build-run-result/2.registration.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "artifacts": {
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "appPath": {"type":"string"},
+                  "buildLogPath": {"type":"string"},
+                  "bundleId": {"type":"string"},
+                  "deviceId": {"type":"string"},
+                  "executablePath": {"type":"string"},
+                  "osLogPath": {"type":"string"},
+                  "packagePath": {"type":"string"},
+                  "processId": {"minimum":1,"type":"integer"},
+                  "runtimeLogPath": {"type":"string"},
+                  "simulatorId": {"type":"string"}
+                },
+                "required": [],
+                "type": "object"
+              },
+              "diagnostics": {"$ref":"#/$defs/basicDiagnostics"},
+              "output": {
+                "additionalProperties": false,
+                "properties": {
+                  "stderr": {
+                    "items": {"type":"string"},
+                    "type": "array"
+                  },
+                  "stdout": {
+                    "items": {"type":"string"},
+                    "type": "array"
+                  }
+                },
+                "required": ["stdout","stderr"],
+                "type": "object"
+              },
+              "request": {"$ref":"#/$defs/buildInvocationRequest"},
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "durationMs": {"minimum":0,"type":"integer"},
+                  "status": {
+                    "enum": ["SUCCEEDED","FAILED"]
+                  },
+                  "target": {
+                    "enum": ["simulator","device","macos","swift-package"]
+                  }
+                },
+                "required": ["status"],
+                "type": "object"
+              }
+            },
+            "required": ["summary","artifacts","diagnostics"],
+            "type": "object"
+          },
+          "didError": {"type":"boolean"},
+          "error": {
+            "type": ["string","null"]
+          },
+          "nextSteps": {"$ref":"#/$defs/nextSteps"},
+          "schema": {"const":"xcodebuildmcp.output.build-run-result"},
+          "schemaVersion": {"const":"2"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "allOf": [
+          {"$ref":"#/$defs/errorConsistency"}
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": ["runtime","validation","schema"]
+              },
+              "code": {"minLength":1,"type":"string"}
+            },
+            "required": ["category","code"],
+            "type": "object"
+          },
+          "didError": {"const":true},
+          "error": {"minLength":1,"type":"string"},
+          "schema": {"const":"xcodebuildmcp.output.error"},
+          "schemaVersion": {"const":"1"}
+        },
+        "required": ["schema","schemaVersion","didError","error","data"],
+        "type": "object"
+      }
+    ],
+    "type": "object"
+  }
+}

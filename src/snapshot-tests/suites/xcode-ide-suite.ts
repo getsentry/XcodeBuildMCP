@@ -243,7 +243,12 @@ export function registerXcodeIdeSnapshotSuite(runtime: SnapshotRuntime): void {
 
           result = await harness.invoke('xcode-ide', 'call-tool', {
             remoteTool: DOCUMENTATION_SEARCH_TOOL,
-            arguments: { query: DOCUMENTATION_SEARCH_QUERY, frameworks: ['AVFoundation'] },
+            arguments: runtime.startsWith('mcp/')
+              ? JSON.stringify({
+                  query: DOCUMENTATION_SEARCH_QUERY,
+                  frameworks: ['AVFoundation'],
+                })
+              : { query: DOCUMENTATION_SEARCH_QUERY, frameworks: ['AVFoundation'] },
             timeoutMs: 120_000,
           });
           expectFixture(result, 'documentation-search--success', 'success');
