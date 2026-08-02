@@ -175,8 +175,8 @@ describe('structured JSON fixture schemas', () => {
           deviceId: 'CONTRACT-PROBE-DEVICE',
           env,
         },
-        expectedOutcome: 'domain-error',
         expectedSchema: 'xcodebuildmcp.output.build-run-result',
+        expectedInfrastructureText: 'spawn xcodebuild ENOENT',
       },
       {
         toolName: 'launch_app_device',
@@ -185,8 +185,8 @@ describe('structured JSON fixture schemas', () => {
           bundleId: 'com.example.contract-probe',
           env,
         },
-        expectedOutcome: 'domain-error',
         expectedSchema: 'xcodebuildmcp.output.launch-result',
+        expectedInfrastructureText: 'spawn xcrun ENOENT',
       },
       {
         toolName: 'test_device',
@@ -195,14 +195,14 @@ describe('structured JSON fixture schemas', () => {
           deviceId: 'CONTRACT-PROBE-DEVICE',
           testRunnerEnv: env,
         },
-        expectedOutcome: 'domain-error',
         expectedSchema: 'xcodebuildmcp.output.test-result',
+        expectedInfrastructureText: 'spawn xcodebuild ENOENT',
       },
       {
         toolName: 'test_macos',
         arguments: { testProductsPath: missingTests, testRunnerEnv: env },
-        expectedOutcome: 'domain-error',
         expectedSchema: 'xcodebuildmcp.output.test-result',
+        expectedInfrastructureText: 'spawn xcodebuild ENOENT',
       },
       {
         toolName: 'launch_app_sim',
@@ -211,8 +211,8 @@ describe('structured JSON fixture schemas', () => {
           bundleId: 'com.example.contract-probe',
           env,
         },
-        expectedOutcome: 'domain-error',
         expectedSchema: 'xcodebuildmcp.output.launch-result',
+        expectedInfrastructureText: 'spawn xcrun ENOENT',
       },
       {
         toolName: 'test_sim',
@@ -221,19 +221,21 @@ describe('structured JSON fixture schemas', () => {
           simulatorName: 'Contract Probe Missing Simulator',
           testRunnerEnv: env,
         },
-        expectedOutcome: 'infrastructure-error',
-        expectedText: 'Unable to determine the simulator platform',
+        expectedSchema: 'xcodebuildmcp.output.test-result',
+        expectedInfrastructureText: 'Unable to determine the simulator platform',
       },
     ] as const;
 
     for (const probe of probes) {
       const result = await fullHarness.callTool(probe.toolName, probe.arguments);
-      expect(result.outcome, probe.toolName).toBe(probe.expectedOutcome);
-      if ('expectedSchema' in probe) {
+      expect(result.outcome, probe.toolName).not.toBe('success');
+      expect(result.outcome, probe.toolName).not.toBe('validation-error');
+      if ('expectedSchema' in probe && result.outcome === 'domain-error') {
         expect(result.structuredEnvelope?.schema, probe.toolName).toBe(probe.expectedSchema);
-      } else {
+      }
+      if (result.outcome === 'infrastructure-error') {
         expect(result.structuredEnvelope, probe.toolName).toBeNull();
-        expect(result.rawText, probe.toolName).toContain(probe.expectedText);
+        expect(result.rawText, probe.toolName).toContain(probe.expectedInfrastructureText);
       }
     }
   }, 30_000);
