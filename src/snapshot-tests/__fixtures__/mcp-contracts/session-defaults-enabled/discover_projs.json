@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Discover Projects"},
   "description": "Scans a directory (defaults to workspace root) to find Xcode project (.xcodeproj) and workspace (.xcworkspace) files. Use when project/workspace path is unknown.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "maxDepth": {"maximum":9007199254740991,"minimum":0,"type":"integer"},
       "scanPath": {"type":"string"},

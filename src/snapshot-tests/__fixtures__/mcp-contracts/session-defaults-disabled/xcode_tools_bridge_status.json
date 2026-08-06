@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Xcode Tools Bridge Status"},
   "description": "Show xcrun mcpbridge availability and proxy tool sync status.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {},
     "type": "object"
   },

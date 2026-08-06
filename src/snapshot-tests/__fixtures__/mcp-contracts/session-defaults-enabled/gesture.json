@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Gesture"},
   "description": "Simulator gesture preset.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "delta": {"description":"Distance to move in pixels.","maximum":200,"minimum":0,"type":"number"},
       "duration": {"description":"Duration of the gesture in seconds.","maximum":10,"minimum":0,"type":"number"},

@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Tap"},
   "description": "Tap one elementRef from the latest snapshot_ui or wait_for_ui output. The elementRef must list the tap action in the snapshot targets; do not use refs from text-only rows. For multiple same-screen taps or visible switch toggles with no intermediate assertion, use batch instead of repeated tap calls. Other same-screen refs may remain usable after success; refresh after navigation, scrolling, sheet changes, or obvious layout changes.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "elementRef": {"minLength":1,"type":"string"},
       "postDelay": {"description":"seconds","maximum":10,"minimum":0,"type":"number"},

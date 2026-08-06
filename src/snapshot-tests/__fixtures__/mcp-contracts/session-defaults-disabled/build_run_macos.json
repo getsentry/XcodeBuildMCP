@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Build Run macOS"},
   "description": "Build and run macOS app.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "arch": {
         "description": "Architecture to build for (arm64 or x86_64). For macOS only.",

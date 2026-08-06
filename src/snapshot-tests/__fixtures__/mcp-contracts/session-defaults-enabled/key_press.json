@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Key Press"},
   "description": "Press one hardware key using an AXe HID key code. Prefer type_text for text entry. Common values include 40 Return/Enter, 42 Backspace, 43 Tab, and 44 Space.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "duration": {"description":"seconds","maximum":10,"minimum":0,"type":"number"},
       "keyCode": {"description":"HID keycode. Common values: 40 Return/Enter, 42 Backspace, 43 Tab, 44 Space.","maximum":255,"minimum":0,"type":"integer"}

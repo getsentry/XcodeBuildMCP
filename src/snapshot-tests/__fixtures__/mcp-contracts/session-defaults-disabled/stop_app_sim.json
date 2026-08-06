@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Stop App Simulator"},
   "description": "Stop sim app.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "bundleId": {"description":"Bundle identifier of the app to stop","type":"string"},
       "simulatorId": {"description":"UUID of the simulator to use (obtained from list_sims). Provide EITHER this OR simulatorName, not both","type":"string"},

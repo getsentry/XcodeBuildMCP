@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Record Simulator Video"},
   "description": "Record sim video.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "fps": {"description":"default: 30","maximum":120,"minimum":1,"type":"integer"},
       "outputFile": {"description":"Path to write MP4 file","type":"string"},

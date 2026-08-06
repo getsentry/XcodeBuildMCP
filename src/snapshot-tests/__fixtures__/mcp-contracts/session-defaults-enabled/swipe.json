@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Swipe"},
   "description": "Swipe within a scrollable UI element using withinElementRef from a current rs/1 runtime snapshot. withinElementRef is required; do not use elementRef. Optional distance is a normalized stroke fraction greater than 0 and up to 1. Example input: {\"withinElementRef\":\"e7\",\"direction\":\"up\",\"distance\":0.7}.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "direction": {
         "description": "up|down|left|right",

@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Get Simulator App Path"},
   "description": "Get sim built app path.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "platform": {
         "enum": ["iOS Simulator","watchOS Simulator","tvOS Simulator","visionOS Simulator"],

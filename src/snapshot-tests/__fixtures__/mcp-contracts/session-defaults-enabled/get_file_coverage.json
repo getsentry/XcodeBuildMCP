@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Get File Coverage"},
   "description": "Show function-level coverage and uncovered line ranges for a specific file.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "file": {"description":"Source file name or path to inspect","type":"string"},
       "showLines": {"default":false,"description":"When true, include uncovered line ranges from the archive","type":"boolean"},

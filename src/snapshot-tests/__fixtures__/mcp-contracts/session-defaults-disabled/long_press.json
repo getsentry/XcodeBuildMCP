@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Long Press"},
   "description": "Long press a UI element by elementRef from a current rs/1 runtime snapshot.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "duration": {"description":"milliseconds","exclusiveMinimum":0,"maximum":10000,"type":"integer"},
       "elementRef": {"minLength":1,"type":"string"},

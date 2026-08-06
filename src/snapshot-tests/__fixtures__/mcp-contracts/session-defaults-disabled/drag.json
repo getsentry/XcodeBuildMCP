@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Drag"},
   "description": "Drag from a visible runtime elementRef in a direction, then return a refreshed runtime UI snapshot. Use this for exposed sheet grabbers or real scroll/list content refs when nextSteps suggests dragging; do not use raw screen coordinates.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "direction": {
         "description": "Drag direction: up, down, left, or right",

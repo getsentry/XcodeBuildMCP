@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Get Device App Path"},
   "description": "Get device built app path.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "configuration": {"description":"Build configuration (Debug, Release, etc.)","type":"string"},
       "derivedDataPath": {"type":"string"},

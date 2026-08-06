@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":true,"openWorldHint":false,"readOnlyHint":false,"title":"Erase Simulators"},
   "description": "Erase simulator.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "shutdownFirst": {"type":"boolean"},
       "simulatorId": {

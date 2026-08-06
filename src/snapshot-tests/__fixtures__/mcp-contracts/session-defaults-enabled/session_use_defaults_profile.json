@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Use Session Defaults Profile"},
   "description": "Switch the active session defaults profile.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "global": {"description":"Activate the global unnamed defaults profile.","type":"boolean"},
       "persist": {"description":"Persist activeSessionDefaultsProfile to .xcodebuildmcp/config.yaml.","type":"boolean"},

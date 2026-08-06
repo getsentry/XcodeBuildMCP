@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Launch App Simulator"},
   "description": "Launch app on simulator. Runtime logs are captured automatically and the log file path is included in the response.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "bundleId": {"description":"Bundle identifier of the app to launch","type":"string"},
       "env": {

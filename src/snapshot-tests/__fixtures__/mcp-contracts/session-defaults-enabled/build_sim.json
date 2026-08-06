@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Build Simulator"},
   "description": "Build for iOS sim (compile-only, no launch).",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "buildForTesting": {"description":"Build reusable test products without running tests (default: false)","type":"boolean"},
       "extraArgs": {

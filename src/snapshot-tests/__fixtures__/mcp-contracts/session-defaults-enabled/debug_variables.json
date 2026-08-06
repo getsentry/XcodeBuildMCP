@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Debug Variables"},
   "description": "Get frame variables.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "debugSessionId": {"description":"default: current session","type":"string"},
       "frameIndex": {"maximum":9007199254740991,"minimum":0,"type":"integer"}

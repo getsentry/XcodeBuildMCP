@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"idempotentHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Toggle Software Keyboard"},
   "description": "Toggle the iOS Simulator software keyboard. Shows or hides the on-screen keyboard. Requires the simulator to be booted and Accessibility permission for the MCP host.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "simulatorId": {
         "description": "UUID of the simulator to use (obtained from list_simulators)",

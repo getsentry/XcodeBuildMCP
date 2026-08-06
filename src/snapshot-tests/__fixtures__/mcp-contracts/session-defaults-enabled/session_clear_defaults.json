@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":true,"openWorldHint":false,"readOnlyHint":false,"title":"Clear Session Defaults"},
   "description": "Clear session defaults for the active profile or a specified profile.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "all": {"description":"Clear all defaults across global and named profiles. Cannot be combined with keys/profile.","type":"boolean"},
       "keys": {

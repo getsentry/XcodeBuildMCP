@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Snapshot UI"},
   "description": "Capture a semantic rs/1 runtime UI snapshot with elementRef targets. Observe once, use tap for one target or batch for multiple same-screen targets, and refresh after navigation, scrolling, sheet changes, or obvious layout changes.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "sinceScreenHash": {"description":"Return an unchanged response when the current screen hash matches this value","minLength":1,"type":"string"}
     },

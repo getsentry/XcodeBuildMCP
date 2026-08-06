@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Install App Simulator"},
   "description": "Install app on sim.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "appPath": {"description":"Path to the .app bundle to install","type":"string"},
       "simulatorId": {"description":"UUID of the simulator to use (obtained from list_sims). Provide EITHER this OR simulatorName, not both","type":"string"},

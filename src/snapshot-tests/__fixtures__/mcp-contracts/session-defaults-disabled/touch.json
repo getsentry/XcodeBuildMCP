@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Touch"},
   "description": "Send touch down/up events to a UI element by elementRef from a current rs/1 runtime snapshot.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "delay": {"description":"seconds","maximum":10,"minimum":0,"type":"number"},
       "down": {"type":"boolean"},

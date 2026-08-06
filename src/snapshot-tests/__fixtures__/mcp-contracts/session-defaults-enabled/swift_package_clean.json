@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":true,"openWorldHint":false,"readOnlyHint":false,"title":"Swift Package Clean"},
   "description": "swift package clean.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "packagePath": {"type":"string"}
     },

@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Debug Breakpoint Add"},
   "description": "Add breakpoint.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "condition": {"description":"Expression for breakpoint condition","type":"string"},
       "debugSessionId": {"description":"default: current session","type":"string"},

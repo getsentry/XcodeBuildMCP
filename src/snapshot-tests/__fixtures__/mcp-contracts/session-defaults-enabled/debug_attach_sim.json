@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":false,"title":"Debug Attach Sim"},
   "description": "Attach LLDB to sim app.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "bundleId": {"description":"Attach by bundle identifier. Provide bundleId without pid; waitFor may be used with this mode.","type":"string"},
       "continueOnAttach": {"default":true,"description":"default: true","type":"boolean"},

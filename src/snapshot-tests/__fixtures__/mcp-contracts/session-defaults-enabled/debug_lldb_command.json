@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":true,"openWorldHint":false,"readOnlyHint":false,"title":"Debug LLDB Command"},
   "description": "Run LLDB command.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "command": {"type":"string"},
       "debugSessionId": {"description":"default: current session","type":"string"},

@@ -1,9 +1,8 @@
 {
   "annotations": {"destructiveHint":false,"openWorldHint":false,"readOnlyHint":true,"title":"Get Coverage Report"},
   "description": "Show per-target code coverage from an xcresult bundle.",
-  "execution": {"taskSupport":"forbidden"},
   "inputSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
       "showFiles": {"default":false,"description":"When true, include per-file coverage breakdown under each target","type":"boolean"},
       "target": {"description":"Filter results to a specific target name","type":"string"},
