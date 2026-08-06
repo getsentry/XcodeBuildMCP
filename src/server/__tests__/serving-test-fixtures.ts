@@ -73,12 +73,15 @@ export function secondTestToolPlanEntry(): McpToolRegistrationPlan['tools'][numb
   return probeToolPlanEntry(SECOND_TEST_TOOL_NAME);
 }
 
-function buildTestToolPlan(mcpNames: string[]): McpToolRegistrationPlan {
+function buildTestToolPlan(
+  mcpNames: string[],
+  workflows: string[] = ['probe'],
+): McpToolRegistrationPlan {
   return {
     tools: mcpNames.map((name) => probeToolPlanEntry(name)),
     catalog: createToolCatalog(mcpNames.map((name) => probeToolDefinition(name))),
-    enabledWorkflows: new Set(['probe']),
-    workflowLabel: 'probe',
+    enabledWorkflows: new Set(workflows),
+    workflowLabel: workflows.join(', '),
   };
 }
 
@@ -93,6 +96,23 @@ let currentTestPlan: McpToolRegistrationPlan | null = null;
 /** Replaces the current plan, as `applyWorkflowSelectionFromManifest` does. */
 export function setCurrentTestPlan(plan: McpToolRegistrationPlan | null): void {
   currentTestPlan = plan;
+}
+
+/**
+ * Rewrites the enabled workflows of the current plan, keeping its tools.
+ *
+ * Stands in for a `manage_workflows` call that turns a workflow on or off.
+ */
+export function setCurrentTestWorkflows(workflows: string[]): void {
+  const plan = currentTestPlan;
+  if (!plan) {
+    throw new Error('No current test plan; call createTestRegistrations() first.');
+  }
+  currentTestPlan = {
+    ...plan,
+    enabledWorkflows: new Set(workflows),
+    workflowLabel: workflows.join(', '),
+  };
 }
 
 /** The plan the fixture registrations currently resolve. */
@@ -128,7 +148,6 @@ export function createTestRegistrations(
   return {
     resolveToolPlan: () => currentTestPlan,
     resources,
-    xcodeIdeEnabled: false,
     ...overrides,
   };
 }

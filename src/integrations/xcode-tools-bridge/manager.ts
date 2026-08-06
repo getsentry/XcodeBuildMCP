@@ -55,9 +55,23 @@ export class XcodeToolsBridgeManager {
     this.registry.rebind(server);
   }
 
+  /**
+   * Enables or disables the xcode-ide workflow.
+   *
+   * Disabling drops the proxied tool registrations as well: the workflow being
+   * off must mean the `xcode_tools_*` tools are gone, otherwise a serving
+   * context built after a `manage_workflows` disable would keep serving tools
+   * the client just turned off.
+   */
   setWorkflowEnabled(enabled: boolean): void {
+    const wasEnabled = this.workflowEnabled;
     this.workflowEnabled = enabled;
     this.service.setWorkflowEnabled(enabled);
+
+    if (!enabled && wasEnabled) {
+      this.suppressListChangedSync = true;
+      this.registry.clear();
+    }
   }
 
   async shutdown(): Promise<void> {

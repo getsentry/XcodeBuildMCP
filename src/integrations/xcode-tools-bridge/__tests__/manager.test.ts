@@ -147,4 +147,47 @@ describe('XcodeToolsBridgeManager', () => {
 
     expect(syncSpy).toHaveBeenCalledWith({ reason: 'listChanged' });
   });
+  it('drops proxied tool registrations when the workflow is disabled', () => {
+    const server = {
+      sendToolListChanged: vi.fn(),
+    } as unknown as McpServer;
+
+    const manager = new XcodeToolsBridgeManager(server);
+    manager.setWorkflowEnabled(true);
+    expect(registryMocks.clear).not.toHaveBeenCalled();
+
+    manager.setWorkflowEnabled(false);
+
+    expect(serviceMocks.setWorkflowEnabled).toHaveBeenLastCalledWith(false);
+    expect(registryMocks.clear).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear registrations when the workflow was already disabled', () => {
+    const server = {
+      sendToolListChanged: vi.fn(),
+    } as unknown as McpServer;
+
+    const manager = new XcodeToolsBridgeManager(server);
+    manager.setWorkflowEnabled(false);
+    manager.setWorkflowEnabled(false);
+
+    expect(registryMocks.clear).not.toHaveBeenCalled();
+  });
+
+  it('does not resync from a listChanged notification after being disabled', async () => {
+    const server = {
+      sendToolListChanged: vi.fn(),
+    } as unknown as McpServer;
+
+    const manager = new XcodeToolsBridgeManager(server);
+    manager.setWorkflowEnabled(true);
+    manager.setWorkflowEnabled(false);
+
+    const syncSpy = vi.spyOn(manager, 'syncTools');
+    onToolCatalogInvalidatedRef.current?.();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(syncSpy).not.toHaveBeenCalled();
+  });
 });

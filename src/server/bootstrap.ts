@@ -5,13 +5,15 @@ import { log, normalizeLogLevel, setLogLevel } from '../utils/logger.ts';
 import type { RuntimeConfigOverrides } from '../utils/config-store.ts';
 import {
   applyToolPlanToServer,
-  getRegisteredWorkflows,
   getToolRegistrationPlan,
   registerWorkflowsFromManifest,
   type McpToolRegistrationPlan,
 } from '../utils/tool-registry.ts';
 import { bootstrapRuntime } from '../runtime/bootstrap-runtime.ts';
-import { getXcodeToolsBridgeManager } from '../integrations/xcode-tools-bridge/index.ts';
+import {
+  getXcodeToolsBridgeManager,
+  peekXcodeToolsBridgeManager,
+} from '../integrations/xcode-tools-bridge/index.ts';
 import { detectXcodeRuntime } from '../utils/xcode-process.ts';
 import { readXcodeIdeState } from '../utils/xcode-state-reader.ts';
 import { sessionStore } from '../utils/session-store.ts';
@@ -44,10 +46,20 @@ export interface ServerRegistrations {
    * afterwards must serve the new selection. Capturing the plan at startup
    * would make every later context replay the boot-time workflows and silently
    * undo the client's selection.
+   *
+   * Every workflow-derived decision a serving context makes - which tools to
+   * register, and whether the Xcode tools bridge is active - is resolved from
+   * this one plan, so the two can never disagree.
    */
   resolveToolPlan: () => McpToolRegistrationPlan | null;
   resources: Map<string, ResourceMeta>;
-  xcodeIdeEnabled: boolean;
+}
+
+const XCODE_IDE_WORKFLOW_ID = 'xcode-ide';
+
+/** Whether the given plan has the xcode-ide workflow enabled. */
+export function planEnablesXcodeIde(plan: McpToolRegistrationPlan | null): boolean {
+  return plan?.enabledWorkflows.has(XCODE_IDE_WORKFLOW_ID) ?? false;
 }
 
 export interface BootstrapResult {
@@ -124,11 +136,23 @@ export function applyServerRegistrations(
 
   registerLoadedResources(server, registrations.resources);
 
-  if (registrations.xcodeIdeEnabled && options.bindXcodeToolsBridge !== false) {
+  if (options.bindXcodeToolsBridge === false) {
+    // A per-request context never owns the process-level bridge, in either
+    // direction: it must neither take the binding nor disable a bridge the live
+    // connection still owns.
+    return;
+  }
+
+  if (planEnablesXcodeIde(toolPlan)) {
     const xcodeToolsBridge = getXcodeToolsBridgeManager(server);
     xcodeToolsBridge?.bindServer(server);
     xcodeToolsBridge?.setWorkflowEnabled(true);
+    return;
   }
+
+  // The workflow is off for this context. Only tell an existing manager to
+  // stand down - never construct one just to disable it.
+  peekXcodeToolsBridgeManager()?.setWorkflowEnabled(false);
 }
 
 /**
@@ -190,9 +214,6 @@ export async function bootstrapServerRuntime(
   await registerWorkflowsFromManifest(enabledWorkflows, ctx);
   profiler.mark('registerWorkflowsFromManifest', stageStartMs);
 
-  const resolvedWorkflows = getRegisteredWorkflows();
-  const xcodeIdeEnabled = resolvedWorkflows.includes('xcode-ide');
-
   stageStartMs = getStartupProfileNowMs();
   const resources = await loadResources(ctx);
   profiler.mark('loadResources', stageStartMs);
@@ -201,7 +222,6 @@ export async function bootstrapServerRuntime(
     registrations: {
       resolveToolPlan: getToolRegistrationPlan,
       resources,
-      xcodeIdeEnabled,
     },
     runDeferredInitialization: async (options = {}): Promise<void> => {
       const deferredProfiler = createStartupProfiler('bootstrap-deferred');

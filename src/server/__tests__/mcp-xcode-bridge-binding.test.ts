@@ -5,17 +5,19 @@ const bridgeMocks = vi.hoisted(() => ({
   bindServer: vi.fn(),
   setWorkflowEnabled: vi.fn(),
   getXcodeToolsBridgeManager: vi.fn(),
+  peekXcodeToolsBridgeManager: vi.fn(),
 }));
 
 vi.mock('../../integrations/xcode-tools-bridge/index.ts', () => ({
   getXcodeToolsBridgeManager: bridgeMocks.getXcodeToolsBridgeManager,
+  peekXcodeToolsBridgeManager: bridgeMocks.peekXcodeToolsBridgeManager,
 }));
 
 import { createMcpHttpHandler, startStdioServer } from '../server.ts';
 import { __resetServerStateForTests } from '../server-state.ts';
 import { __resetToolRegistryForTests } from '../../utils/tool-registry.ts';
 import { __resetMcpInstrumentationForTests } from '../mcp-instrumentation.ts';
-import { createTestRegistrations } from './serving-test-fixtures.ts';
+import { createTestRegistrations, setCurrentTestWorkflows } from './serving-test-fixtures.ts';
 import { modernMeta, RawMcpPeer } from './raw-mcp-peer.ts';
 import { buildModernHttpHeaders } from '../mcp-protocol.ts';
 
@@ -30,6 +32,11 @@ beforeEach(() => {
     bindServer: bridgeMocks.bindServer,
     setWorkflowEnabled: bridgeMocks.setWorkflowEnabled,
   });
+  bridgeMocks.peekXcodeToolsBridgeManager.mockReset();
+  bridgeMocks.peekXcodeToolsBridgeManager.mockReturnValue({
+    bindServer: bridgeMocks.bindServer,
+    setWorkflowEnabled: bridgeMocks.setWorkflowEnabled,
+  });
 });
 
 afterEach(async () => {
@@ -41,6 +48,12 @@ afterEach(async () => {
   __resetServerStateForTests();
   __resetMcpInstrumentationForTests();
 });
+
+function xcodeIdeRegistrations(enabled: boolean): ReturnType<typeof createTestRegistrations> {
+  const registrations = createTestRegistrations();
+  setCurrentTestWorkflows(enabled ? ['probe', 'xcode-ide'] : ['probe']);
+  return registrations;
+}
 
 async function httpToolsList(handler: ReturnType<typeof createMcpHttpHandler>): Promise<void> {
   const params = { _meta: modernMeta() };
@@ -62,7 +75,7 @@ describe('Xcode tools bridge binding across serving contexts', () => {
   it('binds the process-level bridge to a connection-scoped stdio instance', async () => {
     peer = new RawMcpPeer();
     await peer.start();
-    handle = startStdioServer(createTestRegistrations({ xcodeIdeEnabled: true }), {
+    handle = startStdioServer(xcodeIdeRegistrations(true), {
       transport: peer.serverTransport,
     });
 
@@ -73,7 +86,7 @@ describe('Xcode tools bridge binding across serving contexts', () => {
   });
 
   it('never rebinds the bridge for per-request HTTP instances', async () => {
-    const httpHandler = createMcpHttpHandler(createTestRegistrations({ xcodeIdeEnabled: true }));
+    const httpHandler = createMcpHttpHandler(xcodeIdeRegistrations(true));
 
     await httpToolsList(httpHandler);
     await httpToolsList(httpHandler);
@@ -88,13 +101,13 @@ describe('Xcode tools bridge binding across serving contexts', () => {
   it('leaves the stdio binding intact while HTTP requests are served', async () => {
     peer = new RawMcpPeer();
     await peer.start();
-    handle = startStdioServer(createTestRegistrations({ xcodeIdeEnabled: true }), {
+    handle = startStdioServer(xcodeIdeRegistrations(true), {
       transport: peer.serverTransport,
     });
     await peer.request('tools/list', { _meta: modernMeta() });
     expect(bridgeMocks.bindServer).toHaveBeenCalledTimes(1);
 
-    const httpHandler = createMcpHttpHandler(createTestRegistrations({ xcodeIdeEnabled: true }));
+    const httpHandler = createMcpHttpHandler(xcodeIdeRegistrations(true));
     await httpToolsList(httpHandler);
     await httpHandler.close();
 
@@ -104,7 +117,7 @@ describe('Xcode tools bridge binding across serving contexts', () => {
   it('does not touch the bridge when the xcode-ide workflow is disabled', async () => {
     peer = new RawMcpPeer();
     await peer.start();
-    handle = startStdioServer(createTestRegistrations({ xcodeIdeEnabled: false }), {
+    handle = startStdioServer(xcodeIdeRegistrations(false), {
       transport: peer.serverTransport,
     });
 
