@@ -127,6 +127,105 @@ describe('MCP server transport request lifecycle instrumentation', () => {
     expect(onRequestCompleted).toHaveBeenCalledTimes(1);
   });
 
+  it('does not count a long-lived subscriptions/listen request as in flight', async () => {
+    const onRequestStarted = vi.fn();
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestStarted,
+      onRequestCompleted,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+
+    expect(onRequestStarted).not.toHaveBeenCalled();
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+  });
+
+  it('does not double-settle when a listen request is finally answered at teardown', async () => {
+    const onRequestStarted = vi.fn();
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestStarted,
+      onRequestCompleted,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+    await transport.send({ jsonrpc: '2.0', id: 'listen-1', result: {} });
+
+    expect(onRequestStarted).not.toHaveBeenCalled();
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+  });
+
+  it('settles a listen request cancelled by the client without emitting metrics', async () => {
+    const onRequestStarted = vi.fn();
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestStarted,
+      onRequestCompleted,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+    transport.onmessage?.({
+      jsonrpc: '2.0',
+      method: 'notifications/cancelled',
+      params: { requestId: 'listen-1' },
+    });
+    await transport.send({ jsonrpc: '2.0', id: 'listen-1', result: {} });
+
+    expect(onRequestStarted).not.toHaveBeenCalled();
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+  });
+
+  it('settles an ordinary request cancelled without a response', async () => {
+    const onRequestStarted = vi.fn();
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestStarted,
+      onRequestCompleted,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 7, method: 'tools/call' });
+    expect(onRequestStarted).toHaveBeenCalledTimes(1);
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+
+    transport.onmessage?.({
+      jsonrpc: '2.0',
+      method: 'notifications/cancelled',
+      params: { requestId: 7 },
+    });
+
+    expect(onRequestCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles a cancelled request only once even if a late response is written', async () => {
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({ onRequestCompleted });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 7, method: 'tools/call' });
+    transport.onmessage?.({
+      jsonrpc: '2.0',
+      method: 'notifications/cancelled',
+      params: { requestId: 7 },
+    });
+    await transport.send({ jsonrpc: '2.0', id: 7, result: {} });
+
+    expect(onRequestCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores cancellations that carry no usable request id', async () => {
+    const onRequestCompleted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({ onRequestCompleted });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 7, method: 'tools/call' });
+    transport.onmessage?.({ jsonrpc: '2.0', method: 'notifications/cancelled', params: {} });
+    transport.onmessage?.({ jsonrpc: '2.0', method: 'notifications/cancelled' });
+
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+
+    await transport.send({ jsonrpc: '2.0', id: 7, result: {} });
+    expect(onRequestCompleted).toHaveBeenCalledTimes(1);
+  });
+
   it('marks completion when downstream message handling throws synchronously', async () => {
     const onRequestStarted = vi.fn();
     const onRequestCompleted = vi.fn();

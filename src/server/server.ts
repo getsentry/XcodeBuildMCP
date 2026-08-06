@@ -37,7 +37,11 @@ import {
   recordServingContextStarted,
 } from './mcp-instrumentation.ts';
 import { MCP_CACHE_HINTS } from './mcp-protocol.ts';
-import { registerActiveServer, unregisterActiveServer } from './server-state.ts';
+import {
+  registerActiveServer,
+  unregisterActiveServer,
+  type McpServingScope,
+} from './server-state.ts';
 import { releaseServerToolRegistrations } from '../utils/tool-registry.ts';
 import { applyServerRegistrations, type ServerRegistrations } from './bootstrap.ts';
 
@@ -89,14 +93,41 @@ function createBaseServerInstance(): McpServer {
   );
 }
 
+/**
+ * Releases the process-level bookkeeping for a server instance.
+ *
+ * Idempotent, because it is reachable from two seams that both fire depending
+ * on how the instance is torn down.
+ */
+function releaseServerInstance(server: McpServer): void {
+  releaseServerToolRegistrations(server);
+  unregisterActiveServer(server);
+}
+
+/**
+ * Wires instance teardown to every close path the SDK uses.
+ *
+ * `serveStdio` closes the high-level `McpServer`, while `createMcpHandler`
+ * closes the low-level `server.server` once per request and never touches the
+ * high-level wrapper. Hooking only one of them leaks the instance and its tool
+ * registrations, so both are covered; `releaseServerInstance` is idempotent.
+ */
 function trackInstanceTeardown(server: McpServer): void {
+  const lowLevelServer = server.server;
+  const previousOnClose = lowLevelServer.onclose?.bind(lowLevelServer);
+  lowLevelServer.onclose = (): void => {
+    releaseServerInstance(server);
+    previousOnClose?.();
+  };
+
   const originalClose = server.close.bind(server);
   server.close = async (): Promise<void> => {
     try {
       await originalClose();
     } finally {
-      releaseServerToolRegistrations(server);
-      unregisterActiveServer(server);
+      // Covers an instance that was never connected, where closing the
+      // low-level server has no transport to trigger `onclose`.
+      releaseServerInstance(server);
     }
   };
 }
@@ -110,14 +141,14 @@ function trackInstanceTeardown(server: McpServer): void {
  * state is deliberately not owned by the instance, so replacing an instance
  * never discards session defaults, debugger sessions or log captures.
  */
-export function createServer(): McpServer {
+export function createServer(scope: McpServingScope = 'connection'): McpServer {
   const baseServer = createBaseServerInstance();
   const server = Sentry.wrapMcpServerWithSentry(baseServer, {
     recordInputs: false,
     recordOutputs: false,
   });
 
-  registerActiveServer(server);
+  registerActiveServer(server, scope);
   trackInstanceTeardown(server);
 
   log('info', `Server initialized (version ${version})`);
@@ -142,8 +173,12 @@ function buildServerForContext(
   context: McpRequestContext,
   transport: 'stdio' | 'http',
 ): McpServer {
-  const server = createServer();
-  applyServerRegistrations(server, registrations);
+  const server = createServer(transport === 'stdio' ? 'connection' : 'request');
+  applyServerRegistrations(server, registrations, {
+    // Only a connection-scoped context owns the process-level Xcode tools
+    // bridge binding; HTTP instances live for a single request.
+    bindXcodeToolsBridge: transport === 'stdio',
+  });
   recordServingContextStarted({ transport, era: context.era });
   log('info', `MCP serving context started (transport=${transport}, era=${context.era})`);
   return server;

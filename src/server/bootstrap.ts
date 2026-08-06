@@ -67,6 +67,23 @@ function runStartupFilesystemLifecycleSweep(workspaceKey: string): Promise<void>
     });
 }
 
+export interface ApplyServerRegistrationsOptions {
+  /**
+   * Whether this serving context owns the process-level Xcode tools bridge
+   * binding.
+   *
+   * The bridge is a process singleton that registers its proxied tools onto one
+   * server instance. A connection-scoped context (stdio) owns that binding for
+   * the life of the connection. Per-request contexts (HTTP) must not take it:
+   * rebinding on every request would move the proxied tools off the live
+   * connection and leave the bridge pointing at an instance that is closed as
+   * soon as the response is written.
+   *
+   * @default true
+   */
+  bindXcodeToolsBridge?: boolean;
+}
+
 /**
  * Applies process-level registrations onto a freshly built server instance.
  *
@@ -76,6 +93,7 @@ function runStartupFilesystemLifecycleSweep(workspaceKey: string): Promise<void>
 export function applyServerRegistrations(
   server: McpServer,
   registrations: ServerRegistrations,
+  options: ApplyServerRegistrationsOptions = {},
 ): void {
   // Legacy-era clients set verbosity with logging/setLevel. Modern-era clients
   // send io.modelcontextprotocol/logLevel in each request _meta instead, which
@@ -96,11 +114,11 @@ export function applyServerRegistrations(
 
   registerLoadedResources(server, registrations.resources);
 
-  const xcodeToolsBridge = registrations.xcodeIdeEnabled
-    ? getXcodeToolsBridgeManager(server)
-    : null;
-  xcodeToolsBridge?.bindServer(server);
-  xcodeToolsBridge?.setWorkflowEnabled(registrations.xcodeIdeEnabled);
+  if (registrations.xcodeIdeEnabled && options.bindXcodeToolsBridge !== false) {
+    const xcodeToolsBridge = getXcodeToolsBridgeManager(server);
+    xcodeToolsBridge?.bindServer(server);
+    xcodeToolsBridge?.setWorkflowEnabled(true);
+  }
 }
 
 /**

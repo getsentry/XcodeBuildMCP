@@ -1,29 +1,48 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 
 /**
+ * How long a server instance serves.
+ *
+ * A `connection` instance is pinned for the lifetime of a transport connection
+ * (stdio). A `request` instance serves exactly one HTTP request and is closed
+ * as soon as the response is written.
+ */
+export type McpServingScope = 'connection' | 'request';
+
+/**
  * Active MCP server instances for this process.
  *
  * SDK v2 builds a fresh server per serving context (one per stdio connection,
  * one per HTTP request), so this is a set rather than a singleton. Registration
- * order is preserved: the most recently registered instance is the one a
- * process-level singleton (for example the Xcode tools bridge) should target.
+ * order is preserved.
  *
  * This tracks *protocol* instances only. Application session state
  * (`sessionStore`, debugger sessions, log capture) is deliberately process
  * scoped and outlives any individual server instance.
  */
-const activeServers = new Set<McpServer>();
+const activeServers = new Map<McpServer, McpServingScope>();
 
 export type ServerInstanceListener = (server: McpServer | undefined) => void;
 
 const listeners = new Set<ServerInstanceListener>();
 
+/**
+ * The instance a process-level singleton should target.
+ *
+ * Connection-scoped instances win: a per-request HTTP instance must never
+ * shadow the live stdio connection, and it is closed before any process-level
+ * consumer could usefully hold on to it.
+ */
 function currentServer(): McpServer | undefined {
-  let latest: McpServer | undefined;
-  for (const server of activeServers) {
-    latest = server;
+  let latestConnection: McpServer | undefined;
+  let latestAny: McpServer | undefined;
+  for (const [server, scope] of activeServers) {
+    latestAny = server;
+    if (scope === 'connection') {
+      latestConnection = server;
+    }
   }
-  return latest;
+  return latestConnection ?? latestAny;
 }
 
 function notifyListeners(): void {
@@ -33,19 +52,22 @@ function notifyListeners(): void {
   }
 }
 
-/** The most recently registered active server instance, if any. */
+/** The active server instance a process-level singleton should target, if any. */
 export function getServer(): McpServer | undefined {
   return currentServer();
 }
 
 /** Every currently active server instance, in registration order. */
 export function getActiveServers(): McpServer[] {
-  return [...activeServers];
+  return [...activeServers.keys()];
 }
 
 /** Registers a freshly built server instance as active. */
-export function registerActiveServer(server: McpServer): void {
-  activeServers.add(server);
+export function registerActiveServer(
+  server: McpServer,
+  scope: McpServingScope = 'connection',
+): void {
+  activeServers.set(server, scope);
   notifyListeners();
 }
 

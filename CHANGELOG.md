@@ -6,10 +6,16 @@
 
 - MCP protocol revision `2026-07-28` support alongside the existing 2025 revisions. XcodeBuildMCP now serves both protocol eras on one stdio connection: a modern client opens with a `_meta` envelope (protocol version plus client capabilities on every request) and needs no `initialize` handshake or `Mcp-Session-Id`, while 2025-era clients keep using `initialize` unchanged. `server/discover` is answered with the supported modern revisions, capabilities and instructions; modern results carry `resultType` and, for cacheable operations, `ttlMs`/`cacheScope`.
 
+### Fixed
+
+- MCP idle shutdown no longer hangs when a modern client opens a `subscriptions/listen` stream. The serving entry answers listen out-of-band and writes no result until teardown, and a cancelled request receives no response at all, so both are now settled explicitly instead of pinning the in-flight request count open forever.
+- HTTP serving contexts no longer leak server instances and tool registrations. The SDK closes the low-level server per request, so teardown is wired to that lifecycle as well as to the high-level `close()`. The process-level Xcode tools bridge binding now stays with the connection-scoped stdio instance instead of being rebound by every HTTP request.
+
 ### Changed
 
 - Dictionary-shaped MCP inputs now use client-compatible wire representations ([#491](https://github.com/getsentry/XcodeBuildMCP/issues/491)). The `env` and `testRunnerEnv` inputs on build, launch, test, and session-default tools are arrays of `{ "key": "...", "value": "..." }` entries, while `xcode_ide_call_tool.arguments` is a JSON object string. XcodeBuildMCP converts these values to their existing internal objects only after MCP input validation.
 - Migrated from `@modelcontextprotocol/sdk` v1 to the official TypeScript SDK v2 packages (`@modelcontextprotocol/server`, `@modelcontextprotocol/client`).
+- Tool `inputSchema` values published by `tools/list` now declare JSON Schema draft 2020-12 (`https://json-schema.org/draft/2020-12/schema`) instead of draft-07, and the `execution` member (previously always `{"taskSupport":"forbidden"}`) is no longer emitted. Both follow from the SDK v2 tool contract; consumers that pin the draft-07 `$schema` string or read `execution.taskSupport` need updating.
 - A fresh MCP server instance is now built per serving context instead of one process-wide singleton. Session defaults, debugger sessions, log captures and other application state remain process scoped and are unaffected when a protocol instance is replaced.
 - Modern-era clients set log verbosity through the per-request `io.modelcontextprotocol/logLevel` metadata key; `logging/setLevel` continues to work for 2025-era clients.
 

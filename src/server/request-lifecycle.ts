@@ -1,12 +1,18 @@
 import {
   isJSONRPCErrorResponse,
+  isJSONRPCNotification,
   isJSONRPCRequest,
   isJSONRPCResultResponse,
   type JSONRPCMessage,
   type Transport,
   type TransportSendOptions,
 } from '@modelcontextprotocol/server';
-import { readModernRequestEnvelope, type ModernRequestEnvelope } from './mcp-protocol.ts';
+import {
+  cancelledRequestId,
+  isLongLivedRequestMethod,
+  readModernRequestEnvelope,
+  type ModernRequestEnvelope,
+} from './mcp-protocol.ts';
 
 export interface McpModernRequestObservation {
   method: string;
@@ -40,14 +46,64 @@ function completedRequestIdKey(message: JSONRPCMessage): string | null {
   return null;
 }
 
+/**
+ * Observes the transport so idle shutdown knows when the server is busy.
+ *
+ * Three settle paths exist and all of them must be honoured, otherwise the
+ * in-flight count never returns to zero and the process never idles out:
+ * - an ordinary request settles when its result or error response is written;
+ * - a cancelled request settles on `notifications/cancelled`, because the SDK
+ *   deliberately writes no response for an aborted request;
+ * - a long-lived request (`subscriptions/listen`) is answered out-of-band by
+ *   the serving entry, so it is tracked separately and never counted as
+ *   in-flight work.
+ */
 export function instrumentMcpRequestLifecycle(
   transport: Transport,
   observer: McpRequestLifecycleObserver,
 ): void {
   const pendingRequestIds = new Set<string>();
+  const longLivedRequestIds = new Set<string>();
   const originalStart = transport.start.bind(transport);
   const originalSend = transport.send.bind(transport);
   let onMessageWrapped = false;
+
+  const settleRequest = (requestId: string): void => {
+    if (longLivedRequestIds.delete(requestId)) {
+      // Never counted as in-flight, so there is nothing to release.
+      return;
+    }
+    if (pendingRequestIds.delete(requestId)) {
+      observer.onRequestCompleted?.();
+    }
+  };
+
+  const observeInbound = (message: JSONRPCMessage): string | null => {
+    if (isJSONRPCRequest(message)) {
+      const requestId = requestIdKey(message.id);
+
+      if (isLongLivedRequestMethod(message.method)) {
+        longLivedRequestIds.add(requestId);
+        return null;
+      }
+
+      if (!pendingRequestIds.has(requestId)) {
+        pendingRequestIds.add(requestId);
+        observer.onRequestStarted?.();
+        return requestId;
+      }
+      return null;
+    }
+
+    if (isJSONRPCNotification(message)) {
+      const cancelledId = cancelledRequestId(message.method, message.params);
+      if (cancelledId !== null) {
+        settleRequest(requestIdKey(cancelledId));
+      }
+    }
+
+    return null;
+  };
 
   const observeModernEnvelope = (message: JSONRPCMessage): void => {
     if (!observer.onModernEnvelope || !isJSONRPCRequest(message)) {
@@ -66,17 +122,8 @@ export function instrumentMcpRequestLifecycle(
 
     onMessageWrapped = true;
     const downstreamOnMessage = transport.onmessage;
-    transport.onmessage = (message, extra) => {
-      let startedRequestId: string | null = null;
-
-      if (isJSONRPCRequest(message)) {
-        const requestId = requestIdKey(message.id);
-        if (!pendingRequestIds.has(requestId)) {
-          pendingRequestIds.add(requestId);
-          startedRequestId = requestId;
-          observer.onRequestStarted?.();
-        }
-      }
+    transport.onmessage = (message, extra): void => {
+      const startedRequestId = observeInbound(message);
 
       observeModernEnvelope(message);
 
@@ -101,8 +148,12 @@ export function instrumentMcpRequestLifecycle(
     options?: TransportSendOptions,
   ): Promise<void> => {
     const completedRequestId = completedRequestIdKey(message);
+    const completesLongLivedRequest =
+      completedRequestId !== null && longLivedRequestIds.delete(completedRequestId);
     const completesPendingRequest =
-      completedRequestId !== null && pendingRequestIds.delete(completedRequestId);
+      !completesLongLivedRequest &&
+      completedRequestId !== null &&
+      pendingRequestIds.delete(completedRequestId);
 
     try {
       await originalSend(message, options);

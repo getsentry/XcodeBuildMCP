@@ -162,6 +162,39 @@ export function readModernRequestEnvelope(params: unknown): ModernRequestEnvelop
 const MINUTE_MS = 60_000;
 
 /**
+ * Requests the serving entry answers out-of-band rather than with an ordinary
+ * JSON-RPC result.
+ *
+ * `subscriptions/listen` opens a long-lived notification stream: the entry
+ * replies with `notifications/subscriptions/acknowledged` immediately and only
+ * writes the JSON-RPC result when the subscription ends (client cancellation or
+ * connection teardown). Treating it as an ordinary in-flight request would pin
+ * idle-shutdown accounting open for the lifetime of the subscription.
+ */
+export const LONG_LIVED_REQUEST_METHODS: ReadonlySet<string> = new Set(['subscriptions/listen']);
+
+/** Whether a request opens a long-lived stream instead of settling with a result. */
+export function isLongLivedRequestMethod(method: string): boolean {
+  return LONG_LIVED_REQUEST_METHODS.has(method);
+}
+
+/**
+ * The request id a `notifications/cancelled` notification settles, or `null`
+ * when the notification is not a cancellation.
+ *
+ * A cancelled request never receives a JSON-RPC response, so this is the only
+ * signal that its in-flight accounting can be released.
+ */
+export function cancelledRequestId(method: string, params: unknown): string | number | null {
+  if (method !== 'notifications/cancelled' || params === null || typeof params !== 'object') {
+    return null;
+  }
+
+  const requestId = (params as Record<string, unknown>).requestId;
+  return typeof requestId === 'string' || typeof requestId === 'number' ? requestId : null;
+}
+
+/**
  * Cache hints for the modern-era cacheable results (`ttlMs` / `cacheScope`).
  *
  * All XcodeBuildMCP results depend on the local workspace, the enabled

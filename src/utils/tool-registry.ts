@@ -501,6 +501,16 @@ export function releaseServerToolRegistrations(server: McpServer): void {
   registryState.registrationsByServer.delete(server);
 }
 
+/**
+ * How many server instances currently hold tool registrations.
+ *
+ * Diagnostics for serving-context teardown: this must return to its baseline
+ * once every serving context has closed.
+ */
+export function getTrackedRegistrationServerCount(): number {
+  return registryState.registrationsByServer.size;
+}
+
 /** The registration plan resolved by the most recent workflow selection. */
 export function getToolRegistrationPlan(): McpToolRegistrationPlan | null {
   return registryState.plan;
