@@ -1,4 +1,4 @@
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import type { ToolSchemaShape } from '../core/plugin-types.ts';
 import type { StructuredOutputSchemaRef } from '../core/structured-output-schema.ts';
 import type {

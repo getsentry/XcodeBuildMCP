@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CacheHint, McpServer } from '@modelcontextprotocol/server';
 
 import type { PredicateContext } from '../../visibility/predicate-types.ts';
 import type { ResolvedRuntimeConfig } from '../../utils/config-store.ts';
@@ -67,7 +67,7 @@ describe('resources', () => {
   let registeredResources: Array<{
     name: string;
     uri: string;
-    metadata: { mimeType: string; title: string };
+    metadata: { mimeType: string; title: string; cacheHint?: CacheHint };
     handler: any;
   }>;
 
@@ -75,10 +75,10 @@ describe('resources', () => {
     vi.clearAllMocks();
     registeredResources = [];
     mockServer = {
-      resource: (
+      registerResource: (
         name: string,
         uri: string,
-        metadata: { mimeType: string; title: string },
+        metadata: { mimeType: string; title: string; cacheHint?: CacheHint },
         handler: any,
       ) => {
         registeredResources.push({ name, uri, metadata, handler });

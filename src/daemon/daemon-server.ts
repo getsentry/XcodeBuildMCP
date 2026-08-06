@@ -1,6 +1,6 @@
 import net from 'node:net';
 import { writeFrame, createFrameReader } from './framing.ts';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolCatalog } from '../runtime/types.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';
 import type {

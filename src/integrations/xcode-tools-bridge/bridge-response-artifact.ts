@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { SerializedBridgeTool } from './core.ts';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

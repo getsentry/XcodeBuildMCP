@@ -7,7 +7,7 @@
  * It can be invoked from the CLI via the `mcp` subcommand.
  */
 
-import { createServer, startServer } from './server.ts';
+import { startStdioServer } from './server.ts';
 import { log, setLogLevel } from '../utils/logger.ts';
 import {
   enrichSentryContext,
@@ -18,7 +18,7 @@ import {
 } from '../utils/sentry.ts';
 import { version } from '../version.ts';
 import process from 'node:process';
-import { bootstrapServer } from './bootstrap.ts';
+import { bootstrapServerRuntime } from './bootstrap.ts';
 import { createStartupProfiler, getStartupProfileNowMs } from './startup-profiler.ts';
 import { getConfig } from '../utils/config-store.ts';
 import { getRegisteredWorkflows } from '../utils/tool-registry.ts';
@@ -41,7 +41,7 @@ export async function startMcpServer(): Promise<void> {
   let idleShutdown: McpIdleShutdownController | null = null;
 
   const lifecycle = createMcpLifecycleCoordinator({
-    onShutdown: async ({ reason, error, snapshot, server }) => {
+    onShutdown: async ({ reason, error, snapshot, serving }) => {
       idleShutdown?.stop();
 
       const isCrash = reason === 'uncaught-exception' || reason === 'unhandled-rejection';
@@ -81,7 +81,7 @@ export async function startMcpServer(): Promise<void> {
         reason,
         error,
         snapshot,
-        server,
+        serving,
       });
 
       lifecycle.detachProcessHandlers();
@@ -107,14 +107,8 @@ export async function startMcpServer(): Promise<void> {
     profiler.mark('initSentry', stageStartMs);
 
     stageStartMs = getStartupProfileNowMs();
-    lifecycle.markPhase('creating-server');
-    const server = createServer();
-    lifecycle.registerServer(server);
-    profiler.mark('createServer', stageStartMs);
-
-    stageStartMs = getStartupProfileNowMs();
     lifecycle.markPhase('bootstrapping-server');
-    const bootstrap = await bootstrapServer(server);
+    const bootstrap = await bootstrapServerRuntime();
     profiler.mark('bootstrapServer', stageStartMs);
 
     const idleTimeoutConfig = resolveMcpIdleTimeoutConfig();
@@ -146,12 +140,13 @@ export async function startMcpServer(): Promise<void> {
 
     stageStartMs = getStartupProfileNowMs();
     lifecycle.markPhase('starting-stdio-transport');
-    await startServer(server, {
+    const servingHandle = startStdioServer(bootstrap.registrations, {
       requestLifecycle: {
         onRequestStarted: () => idleShutdown?.markRequestStarted(),
         onRequestCompleted: () => idleShutdown?.markRequestCompleted(),
       },
     });
+    lifecycle.registerServingHandle(servingHandle);
     profiler.mark('startServer', stageStartMs);
 
     const config = getConfig();

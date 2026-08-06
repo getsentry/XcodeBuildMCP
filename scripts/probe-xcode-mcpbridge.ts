@@ -1,6 +1,5 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Client, specTypeSchemas } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import process from 'node:process';
 
 function parseArgs(argv: string[]): { limit: number; callWindows: boolean } {
@@ -72,7 +71,7 @@ async function main(): Promise<void> {
   if (callWindows) {
     const windows = await client.request(
       { method: 'tools/call', params: { name: 'XcodeListWindows', arguments: {} } },
-      CompatibilityCallToolResultSchema,
+      specTypeSchemas.CompatibilityCallToolResult,
       { timeout: 15_000 },
     );
     console.log('XcodeListWindows:', windows);

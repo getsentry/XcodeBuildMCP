@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type { StructuredOutputEnvelope } from '../types/structured-output.ts';
 import { normalizeSnapshotOutput } from './normalize.ts';
 import type {
@@ -161,9 +161,12 @@ export async function createMcpSnapshotHarness(
   );
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<SnapshotResult> {
-    const result = await client.callTool({ name, arguments: args }, undefined, {
-      timeout: MCP_TOOL_TIMEOUT_MS,
-    });
+    const result = await client.callTool(
+      { name, arguments: args },
+      {
+        timeout: MCP_TOOL_TIMEOUT_MS,
+      },
+    );
     const rawText = extractSnapshotTextContent(result);
     const text = normalizeSnapshotOutput(rawText);
     const structuredEnvelope = extractStructuredEnvelope(result);

@@ -2,9 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- MCP protocol revision `2026-07-28` support alongside the existing 2025 revisions. XcodeBuildMCP now serves both protocol eras on one stdio connection: a modern client opens with a `_meta` envelope (protocol version plus client capabilities on every request) and needs no `initialize` handshake or `Mcp-Session-Id`, while 2025-era clients keep using `initialize` unchanged. `server/discover` is answered with the supported modern revisions, capabilities and instructions; modern results carry `resultType` and, for cacheable operations, `ttlMs`/`cacheScope`.
+
 ### Changed
 
 - Dictionary-shaped MCP inputs now use client-compatible wire representations ([#491](https://github.com/getsentry/XcodeBuildMCP/issues/491)). The `env` and `testRunnerEnv` inputs on build, launch, test, and session-default tools are arrays of `{ "key": "...", "value": "..." }` entries, while `xcode_ide_call_tool.arguments` is a JSON object string. XcodeBuildMCP converts these values to their existing internal objects only after MCP input validation.
+- Migrated from `@modelcontextprotocol/sdk` v1 to the official TypeScript SDK v2 packages (`@modelcontextprotocol/server`, `@modelcontextprotocol/client`).
+- A fresh MCP server instance is now built per serving context instead of one process-wide singleton. Session defaults, debugger sessions, log captures and other application state remain process scoped and are unaffected when a protocol instance is replaced.
+- Modern-era clients set log verbosity through the per-request `io.modelcontextprotocol/logLevel` metadata key; `logging/setLevel` continues to work for 2025-era clients.
 
 ## [2.7.0]
 

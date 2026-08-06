@@ -5,14 +5,14 @@
  * predicate-aware registration through the Model Context Protocol resource system.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer, ReadResourceResult } from '@modelcontextprotocol/server';
 import { log } from '../utils/logging/index.ts';
 import { loadManifest } from './manifest/load-manifest.ts';
 import { importResourceModule } from './manifest/import-resource-module.ts';
 import type { ResourceManifestEntry } from './manifest/schema.ts';
 import type { PredicateContext } from '../visibility/predicate-types.ts';
 import { isResourceExposedForRuntime } from '../visibility/exposure.ts';
+import { MCP_RESOURCE_CACHE_HINT } from '../server/mcp-protocol.ts';
 
 /**
  * Resource metadata interface (runtime-assembled from manifest + imported module).
@@ -79,7 +79,20 @@ export async function registerResources(
   ctx: PredicateContext,
 ): Promise<boolean> {
   const resources = await loadResources(ctx);
+  registerLoadedResources(server, resources);
+  return true;
+}
 
+/**
+ * Register already-loaded resources onto a server instance.
+ *
+ * Loading is process-level work (manifest parse plus module import); a fresh
+ * server per serving context only needs the cheap registration step.
+ */
+export function registerLoadedResources(
+  server: McpServer,
+  resources: Map<string, ResourceMeta>,
+): void {
   for (const [uri, resource] of resources) {
     const readCallback = async (resourceUri: URL): Promise<ReadResourceResult> => {
       const result = await resource.handler(resourceUri);
@@ -92,12 +105,13 @@ export async function registerResources(
       };
     };
 
-    server.resource(
+    server.registerResource(
       resource.name,
       uri,
       {
         mimeType: resource.mimeType,
         title: resource.description,
+        cacheHint: MCP_RESOURCE_CACHE_HINT,
       },
       readCallback,
     );
@@ -106,7 +120,6 @@ export async function registerResources(
   }
 
   log('info', `Registered ${resources.size} resources`);
-  return true;
 }
 
 /**

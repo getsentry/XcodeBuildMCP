@@ -20,7 +20,7 @@ const testState = vi.hoisted(() => {
 });
 
 vi.mock('../../server/server-state.ts', () => ({
-  server: testState.server,
+  getActiveServers: () => [testState.server],
 }));
 
 vi.mock('../../core/manifest/load-manifest.ts', () => ({

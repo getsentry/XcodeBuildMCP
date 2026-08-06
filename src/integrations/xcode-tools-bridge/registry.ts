@@ -1,5 +1,5 @@
-import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServer, RegisteredTool } from '@modelcontextprotocol/server';
+import type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/server';
 import * as z from 'zod';
 import { jsonSchemaToZod } from './jsonschema-to-zod.ts';
 
@@ -12,6 +12,7 @@ type Entry = {
   remoteName: string;
   localName: string;
   fingerprint: string;
+  tool: Tool;
   registered: RegisteredTool;
 };
 
@@ -23,11 +24,48 @@ export type ProxySyncResult = {
 };
 
 export class XcodeToolsProxyRegistry {
-  private readonly server: McpServer;
+  private server: McpServer;
   private readonly tools: Map<string, Entry> = new Map();
+  private callRemoteTool: CallRemoteTool | null = null;
 
   constructor(server: McpServer) {
     this.server = server;
+  }
+
+  /**
+   * Re-targets the registry at a freshly built server instance.
+   *
+   * SDK v2 creates a new server per serving context, so the proxied Xcode tools
+   * must be re-registered on the new instance for `tools/list` and
+   * `notifications/tools/list_changed` to stay correct.
+   */
+  rebind(server: McpServer): void {
+    if (this.server === server) {
+      return;
+    }
+
+    const previous = [...this.tools.values()];
+    for (const entry of previous) {
+      try {
+        entry.registered.remove();
+      } catch {
+        // The previous instance may already be closed.
+      }
+    }
+    this.tools.clear();
+    this.server = server;
+
+    const callRemoteTool = this.callRemoteTool;
+    if (!callRemoteTool) {
+      return;
+    }
+
+    for (const entry of previous) {
+      this.tools.set(entry.remoteName, {
+        ...entry,
+        registered: this.registerProxyTool(entry.tool, entry.localName, callRemoteTool),
+      });
+    }
   }
 
   getRegisteredToolNames(): string[] {
@@ -46,6 +84,7 @@ export class XcodeToolsProxyRegistry {
   }
 
   sync(remoteTools: Tool[], callRemoteTool: CallRemoteTool): ProxySyncResult {
+    this.callRemoteTool = callRemoteTool;
     const desiredRemoteNames = new Set(remoteTools.map((t) => t.name));
     let added = 0;
     let updated = 0;
@@ -62,6 +101,7 @@ export class XcodeToolsProxyRegistry {
           remoteName,
           localName,
           fingerprint,
+          tool: remoteTool,
           registered: this.registerProxyTool(remoteTool, localName, callRemoteTool),
         });
         added += 1;
@@ -74,6 +114,7 @@ export class XcodeToolsProxyRegistry {
           remoteName,
           localName,
           fingerprint,
+          tool: remoteTool,
           registered: this.registerProxyTool(remoteTool, localName, callRemoteTool),
         });
         updated += 1;

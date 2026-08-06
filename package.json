@@ -90,7 +90,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
-    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@sentry/node": "^10.43.0",
     "bplist-parser": "^0.3.2",
     "chokidar": "^5.0.0",

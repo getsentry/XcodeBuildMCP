@@ -98,7 +98,7 @@ describe('mcp lifecycle coordinator', () => {
     expect(onShutdown.mock.calls[0]?.[0]?.reason).toBe('stdin-end');
   });
 
-  it('shuts down cleanly even if stdin closes before a server is registered', async () => {
+  it('shuts down cleanly even if stdin closes before a serving handle is registered', async () => {
     const processRef = new TestProcess();
     const onShutdown = vi.fn().mockResolvedValue(undefined);
     const coordinator = createMcpLifecycleCoordinator({
@@ -113,7 +113,7 @@ describe('mcp lifecycle coordinator', () => {
       expect(onShutdown).toHaveBeenCalledTimes(1);
     });
 
-    expect(onShutdown.mock.calls[0]?.[0]?.server).toBe(null);
+    expect(onShutdown.mock.calls[0]?.[0]?.serving).toBe(null);
   });
 
   it('maps unhandled rejections to crash shutdowns', async () => {

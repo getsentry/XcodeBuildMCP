@@ -1,5 +1,5 @@
-import { type RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { server } from '../server/server-state.ts';
+import type { McpServer, RegisteredTool } from '@modelcontextprotocol/server';
+import { getActiveServers } from '../server/server-state.ts';
 import type { ToolResponse } from '../types/common.ts';
 import type { ToolCatalog, ToolDefinition } from '../runtime/types.ts';
 import { log } from './logger.ts';
@@ -74,16 +74,33 @@ export interface RuntimeToolInfo {
   registeredToolCount: number;
 }
 
+/**
+ * A resolved, server-independent registration plan.
+ *
+ * Resolving the plan is the expensive part (manifest load, predicate
+ * evaluation, tool module imports). It happens once per process; applying it to
+ * a server instance is cheap, which is what makes a fresh SDK v2 server per
+ * serving context affordable.
+ */
+export interface McpToolRegistrationPlan {
+  tools: Array<{ manifest: ToolManifestEntry; module: ImportedToolModule }>;
+  catalog: ToolCatalog;
+  enabledWorkflows: Set<string>;
+  workflowLabel: string;
+}
+
 const registryState: {
-  tools: Map<string, RegisteredTool>;
+  registrationsByServer: Map<McpServer, Map<string, RegisteredTool>>;
   enabledWorkflows: Set<string>;
   currentContext: PredicateContext | null;
   catalog: ToolCatalog | null;
+  plan: McpToolRegistrationPlan | null;
 } = {
-  tools: new Map<string, RegisteredTool>(),
+  registrationsByServer: new Map<McpServer, Map<string, RegisteredTool>>(),
   enabledWorkflows: new Set<string>(),
   currentContext: null,
   catalog: null,
+  plan: null,
 };
 
 function normalizeName(name: string): string {
@@ -204,12 +221,12 @@ function emitConfigWarningMetric(kind: 'unknown_workflow' | 'invalid_custom_work
 function snapshotRuntimeRegistration(): RuntimeToolInfo {
   return {
     enabledWorkflows: [...registryState.enabledWorkflows],
-    registeredToolCount: registryState.tools.size,
+    registeredToolCount: registryState.plan?.tools.length ?? 0,
   };
 }
 
 export function getRuntimeRegistration(): RuntimeToolInfo | null {
-  if (registryState.tools.size === 0 && registryState.enabledWorkflows.size === 0) {
+  if (registryState.plan === null && registryState.enabledWorkflows.size === 0) {
     return null;
   }
   return snapshotRuntimeRegistration();
@@ -295,15 +312,13 @@ async function invokeRegisteredTool(
 }
 
 function registerToolFromManifest(
+  server: McpServer,
+  registrations: Map<string, RegisteredTool>,
   toolManifest: ToolManifestEntry,
   toolModule: ImportedToolModule,
 ): void {
-  if (!server) {
-    throw new Error('Tool registry has not been initialized.');
-  }
-
   const toolName = toolManifest.names.mcp;
-  if (registryState.tools.has(toolName)) {
+  if (registrations.has(toolName)) {
     return;
   }
 
@@ -321,7 +336,7 @@ function registerToolFromManifest(
     },
     (args: unknown): Promise<ToolResponse> => invokeRegisteredTool(toolName, toolModule, args),
   );
-  registryState.tools.set(toolName, registeredTool);
+  registrations.set(toolName, registeredTool);
 }
 
 function shouldExposeTool(
@@ -409,14 +424,15 @@ function toCatalogTool(
   };
 }
 
-async function enumerateAndRegisterTools(
+async function resolveToolPlan(
   manifest: ResolvedManifest,
   selectedWorkflows: WorkflowManifestEntry[],
   ctx: PredicateContext,
-): Promise<{ registeredCount: number; desiredWorkflows: Set<string> }> {
-  const desiredToolNames = new Set<string>();
+): Promise<McpToolRegistrationPlan> {
+  const seenToolNames = new Set<string>();
   const desiredWorkflows = new Set<string>();
   const catalogTools: ToolDefinition[] = [];
+  const planTools: McpToolRegistrationPlan['tools'] = [];
   const moduleCache = new Map<string, ImportedToolModule>();
   const forceExposedToolAliases = getForceExposedToolAliases();
 
@@ -436,46 +452,79 @@ async function enumerateAndRegisterTools(
         continue;
       }
 
-      desiredToolNames.add(toolManifest.names.mcp);
       catalogTools.push(toCatalogTool(toolManifest, workflow, toolModule));
-      registerToolFromManifest(toolManifest, toolModule);
+
+      if (seenToolNames.has(toolManifest.names.mcp)) {
+        continue;
+      }
+      seenToolNames.add(toolManifest.names.mcp);
+      planTools.push({ manifest: toolManifest, module: toolModule });
     }
   }
 
-  registryState.catalog = createToolCatalog(catalogTools);
+  return {
+    tools: planTools,
+    catalog: createToolCatalog(catalogTools),
+    enabledWorkflows: desiredWorkflows,
+    workflowLabel: selectedWorkflows.map((workflow) => workflow.id).join(', '),
+  };
+}
 
-  for (const [toolName, registeredTool] of registryState.tools.entries()) {
+/**
+ * Applies the current registration plan to a server instance, removing any tool
+ * registrations the plan no longer contains. Removals and additions both emit
+ * `notifications/tools/list_changed` through the SDK.
+ */
+export function applyToolPlanToServer(server: McpServer, plan: McpToolRegistrationPlan): void {
+  let registrations = registryState.registrationsByServer.get(server);
+  if (!registrations) {
+    registrations = new Map<string, RegisteredTool>();
+    registryState.registrationsByServer.set(server, registrations);
+  }
+
+  const desiredToolNames = new Set(plan.tools.map((tool) => tool.manifest.names.mcp));
+
+  for (const tool of plan.tools) {
+    registerToolFromManifest(server, registrations, tool.manifest, tool.module);
+  }
+
+  for (const [toolName, registeredTool] of registrations.entries()) {
     if (!desiredToolNames.has(toolName)) {
       registeredTool.remove();
-      registryState.tools.delete(toolName);
+      registrations.delete(toolName);
     }
   }
+}
 
-  return { registeredCount: desiredToolNames.size, desiredWorkflows };
+/** Drops the registration bookkeeping for a server instance that stopped serving. */
+export function releaseServerToolRegistrations(server: McpServer): void {
+  registryState.registrationsByServer.delete(server);
+}
+
+/** The registration plan resolved by the most recent workflow selection. */
+export function getToolRegistrationPlan(): McpToolRegistrationPlan | null {
+  return registryState.plan;
 }
 
 export async function applyWorkflowSelectionFromManifest(
   requestedWorkflows: string[] | undefined,
   ctx: PredicateContext,
 ): Promise<RuntimeToolInfo> {
-  if (!server) {
-    throw new Error('Tool registry has not been initialized.');
-  }
-
   registryState.currentContext = ctx;
 
   const manifest = loadManifest();
   const selectedWorkflows = resolveSelectedWorkflows(manifest, requestedWorkflows, ctx);
-  const { registeredCount, desiredWorkflows } = await enumerateAndRegisterTools(
-    manifest,
-    selectedWorkflows,
-    ctx,
-  );
+  const plan = await resolveToolPlan(manifest, selectedWorkflows, ctx);
 
-  registryState.enabledWorkflows = desiredWorkflows;
+  registryState.plan = plan;
+  registryState.catalog = plan.catalog;
+  registryState.enabledWorkflows = plan.enabledWorkflows;
 
-  const workflowLabel = selectedWorkflows.map((w) => w.id).join(', ');
-  log('info', `Registered ${registeredCount} tools from workflows: ${workflowLabel}`);
+  for (const server of getActiveServers()) {
+    applyToolPlanToServer(server, plan);
+  }
+
+  log('info', `Registered ${plan.tools.length} tools from workflows: ${plan.workflowLabel}`);
 
   return snapshotRuntimeRegistration();
 }
@@ -488,15 +537,18 @@ export async function registerWorkflowsFromManifest(
 }
 
 export function __resetToolRegistryForTests(): void {
-  for (const tool of registryState.tools.values()) {
-    try {
-      tool.remove();
-    } catch {
-      // Safe to ignore: server may already be closed during cleanup
+  for (const registrations of registryState.registrationsByServer.values()) {
+    for (const tool of registrations.values()) {
+      try {
+        tool.remove();
+      } catch {
+        // Safe to ignore: server may already be closed during cleanup
+      }
     }
   }
-  registryState.tools.clear();
+  registryState.registrationsByServer.clear();
   registryState.enabledWorkflows.clear();
   registryState.currentContext = null;
   registryState.catalog = null;
+  registryState.plan = null;
 }

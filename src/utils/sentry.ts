@@ -644,3 +644,66 @@ export function recordMcpLifecycleAnomalyMetric(metric: McpLifecycleAnomalyMetri
     // Metrics are best effort and must never affect runtime behavior.
   }
 }
+
+export interface McpProtocolContext {
+  era: 'legacy' | 'modern';
+  protocolVersion: string;
+  clientName?: string;
+  clientVersion?: string;
+  clientCapabilities?: string[];
+}
+
+/**
+ * Records the negotiated protocol identity for the current process.
+ *
+ * The Sentry MCP integration derives protocol version and client identity from
+ * the legacy `initialize` handshake. Modern-era (2026-07-28) clients never send
+ * `initialize`, so without this the same attributes would silently go missing.
+ */
+export function setMcpProtocolContext(context: McpProtocolContext): void {
+  if (!initialized || isSentryDisabled() || isTestEnv() || isSentryCaptureSealed()) {
+    return;
+  }
+
+  try {
+    Sentry.setTag('mcp.protocol_era', context.era);
+    Sentry.setTag('mcp.protocol_version', context.protocolVersion);
+    setTagIfDefined('mcp.client.name', context.clientName);
+    setTagIfDefined('mcp.client.version', context.clientVersion);
+    Sentry.setContext('mcp.protocol', {
+      era: context.era,
+      protocolVersion: context.protocolVersion,
+      ...(context.clientName ? { clientName: context.clientName } : {}),
+      ...(context.clientVersion ? { clientVersion: context.clientVersion } : {}),
+      ...(context.clientCapabilities
+        ? { clientCapabilities: context.clientCapabilities.join(',') }
+        : {}),
+    });
+  } catch {
+    // Observability enrichment is best effort and must never affect serving.
+  }
+}
+
+export interface McpServingContextMetric {
+  transport: 'stdio' | 'http';
+  era: 'legacy' | 'modern';
+}
+
+/** Counts freshly constructed server instances, per transport and protocol era. */
+export function recordMcpServingContextMetric(metric: McpServingContextMetric): void {
+  if (!shouldEmitMetrics()) {
+    return;
+  }
+
+  try {
+    Sentry.metrics.count('xcodebuildmcp.mcp.serving_context.count', 1, {
+      attributes: {
+        runtime: 'mcp',
+        transport: metric.transport,
+        era: metric.era,
+      },
+    });
+  } catch {
+    // Metrics are best effort and must never affect runtime behavior.
+  }
+}

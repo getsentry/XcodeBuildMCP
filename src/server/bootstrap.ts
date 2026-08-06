@@ -1,10 +1,15 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { registerResources } from '../core/resources.ts';
+import type { McpServer } from '@modelcontextprotocol/server';
+import { loadResources, registerLoadedResources, type ResourceMeta } from '../core/resources.ts';
 import type { FileSystemExecutor } from '../utils/FileSystemExecutor.ts';
 import { log, normalizeLogLevel, setLogLevel } from '../utils/logger.ts';
 import type { RuntimeConfigOverrides } from '../utils/config-store.ts';
-import { getRegisteredWorkflows, registerWorkflowsFromManifest } from '../utils/tool-registry.ts';
+import {
+  applyToolPlanToServer,
+  getRegisteredWorkflows,
+  getToolRegistrationPlan,
+  registerWorkflowsFromManifest,
+  type McpToolRegistrationPlan,
+} from '../utils/tool-registry.ts';
 import { bootstrapRuntime } from '../runtime/bootstrap-runtime.ts';
 import { getXcodeToolsBridgeManager } from '../integrations/xcode-tools-bridge/index.ts';
 import { detectXcodeRuntime } from '../utils/xcode-process.ts';
@@ -23,7 +28,21 @@ export interface BootstrapOptions {
   cwd?: string;
 }
 
+/**
+ * Everything a fresh server instance needs, resolved once per process.
+ *
+ * SDK v2 builds a new server per serving context, so the expensive discovery
+ * work (manifest load, tool module imports, resource module imports, Xcode
+ * runtime detection) is done once and replayed cheaply onto each instance.
+ */
+export interface ServerRegistrations {
+  toolPlan: McpToolRegistrationPlan | null;
+  resources: Map<string, ResourceMeta>;
+  xcodeIdeEnabled: boolean;
+}
+
 export interface BootstrapResult {
+  registrations: ServerRegistrations;
   runDeferredInitialization: (options?: { isShutdownRequested?: () => boolean }) => Promise<void>;
 }
 
@@ -48,13 +67,20 @@ function runStartupFilesystemLifecycleSweep(workspaceKey: string): Promise<void>
     });
 }
 
-export async function bootstrapServer(
+/**
+ * Applies process-level registrations onto a freshly built server instance.
+ *
+ * Called once per serving context. Everything here is cheap: the manifest, tool
+ * modules and resource modules were already resolved by `bootstrapServerRuntime`.
+ */
+export function applyServerRegistrations(
   server: McpServer,
-  options: BootstrapOptions = {},
-): Promise<BootstrapResult> {
-  const profiler = createStartupProfiler('bootstrap');
-
-  server.server.setRequestHandler(SetLevelRequestSchema, async (request) => {
+  registrations: ServerRegistrations,
+): void {
+  // Legacy-era clients set verbosity with logging/setLevel. Modern-era clients
+  // send io.modelcontextprotocol/logLevel in each request _meta instead, which
+  // the request-lifecycle observer applies.
+  server.server.setRequestHandler('logging/setLevel', async (request) => {
     const { level } = request.params;
     const normalized = normalizeLogLevel(level);
     if (normalized) {
@@ -63,6 +89,30 @@ export async function bootstrapServer(
     log('info', `Client requested log level: ${level}`);
     return {};
   });
+
+  if (registrations.toolPlan) {
+    applyToolPlanToServer(server, registrations.toolPlan);
+  }
+
+  registerLoadedResources(server, registrations.resources);
+
+  const xcodeToolsBridge = registrations.xcodeIdeEnabled
+    ? getXcodeToolsBridgeManager(server)
+    : null;
+  xcodeToolsBridge?.bindServer(server);
+  xcodeToolsBridge?.setWorkflowEnabled(registrations.xcodeIdeEnabled);
+}
+
+/**
+ * Resolves the process-level runtime state and registration plan.
+ *
+ * Does not build or touch a server instance: serving entries construct fresh
+ * instances and replay `result.registrations` onto each of them.
+ */
+export async function bootstrapServerRuntime(
+  options: BootstrapOptions = {},
+): Promise<BootstrapResult> {
+  const profiler = createStartupProfiler('bootstrap');
 
   const hasLegacyEnabledWorkflows = Object.prototype.hasOwnProperty.call(
     options,
@@ -114,14 +164,17 @@ export async function bootstrapServer(
 
   const resolvedWorkflows = getRegisteredWorkflows();
   const xcodeIdeEnabled = resolvedWorkflows.includes('xcode-ide');
-  const xcodeToolsBridge = xcodeIdeEnabled ? getXcodeToolsBridgeManager(server) : null;
-  xcodeToolsBridge?.setWorkflowEnabled(xcodeIdeEnabled);
 
   stageStartMs = getStartupProfileNowMs();
-  await registerResources(server, ctx);
-  profiler.mark('registerResources', stageStartMs);
+  const resources = await loadResources(ctx);
+  profiler.mark('loadResources', stageStartMs);
 
   return {
+    registrations: {
+      toolPlan: getToolRegistrationPlan(),
+      resources,
+      xcodeIdeEnabled,
+    },
     runDeferredInitialization: async (options = {}): Promise<void> => {
       const deferredProfiler = createStartupProfiler('bootstrap-deferred');
       const isShutdownRequested = options.isShutdownRequested;
@@ -221,4 +274,21 @@ export async function bootstrapServer(
       }
     },
   };
+}
+
+/**
+ * Bootstraps the process runtime and immediately applies the registrations to
+ * the given server instance.
+ *
+ * Kept for in-process serving contexts (tests, harnesses) that own a single
+ * long-lived instance. The stdio entry uses `bootstrapServerRuntime` plus
+ * `applyServerRegistrations` so each connection gets a fresh instance.
+ */
+export async function bootstrapServer(
+  server: McpServer,
+  options: BootstrapOptions = {},
+): Promise<BootstrapResult> {
+  const result = await bootstrapServerRuntime(options);
+  applyServerRegistrations(server, result.registrations);
+  return result;
 }

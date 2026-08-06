@@ -4,8 +4,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import type { ChildProcess } from 'node:child_process';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { CommandExecutor, CommandResponse } from '../utils/CommandExecutor.ts';
 import {
   __setTestCommandExecutorOverride,

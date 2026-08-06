@@ -1,5 +1,4 @@
 import process from 'node:process';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
 import { listActiveSimulatorLaunchOsLogSessions } from '../utils/log-capture/simulator-launch-oslog-sessions.ts';
 import { terminateOwnedWorkspaceFilesystemArtifactsSync } from '../utils/workspace-filesystem-lifecycle.ts';
@@ -15,7 +14,6 @@ export type McpStartupPhase =
   | 'initializing'
   | 'hydrating-sentry-config'
   | 'initializing-sentry'
-  | 'creating-server'
   | 'bootstrapping-server'
   | 'starting-stdio-transport'
   | 'running'
@@ -88,20 +86,28 @@ interface LifecycleProcessLike {
   removeListener(event: string, listener: (...args: unknown[]) => void): this;
 }
 
+/**
+ * A serving context that owns the connection: the handle returned by the SDK
+ * stdio entry closes the pinned server instance and the transport together.
+ */
+export interface McpServingHandle {
+  close(): Promise<void>;
+}
+
 interface McpLifecycleState {
   startedAtMs: number;
   phase: McpStartupPhase;
   shutdownReason: McpShutdownReason | null;
   shutdownPromise: Promise<void> | null;
   shutdownRequested: boolean;
-  server: McpServer | null;
+  serving: McpServingHandle | null;
 }
 
 export interface McpLifecycleCoordinator {
   attachProcessHandlers(): void;
   detachProcessHandlers(): void;
   markPhase(phase: McpStartupPhase): void;
-  registerServer(server: McpServer): void;
+  registerServingHandle(handle: McpServingHandle): void;
   isShutdownRequested(): boolean;
   getSnapshot(): Promise<McpLifecycleSnapshot>;
   shutdown(reason: McpShutdownReason, error?: unknown): Promise<void>;
@@ -114,7 +120,7 @@ export interface McpLifecycleCoordinatorOptions {
     reason: McpShutdownReason;
     error?: unknown;
     snapshot: McpLifecycleSnapshot;
-    server: McpServer | null;
+    serving: McpServingHandle | null;
   }) => Promise<void>;
 }
 
@@ -325,7 +331,7 @@ export function createMcpLifecycleCoordinator(
     shutdownReason: null,
     shutdownPromise: null,
     shutdownRequested: false,
-    server: null,
+    serving: null,
   };
 
   const handleSigterm = (): void => {
@@ -407,8 +413,8 @@ export function createMcpLifecycleCoordinator(
       state.phase = phase;
     },
 
-    registerServer(server: McpServer): void {
-      state.server = server;
+    registerServingHandle(handle: McpServingHandle): void {
+      state.serving = handle;
     },
 
     isShutdownRequested(): boolean {
@@ -445,7 +451,7 @@ export function createMcpLifecycleCoordinator(
           reason,
           error,
           snapshot,
-          server: state.server,
+          serving: state.serving,
         });
         state.phase = 'stopped';
       })();

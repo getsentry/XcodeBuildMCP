@@ -1,4 +1,4 @@
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import type { ToolSchemaShape } from '../core/plugin-types.ts';
 import { startDaemonBackground } from './daemon-control.ts';
 import { DaemonClient } from './daemon-client.ts';

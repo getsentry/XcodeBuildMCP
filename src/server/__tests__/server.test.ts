@@ -1,8 +1,4 @@
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import type {
-  Transport,
-  TransportSendOptions,
-} from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
   instrumentMcpRequestLifecycle,

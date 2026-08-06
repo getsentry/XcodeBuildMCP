@@ -12,7 +12,7 @@
 ESM TypeScript project (`type: module`). Key layers:
 
 - `src/cli/` - CLI entrypoint, yargs wiring, daemon routing
-- `src/server/` - MCP stdio server, lifecycle, workflow/resource registration
+- `src/server/` - MCP serving contexts (dual-era stdio via the SDK v2 `serveStdio` entry), protocol constants, lifecycle, workflow/resource registration
 - `src/runtime/` - Config bootstrap, session state, tool catalog assembly
 - `src/core/manifest/` - YAML manifest loading, validation, tool module imports
 - `src/mcp/tools/` - Tool implementations grouped by workflow (mirrors `manifests/workflows/`)

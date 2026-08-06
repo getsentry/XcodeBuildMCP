@@ -98,7 +98,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ orphaned: true }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     expect(result.exitCode).toBe(0);
@@ -129,7 +129,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot(),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const filesystemStep = result.steps.find(
@@ -150,7 +150,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ videoCaptureSessionCount: 1 }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
@@ -169,7 +169,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ videoCaptureSessionCount: 1 }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const videoStep = result.steps.find((step) => step.name === 'video-capture.stop-all');
@@ -188,7 +188,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ swiftPackageProcessCount: 1 }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
@@ -207,7 +207,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ swiftPackageProcessCount: 1 }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const swiftStep = result.steps.find((step) => step.name === 'swift-processes.stop-all');
@@ -238,7 +238,7 @@ describe('runMcpShutdown', () => {
         simulatorLaunchOsLogSessionCount: 1,
         ownedSimulatorLaunchOsLogSessionCount: 1,
       }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const filesystemStep = result.steps.find(
@@ -269,7 +269,7 @@ describe('runMcpShutdown', () => {
         simulatorLaunchOsLogSessionCount: 2,
         ownedSimulatorLaunchOsLogSessionCount: 2,
       }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const filesystemStep = result.steps.find(
@@ -289,7 +289,7 @@ describe('runMcpShutdown', () => {
     const result = await runMcpShutdown({
       reason: 'sigterm',
       snapshot: createSnapshot({ debuggerSessionCount: 1 }),
-      server: { close: async () => undefined },
+      serving: { close: async () => undefined },
     });
 
     const debuggerStep = result.steps.find((step) => step.name === 'debugger.dispose-all');

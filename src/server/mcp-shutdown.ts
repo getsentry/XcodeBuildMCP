@@ -1,4 +1,3 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getDefaultDebuggerManager } from '../utils/debugger/index.ts';
 import { stopXcodeStateWatcher } from '../utils/xcode-state-watcher.ts';
 import { shutdownXcodeToolsBridge } from '../integrations/xcode-tools-bridge/index.ts';
@@ -12,7 +11,7 @@ import {
 } from '../utils/sentry.ts';
 import { sealSentryCapture } from '../utils/shutdown-state.ts';
 import { toErrorMessage } from '../utils/errors.ts';
-import type { McpLifecycleSnapshot, McpShutdownReason } from './mcp-lifecycle.ts';
+import type { McpLifecycleSnapshot, McpServingHandle, McpShutdownReason } from './mcp-lifecycle.ts';
 import { isTransportDisconnectReason } from './mcp-lifecycle.ts';
 
 const DISCONNECT_SERVER_CLOSE_TIMEOUT_MS = 150;
@@ -137,14 +136,14 @@ function workspaceFilesystemCleanupTimeoutForOwnedSessions(ownedSessionCount: nu
 }
 
 export async function closeServerWithTimeout(
-  server: Pick<McpServer, 'close'> | null | undefined,
+  serving: McpServingHandle | null | undefined,
   timeoutMs: number,
 ): Promise<'skipped' | 'closed' | 'timed_out' | 'rejected'> {
-  if (!server) {
+  if (!serving) {
     return 'skipped';
   }
 
-  const outcome = await runStep('server.close', timeoutMs, () => server.close());
+  const outcome = await runStep('server.close', timeoutMs, () => serving.close());
   if (outcome.status === 'completed') {
     return 'closed';
   }
@@ -158,7 +157,7 @@ export async function runMcpShutdown(input: {
   reason: McpShutdownReason;
   error?: unknown;
   snapshot: McpLifecycleSnapshot;
-  server: Pick<McpServer, 'close'> | null;
+  serving: McpServingHandle | null;
 }): Promise<McpShutdownResult> {
   const shutdownStartedAt = Date.now();
   const exitCode = buildExitCode(input.reason);
@@ -191,7 +190,7 @@ export async function runMcpShutdown(input: {
     : DEFAULT_SERVER_CLOSE_TIMEOUT_MS;
 
   const serverCloseOutcome = await runStep('server.close', serverCloseTimeout, async () => {
-    await input.server?.close();
+    await input.serving?.close();
   });
   pushStep('server.close', serverCloseOutcome);
 

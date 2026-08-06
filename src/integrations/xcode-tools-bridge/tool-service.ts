@@ -1,4 +1,4 @@
-import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, Tool } from '@modelcontextprotocol/server';
 import {
   XcodeToolsBridgeClient,
   type XcodeToolsBridgeClientOptions,

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import process from 'node:process';
 import { promisify } from 'node:util';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import type { XcodeToolsBridgeClientStatus } from './client.ts';
 
 const execFileAsync = promisify(execFile);

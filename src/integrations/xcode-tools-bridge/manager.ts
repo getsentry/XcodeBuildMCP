@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { log } from '../../utils/logger.ts';
 import { writeBridgeToolListResponseArtifact } from './bridge-response-artifact.ts';
 import {
@@ -18,7 +18,7 @@ import {
 import { XcodeIdeToolService } from './tool-service.ts';
 
 export class XcodeToolsBridgeManager {
-  private readonly server: McpServer;
+  private server: McpServer;
   private readonly registry: XcodeToolsProxyRegistry;
   private readonly service: XcodeIdeToolService;
 
@@ -38,6 +38,21 @@ export class XcodeToolsBridgeManager {
         void this.syncTools({ reason: 'listChanged' });
       },
     });
+  }
+
+  /**
+   * Binds the bridge to the server instance of the current serving context.
+   *
+   * The bridge is a process-level singleton while SDK v2 servers are per
+   * serving context, so proxied tools are moved onto the new instance instead
+   * of being lost.
+   */
+  bindServer(server: McpServer): void {
+    if (this.server === server) {
+      return;
+    }
+    this.server = server;
+    this.registry.rebind(server);
   }
 
   setWorkflowEnabled(enabled: boolean): void {

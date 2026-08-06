@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import { loadManifest } from '../../core/manifest/load-manifest.ts';
 import { assertCodex031InputSchemaCompatible } from '../codex-031-input-schema.ts';
 import { createStructuredFixtureSchemaValidator } from '../json-schema-validation.ts';

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { globSync } from 'glob';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 
 const FIXTURE_ROOT = path.resolve(process.cwd(), 'src/snapshot-tests/__fixtures__');
 const JSON_FIXTURE_BUCKETS = ['cli/json', 'mcp/json'] as const;

@@ -1,4 +1,4 @@
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import type { StructuredToolOutput } from '../rendering/types.ts';
 import type { NextStep, NextStepParamsMap } from '../types/common.ts';
 import type { AnyFragment } from '../types/domain-fragments.ts';

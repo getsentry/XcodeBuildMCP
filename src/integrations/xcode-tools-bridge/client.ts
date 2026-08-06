@@ -1,10 +1,9 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client, specTypeSchemas } from '@modelcontextprotocol/client';
+import type { CallToolResult, Tool } from '@modelcontextprotocol/client';
 import {
   StdioClientTransport,
   type StdioServerParameters,
-} from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/client/stdio';
 import process from 'node:process';
 
 export interface XcodeToolsBridgeClientStatus {
@@ -149,7 +148,7 @@ export class XcodeToolsBridgeClient {
     }
     const result: unknown = await this.client.request(
       { method: 'tools/call', params: { name, arguments: args } },
-      CompatibilityCallToolResultSchema,
+      specTypeSchemas.CompatibilityCallToolResult,
       {
         timeout: opts.timeoutMs ?? this.options.callToolTimeoutMs,
         resetTimeoutOnProgress: true,

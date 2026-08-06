@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { NextStepParamsMap } from '../../types/common.ts';
 import type { XcodeToolsBridgeStatus } from './core.ts';
 import type { ProxySyncResult } from './registry.ts';

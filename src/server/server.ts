@@ -1,36 +1,47 @@
 /**
- * Server Configuration - MCP Server setup and lifecycle management
+ * Server Configuration - MCP server construction and serving contexts.
  *
- * This module handles the creation, configuration, and lifecycle management of the
- * Model Context Protocol (MCP) server. It provides the foundation for all tool
- * registrations and server capabilities.
+ * XcodeBuildMCP speaks MCP protocol revision 2026-07-28 (the "modern" era) and
+ * the 2025 revisions (the "legacy" era) through the official TypeScript SDK v2.
  *
- * Responsibilities:
- * - Creating and configuring the MCP server instance
- * - Setting up server capabilities and options
- * - Managing server lifecycle (start/stop)
- * - Handling transport configuration (stdio)
+ * Era selection, `server/discover`, the per-request `_meta` envelope,
+ * `resultType`, cache fields and the modern HTTP headers are all owned by the
+ * SDK serving entries. This module only:
+ * - builds a fresh `McpServer` per serving context,
+ * - replays the process-level registrations onto it,
+ * - keeps observability (Sentry) attached to every instance.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  McpServer,
+  createMcpHandler,
+  type McpHttpHandler,
+  type McpRequestContext,
+  type Transport,
+} from '@modelcontextprotocol/server';
+import {
+  StdioServerTransport,
+  serveStdio,
+  type StdioServerHandle,
+} from '@modelcontextprotocol/server/stdio';
 import * as Sentry from '@sentry/node';
-import { log } from '../utils/logger.ts';
+import { log, normalizeLogLevel, setLogLevel } from '../utils/logger.ts';
 import { version } from '../version.ts';
 import {
   instrumentMcpRequestLifecycle,
+  type McpModernRequestObservation,
   type McpRequestLifecycleObserver,
 } from './request-lifecycle.ts';
-import { getServer, setServer } from './server-state.ts';
+import {
+  recordModernProtocolEnvelope,
+  recordServingContextStarted,
+} from './mcp-instrumentation.ts';
+import { MCP_CACHE_HINTS } from './mcp-protocol.ts';
+import { registerActiveServer, unregisterActiveServer } from './server-state.ts';
+import { releaseServerToolRegistrations } from '../utils/tool-registry.ts';
+import { applyServerRegistrations, type ServerRegistrations } from './bootstrap.ts';
 
-function createBaseServerInstance(): McpServer {
-  return new McpServer(
-    {
-      name: 'xcodebuildmcp',
-      version: String(version),
-    },
-    {
-      instructions: `XcodeBuildMCP provides comprehensive tooling for Apple platform development (iOS, macOS, watchOS, tvOS, visionOS).
+const SERVER_INSTRUCTIONS = `XcodeBuildMCP provides comprehensive tooling for Apple platform development (iOS, macOS, watchOS, tvOS, visionOS).
 
 Prefer XcodeBuildMCP tools over shell commands for Apple platform tasks when available.
 
@@ -53,7 +64,16 @@ Simulator run flow:
 - If session_show_defaults confirms project/workspace + scheme + simulator are set, call build_run_sim immediately (often with empty arguments).
 - Use discover_projs only when session_show_defaults shows project/workspace is missing or wrong.
 - Never call discover_projs speculatively or in parallel with session_show_defaults.
-- Do not call boot_sim or open_sim as prerequisites for build_run_sim; build_run_sim boots and opens the simulator frontend as needed.`,
+- Do not call boot_sim or open_sim as prerequisites for build_run_sim; build_run_sim boots and opens the simulator frontend as needed.`;
+
+function createBaseServerInstance(): McpServer {
+  return new McpServer(
+    {
+      name: 'xcodebuildmcp',
+      version: String(version),
+    },
+    {
+      instructions: SERVER_INSTRUCTIONS,
       capabilities: {
         tools: {
           listChanged: true,
@@ -64,25 +84,41 @@ Simulator run flow:
         },
         logging: {},
       },
+      cacheHints: MCP_CACHE_HINTS,
     },
-  ) as unknown as McpServer;
+  );
+}
+
+function trackInstanceTeardown(server: McpServer): void {
+  const originalClose = server.close.bind(server);
+  server.close = async (): Promise<void> => {
+    try {
+      await originalClose();
+    } finally {
+      releaseServerToolRegistrations(server);
+      unregisterActiveServer(server);
+    }
+  };
 }
 
 /**
- * Create and configure the MCP server
- * @returns Configured MCP server instance
+ * Create and configure a fresh MCP server instance.
+ *
+ * Every serving context gets its own instance: one per stdio connection (plus
+ * the discarded `server/discover` probe instance the SDK builds when a client
+ * falls back to `initialize`), and one per HTTP request. Application session
+ * state is deliberately not owned by the instance, so replacing an instance
+ * never discards session defaults, debugger sessions or log captures.
  */
 export function createServer(): McpServer {
-  if (getServer()) {
-    throw new Error('MCP server already initialized.');
-  }
   const baseServer = createBaseServerInstance();
   const server = Sentry.wrapMcpServerWithSentry(baseServer, {
     recordInputs: false,
     recordOutputs: false,
   });
 
-  setServer(server);
+  registerActiveServer(server);
+  trackInstanceTeardown(server);
 
   log('info', `Server initialized (version ${version})`);
 
@@ -91,20 +127,86 @@ export function createServer(): McpServer {
 
 export interface StartServerOptions {
   requestLifecycle?: McpRequestLifecycleObserver;
+  /** Transport override. Defaults to the SDK stdio transport over this process. */
+  transport?: Transport;
+  /**
+   * How a 2025-era opening is handled. `serve` (default) keeps legacy clients
+   * working; `reject` makes the connection modern-only.
+   */
+  legacy?: 'serve' | 'reject';
+  onerror?: (error: Error) => void;
+}
+
+function buildServerForContext(
+  registrations: ServerRegistrations,
+  context: McpRequestContext,
+  transport: 'stdio' | 'http',
+): McpServer {
+  const server = createServer();
+  applyServerRegistrations(server, registrations);
+  recordServingContextStarted({ transport, era: context.era });
+  log('info', `MCP serving context started (transport=${transport}, era=${context.era})`);
+  return server;
 }
 
 /**
- * Start the MCP server with stdio transport
- * @param server The MCP server instance to start
+ * Modern-era clients replace `logging/setLevel` with the per-request
+ * `io.modelcontextprotocol/logLevel` envelope key, and replace the `initialize`
+ * handshake with per-request protocol identity. Both are applied here.
  */
-export async function startServer(
-  server: McpServer,
-  options: StartServerOptions = {},
-): Promise<void> {
-  const transport = new StdioServerTransport();
-  if (options.requestLifecycle) {
-    instrumentMcpRequestLifecycle(transport, options.requestLifecycle);
+function handleModernEnvelope(observation: McpModernRequestObservation): void {
+  recordModernProtocolEnvelope(observation);
+
+  const requestedLevel = observation.envelope.logLevel;
+  if (!requestedLevel) {
+    return;
   }
-  await server.connect(transport);
+  const normalized = normalizeLogLevel(requestedLevel);
+  if (normalized) {
+    setLogLevel(normalized);
+  }
+}
+
+/**
+ * Serve MCP over stdio, supporting both protocol eras on the same pipe.
+ *
+ * The SDK entry classifies the opening message: a request carrying a valid
+ * modern `_meta` envelope pins the connection to 2026-07-28, an `initialize`
+ * request pins it to the 2025 era. Only the pinned instance survives.
+ */
+export function startStdioServer(
+  registrations: ServerRegistrations,
+  options: StartServerOptions = {},
+): StdioServerHandle {
+  const transport = options.transport ?? new StdioServerTransport();
+
+  instrumentMcpRequestLifecycle(transport, {
+    ...options.requestLifecycle,
+    onModernEnvelope: handleModernEnvelope,
+  });
+
+  const handle = serveStdio((context) => buildServerForContext(registrations, context, 'stdio'), {
+    transport,
+    ...(options.legacy ? { legacy: options.legacy } : {}),
+    onerror:
+      options.onerror ??
+      ((error: Error): void => {
+        log('warn', `MCP stdio serving error: ${error.message}`);
+      }),
+  });
+
   log('info', 'XcodeBuildMCP Server running on stdio');
+  return handle;
+}
+
+/**
+ * Serve MCP over HTTP as a fetch-shaped handler.
+ *
+ * The SDK entry enforces the modern header contract (`MCP-Protocol-Version`,
+ * `Mcp-Method`, `Mcp-Name`) and builds a fresh server per request; legacy
+ * `initialize` traffic is served statelessly. No socket is bound here - the
+ * caller owns the listener.
+ */
+export function createMcpHttpHandler(registrations: ServerRegistrations): McpHttpHandler {
+  return createMcpHandler((context) => buildServerForContext(registrations, context, 'http'));
 }

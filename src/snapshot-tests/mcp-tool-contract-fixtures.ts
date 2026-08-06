@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Tool } from '@modelcontextprotocol/server';
 import { shouldUpdateSnapshots } from './fixture-io.ts';
 
 export type McpToolContractMode = 'session-defaults-disabled' | 'session-defaults-enabled';
