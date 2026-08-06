@@ -3,6 +3,7 @@ import type { ToolSchemaShape } from '../../core/plugin-types.ts';
 import type { ToolHandlerContext } from '../../rendering/types.ts';
 import type { ServerRegistrations } from '../bootstrap.ts';
 import type { ResourceMeta } from '../../core/resources.ts';
+import { BUNDLE_ID_STRUCTURED_OUTPUT_SCHEMA } from '../../utils/app-query-results.ts';
 import { createToolCatalog } from '../../runtime/tool-catalog.ts';
 import type { McpToolRegistrationPlan } from '../../utils/tool-registry.ts';
 import type { ToolDefinition } from '../../runtime/types.ts';
@@ -10,6 +11,19 @@ import type { ToolDefinition } from '../../runtime/types.ts';
 export const TEST_TOOL_NAME = 'probe_echo';
 export const SECOND_TEST_TOOL_NAME = 'probe_second';
 export const TEST_RESOURCE_URI = 'xcodebuildmcp://probe';
+
+/**
+ * The structured-output contract the probe tool emits.
+ *
+ * Serving-layer tests assert the MCP `structuredContent` envelope end to end, so
+ * the fixture must emit the same identifier and version a real tool does
+ * (`setBundleIdStructuredOutput`). The published
+ * `xcodebuildmcp.output.bundle-id/2.schema.json` pins both fields with `const`,
+ * so an ad-hoc identifier or a semver-shaped version would make these tests
+ * attest to an envelope the contract rejects.
+ */
+export const PROBE_SCHEMA = BUNDLE_ID_STRUCTURED_OUTPUT_SCHEMA;
+export const PROBE_SCHEMA_VERSION = '2';
 
 const probeSchema = z.object({ text: z.string() }) as unknown as ToolSchemaShape;
 
@@ -25,8 +39,8 @@ function probeHandler(params: Record<string, unknown>, ctx?: ToolHandlerContext)
           bundleId: `echo:${String(params.text ?? '')}`,
         },
       },
-      schema: 'bundle-id',
-      schemaVersion: '1.0.0',
+      schema: BUNDLE_ID_STRUCTURED_OUTPUT_SCHEMA,
+      schemaVersion: PROBE_SCHEMA_VERSION,
     };
   }
   return Promise.resolve(undefined);

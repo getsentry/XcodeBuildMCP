@@ -7,6 +7,8 @@ import { __resetToolRegistryForTests } from '../../utils/tool-registry.ts';
 import { __resetMcpInstrumentationForTests } from '../mcp-instrumentation.ts';
 import {
   createTestRegistrations,
+  PROBE_SCHEMA,
+  PROBE_SCHEMA_VERSION,
   TEST_RESOURCE_URI,
   TEST_TOOL_NAME,
 } from './serving-test-fixtures.ts';
@@ -109,7 +111,8 @@ describe('MCP 2026-07-28 modern era serving', () => {
 
     expect(response.error).toBeUndefined();
     expect(response.result?.structuredContent).toMatchObject({
-      schema: 'bundle-id',
+      schema: PROBE_SCHEMA,
+      schemaVersion: PROBE_SCHEMA_VERSION,
       didError: false,
       data: { artifacts: { bundleId: 'echo:direct' } },
     });
