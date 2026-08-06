@@ -654,6 +654,28 @@ export interface McpProtocolContext {
 }
 
 /**
+ * Builds the `mcp.protocol` Sentry context payload.
+ *
+ * Optional members are omitted rather than emitted empty. `clientCapabilities`
+ * in particular is an array, and an empty array is truthy, so a presence check
+ * alone would publish `clientCapabilities: ''` for every client that declares
+ * no capabilities - which is the common case on the modern era.
+ */
+export function buildMcpProtocolContextPayload(
+  context: McpProtocolContext,
+): Record<string, string> {
+  return {
+    era: context.era,
+    protocolVersion: context.protocolVersion,
+    ...(context.clientName ? { clientName: context.clientName } : {}),
+    ...(context.clientVersion ? { clientVersion: context.clientVersion } : {}),
+    ...(context.clientCapabilities && context.clientCapabilities.length > 0
+      ? { clientCapabilities: context.clientCapabilities.join(',') }
+      : {}),
+  };
+}
+
+/**
  * Records the negotiated protocol identity for the current process.
  *
  * The Sentry MCP integration derives protocol version and client identity from
@@ -670,15 +692,7 @@ export function setMcpProtocolContext(context: McpProtocolContext): void {
     Sentry.setTag('mcp.protocol_version', context.protocolVersion);
     setTagIfDefined('mcp.client.name', context.clientName);
     setTagIfDefined('mcp.client.version', context.clientVersion);
-    Sentry.setContext('mcp.protocol', {
-      era: context.era,
-      protocolVersion: context.protocolVersion,
-      ...(context.clientName ? { clientName: context.clientName } : {}),
-      ...(context.clientVersion ? { clientVersion: context.clientVersion } : {}),
-      ...(context.clientCapabilities
-        ? { clientCapabilities: context.clientCapabilities.join(',') }
-        : {}),
-    });
+    Sentry.setContext('mcp.protocol', buildMcpProtocolContextPayload(context));
   } catch {
     // Observability enrichment is best effort and must never affect serving.
   }

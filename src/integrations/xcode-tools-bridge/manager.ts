@@ -23,8 +23,10 @@ export class XcodeToolsBridgeManager {
   private readonly service: XcodeIdeToolService;
 
   private workflowEnabled = false;
+  private workflowEpoch = 0;
   private lastError: string | null = null;
   private syncInFlight: Promise<ProxySyncResult> | null = null;
+  private syncInFlightEpoch = -1;
   private suppressListChangedSync = false;
 
   constructor(server: McpServer) {
@@ -62,16 +64,41 @@ export class XcodeToolsBridgeManager {
    * off must mean the `xcode_tools_*` tools are gone, otherwise a serving
    * context built after a `manage_workflows` disable would keep serving tools
    * the client just turned off.
+   *
+   * Every transition advances the workflow epoch, which invalidates any sync
+   * that is already in flight so its result can never be written back after the
+   * workflow changed underneath it.
    */
   setWorkflowEnabled(enabled: boolean): void {
     const wasEnabled = this.workflowEnabled;
+    if (wasEnabled === enabled) {
+      return;
+    }
+
     this.workflowEnabled = enabled;
     this.service.setWorkflowEnabled(enabled);
+    this.workflowEpoch += 1;
 
-    if (!enabled && wasEnabled) {
-      this.suppressListChangedSync = true;
-      this.registry.clear();
+    if (enabled) {
+      // Re-enabling must restore listChanged-driven syncing; otherwise the
+      // suppression set by the preceding disable would silently survive and
+      // the proxied catalogue would never refresh again.
+      this.suppressListChangedSync = false;
+      return;
     }
+
+    this.suppressListChangedSync = true;
+    this.registry.clear();
+  }
+
+  /**
+   * Whether a sync started at `epoch` may still write to the registry.
+   *
+   * A sync performs two awaits before it registers anything, and the workflow
+   * can be disabled during either of them.
+   */
+  private isSyncStale(epoch: number): boolean {
+    return epoch !== this.workflowEpoch || !this.workflowEnabled;
   }
 
   async shutdown(): Promise<void> {
@@ -99,45 +126,69 @@ export class XcodeToolsBridgeManager {
       this.suppressListChangedSync = false;
     }
 
-    if (this.syncInFlight) return this.syncInFlight;
+    const epoch = this.workflowEpoch;
 
+    // Only share an in-flight sync with callers from the same epoch. A sync
+    // started before a disable/enable cycle answers for a catalogue the caller
+    // is no longer asking about.
+    if (this.syncInFlight && this.syncInFlightEpoch === epoch) {
+      return this.syncInFlight;
+    }
+
+    const noop: ProxySyncResult = { added: 0, updated: 0, removed: 0, total: 0 };
+
+    this.syncInFlightEpoch = epoch;
     this.syncInFlight = (async (): Promise<ProxySyncResult> => {
-      const bridge = await getMcpBridgeAvailability();
-      if (!bridge.available) {
-        this.lastError = 'mcpbridge not available (xcrun --find mcpbridge failed)';
-        const existingCount = this.registry.getRegisteredCount();
-        this.registry.clear();
-        this.server.sendToolListChanged();
-        return { added: 0, updated: 0, removed: existingCount, total: 0 };
-      }
-
       try {
-        const remoteTools = await this.service.listTools({ refresh: true });
-
-        const sync = this.registry.sync(remoteTools, async (remoteName, args) => {
-          return this.service.invokeTool(remoteName, args);
-        });
-
-        if (opts.reason !== 'listChanged') {
-          log(
-            'info',
-            `[xcode-ide] Synced proxied tools (added=${sync.added}, updated=${sync.updated}, removed=${sync.removed}, total=${sync.total})`,
-          );
+        const bridge = await getMcpBridgeAvailability();
+        if (this.isSyncStale(epoch)) {
+          return noop;
         }
 
-        this.lastError = null;
-        this.server.sendToolListChanged();
+        if (!bridge.available) {
+          this.lastError = 'mcpbridge not available (xcrun --find mcpbridge failed)';
+          const existingCount = this.registry.getRegisteredCount();
+          this.registry.clear();
+          this.server.sendToolListChanged();
+          return { added: 0, updated: 0, removed: existingCount, total: 0 };
+        }
 
-        return sync;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.lastError = message;
-        log('warn', `[xcode-ide] Tool sync failed: ${message}`);
-        this.registry.clear();
-        this.server.sendToolListChanged();
-        return { added: 0, updated: 0, removed: 0, total: 0 };
+        try {
+          const remoteTools = await this.service.listTools({ refresh: true });
+          if (this.isSyncStale(epoch)) {
+            return noop;
+          }
+
+          const sync = this.registry.sync(remoteTools, async (remoteName, args) => {
+            return this.service.invokeTool(remoteName, args);
+          });
+
+          if (opts.reason !== 'listChanged') {
+            log(
+              'info',
+              `[xcode-ide] Synced proxied tools (added=${sync.added}, updated=${sync.updated}, removed=${sync.removed}, total=${sync.total})`,
+            );
+          }
+
+          this.lastError = null;
+          this.server.sendToolListChanged();
+
+          return sync;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (this.isSyncStale(epoch)) {
+            return noop;
+          }
+          this.lastError = message;
+          log('warn', `[xcode-ide] Tool sync failed: ${message}`);
+          this.registry.clear();
+          this.server.sendToolListChanged();
+          return noop;
+        }
       } finally {
-        this.syncInFlight = null;
+        if (this.syncInFlightEpoch === epoch) {
+          this.syncInFlight = null;
+        }
       }
     })();
 
@@ -146,6 +197,9 @@ export class XcodeToolsBridgeManager {
 
   async disconnect(): Promise<void> {
     this.suppressListChangedSync = true;
+    // A manual disconnect is a catalogue transition too: invalidate any sync
+    // already in flight so it cannot re-register the tools just torn down.
+    this.workflowEpoch += 1;
     this.registry.clear();
     this.server.sendToolListChanged();
     await this.service.disconnect();
