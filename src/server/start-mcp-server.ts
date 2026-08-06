@@ -144,6 +144,7 @@ export async function startMcpServer(): Promise<void> {
       requestLifecycle: {
         onRequestStarted: () => idleShutdown?.markRequestStarted(),
         onRequestCompleted: () => idleShutdown?.markRequestCompleted(),
+        onRequestActivity: () => idleShutdown?.markActivity(),
       },
     });
     lifecycle.registerServingHandle(servingHandle);

@@ -141,6 +141,48 @@ describe('MCP server transport request lifecycle instrumentation', () => {
     expect(onRequestCompleted).not.toHaveBeenCalled();
   });
 
+  it('reports activity exactly once when a listen request opens', async () => {
+    const onRequestStarted = vi.fn();
+    const onRequestCompleted = vi.fn();
+    const onRequestActivity = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestStarted,
+      onRequestCompleted,
+      onRequestActivity,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+
+    expect(onRequestActivity).toHaveBeenCalledTimes(1);
+    expect(onRequestStarted).not.toHaveBeenCalled();
+    expect(onRequestCompleted).not.toHaveBeenCalled();
+  });
+
+  it('reports activity for each distinct listen stream', async () => {
+    const onRequestActivity = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({ onRequestActivity });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-1', method: 'subscriptions/listen' });
+    transport.onmessage?.({ jsonrpc: '2.0', id: 'listen-2', method: 'subscriptions/listen' });
+
+    expect(onRequestActivity).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not report activity for ordinary requests', async () => {
+    const onRequestActivity = vi.fn();
+    const onRequestStarted = vi.fn();
+    const { transport } = await createStartedInstrumentedTransport({
+      onRequestActivity,
+      onRequestStarted,
+    });
+
+    transport.onmessage?.({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+
+    expect(onRequestStarted).toHaveBeenCalledTimes(1);
+    expect(onRequestActivity).not.toHaveBeenCalled();
+  });
+
   it('does not double-settle when a listen request is finally answered at teardown', async () => {
     const onRequestStarted = vi.fn();
     const onRequestCompleted = vi.fn();

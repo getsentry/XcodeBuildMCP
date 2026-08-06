@@ -4,9 +4,11 @@ import type { ToolHandlerContext } from '../../rendering/types.ts';
 import type { ServerRegistrations } from '../bootstrap.ts';
 import type { ResourceMeta } from '../../core/resources.ts';
 import { createToolCatalog } from '../../runtime/tool-catalog.ts';
+import type { McpToolRegistrationPlan } from '../../utils/tool-registry.ts';
 import type { ToolDefinition } from '../../runtime/types.ts';
 
 export const TEST_TOOL_NAME = 'probe_echo';
+export const SECOND_TEST_TOOL_NAME = 'probe_second';
 export const TEST_RESOURCE_URI = 'xcodebuildmcp://probe';
 
 const probeSchema = z.object({ text: z.string() }) as unknown as ToolSchemaShape;
@@ -30,11 +32,11 @@ function probeHandler(params: Record<string, unknown>, ctx?: ToolHandlerContext)
   return Promise.resolve(undefined);
 }
 
-function probeToolDefinition(): ToolDefinition {
+function probeToolDefinition(mcpName: string): ToolDefinition {
   return {
-    id: TEST_TOOL_NAME,
-    cliName: 'probe-echo',
-    mcpName: TEST_TOOL_NAME,
+    id: mcpName,
+    cliName: mcpName.replace(/_/g, '-'),
+    mcpName,
     workflow: 'probe',
     description: 'Echoes its input',
     annotations: { readOnlyHint: true },
@@ -44,6 +46,58 @@ function probeToolDefinition(): ToolDefinition {
     stateful: false,
     handler: probeHandler as ToolDefinition['handler'],
   };
+}
+
+function probeToolPlanEntry(mcpName: string): McpToolRegistrationPlan['tools'][number] {
+  return {
+    manifest: {
+      id: mcpName,
+      module: 'probe/echo',
+      names: { mcp: mcpName },
+      description: 'Echoes its input',
+      availability: { mcp: true, cli: false },
+      predicates: [],
+      nextSteps: [],
+      annotations: { readOnlyHint: true },
+    },
+    module: {
+      schema: probeSchema,
+      mcpSchema: probeSchema,
+      handler: probeHandler,
+    },
+  };
+}
+
+/** A second tool, for asserting that a workflow change reaches a new context. */
+export function secondTestToolPlanEntry(): McpToolRegistrationPlan['tools'][number] {
+  return probeToolPlanEntry(SECOND_TEST_TOOL_NAME);
+}
+
+function buildTestToolPlan(mcpNames: string[]): McpToolRegistrationPlan {
+  return {
+    tools: mcpNames.map((name) => probeToolPlanEntry(name)),
+    catalog: createToolCatalog(mcpNames.map((name) => probeToolDefinition(name))),
+    enabledWorkflows: new Set(['probe']),
+    workflowLabel: 'probe',
+  };
+}
+
+/**
+ * The process-level plan the fixture registrations resolve.
+ *
+ * Stands in for the registry that `manage_workflows` rewrites at runtime, so a
+ * test can change the selection and assert that later serving contexts see it.
+ */
+let currentTestPlan: McpToolRegistrationPlan | null = null;
+
+/** Replaces the current plan, as `applyWorkflowSelectionFromManifest` does. */
+export function setCurrentTestPlan(plan: McpToolRegistrationPlan | null): void {
+  currentTestPlan = plan;
+}
+
+/** The plan the fixture registrations currently resolve. */
+export function getCurrentTestPlan(): McpToolRegistrationPlan | null {
+  return currentTestPlan;
 }
 
 /**
@@ -69,31 +123,10 @@ export function createTestRegistrations(
     ],
   ]);
 
+  currentTestPlan = buildTestToolPlan([TEST_TOOL_NAME]);
+
   return {
-    toolPlan: {
-      tools: [
-        {
-          manifest: {
-            id: TEST_TOOL_NAME,
-            module: 'probe/echo',
-            names: { mcp: TEST_TOOL_NAME },
-            description: 'Echoes its input',
-            availability: { mcp: true, cli: false },
-            predicates: [],
-            nextSteps: [],
-            annotations: { readOnlyHint: true },
-          },
-          module: {
-            schema: probeSchema,
-            mcpSchema: probeSchema,
-            handler: probeHandler,
-          },
-        },
-      ],
-      catalog: createToolCatalog([probeToolDefinition()]),
-      enabledWorkflows: new Set(['probe']),
-      workflowLabel: 'probe',
-    },
+    resolveToolPlan: () => currentTestPlan,
     resources,
     xcodeIdeEnabled: false,
     ...overrides,

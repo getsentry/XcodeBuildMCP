@@ -25,14 +25,20 @@ afterEach(async () => {
 });
 
 function createLifecycleCounter(): {
-  observer: { onRequestStarted: () => void; onRequestCompleted: () => void };
+  observer: {
+    onRequestStarted: () => void;
+    onRequestCompleted: () => void;
+    onRequestActivity: () => void;
+  };
   inFlight: () => number;
   started: () => number;
   completed: () => number;
+  activity: () => number;
 } {
   let inFlight = 0;
   let started = 0;
   let completed = 0;
+  let activity = 0;
   return {
     observer: {
       onRequestStarted: (): void => {
@@ -43,10 +49,14 @@ function createLifecycleCounter(): {
         inFlight -= 1;
         completed += 1;
       },
+      onRequestActivity: (): void => {
+        activity += 1;
+      },
     },
     inFlight: () => inFlight,
     started: () => started,
     completed: () => completed,
+    activity: () => activity,
   };
 }
 
@@ -91,8 +101,10 @@ describe('idle-shutdown accounting for entry-served requests', () => {
 
     // The entry answers `subscriptions/listen` with an acknowledgement
     // notification; the JSON-RPC result only arrives at teardown. It must not
-    // pin the idle-shutdown in-flight count.
+    // pin the idle-shutdown in-flight count, but it must still refresh the
+    // idle window so a subscription opened near the deadline is not raced.
     expect(counter.inFlight()).toBe(0);
+    expect(counter.activity()).toBe(1);
     expect(listenId).toBeGreaterThan(0);
   });
 

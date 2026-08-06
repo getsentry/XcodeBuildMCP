@@ -47,7 +47,7 @@ describe('dynamic tool and resource notifications', () => {
     expect(server).toBeDefined();
 
     applyToolPlanToServer(server!, {
-      ...registrations.toolPlan!,
+      ...registrations.resolveToolPlan()!,
       tools: [],
     });
 
@@ -77,7 +77,7 @@ describe('dynamic tool and resource notifications', () => {
     expect(initial.tools.map((tool) => tool.name)).toContain(TEST_TOOL_NAME);
 
     const server = getServer();
-    applyToolPlanToServer(server!, { ...registrations.toolPlan!, tools: [] });
+    applyToolPlanToServer(server!, { ...registrations.resolveToolPlan()!, tools: [] });
 
     await waitFor(() => notified.mock.calls.length > 0);
 
@@ -120,7 +120,7 @@ describe('dynamic tool and resource notifications', () => {
     const server = getServer();
     expect(server).toBeDefined();
 
-    expect(() => applyToolPlanToServer(server!, registrations.toolPlan!)).not.toThrow();
+    expect(() => applyToolPlanToServer(server!, registrations.resolveToolPlan()!)).not.toThrow();
 
     const listed = await peer.request('tools/list', { _meta: modernMeta() });
     expect(

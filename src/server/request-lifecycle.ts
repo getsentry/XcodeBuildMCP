@@ -23,6 +23,14 @@ export interface McpRequestLifecycleObserver {
   onRequestStarted?: () => void;
   onRequestCompleted?: () => void;
   /**
+   * Called once when a long-lived request opens.
+   *
+   * Opening a `subscriptions/listen` stream is real client activity, so it must
+   * restart the idle window, but it is answered out of band and so must never
+   * be counted as in-flight work or the process could never idle out.
+   */
+  onRequestActivity?: () => void;
+  /**
    * Called for every inbound modern-era request. Modern clients never send
    * `initialize`, so this is the only place the protocol revision and the
    * client's declared capabilities are observable at the transport seam.
@@ -56,7 +64,8 @@ function completedRequestIdKey(message: JSONRPCMessage): string | null {
  *   deliberately writes no response for an aborted request;
  * - a long-lived request (`subscriptions/listen`) is answered out-of-band by
  *   the serving entry, so it is tracked separately and never counted as
- *   in-flight work.
+ *   in-flight work. Opening one still reports activity once, so a subscription
+ *   opened near the idle deadline restarts the window instead of racing it.
  */
 export function instrumentMcpRequestLifecycle(
   transport: Transport,
@@ -83,7 +92,10 @@ export function instrumentMcpRequestLifecycle(
       const requestId = requestIdKey(message.id);
 
       if (isLongLivedRequestMethod(message.method)) {
-        longLivedRequestIds.add(requestId);
+        if (!longLivedRequestIds.has(requestId)) {
+          longLivedRequestIds.add(requestId);
+          observer.onRequestActivity?.();
+        }
         return null;
       }
 

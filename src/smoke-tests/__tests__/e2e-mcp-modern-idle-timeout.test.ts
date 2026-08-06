@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const CLI_PATH = join(process.cwd(), 'build/cli.js');
 const MCP_IDLE_TIMEOUT_MS = 1_000;
+const MCP_KEEPALIVE_IDLE_TIMEOUT_MS = 1_500;
+const LISTEN_REFRESH_INTERVAL_MS = 900;
+const LISTEN_REFRESH_ROUNDS = 5;
 const MCP_READY_TIMEOUT_MS = 20_000;
 const MCP_EXIT_WAIT_MS = 15_000;
 const MCP_TEST_TIMEOUT_MS = 45_000;
@@ -108,31 +111,39 @@ class ModernStdioChild {
 
   async awaitResult(id: number, timeoutMs: number): Promise<JsonRpcMessage> {
     return this.awaitMessage(
-      (message) =>
-        message.id === id && (message.result !== undefined || message.error !== undefined),
+      (_message, matches) => matches >= 1,
       timeoutMs,
       `a response to request ${id}`,
+      (message) =>
+        message.id === id && (message.result !== undefined || message.error !== undefined),
     );
   }
 
-  async awaitNotification(method: string, timeoutMs: number): Promise<JsonRpcMessage> {
+  async awaitNotification(
+    method: string,
+    timeoutMs: number,
+    occurrence = 1,
+  ): Promise<JsonRpcMessage> {
     return this.awaitMessage(
-      (message) => message.method === method && message.id === undefined,
+      (_message, matches) => matches >= occurrence,
       timeoutMs,
-      method,
+      `${method} #${occurrence}`,
+      (message) => message.method === method && message.id === undefined,
     );
   }
 
   private async awaitMessage(
-    predicate: (message: JsonRpcMessage) => boolean,
+    accept: (message: JsonRpcMessage, matchCount: number) => boolean,
     timeoutMs: number,
     description: string,
+    filter: (message: JsonRpcMessage) => boolean = () => true,
   ): Promise<JsonRpcMessage> {
     const startedAt = Date.now();
     for (;;) {
-      const found = this.messages.find(predicate);
-      if (found) {
-        return found;
+      const matched = this.messages.filter(filter);
+      const last = matched[matched.length - 1];
+      if (last && accept(last, matched.length)) {
+        return last;
       }
       if (Date.now() - startedAt > timeoutMs) {
         throw new Error(
@@ -223,6 +234,56 @@ describe('MCP modern-era idle timeout e2e', () => {
         params: { requestId: listenId, reason: 'test finished' },
       });
 
+      const exit = await server.waitForExit(MCP_EXIT_WAIT_MS);
+      activeChild = null;
+
+      expect(exit).toEqual({ code: 0, signal: null });
+      expect(server.stderr).toContain('MCP idle timeout reached');
+    },
+    MCP_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'keeps the process alive while listen streams keep opening inside the idle window',
+    async () => {
+      requireBuild();
+      const server = new ModernStdioChild(MCP_KEEPALIVE_IDLE_TIMEOUT_MS);
+      activeChild = server;
+
+      const listId = server.sendRequest('tools/list');
+      await server.awaitResult(listId, MCP_READY_TIMEOUT_MS);
+      const lastOrdinaryRequestAt = Date.now();
+
+      // Open a subscription every time the window is about to lapse, and never
+      // send any other traffic. Opening a stream is real client activity, so it
+      // must refresh the idle window; without that refresh the server shuts
+      // down at the first idle check after `lastOrdinaryRequestAt`.
+      for (let round = 0; round < LISTEN_REFRESH_ROUNDS; round += 1) {
+        await new Promise((resolve) => setTimeout(resolve, LISTEN_REFRESH_INTERVAL_MS));
+
+        if (server.child.exitCode !== null || server.child.signalCode !== null) {
+          throw new Error(
+            `MCP server exited after ${Date.now() - lastOrdinaryRequestAt}ms of listen-only ` +
+              `activity (round ${round}); opening a subscription did not refresh the idle window.`,
+          );
+        }
+
+        server.sendRequest('subscriptions/listen', {
+          notifications: { toolsListChanged: true },
+        });
+        await server.awaitNotification(
+          'notifications/subscriptions/acknowledged',
+          MCP_READY_TIMEOUT_MS,
+          round + 1,
+        );
+      }
+
+      const keptAliveForMs = Date.now() - lastOrdinaryRequestAt;
+      expect(server.child.exitCode).toBeNull();
+      expect(keptAliveForMs).toBeGreaterThan(MCP_KEEPALIVE_IDLE_TIMEOUT_MS * 2);
+
+      // Refreshing is a delay, not a reprieve: once the streams stop opening,
+      // idle shutdown still runs.
       const exit = await server.waitForExit(MCP_EXIT_WAIT_MS);
       activeChild = null;
 

@@ -36,7 +36,16 @@ export interface BootstrapOptions {
  * runtime detection) is done once and replayed cheaply onto each instance.
  */
 export interface ServerRegistrations {
-  toolPlan: McpToolRegistrationPlan | null;
+  /**
+   * Reads the tool registration plan that is current *now*.
+   *
+   * Deliberately a resolver rather than a captured value: `manage_workflows`
+   * rewrites the process-level plan at runtime, and a serving context created
+   * afterwards must serve the new selection. Capturing the plan at startup
+   * would make every later context replay the boot-time workflows and silently
+   * undo the client's selection.
+   */
+  resolveToolPlan: () => McpToolRegistrationPlan | null;
   resources: Map<string, ResourceMeta>;
   xcodeIdeEnabled: boolean;
 }
@@ -108,8 +117,9 @@ export function applyServerRegistrations(
     return {};
   });
 
-  if (registrations.toolPlan) {
-    applyToolPlanToServer(server, registrations.toolPlan);
+  const toolPlan = registrations.resolveToolPlan();
+  if (toolPlan) {
+    applyToolPlanToServer(server, toolPlan);
   }
 
   registerLoadedResources(server, registrations.resources);
@@ -189,7 +199,7 @@ export async function bootstrapServerRuntime(
 
   return {
     registrations: {
-      toolPlan: getToolRegistrationPlan(),
+      resolveToolPlan: getToolRegistrationPlan,
       resources,
       xcodeIdeEnabled,
     },

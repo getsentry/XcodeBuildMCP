@@ -74,6 +74,86 @@ describe('MCP idle shutdown', () => {
     expect(requestShutdown).not.toHaveBeenCalled();
   });
 
+  it('restarts the idle window when activity is reported without in-flight work', async () => {
+    vi.useFakeTimers();
+    const requestShutdown = vi.fn();
+    let now = 0;
+    const controller = createMcpIdleShutdownController({
+      timeoutMs: 1_000,
+      intervalMs: 100,
+      nowMs: () => now,
+      requestShutdown,
+    });
+
+    controller.start();
+
+    // Just short of the deadline: still alive.
+    now = 950;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).not.toHaveBeenCalled();
+
+    // A subscription opens. It is not in-flight work, but it is activity.
+    controller.markActivity();
+    expect(controller.getInFlightRequestCount()).toBe(0);
+
+    // Past the original deadline, but inside the restarted window.
+    now = 1_500;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).not.toHaveBeenCalled();
+
+    // The refreshed window is a delay, not a reprieve: idle shutdown still runs.
+    now = 2_100;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('shuts down at the original deadline when no activity is reported', async () => {
+    vi.useFakeTimers();
+    const requestShutdown = vi.fn();
+    let now = 0;
+    const controller = createMcpIdleShutdownController({
+      timeoutMs: 1_000,
+      intervalMs: 100,
+      nowMs: () => now,
+      requestShutdown,
+    });
+
+    controller.start();
+
+    now = 950;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).not.toHaveBeenCalled();
+
+    now = 1_050;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let reported activity mask in-flight work', async () => {
+    vi.useFakeTimers();
+    const requestShutdown = vi.fn();
+    let now = 0;
+    const controller = createMcpIdleShutdownController({
+      timeoutMs: 1_000,
+      intervalMs: 100,
+      nowMs: () => now,
+      requestShutdown,
+    });
+
+    controller.start();
+    controller.markRequestStarted();
+    controller.markActivity();
+
+    now = 5_000;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).not.toHaveBeenCalled();
+
+    controller.markRequestCompleted();
+    now = 6_100;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(requestShutdown).toHaveBeenCalledTimes(1);
+  });
+
   it('starts an unref interval when enabled', () => {
     const unref = vi.fn();
     const timer = { unref } as unknown as NodeJS.Timeout;

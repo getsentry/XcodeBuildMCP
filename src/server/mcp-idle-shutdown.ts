@@ -18,6 +18,15 @@ export interface McpIdleShutdownController {
   stop(): void;
   markRequestStarted(): void;
   markRequestCompleted(): void;
+  /**
+   * Refreshes the idle window without touching the in-flight count.
+   *
+   * For client interactions that are real activity but are not settle-able
+   * work, such as opening a `subscriptions/listen` stream: the entry answers it
+   * out of band, so it must not be counted as in-flight, but it still means the
+   * client is alive right now and the idle window should restart.
+   */
+  markActivity(): void;
   getInFlightRequestCount(): number;
 }
 
@@ -117,6 +126,10 @@ export function createMcpIdleShutdownController(options: {
 
     markRequestStarted(): void {
       inFlightRequestCount += 1;
+    },
+
+    markActivity(): void {
+      lastRequestCompletedAtMs = nowMs();
     },
 
     markRequestCompleted(): void {
