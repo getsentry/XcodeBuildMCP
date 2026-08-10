@@ -145,6 +145,71 @@ describe('MCP Session Management (e2e)', () => {
     expect(buildCommand).toContain('SessionScheme');
   });
 
+  it('explicit simulator build arguments override session defaults', async () => {
+    await harness.client.callTool({
+      name: 'session_set_defaults',
+      arguments: {
+        scheme: 'DefaultScheme',
+        projectPath: '/default/project.xcodeproj',
+        simulatorId: 'AAAAAAAA-1111-2222-3333-444444444444',
+        configuration: 'Debug',
+      },
+    });
+
+    harness.resetCapturedCommands();
+    const result = await harness.client.callTool({
+      name: 'build_sim',
+      arguments: {
+        scheme: 'ExplicitScheme',
+        projectPath: '/explicit/project.xcodeproj',
+        simulatorName: 'iPhone 17 Pro',
+        configuration: 'Release',
+      },
+    });
+
+    expectContent(result);
+    const commandStrs = harness.capturedCommands.map((command) => command.command.join(' '));
+    const buildCommand = commandStrs.find(
+      (command) => command.includes('xcodebuild') && command.includes('-scheme'),
+    );
+    expect(buildCommand).toBeDefined();
+    expect(buildCommand).toContain('ExplicitScheme');
+    expect(buildCommand).toContain('/explicit/project.xcodeproj');
+    expect(buildCommand).toContain('iPhone 17 Pro');
+    expect(buildCommand).toContain('Release');
+    expect(buildCommand).not.toContain('DefaultScheme');
+    expect(buildCommand).not.toContain('/default/project.xcodeproj');
+  });
+
+  it('accepts typed simulator test selectors', async () => {
+    await harness.client.callTool({
+      name: 'session_set_defaults',
+      arguments: {
+        scheme: 'SessionScheme',
+        projectPath: '/session/project.xcodeproj',
+        simulatorId: 'AAAAAAAA-1111-2222-3333-444444444444',
+      },
+    });
+
+    harness.resetCapturedCommands();
+    const result = await harness.client.callTool({
+      name: 'test_sim',
+      arguments: {
+        onlyTesting: ['MyTests/LoginTests/testSuccess'],
+        skipTesting: ['MyTests/LoginTests/testFailure'],
+      },
+    });
+
+    expectContent(result);
+    const commandStrs = harness.capturedCommands.map((command) => command.command.join(' '));
+    const testCommand = commandStrs.find(
+      (command) => command.includes('xcodebuild') && command.includes(' test'),
+    );
+    expect(testCommand).toBeDefined();
+    expect(testCommand).toContain('-only-testing:MyTests/LoginTests/testSuccess');
+    expect(testCommand).toContain('-skip-testing:MyTests/LoginTests/testFailure');
+  });
+
   it('updating session defaults changes subsequent tool behavior', async () => {
     // Set initial defaults
     await harness.client.callTool({
