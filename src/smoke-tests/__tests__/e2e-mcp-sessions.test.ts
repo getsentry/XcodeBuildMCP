@@ -151,7 +151,7 @@ describe('MCP Session Management (e2e)', () => {
       arguments: {
         scheme: 'DefaultScheme',
         projectPath: '/default/project.xcodeproj',
-        simulatorId: 'AAAAAAAA-1111-2222-3333-444444444444',
+        simulatorId: 'BBBBBBBB-1111-2222-3333-444444444444',
         configuration: 'Debug',
       },
     });
@@ -181,13 +181,14 @@ describe('MCP Session Management (e2e)', () => {
     expect(buildCommand).not.toContain('/default/project.xcodeproj');
   });
 
-  it('accepts typed simulator test selectors', async () => {
+  it('explicit simulator test arguments and selectors override session defaults', async () => {
     await harness.client.callTool({
       name: 'session_set_defaults',
       arguments: {
-        scheme: 'SessionScheme',
-        projectPath: '/session/project.xcodeproj',
+        scheme: 'DefaultScheme',
+        projectPath: '/default/project.xcodeproj',
         simulatorId: 'AAAAAAAA-1111-2222-3333-444444444444',
+        configuration: 'Debug',
       },
     });
 
@@ -195,6 +196,10 @@ describe('MCP Session Management (e2e)', () => {
     const result = await harness.client.callTool({
       name: 'test_sim',
       arguments: {
+        scheme: 'WorktreeScheme',
+        projectPath: '/worktree/project.xcodeproj',
+        simulatorName: 'iPhone 17 Pro',
+        configuration: 'Release',
         onlyTesting: ['MyTests/LoginTests/testSuccess'],
         skipTesting: ['MyTests/LoginTests/testFailure'],
       },
@@ -202,12 +207,23 @@ describe('MCP Session Management (e2e)', () => {
 
     expectContent(result);
     const commandStrs = harness.capturedCommands.map((command) => command.command.join(' '));
-    const testCommand = commandStrs.find(
+    const buildForTestingCommand = commandStrs.find((command) =>
+      command.includes('build-for-testing'),
+    );
+    const testWithoutBuildingCommand = commandStrs.find(
       (command) => command.includes('xcodebuild') && command.includes(' test'),
     );
-    expect(testCommand).toBeDefined();
-    expect(testCommand).toContain('-only-testing:MyTests/LoginTests/testSuccess');
-    expect(testCommand).toContain('-skip-testing:MyTests/LoginTests/testFailure');
+    expect(buildForTestingCommand).toBeDefined();
+    expect(buildForTestingCommand).toContain('WorktreeScheme');
+    expect(buildForTestingCommand).toContain('/worktree/project.xcodeproj');
+    expect(buildForTestingCommand).toContain('Release');
+    expect(buildForTestingCommand).toContain('AAAAAAAA-1111-2222-3333-444444444444');
+    expect(testWithoutBuildingCommand).toBeDefined();
+    expect(testWithoutBuildingCommand).toContain('-only-testing:MyTests/LoginTests/testSuccess');
+    expect(testWithoutBuildingCommand).toContain('-skip-testing:MyTests/LoginTests/testFailure');
+    expect(commandStrs.join('\n')).not.toContain('DefaultScheme');
+    expect(commandStrs.join('\n')).not.toContain('/default/project.xcodeproj');
+    expect(commandStrs.join('\n')).not.toContain('BBBBBBBB-1111-2222-3333-444444444444');
   });
 
   it('updating session defaults changes subsequent tool behavior', async () => {
