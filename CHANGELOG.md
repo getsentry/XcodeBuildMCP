@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed simulator build, build-and-run, and test MCP calls silently discarding explicit project, scheme, destination, and configuration arguments when session defaults were set. Explicit values now override defaults, and `test_sim` accepts typed `onlyTesting` and `skipTesting` selectors ([#509](https://github.com/getsentry/XcodeBuildMCP/issues/509)).
+
 ### Changed
 
 - Dictionary-shaped MCP inputs now use client-compatible wire representations ([#491](https://github.com/getsentry/XcodeBuildMCP/issues/491)). The `env` and `testRunnerEnv` inputs on build, launch, test, and session-default tools are arrays of `{ "key": "...", "value": "..." }` entries, while `xcode_ide_call_tool.arguments` is a JSON object string. XcodeBuildMCP converts these values to their existing internal objects only after MCP input validation.
