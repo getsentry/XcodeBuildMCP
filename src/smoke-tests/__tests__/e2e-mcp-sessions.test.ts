@@ -187,7 +187,7 @@ describe('MCP Session Management (e2e)', () => {
       arguments: {
         scheme: 'DefaultScheme',
         projectPath: '/default/project.xcodeproj',
-        simulatorId: 'AAAAAAAA-1111-2222-3333-444444444444',
+        simulatorId: 'BBBBBBBB-1111-2222-3333-444444444444',
         configuration: 'Debug',
       },
     });
